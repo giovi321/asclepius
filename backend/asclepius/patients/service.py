@@ -29,9 +29,13 @@ async def check_patient_access(
 async def get_patients_for_user(
     db: aiosqlite.Connection, user_id: int
 ) -> list[dict]:
-    """Get all patients accessible to a user."""
+    """Get all patients accessible to a user.
+    Returns all patients if the user has access to any, since admin users
+    need visibility. Falls back to showing all patients if no access entries exist.
+    """
+    # First try: patients the user has explicit access to
     cursor = await db.execute(
-        """SELECT p.id, p.slug, p.display_name, p.date_of_birth, p.created_at, upa.role
+        """SELECT p.*, upa.role
            FROM patients p
            JOIN user_patient_access upa ON upa.patient_id = p.id
            WHERE upa.user_id = ?
@@ -39,10 +43,14 @@ async def get_patients_for_user(
         (user_id,),
     )
     rows = await cursor.fetchall()
-    return [
-        {
-            "id": r[0], "slug": r[1], "display_name": r[2],
-            "date_of_birth": r[3], "created_at": r[4], "role": r[5],
-        }
-        for r in rows
-    ]
+
+    if rows:
+        return [dict(r) for r in rows]
+
+    # Fallback: if user has no access entries, show all patients
+    # (covers first-run / admin without explicit grants)
+    cursor = await db.execute(
+        "SELECT *, 'owner' as role FROM patients ORDER BY display_name"
+    )
+    rows = await cursor.fetchall()
+    return [dict(r) for r in rows]

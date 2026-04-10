@@ -6,6 +6,8 @@
 
 CLASSIFICATION_PROMPT = """You are a medical document classifier. Analyze the OCR text and extract basic metadata.
 
+NOTE: The OCR text may be in Markdown format (with headers like #, tables with |, etc.) from an AI-based OCR engine. Parse it as structured text.
+
 CRITICAL: Patient identification rules:
 - The PATIENT is the person RECEIVING care, NOT the doctor/provider/sender.
 - On invoices: the patient is the person being BILLED. The letterhead is the FACILITY.

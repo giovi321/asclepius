@@ -102,6 +102,56 @@ async def _extract_type_specific(llm: LLMProvider, ocr_text: str, doc_type: str,
         return {}
 
 
+VALID_DOC_TYPES = {
+    "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
+    "insurance_claim", "insurance_doc", "referral", "discharge",
+    "specialist_report", "radiology_report", "pathology_report",
+    "surgical_report", "er_report", "vaccination", "allergy", "sick_leave",
+    "medical_cert", "physio_report", "dental", "ophthalmology",
+    "mental_health", "consent", "advance_directive", "imaging_dicom",
+    "imaging_other", "correspondence", "other",
+}
+
+# Fuzzy mapping for common LLM mistakes
+_DOC_TYPE_ALIASES = {
+    "blood test": "bloodtest", "blood_test": "bloodtest", "lab": "bloodtest",
+    "lab test": "bloodtest", "lab_test": "bloodtest", "laboratory": "bloodtest",
+    "report": "specialist_report", "visit": "specialist_report",
+    "consultation": "specialist_report", "checkup": "specialist_report",
+    "follow-up": "specialist_report", "follow_up_report": "specialist_report",
+    "specialist": "specialist_report", "visit_report": "specialist_report",
+    "medical_report": "specialist_report", "clinical_report": "specialist_report",
+    "bill": "invoice", "fattura": "invoice", "rechnung": "invoice",
+    "receipt_payment": "receipt", "payment": "receipt",
+    "discharge_letter": "discharge", "discharge_summary": "discharge",
+    "radiology": "radiology_report", "xray": "radiology_report",
+    "x-ray": "radiology_report", "imaging_report": "radiology_report",
+    "pathology": "pathology_report", "histology": "pathology_report",
+    "surgery": "surgical_report", "operation": "surgical_report",
+    "emergency": "er_report", "er": "er_report",
+    "vaccine": "vaccination", "immunization": "vaccination",
+    "referral_letter": "referral", "letter": "correspondence",
+    "sick_note": "sick_leave", "certificate": "medical_cert",
+}
+
+
+def _normalize_doc_type(raw: str | None) -> str:
+    """Normalize a doc_type from LLM output to a valid code."""
+    if not raw:
+        return "other"
+    cleaned = raw.strip().lower().replace(" ", "_").replace("-", "_")
+    if cleaned in VALID_DOC_TYPES:
+        return cleaned
+    if cleaned in _DOC_TYPE_ALIASES:
+        return _DOC_TYPE_ALIASES[cleaned]
+    # Partial match
+    for alias, code in _DOC_TYPE_ALIASES.items():
+        if alias in cleaned or cleaned in alias:
+            return code
+    logger.warning("Unknown doc_type '%s', defaulting to 'other'", raw)
+    return "other"
+
+
 async def classify_and_extract(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -137,8 +187,11 @@ async def classify_and_extract(
             await db.commit()
             return classification
 
+        # Normalize doc_type to valid code
+        doc_type = _normalize_doc_type(classification.get("doc_type", "other"))
+        classification["doc_type"] = doc_type
+
         # Phase 2: Type-specific extraction
-        doc_type = classification.get("doc_type", "other")
         logger.info("Phase 2 — extracting type-specific data for doc %d (type=%s)", doc_id, doc_type)
         type_extraction = await _extract_type_specific(llm, ocr_text, doc_type, context)
 

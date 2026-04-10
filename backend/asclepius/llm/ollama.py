@@ -76,14 +76,17 @@ class OllamaProvider(LLMProvider):
             return select_match.group(1).strip()
         return response_text.strip()
 
-    async def _generate(self, prompt: str) -> str:
+    async def _generate(self, prompt: str, force_json: bool = True) -> str:
         logger.debug("Ollama _generate: model=%s, prompt_len=%d, url=%s", self.model, len(prompt), self.base_url)
         # Separate timeouts: short connect, long read (LLM can take minutes)
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
+        payload = {"model": self.model, "prompt": prompt, "stream": False}
+        if force_json:
+            payload["format"] = "json"
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/api/generate",
-                json={"model": self.model, "prompt": prompt, "stream": False},
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()
@@ -111,10 +114,18 @@ class OllamaProvider(LLMProvider):
         # Try to find JSON object
         brace_match = re.search(r"\{.*\}", text, re.DOTALL)
         if brace_match:
+            raw = brace_match.group(0)
             try:
-                return json.loads(brace_match.group(0))
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+            # Fix common LLM JSON issues: trailing commas, single quotes
+            fixed = re.sub(r",\s*([}\]])", r"\1", raw)  # trailing commas
+            fixed = re.sub(r"'", '"', fixed)  # single quotes to double
+            try:
+                return json.loads(fixed)
             except json.JSONDecodeError:
                 pass
 
-        logger.warning("Failed to parse JSON from LLM response")
+        logger.warning("Failed to parse JSON from LLM response: %s", text[:200])
         return {"error": "Failed to parse extraction", "raw_response": text[:500]}

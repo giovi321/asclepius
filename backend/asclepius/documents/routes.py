@@ -47,25 +47,13 @@ async def upload_document(
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Create document record immediately via a proper DB connection
-    import os
-    import aiosqlite
-    from asclepius.documents.service import compute_file_hash
-    try:
-        file_hash = compute_file_hash(str(dest))
-        file_size = os.path.getsize(str(dest))
-        async with aiosqlite.connect(config.database.path) as db:
-            await db.execute("PRAGMA journal_mode=WAL")
-            await db.execute("PRAGMA foreign_keys=ON")
-            await db.execute(
-                """INSERT INTO documents
-                   (file_path, original_filename, file_hash, file_size, patient_id, date_received, status)
-                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{dest.name}", original_name, file_hash, file_size, patient_id),
-            )
-            await db.commit()
-    except Exception:
-        pass  # Pipeline will create the record if this fails
+    # Write patient_id hint as a sidecar file so the pipeline can read it
+    if patient_id:
+        hint_path = Path(str(dest) + ".patient_hint")
+        hint_path.write_text(str(patient_id))
+
+    # The pipeline watcher will detect the file, create the DB record,
+    # and process it. No DB record created here to avoid duplicates.
 
     return {"filename": dest.name, "status": "pending", "message": "File uploaded and queued for processing"}
 

@@ -143,13 +143,23 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         pipeline_status["last_processed"] = path.name
                     return
 
+                # Check for patient_id hint from upload
+                hint_patient_id = None
+                hint_path = Path(str(path) + ".patient_hint")
+                if hint_path.exists():
+                    try:
+                        hint_patient_id = int(hint_path.read_text().strip())
+                    except (ValueError, OSError):
+                        pass
+                    hint_path.unlink(missing_ok=True)
+
                 # Create new document record
                 cursor = await db.execute(
                     """INSERT INTO documents
                        (file_path, original_filename, file_hash, file_size, page_count,
-                        date_received, status)
-                       VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
-                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
+                        patient_id, date_received, status)
+                       VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'processing')""",
+                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id),
                 )
                 doc_id = cursor.lastrowid
                 await db.commit()

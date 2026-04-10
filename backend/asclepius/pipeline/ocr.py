@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 
+import httpx
 import fitz  # pymupdf
 import pytesseract
 from PIL import Image
@@ -15,10 +16,19 @@ logger = logging.getLogger(__name__)
 async def extract_text(file_path: str, config: AppConfig) -> tuple[str, float, str]:
     """Extract text from a file using OCR.
 
+    Routes to the appropriate engine based on config.ocr.engine:
+    - 'tesseract': local Tesseract OCR (default)
+    - 'tesseract_remote': remote Tesseract server
+    - 'google_vision': Google Cloud Vision API
+
     Returns: (text, confidence, engine_used)
     """
     path = Path(file_path)
     ext = path.suffix.lower()
+
+    # Remote OCR — send the file directly
+    if config.ocr.engine == "tesseract_remote" and config.ocr.remote_url:
+        return await _extract_remote_ocr(file_path, config)
 
     if ext == ".pdf":
         return await _extract_from_pdf(path, config)
@@ -50,11 +60,21 @@ async def _extract_from_pdf(path: Path, config: AppConfig) -> tuple[str, float, 
 
     # Fall back to OCR — render pages as images
     doc = fitz.open(str(path))
+    total_pages = len(doc)
     ocr_parts = []
     total_confidence = 0.0
     page_count = 0
 
-    for page in doc:
+    # For large documents (>20 pages), process page by page with progress tracking
+    from asclepius.pipeline.processor import pipeline_status
+
+    if total_pages > 20:
+        pipeline_status["processing_pages"] = total_pages
+
+    for page_idx, page in enumerate(doc):
+        if total_pages > 20:
+            pipeline_status["processing_page_current"] = page_idx + 1
+
         pix = page.get_pixmap(dpi=300)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
@@ -103,3 +123,45 @@ async def _extract_from_image(path: Path, config: AppConfig) -> tuple[str, float
     avg_confidence = (sum(confidences) / len(confidences) / 100.0) if confidences else 0.0
 
     return text, avg_confidence, "tesseract"
+
+
+async def _extract_remote_ocr(file_path: str, config: AppConfig) -> tuple[str, float, str]:
+    """Send file to a remote Tesseract OCR server.
+
+    The remote server is expected to accept POST with a file upload
+    and return JSON: {"text": "...", "confidence": 0.95}
+    """
+    path = Path(file_path)
+    logger.info("Sending %s to remote OCR server: %s", path.name, config.ocr.remote_url)
+
+    headers = {}
+    if config.ocr.remote_api_key:
+        headers["Authorization"] = f"Bearer {config.ocr.remote_api_key}"
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            with open(file_path, "rb") as f:
+                files = {"file": (path.name, f, "application/octet-stream")}
+                params = {"language": config.ocr.language}
+                response = await client.post(
+                    config.ocr.remote_url,
+                    files=files,
+                    params=params,
+                    headers=headers,
+                )
+                response.raise_for_status()
+
+            result = response.json()
+            text = result.get("text", "")
+            confidence = float(result.get("confidence", 0.0))
+            return text, confidence, "tesseract_remote"
+
+    except Exception as e:
+        logger.error("Remote OCR failed for %s: %s — falling back to local", path.name, e)
+        # Fallback to local Tesseract
+        ext = path.suffix.lower()
+        if ext == ".pdf":
+            return await _extract_from_pdf(path, config)
+        elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+            return await _extract_from_image(path, config)
+        return "", 0.0, "none"

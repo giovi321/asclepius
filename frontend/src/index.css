@@ -53,4 +53,20 @@
     @apply bg-background text-foreground;
     font-family: system-ui, -apple-system, sans-serif;
   }
+  /* Fix native form elements in dark mode */
+  select, input, textarea {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+  }
+  select option {
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0);
+  }
+  .dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }

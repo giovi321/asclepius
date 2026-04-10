@@ -2,6 +2,17 @@
 
 EXTRACTION_PROMPT = """You are a medical document parser. Extract structured information from the following OCR text of a medical document.
 
+CRITICAL: Document classification rules (doc_type). Read the document carefully before classifying:
+- "specialist_report" = any visit report, consultation, checkup, follow-up, "visita di controllo", "referto", "Befund". This is the MOST COMMON type.
+- "bloodtest" = ONLY if the document contains a table/list of lab test values with numbers and units
+- "prescription" = ONLY if the document is a prescription/recipe for medications ("ricetta", "Rezept")
+- "invoice" = ONLY if the document contains prices, amounts, payment details, or billing codes
+- "discharge" = hospital discharge letter ("lettera di dimissione", "Austrittsbrief")
+- "radiology_report" = radiology/imaging report with findings from X-ray, CT, MRI, ultrasound
+- "referral" = a letter referring the patient to another doctor/specialist
+- Look for the document TITLE or HEADING first — it usually tells you the type directly.
+- When in doubt, use "specialist_report" rather than "prescription" or "other".
+
 Known patients: {patient_list}
 Known facilities: {facility_list}
 Known doctors: {doctor_list}
@@ -80,10 +91,20 @@ Respond in JSON only. No markdown, no explanation.
     }}
   ],
   "cost": {{
-    "amount": null,
+    "total_amount": null,
     "currency": "ISO 4217 code",
+    "subtotal": null,
+    "tax_amount": null,
+    "tax_rate": null,
     "line_items": [
-      {{"description": "string", "amount": 0}}
+      {{
+        "description": "string",
+        "quantity": 1,
+        "unit_price": null,
+        "amount": 0,
+        "tariff_code": "string or null",
+        "category": "consultation|procedure|medication|lab|imaging|admin|other"
+      }}
     ]
   }},
   "insurance": {{

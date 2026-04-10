@@ -123,9 +123,13 @@ async def extract_and_store(
         updates["summary_en"] = extraction["summary_en"]
     if extraction.get("summary_original"):
         updates["summary_original"] = extraction["summary_original"]
-    if extraction.get("cost", {}).get("amount"):
-        updates["cost_amount"] = extraction["cost"]["amount"]
-        updates["cost_currency"] = extraction["cost"].get("currency")
+    cost_data = extraction.get("cost", {})
+    if cost_data.get("total_amount"):
+        updates["cost_amount"] = cost_data["total_amount"]
+        updates["cost_currency"] = cost_data.get("currency")
+    elif cost_data.get("amount"):
+        updates["cost_amount"] = cost_data["amount"]
+        updates["cost_currency"] = cost_data.get("currency")
 
     # Insurance info from extraction
     insurance = extraction.get("insurance", {})
@@ -253,8 +257,68 @@ async def extract_and_store(
                  vax.get("dose_number"), vax.get("date_administered")),
             )
 
+    # Insert invoice line items (not gated on patient_id — invoices may not have a patient)
+    cost_data = extraction.get("cost", {})
+    for item in cost_data.get("line_items", []):
+        if not item.get("description"):
+            continue
+        await db.execute(
+            """INSERT INTO invoice_items
+               (document_id, patient_id, description, quantity, unit_price,
+                amount, currency, tariff_code, tax_rate, category)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (doc_id, patient_id, item["description"],
+             item.get("quantity", 1), item.get("unit_price"),
+             item.get("amount"), cost_data.get("currency", "CHF"),
+             item.get("tariff_code"), cost_data.get("tax_rate"),
+             item.get("category")),
+        )
+
     await db.commit()
     return extraction
+
+
+def normalize_name(name: str) -> str:
+    """Normalize doctor/facility name capitalization.
+
+    - Title-cases the name
+    - Handles common prefixes: "Dr.", "Prof.", "Dr. med."
+    - Handles particles: "von", "della", "de" stay lowercase
+    - Example: "GIOVANNI CRAPELLI" -> "Giovanni Crapelli"
+    - Example: "dr. hans müller" -> "Dr. Hans Müller"
+    - Example: "prof. dr. med. anna von berg" -> "Prof. Dr. med. Anna von Berg"
+    """
+    if not name:
+        return name
+
+    # Particles that should stay lowercase (when not at start)
+    particles = {"von", "della", "del", "de", "di", "van", "den", "der", "la", "le", "da"}
+    # Prefixes that have specific capitalization
+    prefix_map = {
+        "dr.": "Dr.",
+        "dr": "Dr.",
+        "prof.": "Prof.",
+        "prof": "Prof.",
+        "med.": "med.",
+        "med": "med.",
+        "ing.": "Ing.",
+        "ing": "Ing.",
+    }
+
+    words = name.split()
+    result = []
+    for i, word in enumerate(words):
+        lower = word.lower().rstrip(".")
+        lower_with_dot = word.lower()
+
+        if lower_with_dot in prefix_map:
+            result.append(prefix_map[lower_with_dot])
+        elif i > 0 and lower in particles:
+            result.append(lower)
+        else:
+            result.append(word.capitalize())
+
+    return " ".join(result)
 
 
 async def _match_patient(db: aiosqlite.Connection, name: str | None) -> int | None:
@@ -300,7 +364,7 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
     """Insert or get existing facility."""
     from asclepius.patients.service import slugify
 
-    name = facility_data["name"]
+    name = normalize_name(facility_data["name"])
     slug = slugify(name)
 
     cursor = await db.execute("SELECT id FROM facilities WHERE slug = ?", (slug,))
@@ -325,7 +389,7 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
     """Insert or get existing doctor."""
     from asclepius.patients.service import slugify
 
-    name = doctor_data["name"]
+    name = normalize_name(doctor_data["name"])
     slug = slugify(name)
 
     cursor = await db.execute("SELECT id FROM doctors WHERE slug = ?", (slug,))

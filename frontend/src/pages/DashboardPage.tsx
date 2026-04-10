@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [stats, setStats] = useState({ total: 0, pending: 0, unclassified: 0 });
 
-  useEffect(() => {
+  const fetchData = () => {
     const params: Record<string, any> = { limit: 10 };
     if (selectedPatient) params.patient_id = selectedPatient.id;
 
@@ -36,13 +36,18 @@ export default function DashboardPage() {
       setStats((s) => ({ ...s, pending: res.data.total || 0 }));
     });
 
-    api
-      .get("/documents", { params: { limit: 1 } })
-      .then((_res) => {
-        // TODO: count unclassified documents
-      });
+    api.get("/documents", { params: { status: "processing", limit: 1 } }).then((res) => {
+      setStats((s) => ({ ...s, pending: s.pending + (res.data.total || 0) }));
+    });
 
     api.get("/pipeline/status").then((res) => setPipeline(res.data));
+  };
+
+  useEffect(() => {
+    fetchData();
+    // Auto-refresh every 5 seconds to show pipeline progress
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, [selectedPatient]);
 
   return (
@@ -78,20 +83,37 @@ export default function DashboardPage() {
       </div>
 
       {/* Pipeline status */}
-      {pipeline && (pipeline.processing || pipeline.recent_errors.length > 0) && (
+      {pipeline && (
         <div className="rounded-lg border p-4">
           <h2 className="mb-2 font-medium">Pipeline Status</h2>
-          {pipeline.processing && (
-            <p className="text-sm text-muted-foreground">
-              Processing: <span className="font-medium">{pipeline.processing}</span>
-            </p>
+          {pipeline.processing ? (
+            <div className="space-y-1">
+              <p className="text-sm">
+                Processing: <span className="font-medium">{pipeline.processing}</span>
+              </p>
+              {pipeline.processing_step && (
+                <p className="text-xs text-muted-foreground">
+                  Step: <span className="font-medium">{pipeline.processing_step}</span>
+                  {pipeline.processing_pages && pipeline.processing_page_current != null && (
+                    <span> — page {pipeline.processing_page_current}/{pipeline.processing_pages}</span>
+                  )}
+                </p>
+              )}
+              {pipeline.queued_files?.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Queue: {pipeline.queued_files.length} file(s) waiting
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Idle</p>
           )}
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Processed: {pipeline.total_processed} | Errors: {pipeline.total_errors}
           </p>
-          {pipeline.recent_errors.length > 0 && (
+          {pipeline.recent_errors?.length > 0 && (
             <div className="mt-2 space-y-1">
-              {pipeline.recent_errors.slice(-3).map((err, i) => (
+              {pipeline.recent_errors.slice(-3).map((err: any, i: number) => (
                 <p key={i} className="text-xs text-destructive">
                   {err.file}: {err.error}
                 </p>

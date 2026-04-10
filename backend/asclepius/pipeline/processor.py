@@ -20,11 +20,19 @@ logger = logging.getLogger(__name__)
 pipeline_status = {
     "queue_depth": 0,
     "processing": None,
+    "processing_step": None,  # 'ocr', 'llm_extraction', 'organizing'
+    "processing_doc_id": None,
+    "processing_pages": None,
+    "processing_page_current": None,
     "last_processed": None,
     "total_processed": 0,
     "total_errors": 0,
     "recent_errors": [],
+    "queued_files": [],  # list of {filename, size} in queue
 }
+
+# Set of doc IDs that have been requested for cancellation
+cancelled_docs: set[int] = set()
 
 
 def get_llm_provider(config: AppConfig):
@@ -76,6 +84,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
         return
 
     pipeline_status["processing"] = path.name
+    pipeline_status["processing_step"] = None
+    pipeline_status["processing_doc_id"] = None
+    pipeline_status["processing_pages"] = None
+    pipeline_status["processing_page_current"] = None
     pipeline_status["queue_depth"] = max(0, pipeline_status["queue_depth"] - 1)
 
     logger.info("Processing: %s", path.name)
@@ -142,7 +154,22 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["last_processed"] = path.name
                 return
 
+            # Check cancellation
+            if doc_id in cancelled_docs:
+                cancelled_docs.discard(doc_id)
+                await db.execute(
+                    "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (doc_id,),
+                )
+                await db.commit()
+                logger.info("Processing cancelled for doc %d", doc_id)
+                pipeline_status["processing"] = None
+                return
+
             # OCR
+            pipeline_status["processing_step"] = "ocr"
+            pipeline_status["processing_doc_id"] = doc_id
+            pipeline_status["processing_pages"] = page_count
             logger.info("Running OCR on doc %d: %s", doc_id, path.name)
             ocr_text, confidence, engine = await extract_text(file_path, config)
 
@@ -171,10 +198,29 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     "Low OCR confidence (%.2f) for %s", confidence, path.name
                 )
 
+            # Check cancellation before LLM extraction
+            if doc_id in cancelled_docs:
+                cancelled_docs.discard(doc_id)
+                await db.execute(
+                    "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (doc_id,),
+                )
+                await db.commit()
+                logger.info("Processing cancelled for doc %d", doc_id)
+                pipeline_status["processing"] = None
+                return
+
             # LLM extraction
+            pipeline_status["processing_step"] = "llm_extraction"
             logger.info("Running LLM extraction on doc %d", doc_id)
             llm = get_llm_provider(config)
-            extraction = await extract_and_store(db, llm, doc_id, ocr_text, config)
+
+            # Chunked LLM extraction for very long texts
+            if len(ocr_text) > 15000:
+                logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
+                extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
+            else:
+                extraction = await extract_and_store(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
                 pipeline_status["total_errors"] += 1
@@ -184,6 +230,21 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 })
                 pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
                 return
+
+            # Check cancellation before organizing
+            if doc_id in cancelled_docs:
+                cancelled_docs.discard(doc_id)
+                await db.execute(
+                    "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (doc_id,),
+                )
+                await db.commit()
+                logger.info("Processing cancelled for doc %d", doc_id)
+                pipeline_status["processing"] = None
+                return
+
+            # Organize file
+            pipeline_status["processing_step"] = "organizing"
 
             # Get document metadata for file organization
             cursor = await db.execute(
@@ -249,6 +310,105 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pass
 
     pipeline_status["processing"] = None
+    pipeline_status["processing_step"] = None
+    pipeline_status["processing_doc_id"] = None
+    pipeline_status["processing_pages"] = None
+    pipeline_status["processing_page_current"] = None
+
+
+async def _chunked_extract_and_store(
+    db: aiosqlite.Connection,
+    llm,
+    doc_id: int,
+    ocr_text: str,
+    config: AppConfig,
+) -> dict:
+    """Split long text into overlapping chunks, extract from each, and merge results."""
+    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
+
+    chunk_size = 10000
+    overlap = 1000
+    chunks = []
+    start = 0
+    while start < len(ocr_text):
+        end = start + chunk_size
+        chunks.append(ocr_text[start:end])
+        start = end - overlap
+
+    logger.info("Splitting doc %d into %d chunks for LLM extraction", doc_id, len(chunks))
+
+    # Extract first chunk normally (this writes to DB)
+    extraction = await extract_and_store(db, llm, doc_id, chunks[0], config)
+    if "error" in extraction:
+        return extraction
+
+    # Extract remaining chunks and merge
+    context = await build_extraction_context(db)
+    for i, chunk in enumerate(chunks[1:], start=2):
+        logger.info("Extracting chunk %d/%d for doc %d", i, len(chunks), doc_id)
+        try:
+            chunk_extraction = await llm.extract(chunk, context)
+            if "error" in chunk_extraction:
+                continue
+            extraction = _merge_extractions(extraction, chunk_extraction)
+        except Exception:
+            logger.exception("Chunk %d extraction failed for doc %d", i, doc_id)
+
+    return extraction
+
+
+def _merge_extractions(base: dict, additional: dict) -> dict:
+    """Merge additional extraction results into the base, deduplicating."""
+    # Merge lab results — deduplicate by test_name_original
+    existing_labs = {lr.get("test_name_original") for lr in base.get("lab_results", [])}
+    for lab in additional.get("lab_results", []):
+        if lab.get("test_name_original") not in existing_labs:
+            base.setdefault("lab_results", []).append(lab)
+            existing_labs.add(lab.get("test_name_original"))
+
+    # Merge medications — deduplicate by brand_name + active_ingredient_original
+    existing_meds = {
+        (m.get("brand_name"), m.get("active_ingredient_original"))
+        for m in base.get("medications", [])
+    }
+    for med in additional.get("medications", []):
+        key = (med.get("brand_name"), med.get("active_ingredient_original"))
+        if key not in existing_meds:
+            base.setdefault("medications", []).append(med)
+            existing_meds.add(key)
+
+    # Merge diagnoses — deduplicate by diagnosis_original
+    existing_diags = {d.get("diagnosis_original") for d in base.get("diagnoses", [])}
+    for diag in additional.get("diagnoses", []):
+        if diag.get("diagnosis_original") not in existing_diags:
+            base.setdefault("diagnoses", []).append(diag)
+            existing_diags.add(diag.get("diagnosis_original"))
+
+    # Merge vaccinations — deduplicate by vaccine_name + date_administered
+    existing_vax = {
+        (v.get("vaccine_name"), v.get("date_administered"))
+        for v in base.get("vaccinations", [])
+    }
+    for vax in additional.get("vaccinations", []):
+        key = (vax.get("vaccine_name"), vax.get("date_administered"))
+        if key not in existing_vax:
+            base.setdefault("vaccinations", []).append(vax)
+            existing_vax.add(key)
+
+    # Merge cost line items — deduplicate by description + amount
+    base_cost = base.get("cost", {})
+    add_cost = additional.get("cost", {})
+    existing_items = {
+        (li.get("description"), li.get("amount"))
+        for li in base_cost.get("line_items", [])
+    }
+    for item in add_cost.get("line_items", []):
+        key = (item.get("description"), item.get("amount"))
+        if key not in existing_items:
+            base_cost.setdefault("line_items", []).append(item)
+            existing_items.add(key)
+
+    return base
 
 
 async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
@@ -296,7 +456,7 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
             return {"error": "No text could be extracted"}
 
         # Clear old extracted data
-        for table in ["lab_results", "encounters", "medications", "vaccinations"]:
+        for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
 
         await db.execute(

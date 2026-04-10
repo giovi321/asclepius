@@ -44,9 +44,11 @@ class OidcConfig(BaseModel):
 
 
 class OcrConfig(BaseModel):
-    engine: str = "tesseract"
+    engine: str = "tesseract"  # 'tesseract', 'tesseract_remote', 'google_vision'
     language: str = "eng+ita+deu"
     confidence_threshold: float = 0.7
+    remote_url: str = ""  # URL for remote OCR server
+    remote_api_key: str = ""
     cloud_ocr_enabled: bool = False
     google_vision_key: str = ""
 

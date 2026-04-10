@@ -2,9 +2,10 @@
 
 import asyncio
 import logging
+import os
 import threading
 from pathlib import Path
-from queue import Queue, Empty
+from queue import PriorityQueue, Empty
 
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 from watchdog.observers import Observer
@@ -23,7 +24,7 @@ SUPPORTED_EXTENSIONS = {
 class InboxHandler(FileSystemEventHandler):
     """Handles new files appearing in the inbox directory."""
 
-    def __init__(self, queue: Queue):
+    def __init__(self, queue: PriorityQueue):
         self.queue = queue
 
     def on_created(self, event: FileCreatedEvent) -> None:
@@ -42,10 +43,15 @@ class InboxHandler(FileSystemEventHandler):
             return
 
         logger.info("New file detected: %s", path.name)
-        self.queue.put(str(path))
+        # Use file size as priority — smaller files processed first
+        try:
+            file_size = os.path.getsize(event.src_path)
+        except OSError:
+            file_size = 0
+        self.queue.put((file_size, str(path)))
 
 
-def _pipeline_worker(config: AppConfig, queue: Queue) -> None:
+def _pipeline_worker(config: AppConfig, queue: PriorityQueue) -> None:
     """Worker thread that processes files. Runs in its own thread with its own event loop."""
     import asyncio
 
@@ -54,7 +60,7 @@ def _pipeline_worker(config: AppConfig, queue: Queue) -> None:
 
         while True:
             try:
-                file_path = queue.get(timeout=2)
+                _priority, file_path = queue.get(timeout=2)
             except Empty:
                 continue
 
@@ -85,8 +91,8 @@ async def start_watcher(config: AppConfig) -> None:
     inbox_path = config.vault.inbox_path
     Path(inbox_path).mkdir(parents=True, exist_ok=True)
 
-    # Thread-safe queue (not asyncio.Queue)
-    queue: Queue[str] = Queue()
+    # Thread-safe priority queue (not asyncio.Queue) — smaller files first
+    queue: PriorityQueue[tuple[int, str]] = PriorityQueue()
 
     # Start pipeline worker in a daemon thread
     worker = threading.Thread(
@@ -109,7 +115,11 @@ async def start_watcher(config: AppConfig) -> None:
     for f in Path(inbox_path).iterdir():
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith("."):
             logger.info("Queuing existing inbox file: %s", f.name)
-            queue.put(str(f))
+            try:
+                file_size = f.stat().st_size
+            except OSError:
+                file_size = 0
+            queue.put((file_size, str(f)))
 
     # Keep the coroutine alive (so the task isn't garbage collected)
     try:

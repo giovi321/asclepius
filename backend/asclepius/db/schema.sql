@@ -187,6 +187,21 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     folder_path TEXT
 );
 
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    patient_id INTEGER REFERENCES patients(id),
+    description TEXT NOT NULL,
+    quantity REAL DEFAULT 1,
+    unit_price REAL,
+    amount REAL,
+    currency TEXT DEFAULT 'CHF',
+    tariff_code TEXT,  -- e.g. TARMED code
+    tax_rate REAL,
+    category TEXT,  -- 'consultation', 'procedure', 'medication', 'lab', 'imaging', 'admin', 'other'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS imaging_series (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     study_id INTEGER NOT NULL REFERENCES imaging_studies(id) ON DELETE CASCADE,
@@ -332,3 +347,4 @@ CREATE INDEX IF NOT EXISTS idx_norm_lab_test_aliases_alias ON norm_lab_test_alia
 CREATE INDEX IF NOT EXISTS idx_norm_specialty_aliases_alias ON norm_specialty_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_norm_diagnosis_aliases_alias ON norm_diagnosis_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_norm_medication_aliases_alias ON norm_medication_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_document ON invoice_items(document_id);

@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import api from "@/api/client";
 
 interface Patient {
   id: number;
@@ -18,6 +19,20 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("asclepius_patient");
     return stored ? JSON.parse(stored) : null;
   });
+
+  // Validate stored patient still exists in DB
+  useEffect(() => {
+    if (selectedPatient) {
+      api.get("/patients").then((res) => {
+        const patients = Array.isArray(res.data) ? res.data : [];
+        const exists = patients.some((p: Patient) => p.id === selectedPatient.id);
+        if (!exists) {
+          setSelectedPatient(null);
+          localStorage.removeItem("asclepius_patient");
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   const handleSet = (p: Patient | null) => {
     setSelectedPatient(p);

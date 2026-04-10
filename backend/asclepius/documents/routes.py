@@ -22,6 +22,7 @@ router = APIRouter()
 @router.post("/upload", status_code=201)
 async def upload_document(
     file: UploadFile = File(...),
+    patient_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
 ):
     """Upload a document file to the inbox for processing."""
@@ -58,9 +59,9 @@ async def upload_document(
             await db.execute("PRAGMA foreign_keys=ON")
             await db.execute(
                 """INSERT INTO documents
-                   (file_path, original_filename, file_hash, file_size, date_received, status)
-                   VALUES (?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{dest.name}", original_name, file_hash, file_size),
+                   (file_path, original_filename, file_hash, file_size, patient_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{dest.name}", original_name, file_hash, file_size, patient_id),
             )
             await db.commit()
     except Exception:
@@ -239,13 +240,42 @@ async def update_doc(
     return await get_document(db, doc_id)
 
 
+@router.post("/{doc_id}/cancel")
+async def cancel_processing(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Cancel processing of a document."""
+    from asclepius.pipeline.processor import cancelled_docs
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Add to cancelled set — the pipeline checks this between steps
+    cancelled_docs.add(doc_id)
+
+    # Update status in DB
+    await db.execute(
+        "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (doc_id,),
+    )
+    await db.commit()
+
+    return {"status": "cancelled", "document_id": doc_id}
+
+
 @router.delete("/{doc_id}")
 async def delete_doc(
     doc_id: int,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Delete a document and its file from disk."""
+    """Delete a document and its file from disk. Gracefully handles in-progress processing."""
+    import asyncio
+    from asclepius.pipeline.processor import cancelled_docs
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -256,11 +286,25 @@ async def delete_doc(
         if role != "owner":
             raise HTTPException(status_code=403, detail="Only owners can delete documents")
 
-    # Delete file from disk
+    # If document is being processed, cancel it first
+    if doc["status"] in ("processing", "pending"):
+        cancelled_docs.add(doc_id)
+        # Give the pipeline a moment to notice the cancellation
+        await asyncio.sleep(0.5)
+
+    # Delete file from disk — handle case where file may have already been moved
     config = get_config()
     file_path = Path(config.vault.root_path) / doc["file_path"]
     if file_path.exists():
         file_path.unlink()
+    else:
+        # Try inbox with original filename
+        inbox_path = Path(config.vault.inbox_path) / doc["original_filename"]
+        if inbox_path.exists():
+            inbox_path.unlink()
+
+    # Clean up cancellation set
+    cancelled_docs.discard(doc_id)
 
     # Delete from DB (CASCADE will handle child tables)
     await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))

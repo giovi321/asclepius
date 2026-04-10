@@ -41,6 +41,23 @@ export default function DocumentDetailPage() {
     await loadDoc();
   };
 
+  const handleCancel = async () => {
+    try {
+      await api.post(`/documents/${id}/cancel`);
+      await loadDoc();
+    } catch {
+      alert("Failed to cancel processing");
+    }
+  };
+
+  // Auto-refresh while processing
+  useEffect(() => {
+    if (doc?.status === "processing" || doc?.status === "pending") {
+      const interval = setInterval(loadDoc, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [doc?.status]);
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) return;
     try {
@@ -126,12 +143,22 @@ export default function DocumentDetailPage() {
           >
             <FileText className="h-4 w-4" /> View file
           </a>
-          <button
-            onClick={handleReprocess}
-            className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
-            <RefreshCw className="h-4 w-4" /> Reprocess
-          </button>
+          {(doc.status === "processing" || doc.status === "pending") && (
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1 rounded-md border border-yellow-300 px-3 py-1.5 text-sm text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:hover:bg-yellow-950"
+            >
+              <X className="h-4 w-4" /> Cancel
+            </button>
+          )}
+          {doc.status !== "processing" && (
+            <button
+              onClick={handleReprocess}
+              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              <RefreshCw className="h-4 w-4" /> Reprocess
+            </button>
+          )}
           <button
             onClick={handleDelete}
             className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"

@@ -59,6 +59,18 @@ async def process_dicom(
         from asclepius.pipeline.extractor import _match_patient
         patient_id = await _match_patient(db, patient_name)
 
+    # Upsert facility from institution name
+    facility_id = None
+    if institution:
+        from asclepius.pipeline.extractor import _upsert_facility
+        facility_id = await _upsert_facility(db, {"name": institution, "type": "imaging_center"})
+
+    # Upsert doctor from referring physician
+    doctor_id = None
+    if referring:
+        from asclepius.pipeline.extractor import _upsert_doctor
+        doctor_id = await _upsert_doctor(db, {"name": referring}, facility_id)
+
     # Determine destination path
     from asclepius.patients.service import slugify
 
@@ -70,8 +82,8 @@ async def process_dicom(
         patient_slug = None
 
     year = study_date[:4] if study_date else "unknown"
-    provider_slug = slugify(institution) if institution else "unknown"
-    study_folder_name = f"{study_date or 'unknown'}_{provider_slug}_{modality or 'unknown'}"
+    facility_slug = slugify(institution) if institution else "unknown"
+    study_folder_name = f"{study_date or 'unknown'}_{facility_slug}_{modality or 'unknown'}"
 
     if patient_slug:
         base_path = f"patients/{patient_slug}/{year}/imaging/{study_folder_name}"
@@ -92,9 +104,10 @@ async def process_dicom(
     cursor = await db.execute(
         """INSERT INTO documents
            (patient_id, file_path, original_filename, doc_type, doc_date,
-            status, ocr_engine, ocr_text)
-           VALUES (?, ?, ?, 'imaging_dicom', ?, 'done', 'dicom', ?)""",
+            doctor_id, facility_id, status, ocr_engine, ocr_text)
+           VALUES (?, ?, ?, 'imaging_dicom', ?, ?, ?, 'done', 'dicom', ?)""",
         (patient_id, relative_path, path.name, study_date,
+         doctor_id, facility_id,
          f"DICOM: {modality} {body_part} {study_desc}"),
     )
     doc_id = cursor.lastrowid
@@ -117,12 +130,14 @@ async def process_dicom(
     if not study_id:
         cursor = await db.execute(
             """INSERT INTO imaging_studies
-               (document_id, patient_id, study_date, modality, body_part,
+               (document_id, patient_id, doctor_id, facility_id,
+                study_date, modality, body_part,
                 study_description, institution_name, referring_physician,
                 accession_number, study_instance_uid, num_series, num_images,
                 is_dicom, folder_path)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)""",
-            (doc_id, patient_id, study_date, modality, body_part,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)""",
+            (doc_id, patient_id, doctor_id, facility_id,
+             study_date, modality, body_part,
              study_desc, institution, referring, accession, study_uid,
              base_path),
         )

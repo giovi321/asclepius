@@ -3,7 +3,8 @@
 EXTRACTION_PROMPT = """You are a medical document parser. Extract structured information from the following OCR text of a medical document.
 
 Known patients: {patient_list}
-Known providers: {provider_list}
+Known facilities: {facility_list}
+Known doctors: {doctor_list}
 Known lab test mappings: {lab_test_mappings}
 Known specialty mappings: {specialty_mappings}
 Known diagnosis mappings: {diagnosis_mappings}
@@ -18,13 +19,29 @@ Respond in JSON only. No markdown, no explanation.
 {{
   "patient_name": "string or null",
   "doc_type": "one of: bloodtest, labtest_other, prescription, invoice, receipt, insurance_claim, insurance_doc, referral, discharge, specialist_report, radiology_report, pathology_report, surgical_report, er_report, vaccination, allergy, sick_leave, medical_cert, physio_report, dental, ophthalmology, mental_health, consent, advance_directive, imaging_dicom, imaging_other, correspondence, other",
-  "doc_date": "YYYY-MM-DD or null",
+  "doc_date": "YYYY-MM-DD or null (most generic date; fallback)",
+  "date_issued": "YYYY-MM-DD or null (when the document was issued/printed)",
+  "date_visit": "YYYY-MM-DD or null (when the visit/exam actually happened)",
   "language_detected": "ISO 639-1 code",
-  "provider": {{
-    "name": "string or null",
+  "doctor": {{
+    "name": "string or null (the treating/signing doctor's name)",
+    "title": "string or null (e.g. 'Dr.', 'Prof.')",
     "specialty_original": "string in source language or null",
     "specialty_canonical": "canonical code or best English name",
     "specialty_mapped": true
+  }},
+  "facility": {{
+    "name": "string or null (hospital, clinic, lab name)",
+    "type": "hospital|clinic|lab|pharmacy|imaging_center|other|null",
+    "address": "string or null",
+    "city": "string or null",
+    "country": "string or null",
+    "phone": "string or null"
+  }},
+  "specialty": {{
+    "original": "string in source language or null (the medical specialty of this document)",
+    "canonical": "canonical code or best English name",
+    "mapped": true
   }},
   "lab_results": [
     {{
@@ -91,7 +108,8 @@ Respond in JSON only. No markdown, no explanation.
       "date_administered": "YYYY-MM-DD or null"
     }}
   ],
-  "summary_en": "1-3 sentence English summary of the document"
+  "summary_en": "1-3 sentence English summary of the document",
+  "summary_original": "1-3 sentence summary in the document's source language"
 }}
 
 OCR text:
@@ -135,14 +153,16 @@ When answering questions:
 
 DB_SCHEMA_FOR_CHAT = """
 Tables:
-- documents(id, patient_id, file_path, original_filename, doc_type, doc_date, provider_id, ocr_text, raw_extraction, status)
-- patients(id, slug, display_name, date_of_birth)
-- providers(id, name, slug, specialty)
+- documents(id, patient_id, file_path, original_filename, doc_type, doc_date, doctor_id, facility_id, date_issued, date_visit, date_received, summary_en, summary_original, norm_specialty_id, specialty_original, insurance_company, insurance_policy, notes, tags, ocr_text, raw_extraction, status)
+- patients(id, slug, display_name, date_of_birth, sex, blood_type, allergies, notes, phone, email, address, insurance_company, insurance_number)
+- facilities(id, name, slug, type, address, city, country, phone, email, website)
+- doctors(id, name, slug, title, norm_specialty_id, specialty_original, facility_id, phone, email)
+- document_links(id, source_document_id, target_document_id, link_type)
 - lab_results(id, document_id, patient_id, test_name_original, norm_lab_test_id, value, value_text, unit, reference_range_low, reference_range_high, is_abnormal, sample_type, panel_name, test_date)
-- encounters(id, document_id, patient_id, provider_id, encounter_date, admission_date, discharge_date, diagnosis_original, diagnosis_code, notes, findings, follow_up_date, follow_up_instructions)
+- encounters(id, document_id, patient_id, doctor_id, facility_id, encounter_date, admission_date, discharge_date, diagnosis_original, diagnosis_code, notes, findings, follow_up_date, follow_up_instructions)
 - medications(id, document_id, patient_id, brand_name, active_ingredient_original, dosage, form, frequency, duration, quantity, prescribed_date)
 - vaccinations(id, document_id, patient_id, vaccine_name, manufacturer, lot_number, dose_number, date_administered)
-- imaging_studies(id, document_id, patient_id, study_date, modality, body_part, study_description, institution_name)
+- imaging_studies(id, document_id, patient_id, doctor_id, facility_id, study_date, modality, body_part, study_description, institution_name)
 - norm_lab_tests(id, canonical_code, canonical_display, loinc_code, category, unit_preferred)
 - norm_lab_test_aliases(id, norm_lab_test_id, alias, language)
 - norm_diagnoses(id, canonical_code, canonical_display, icd10_code)

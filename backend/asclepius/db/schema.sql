@@ -14,6 +14,15 @@ CREATE TABLE IF NOT EXISTS patients (
     slug TEXT UNIQUE NOT NULL,
     display_name TEXT NOT NULL,
     date_of_birth DATE,
+    sex TEXT,  -- 'M', 'F', 'O'
+    blood_type TEXT,
+    allergies TEXT,
+    notes TEXT,
+    phone TEXT,
+    email TEXT,
+    address TEXT,
+    insurance_company TEXT,
+    insurance_number TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -24,13 +33,31 @@ CREATE TABLE IF NOT EXISTS user_patient_access (
     PRIMARY KEY (user_id, patient_id)
 );
 
-CREATE TABLE IF NOT EXISTS providers (
+CREATE TABLE IF NOT EXISTS facilities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
-    specialty TEXT,
+    type TEXT,  -- 'hospital', 'clinic', 'lab', 'pharmacy', 'imaging_center', 'other'
     address TEXT,
-    phone TEXT
+    city TEXT,
+    country TEXT,
+    phone TEXT,
+    email TEXT,
+    website TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS doctors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT,  -- 'Dr.', 'Prof.', etc.
+    norm_specialty_id INTEGER REFERENCES norm_specialties(id),
+    specialty_original TEXT,
+    facility_id INTEGER REFERENCES facilities(id),
+    phone TEXT,
+    email TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS documents (
@@ -40,7 +67,22 @@ CREATE TABLE IF NOT EXISTS documents (
     original_filename TEXT NOT NULL,
     doc_type TEXT,
     doc_date DATE,
-    provider_id INTEGER REFERENCES providers(id),
+    doctor_id INTEGER REFERENCES doctors(id),
+    facility_id INTEGER REFERENCES facilities(id),
+    date_issued DATE,
+    date_visit DATE,
+    date_received DATE,
+    summary_en TEXT,
+    summary_original TEXT,
+    norm_specialty_id INTEGER REFERENCES norm_specialties(id),
+    specialty_original TEXT,
+    insurance_company TEXT,
+    insurance_policy TEXT,
+    notes TEXT,
+    tags TEXT,  -- comma-separated user tags
+    page_count INTEGER,
+    file_size INTEGER,  -- bytes
+    file_hash TEXT,  -- SHA-256 for dedup
     language_source TEXT,
     ocr_text TEXT,
     ocr_confidence REAL,
@@ -52,6 +94,15 @@ CREATE TABLE IF NOT EXISTS documents (
     status TEXT NOT NULL DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS document_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    target_document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    link_type TEXT NOT NULL,  -- 'invoice_for', 'report_for', 'imaging_for', 'follow_up', 'related'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_document_id, target_document_id, link_type)
 );
 
 CREATE TABLE IF NOT EXISTS lab_results (
@@ -75,7 +126,8 @@ CREATE TABLE IF NOT EXISTS encounters (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     patient_id INTEGER NOT NULL REFERENCES patients(id),
-    provider_id INTEGER REFERENCES providers(id),
+    doctor_id INTEGER REFERENCES doctors(id),
+    facility_id INTEGER REFERENCES facilities(id),
     encounter_date DATE,
     admission_date DATE,
     discharge_date DATE,
@@ -119,7 +171,8 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     patient_id INTEGER NOT NULL REFERENCES patients(id),
-    provider_id INTEGER REFERENCES providers(id),
+    doctor_id INTEGER REFERENCES doctors(id),
+    facility_id INTEGER REFERENCES facilities(id),
     study_date DATE,
     modality TEXT,
     body_part TEXT,
@@ -256,13 +309,25 @@ CREATE INDEX IF NOT EXISTS idx_documents_patient_id ON documents(patient_id);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_type ON documents(doc_type);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_date ON documents(doc_date);
+CREATE INDEX IF NOT EXISTS idx_documents_doctor_id ON documents(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_documents_facility_id ON documents(facility_id);
+CREATE INDEX IF NOT EXISTS idx_documents_file_hash ON documents(file_hash);
+CREATE INDEX IF NOT EXISTS idx_documents_norm_specialty_id ON documents(norm_specialty_id);
+CREATE INDEX IF NOT EXISTS idx_document_links_source ON document_links(source_document_id);
+CREATE INDEX IF NOT EXISTS idx_document_links_target ON document_links(target_document_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_facility_id ON doctors(facility_id);
+CREATE INDEX IF NOT EXISTS idx_doctors_norm_specialty_id ON doctors(norm_specialty_id);
 CREATE INDEX IF NOT EXISTS idx_lab_results_patient_id ON lab_results(patient_id);
 CREATE INDEX IF NOT EXISTS idx_lab_results_test_date ON lab_results(test_date);
 CREATE INDEX IF NOT EXISTS idx_lab_results_norm_id ON lab_results(norm_lab_test_id);
 CREATE INDEX IF NOT EXISTS idx_encounters_patient_id ON encounters(patient_id);
+CREATE INDEX IF NOT EXISTS idx_encounters_doctor_id ON encounters(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_encounters_facility_id ON encounters(facility_id);
 CREATE INDEX IF NOT EXISTS idx_medications_patient_id ON medications(patient_id);
 CREATE INDEX IF NOT EXISTS idx_vaccinations_patient_id ON vaccinations(patient_id);
 CREATE INDEX IF NOT EXISTS idx_imaging_studies_patient_id ON imaging_studies(patient_id);
+CREATE INDEX IF NOT EXISTS idx_imaging_studies_doctor_id ON imaging_studies(doctor_id);
+CREATE INDEX IF NOT EXISTS idx_imaging_studies_facility_id ON imaging_studies(facility_id);
 CREATE INDEX IF NOT EXISTS idx_norm_lab_test_aliases_alias ON norm_lab_test_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_norm_specialty_aliases_alias ON norm_specialty_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_norm_diagnosis_aliases_alias ON norm_diagnosis_aliases(alias);

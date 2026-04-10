@@ -44,20 +44,121 @@ export default function SettingsPage() {
 
 function GeneralTab() {
   const [settings, setSettings] = useState<any>(null);
+  const [ocrLanguage, setOcrLanguage] = useState("");
+  const [ocrConfidence, setOcrConfidence] = useState<number>(0);
+  const [pipelineWatch, setPipelineWatch] = useState(false);
+  const [cloudOcr, setCloudOcr] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
   useEffect(() => {
-    api.get("/settings").then((res) => setSettings(res.data));
+    api.get("/settings").then((res) => {
+      setSettings(res.data);
+      setOcrLanguage(res.data.ocr?.language || "");
+      setOcrConfidence(res.data.ocr?.confidence_threshold ?? 0.8);
+      setPipelineWatch(res.data.pipeline?.watch_enabled ?? false);
+      setCloudOcr(res.data.ocr?.cloud_enabled ?? false);
+    });
   }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (ocrLanguage !== (settings.ocr?.language || "")) updates.ocr_language = ocrLanguage;
+      if (ocrConfidence !== (settings.ocr?.confidence_threshold ?? 0.8)) updates.ocr_confidence_threshold = ocrConfidence;
+      if (pipelineWatch !== (settings.pipeline?.watch_enabled ?? false)) updates.pipeline_watch_enabled = pipelineWatch;
+      if (cloudOcr !== (settings.ocr?.cloud_enabled ?? false)) updates.ocr_cloud_enabled = cloudOcr;
+      if (Object.keys(updates).length > 0) {
+        await api.patch("/settings", updates);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+        // Reload settings
+        const res = await api.get("/settings");
+        setSettings(res.data);
+      }
+    } catch {
+      alert("Failed to save settings");
+    }
+    setSaving(false);
+  };
+
   if (!settings) return <div className="text-muted-foreground">Loading...</div>;
 
   return (
-    <div className="rounded-lg border p-4 space-y-3">
+    <div className="rounded-lg border p-4 space-y-4">
       <h3 className="font-medium">General Settings</h3>
+
       <InfoRow label="Vault Path" value={settings.vault?.root_path} />
       <InfoRow label="Inbox Path" value={settings.vault?.inbox_path} />
       <InfoRow label="OCR Engine" value={settings.ocr?.engine} />
-      <InfoRow label="OCR Languages" value={settings.ocr?.language} />
-      <InfoRow label="OCR Confidence Threshold" value={settings.ocr?.confidence_threshold} />
-      <InfoRow label="Pipeline Watch" value={settings.pipeline?.watch_enabled ? "Enabled" : "Disabled"} />
+
+      <div className="grid gap-4 max-w-md pt-2">
+        <label className="space-y-1">
+          <span className="text-sm font-medium">OCR Language</span>
+          <input
+            type="text"
+            value={ocrLanguage}
+            onChange={(e) => setOcrLanguage(e.target.value)}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            placeholder="e.g. deu+eng"
+          />
+        </label>
+
+        <label className="space-y-1">
+          <span className="text-sm font-medium">OCR Confidence Threshold</span>
+          <input
+            type="number"
+            value={ocrConfidence}
+            onChange={(e) => setOcrConfidence(parseFloat(e.target.value) || 0)}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            min={0}
+            max={1}
+            step={0.05}
+          />
+        </label>
+
+        <label className="flex items-center justify-between">
+          <span className="text-sm font-medium">Pipeline Watch Enabled</span>
+          <button
+            onClick={() => setPipelineWatch(!pipelineWatch)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              pipelineWatch ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                pipelineWatch ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </label>
+
+        <label className="flex items-center justify-between">
+          <span className="text-sm font-medium">Cloud OCR Enabled</span>
+          <button
+            onClick={() => setCloudOcr(!cloudOcr)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              cloudOcr ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                cloudOcr ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </label>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+        {saved ? "Saved" : saving ? "Saving..." : "Save"}
+      </button>
     </div>
   );
 }

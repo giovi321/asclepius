@@ -12,7 +12,7 @@ class LLMProvider(ABC):
 
         Args:
             ocr_text: The OCR text from the document.
-            context: Dict with keys: patient_list, provider_list,
+            context: Dict with keys: patient_list, facility_list, doctor_list,
                      lab_test_mappings, specialty_mappings,
                      diagnosis_mappings, medication_mappings.
 

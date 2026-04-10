@@ -17,9 +17,13 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     cursor = await db.execute("SELECT id, slug, display_name FROM patients")
     patients = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
 
-    # Get known providers
-    cursor = await db.execute("SELECT id, slug, name FROM providers")
-    providers = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
+    # Get known facilities
+    cursor = await db.execute("SELECT id, slug, name FROM facilities")
+    facilities = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
+
+    # Get known doctors
+    cursor = await db.execute("SELECT id, slug, name FROM doctors")
+    doctors = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
 
     # Get lab test mappings
     cursor = await db.execute(
@@ -55,7 +59,8 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
 
     return {
         "patient_list": patients,
-        "provider_list": providers,
+        "facility_list": facilities,
+        "doctor_list": doctors,
         "lab_test_mappings": lab_mappings,
         "specialty_mappings": specialty_mappings,
         "diagnosis_mappings": diagnosis_mappings,
@@ -95,7 +100,7 @@ async def extract_and_store(
     patient_id = row[0] if row else None
 
     if not patient_id:
-        # Try to match patient from extraction
+        # Try to match patient from extraction — auto-assign
         patient_id = await _match_patient(db, extraction.get("patient_name"))
         if patient_id:
             await db.execute(
@@ -108,23 +113,57 @@ async def extract_and_store(
         updates["doc_type"] = extraction["doc_type"]
     if extraction.get("doc_date"):
         updates["doc_date"] = extraction["doc_date"]
+    if extraction.get("date_issued"):
+        updates["date_issued"] = extraction["date_issued"]
+    if extraction.get("date_visit"):
+        updates["date_visit"] = extraction["date_visit"]
     if extraction.get("language_detected"):
         updates["language_source"] = extraction["language_detected"]
+    if extraction.get("summary_en"):
+        updates["summary_en"] = extraction["summary_en"]
+    if extraction.get("summary_original"):
+        updates["summary_original"] = extraction["summary_original"]
     if extraction.get("cost", {}).get("amount"):
         updates["cost_amount"] = extraction["cost"]["amount"]
         updates["cost_currency"] = extraction["cost"].get("currency")
+
+    # Insurance info from extraction
+    insurance = extraction.get("insurance", {})
+    if insurance.get("company"):
+        updates["insurance_company"] = insurance["company"]
+    if insurance.get("policy_number"):
+        updates["insurance_policy"] = insurance["policy_number"]
+
+    # Specialty info on the document itself
+    specialty_data = extraction.get("specialty", {})
+    if specialty_data.get("original"):
+        updates["specialty_original"] = specialty_data["original"]
+    if specialty_data.get("canonical"):
+        norm_spec_id = await _resolve_specialty_from_data(db, specialty_data)
+        if norm_spec_id:
+            updates["norm_specialty_id"] = norm_spec_id
 
     if updates:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [doc_id]
         await db.execute(f"UPDATE documents SET {set_clause} WHERE id = ?", values)
 
-    # Upsert provider
-    provider_id = None
-    if extraction.get("provider", {}).get("name"):
-        provider_id = await _upsert_provider(db, extraction["provider"])
+    # Upsert facility
+    facility_id = None
+    facility_data = extraction.get("facility", {})
+    if facility_data.get("name"):
+        facility_id = await _upsert_facility(db, facility_data)
         await db.execute(
-            "UPDATE documents SET provider_id = ? WHERE id = ?", (provider_id, doc_id)
+            "UPDATE documents SET facility_id = ? WHERE id = ?", (facility_id, doc_id)
+        )
+
+    # Upsert doctor
+    doctor_id = None
+    doctor_data = extraction.get("doctor", {})
+    if doctor_data.get("name"):
+        doctor_id = await _upsert_doctor(db, doctor_data, facility_id)
+        await db.execute(
+            "UPDATE documents SET doctor_id = ? WHERE id = ?", (doctor_id, doc_id)
         )
 
     # Insert lab results
@@ -150,19 +189,17 @@ async def extract_and_store(
         for diag in extraction.get("diagnoses", []):
             norm_diag_id = await _resolve_diagnosis(db, diag)
             norm_spec_id = None
-            if extraction.get("provider", {}).get("specialty_canonical"):
-                norm_spec_id = await _resolve_specialty(
-                    db, extraction["provider"]
-                )
+            if doctor_data.get("specialty_canonical"):
+                norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
 
             await db.execute(
                 """INSERT INTO encounters
-                   (document_id, patient_id, provider_id, encounter_date,
+                   (document_id, patient_id, doctor_id, facility_id, encounter_date,
                     admission_date, discharge_date, norm_diagnosis_id,
                     diagnosis_original, diagnosis_code, norm_specialty_id,
                     notes, findings, follow_up_date, follow_up_instructions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, provider_id,
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, doctor_id, facility_id,
                  encounter.get("encounter_date") or extraction.get("doc_date"),
                  encounter.get("admission_date"), encounter.get("discharge_date"),
                  norm_diag_id, diag.get("diagnosis_original"),
@@ -177,10 +214,10 @@ async def extract_and_store(
         if not extraction.get("diagnoses") and encounter.get("encounter_date"):
             await db.execute(
                 """INSERT INTO encounters
-                   (document_id, patient_id, provider_id, encounter_date,
+                   (document_id, patient_id, doctor_id, facility_id, encounter_date,
                     notes, findings, follow_up_date, follow_up_instructions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, provider_id,
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, doctor_id, facility_id,
                  encounter.get("encounter_date"),
                  extraction.get("summary_en"),
                  encounter.get("findings"),
@@ -259,23 +296,88 @@ async def _match_patient(db: aiosqlite.Connection, name: str | None) -> int | No
     return None
 
 
-async def _upsert_provider(db: aiosqlite.Connection, provider_data: dict) -> int:
-    """Insert or get existing provider."""
+async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int:
+    """Insert or get existing facility."""
     from asclepius.patients.service import slugify
 
-    name = provider_data["name"]
+    name = facility_data["name"]
     slug = slugify(name)
 
-    cursor = await db.execute("SELECT id FROM providers WHERE slug = ?", (slug,))
+    cursor = await db.execute("SELECT id FROM facilities WHERE slug = ?", (slug,))
     row = await cursor.fetchone()
     if row:
         return row[0]
 
     cursor = await db.execute(
-        "INSERT INTO providers (name, slug, specialty) VALUES (?, ?, ?)",
-        (name, slug, provider_data.get("specialty_original")),
+        """INSERT INTO facilities (name, slug, type, address, city, country, phone)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (name, slug,
+         facility_data.get("type"),
+         facility_data.get("address"),
+         facility_data.get("city"),
+         facility_data.get("country"),
+         facility_data.get("phone")),
     )
     return cursor.lastrowid
+
+
+async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_id: int | None = None) -> int:
+    """Insert or get existing doctor."""
+    from asclepius.patients.service import slugify
+
+    name = doctor_data["name"]
+    slug = slugify(name)
+
+    cursor = await db.execute("SELECT id FROM doctors WHERE slug = ?", (slug,))
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    # Resolve specialty for the doctor
+    norm_spec_id = None
+    if doctor_data.get("specialty_canonical"):
+        norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
+
+    cursor = await db.execute(
+        """INSERT INTO doctors (name, slug, title, norm_specialty_id, specialty_original, facility_id)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (name, slug,
+         doctor_data.get("title"),
+         norm_spec_id,
+         doctor_data.get("specialty_original"),
+         facility_id),
+    )
+    return cursor.lastrowid
+
+
+async def _resolve_specialty_from_doctor(db: aiosqlite.Connection, doctor_data: dict) -> int | None:
+    """Resolve specialty to norm_specialties ID from doctor extraction data."""
+    canonical = doctor_data.get("specialty_canonical", "")
+
+    if canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    return None
+
+
+async def _resolve_specialty_from_data(db: aiosqlite.Connection, specialty_data: dict) -> int | None:
+    """Resolve specialty to norm_specialties ID from specialty extraction data."""
+    canonical = specialty_data.get("canonical", "")
+
+    if canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    return None
 
 
 async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
@@ -360,21 +462,6 @@ async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None
                 (diag_id, original),
             )
             return diag_id
-
-    return None
-
-
-async def _resolve_specialty(db: aiosqlite.Connection, provider_data: dict) -> int | None:
-    """Resolve specialty to norm_specialties ID."""
-    canonical = provider_data.get("specialty_canonical", "")
-
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
 
     return None
 

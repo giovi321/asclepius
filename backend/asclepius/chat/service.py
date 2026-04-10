@@ -21,7 +21,9 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     """Build a context string with patient summary data."""
     # Patient info
     cursor = await db.execute(
-        "SELECT display_name, date_of_birth FROM patients WHERE id = ?",
+        """SELECT display_name, date_of_birth, sex, blood_type, allergies,
+                  insurance_company, insurance_number
+           FROM patients WHERE id = ?""",
         (patient_id,),
     )
     patient = await cursor.fetchone()
@@ -31,19 +33,37 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     parts = [f"Patient: {patient[0]}"]
     if patient[1]:
         parts.append(f"Date of birth: {patient[1]}")
+    if patient[2]:
+        parts.append(f"Sex: {patient[2]}")
+    if patient[3]:
+        parts.append(f"Blood type: {patient[3]}")
+    if patient[4]:
+        parts.append(f"Allergies: {patient[4]}")
+    if patient[5]:
+        parts.append(f"Insurance: {patient[5]} ({patient[6] or 'N/A'})")
 
     # Recent documents
     cursor = await db.execute(
-        """SELECT doc_type, doc_date, original_filename FROM documents
-           WHERE patient_id = ? AND status = 'done'
-           ORDER BY doc_date DESC LIMIT 10""",
+        """SELECT d.doc_type, d.doc_date, d.original_filename, d.summary_en,
+                  doc.name as doctor_name, f.name as facility_name
+           FROM documents d
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
+           WHERE d.patient_id = ? AND d.status = 'done'
+           ORDER BY d.doc_date DESC LIMIT 10""",
         (patient_id,),
     )
     docs = await cursor.fetchall()
     if docs:
         parts.append(f"\nRecent documents ({len(docs)}):")
         for d in docs:
-            parts.append(f"  - {d[1] or '?'}: {d[0]} ({d[2]})")
+            provider_info = ""
+            if d[4]:
+                provider_info += f" Dr. {d[4]}"
+            if d[5]:
+                provider_info += f" @ {d[5]}"
+            summary = f" - {d[3]}" if d[3] else ""
+            parts.append(f"  - {d[1] or '?'}: {d[0]} ({d[2]}){provider_info}{summary}")
 
     # Recent lab results
     cursor = await db.execute(

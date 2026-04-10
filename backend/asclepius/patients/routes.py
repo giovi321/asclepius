@@ -17,11 +17,29 @@ router = APIRouter()
 class PatientCreate(BaseModel):
     display_name: str
     date_of_birth: str | None = None
+    sex: str | None = None
+    blood_type: str | None = None
+    allergies: str | None = None
+    notes: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    insurance_company: str | None = None
+    insurance_number: str | None = None
 
 
 class PatientUpdate(BaseModel):
     display_name: str | None = None
     date_of_birth: str | None = None
+    sex: str | None = None
+    blood_type: str | None = None
+    allergies: str | None = None
+    notes: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    address: str | None = None
+    insurance_company: str | None = None
+    insurance_number: str | None = None
 
 
 @router.get("")
@@ -30,6 +48,40 @@ async def list_patients(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     return await get_patients_for_user(db, current_user["id"])
+
+
+@router.get("/{patient_id}")
+async def get_patient(
+    patient_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Get a single patient's details."""
+    role = await check_patient_access(db, current_user["id"], patient_id)
+    if not role:
+        raise HTTPException(status_code=403, detail="No access to this patient")
+
+    cursor = await db.execute(
+        """SELECT id, slug, display_name, date_of_birth, sex, blood_type,
+                  allergies, notes, phone, email, address,
+                  insurance_company, insurance_number, created_at
+           FROM patients WHERE id = ?""",
+        (patient_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    patient = dict(row)
+    patient["role"] = role
+
+    # Get document count
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM documents WHERE patient_id = ?", (patient_id,)
+    )
+    patient["document_count"] = (await cursor.fetchone())[0]
+
+    return patient
 
 
 @router.post("", status_code=201)
@@ -47,8 +99,13 @@ async def create_patient(
 
     try:
         cursor = await db.execute(
-            "INSERT INTO patients (slug, display_name, date_of_birth) VALUES (?, ?, ?)",
-            (slug, body.display_name, body.date_of_birth),
+            """INSERT INTO patients (slug, display_name, date_of_birth, sex, blood_type,
+                                    allergies, notes, phone, email, address,
+                                    insurance_company, insurance_number)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (slug, body.display_name, body.date_of_birth, body.sex, body.blood_type,
+             body.allergies, body.notes, body.phone, body.email, body.address,
+             body.insurance_company, body.insurance_number),
         )
         patient_id = cursor.lastrowid
 
@@ -83,10 +140,13 @@ async def update_patient(
         raise HTTPException(status_code=403, detail="Only owners can edit patient info")
 
     updates = {}
-    if body.display_name is not None:
-        updates["display_name"] = body.display_name
-    if body.date_of_birth is not None:
-        updates["date_of_birth"] = body.date_of_birth
+    for field in [
+        "display_name", "date_of_birth", "sex", "blood_type", "allergies",
+        "notes", "phone", "email", "address", "insurance_company", "insurance_number",
+    ]:
+        value = getattr(body, field, None)
+        if value is not None:
+            updates[field] = value
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -97,11 +157,40 @@ async def update_patient(
     await db.commit()
 
     cursor = await db.execute(
-        "SELECT id, slug, display_name, date_of_birth FROM patients WHERE id = ?",
+        """SELECT id, slug, display_name, date_of_birth, sex, blood_type,
+                  allergies, notes, phone, email, address,
+                  insurance_company, insurance_number
+           FROM patients WHERE id = ?""",
         (patient_id,),
     )
     row = await cursor.fetchone()
-    return {
-        "id": row[0], "slug": row[1],
-        "display_name": row[2], "date_of_birth": row[3],
-    }
+    return dict(row)
+
+
+@router.delete("/{patient_id}")
+async def delete_patient(
+    patient_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Delete a patient and disassociate their documents."""
+    role = await check_patient_access(db, current_user["id"], patient_id)
+    if not role:
+        raise HTTPException(status_code=403, detail="No access to this patient")
+    if role != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can delete patients")
+
+    # Disassociate documents (set patient_id to NULL rather than deleting)
+    await db.execute(
+        "UPDATE documents SET patient_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE patient_id = ?",
+        (patient_id,),
+    )
+
+    # Remove access entries
+    await db.execute("DELETE FROM user_patient_access WHERE patient_id = ?", (patient_id,))
+
+    # Delete the patient
+    await db.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
+    await db.commit()
+
+    return {"status": "deleted", "patient_id": patient_id}

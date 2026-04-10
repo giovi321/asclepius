@@ -20,8 +20,9 @@ def build_organized_path(
 ) -> str:
     """Build the organized file path.
 
-    Format: patients/{slug}/{YYYY}/{YYYY-MM-DD}_{provider-slug}_{doctype}.{ext}
+    Format: patients/{slug}/{YYYY}/{YYYY-MM-DD}_{facility-or-doctor-slug}_{doctype}.{ext}
     If no patient, goes to unclassified/
+    The provider_slug parameter accepts either a facility slug or doctor slug.
     """
     ext = Path(original_filename).suffix.lower()
     year = doc_date[:4] if doc_date else "unknown"

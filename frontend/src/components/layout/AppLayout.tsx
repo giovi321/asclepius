@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePatient } from "@/contexts/PatientContext";
+import { useTheme } from "@/hooks/useTheme";
 import PatientSelector from "@/components/PatientSelector";
 import {
   LayoutDashboard,
@@ -14,12 +15,15 @@ import {
   Settings,
   LogOut,
   Menu,
-  X,
   Activity,
+  Users,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/patients", label: "Patients", icon: Users },
   { path: "/documents", label: "Documents", icon: FileText },
   { path: "/unclassified", label: "Unclassified", icon: AlertCircle },
   { path: "/lab-results", label: "Lab Results", icon: TestTube },
@@ -34,6 +38,7 @@ export default function AppLayout() {
   const { selectedPatient } = usePatient();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -111,8 +116,16 @@ export default function AppLayout() {
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
+            title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            <Menu className="h-5 w-5" />
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
           {selectedPatient && (
             <div className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1">

@@ -64,6 +64,30 @@ def _validate_type(norm_type: str) -> dict:
     return NORM_TABLES[norm_type]
 
 
+# --- Doctors and Facilities (not norm_ tables, but used by filters) ---
+
+@router.get("/doctors")
+async def list_doctors(
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    cursor = await db.execute(
+        "SELECT id, name, slug, title, specialty_original FROM doctors ORDER BY name"
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+@router.get("/facilities")
+async def list_facilities(
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    cursor = await db.execute(
+        "SELECT id, name, slug, type, city, country FROM facilities ORDER BY name"
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
 @router.get("/{norm_type}")
 async def list_norms(
     norm_type: str,

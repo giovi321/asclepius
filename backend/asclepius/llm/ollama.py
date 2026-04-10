@@ -21,7 +21,8 @@ class OllamaProvider(LLMProvider):
     async def extract(self, ocr_text: str, context: dict) -> dict:
         prompt = EXTRACTION_PROMPT.format(
             patient_list=json.dumps(context.get("patient_list", []), indent=2),
-            provider_list=json.dumps(context.get("provider_list", []), indent=2),
+            facility_list=json.dumps(context.get("facility_list", []), indent=2),
+            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
             lab_test_mappings=json.dumps(context.get("lab_test_mappings", []), indent=2),
             specialty_mappings=json.dumps(context.get("specialty_mappings", []), indent=2),
             diagnosis_mappings=json.dumps(context.get("diagnosis_mappings", []), indent=2),

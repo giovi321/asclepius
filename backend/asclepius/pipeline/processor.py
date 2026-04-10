@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import aiosqlite
@@ -44,6 +45,29 @@ def get_llm_provider(config: AppConfig):
         )
 
 
+def _count_pages(file_path: str) -> int | None:
+    """Try to count pages in a PDF file. Returns None for non-PDFs or on error."""
+    path = Path(file_path)
+    if path.suffix.lower() != ".pdf":
+        return None
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(str(path))
+        count = len(doc)
+        doc.close()
+        return count
+    except Exception:
+        try:
+            # Fallback: try pikepdf
+            import pikepdf
+            pdf = pikepdf.open(str(path))
+            count = len(pdf.pages)
+            pdf.close()
+            return count
+        except Exception:
+            return None
+
+
 async def process_file(file_path: str, config: AppConfig) -> None:
     """Process a single file through the full pipeline."""
     path = Path(file_path)
@@ -62,15 +86,30 @@ async def process_file(file_path: str, config: AppConfig) -> None:
         await db.execute("PRAGMA foreign_keys=ON")
 
         try:
-            # Check for duplicates via file hash
+            # Compute file hash and size for dedup
             file_hash = compute_file_hash(file_path)
+            file_size = os.path.getsize(file_path)
+            page_count = _count_pages(file_path)
+
+            # Check for duplicates via file hash
+            cursor = await db.execute(
+                "SELECT id FROM documents WHERE file_hash = ?",
+                (file_hash,),
+            )
+            existing = await cursor.fetchone()
+            if existing:
+                logger.info("Duplicate detected by hash, skipping: %s", path.name)
+                path.unlink()
+                return
+
+            # Also check by filename as fallback
             cursor = await db.execute(
                 "SELECT id FROM documents WHERE file_path LIKE ? OR original_filename = ?",
                 (f"%{path.name}", path.name),
             )
             existing = await cursor.fetchone()
             if existing:
-                logger.info("Duplicate detected, skipping: %s", path.name)
+                logger.info("Duplicate detected by name, skipping: %s", path.name)
                 path.unlink()
                 return
 
@@ -85,12 +124,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["last_processed"] = path.name
                 return
 
-            # Create initial document record
+            # Create initial document record with file metadata
             cursor = await db.execute(
                 """INSERT INTO documents
-                   (file_path, original_filename, status)
-                   VALUES (?, ?, 'processing')""",
-                (f"inbox/{path.name}", path.name),
+                   (file_path, original_filename, file_hash, file_size, page_count,
+                    date_received, status)
+                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
+                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
             )
             doc_id = cursor.lastrowid
             await db.commit()
@@ -140,22 +180,30 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Get document metadata for file organization
             cursor = await db.execute(
-                """SELECT d.patient_id, d.doc_type, d.doc_date, d.provider_id,
-                          p.slug as patient_slug, pr.slug as provider_slug
+                """SELECT d.patient_id, d.doc_type, d.doc_date, d.doctor_id, d.facility_id,
+                          p.slug as patient_slug,
+                          doc.slug as doctor_slug,
+                          f.slug as facility_slug
                    FROM documents d
                    LEFT JOIN patients p ON d.patient_id = p.id
-                   LEFT JOIN providers pr ON d.provider_id = pr.id
+                   LEFT JOIN doctors doc ON d.doctor_id = doc.id
+                   LEFT JOIN facilities f ON d.facility_id = f.id
                    WHERE d.id = ?""",
                 (doc_id,),
             )
             doc = await cursor.fetchone()
+
+            # Use facility slug for path organization, fall back to doctor slug
+            provider_slug = None
+            if doc:
+                provider_slug = doc["facility_slug"] or doc["doctor_slug"]
 
             # Organize file
             dest_path = build_organized_path(
                 config,
                 doc["patient_slug"] if doc else None,
                 doc["doc_date"] if doc else None,
-                doc["provider_slug"] if doc else None,
+                provider_slug,
                 doc["doc_type"] if doc else None,
                 path.name,
             )

@@ -18,9 +18,31 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [specialtyFilter, setSpecialtyFilter] = useState("");
+  const [doctorFilter, setDoctorFilter] = useState("");
+  const [facilityFilter, setFacilityFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const limit = 20;
+
+  // Load filter options
+  const [specialties, setSpecialties] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [facilities, setFacilities] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.get("/normalization/specialties").then((res) => {
+      setSpecialties(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
+    api.get("/normalization/doctors").then((res) => {
+      setDoctors(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
+    api.get("/normalization/facilities").then((res) => {
+      setFacilities(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -28,13 +50,18 @@ export default function DocumentsPage() {
     if (selectedPatient) params.patient_id = selectedPatient.id;
     if (search) params.q = search;
     if (typeFilter) params.type = typeFilter;
+    if (specialtyFilter) params.specialty = specialtyFilter;
+    if (doctorFilter) params.doctor = doctorFilter;
+    if (facilityFilter) params.facility = facilityFilter;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
 
     api.get("/documents", { params }).then((res) => {
       setDocuments(res.data.items || []);
       setTotal(res.data.total || 0);
       setLoading(false);
     });
-  }, [selectedPatient, search, typeFilter, page]);
+  }, [selectedPatient, search, typeFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
 
   return (
     <div className="space-y-4">
@@ -51,7 +78,6 @@ export default function DocumentsPage() {
 
       {showUpload && (
         <FileUpload onUploadComplete={() => {
-          // Refresh document list after upload
           setPage(0);
           setLoading(true);
           const params: Record<string, any> = { limit, offset: 0 };
@@ -86,6 +112,74 @@ export default function DocumentsPage() {
             <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
           ))}
         </select>
+        <select
+          value={specialtyFilter}
+          onChange={(e) => { setSpecialtyFilter(e.target.value); setPage(0); }}
+          className="rounded-md border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">All specialties</option>
+          {specialties.map((s) => (
+            <option key={s.id || s.canonical_code} value={s.canonical_code || s.canonical_display}>
+              {s.canonical_display || s.canonical_code}
+            </option>
+          ))}
+        </select>
+        <select
+          value={doctorFilter}
+          onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
+          className="rounded-md border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">All doctors</option>
+          {doctors.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title ? `${d.title} ` : ""}{d.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={facilityFilter}
+          onChange={(e) => { setFacilityFilter(e.target.value); setPage(0); }}
+          className="rounded-md border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">All facilities</option>
+          {facilities.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}{f.city ? ` (${f.city})` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* Date range */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">From:</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+            className="rounded-md border bg-background px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">To:</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+            className="rounded-md border bg-background px-3 py-2 text-sm"
+          />
+        </label>
+        {(dateFrom || dateTo || specialtyFilter || doctorFilter || facilityFilter) && (
+          <button
+            onClick={() => {
+              setDateFrom(""); setDateTo(""); setSpecialtyFilter("");
+              setDoctorFilter(""); setFacilityFilter(""); setPage(0);
+            }}
+            className="rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -115,16 +209,16 @@ export default function DocumentsPage() {
                       <span className="max-w-[200px] truncate">{doc.original_filename}</span>
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_date || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "\u2014"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_date || "\u2014"}</td>
                   <td className="px-4 py-2">{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.provider_name || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{doc.provider_name || "\u2014"}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${
-                      doc.status === "done" ? "bg-green-100 text-green-700" :
-                      doc.status === "failed" ? "bg-red-100 text-red-700" :
-                      doc.status === "needs_review" ? "bg-yellow-100 text-yellow-700" :
-                      "bg-gray-100 text-gray-600"
+                      doc.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
+                      doc.status === "failed" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" :
+                      doc.status === "needs_review" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" :
+                      "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                     }`}>{doc.status}</span>
                   </td>
                 </tr>
@@ -138,7 +232,7 @@ export default function DocumentsPage() {
       {total > limit && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+            Showing {page * limit + 1}\u2013{Math.min((page + 1) * limit, total)} of {total}
           </span>
           <div className="flex gap-2">
             <button

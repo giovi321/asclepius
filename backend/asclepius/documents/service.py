@@ -10,10 +10,11 @@ async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     """Get a single document by ID."""
     cursor = await db.execute(
         """SELECT d.*, p.display_name as patient_name, p.slug as patient_slug,
-                  pr.name as provider_name
+                  doc.name as doctor_name, f.name as facility_name
            FROM documents d
            LEFT JOIN patients p ON d.patient_id = p.id
-           LEFT JOIN providers pr ON d.provider_id = pr.id
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE d.id = ?""",
         (doc_id,),
     )
@@ -34,6 +35,9 @@ async def list_documents(
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    specialty: str | None = None,
+    doctor_id: int | None = None,
+    facility_id: int | None = None,
 ) -> dict:
     """List documents with filters. Returns {items, total}."""
     conditions = []
@@ -61,16 +65,34 @@ async def list_documents(
     if status:
         conditions.append("d.status = ?")
         params.append(status)
+    if doctor_id is not None:
+        conditions.append("d.doctor_id = ?")
+        params.append(doctor_id)
+    if facility_id is not None:
+        conditions.append("d.facility_id = ?")
+        params.append(facility_id)
+    if specialty:
+        conditions.append(
+            "(d.norm_specialty_id = ? OR d.specialty_original LIKE ?)"
+        )
+        # Try to parse as int for norm_specialty_id, otherwise use LIKE for both
+        try:
+            spec_id = int(specialty)
+            params.extend([spec_id, f"%{specialty}%"])
+        except ValueError:
+            params.extend([-1, f"%{specialty}%"])
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     # Full-text search
     if q:
         fts_query = (
-            f"""SELECT d.*, p.display_name as patient_name, pr.name as provider_name
+            f"""SELECT d.*, p.display_name as patient_name,
+                       doc.name as doctor_name, f.name as facility_name
                 FROM documents d
                 LEFT JOIN patients p ON d.patient_id = p.id
-                LEFT JOIN providers pr ON d.provider_id = pr.id
+                LEFT JOIN doctors doc ON d.doctor_id = doc.id
+                LEFT JOIN facilities f ON d.facility_id = f.id
                 JOIN documents_fts ON documents_fts.rowid = d.id
                 {where} AND documents_fts MATCH ?
                 ORDER BY rank
@@ -79,10 +101,12 @@ async def list_documents(
         params.extend([q, limit, offset])
         cursor = await db.execute(fts_query, params)
     else:
-        query = f"""SELECT d.*, p.display_name as patient_name, pr.name as provider_name
+        query = f"""SELECT d.*, p.display_name as patient_name,
+                           doc.name as doctor_name, f.name as facility_name
                     FROM documents d
                     LEFT JOIN patients p ON d.patient_id = p.id
-                    LEFT JOIN providers pr ON d.provider_id = pr.id
+                    LEFT JOIN doctors doc ON d.doctor_id = doc.id
+                    LEFT JOIN facilities f ON d.facility_id = f.id
                     {where}
                     ORDER BY d.created_at DESC
                     LIMIT ? OFFSET ?"""

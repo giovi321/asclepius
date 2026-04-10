@@ -7,7 +7,7 @@ import re
 import httpx
 
 from asclepius.llm.base import LLMProvider
-from asclepius.llm.prompts import EXTRACTION_PROMPT, SQL_GENERATION_PROMPT
+from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,17 @@ class OllamaProvider(LLMProvider):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+
+    async def classify(self, ocr_text: str, context: dict) -> dict:
+        prompt = CLASSIFICATION_PROMPT.format(
+            patient_list=json.dumps(context.get("patient_list", []), indent=2),
+            facility_list=json.dumps(context.get("facility_list", []), indent=2),
+            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
+            ocr_text=ocr_text,
+        )
+
+        response_text = await self._generate(prompt)
+        return self._parse_json(response_text)
 
     async def extract(self, ocr_text: str, context: dict) -> dict:
         prompt = EXTRACTION_PROMPT.format(

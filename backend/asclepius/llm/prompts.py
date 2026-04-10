@@ -1,6 +1,503 @@
 """LLM prompt templates for document extraction and chat."""
 
-EXTRACTION_PROMPT = """You are a medical document parser. Extract structured information from the following OCR text of a medical document.
+# ---------------------------------------------------------------------------
+# Phase 1: Classification prompt (same for ALL document types)
+# ---------------------------------------------------------------------------
+
+CLASSIFICATION_PROMPT = """You are a medical document classifier. Analyze the OCR text and extract basic metadata.
+
+CRITICAL: Patient identification rules:
+- The PATIENT is the person RECEIVING care, NOT the doctor/provider/sender.
+- On invoices: the patient is the person being BILLED. The letterhead is the FACILITY.
+- Match against known patients if possible.
+
+Known patients: {patient_list}
+Known facilities: {facility_list}
+Known doctors: {doctor_list}
+
+Respond in JSON only. No markdown.
+
+{{
+  "patient_name": "string or null",
+  "doc_type": "one of: bloodtest, labtest_other, prescription, invoice, receipt, insurance_claim, insurance_doc, referral, discharge, specialist_report, radiology_report, pathology_report, surgical_report, er_report, vaccination, allergy, sick_leave, medical_cert, physio_report, dental, ophthalmology, mental_health, consent, advance_directive, imaging_dicom, imaging_other, correspondence, other",
+  "doc_date": "YYYY-MM-DD or null",
+  "date_issued": "YYYY-MM-DD or null",
+  "date_visit": "YYYY-MM-DD or null",
+  "language_detected": "ISO 639-1 code",
+  "doctor": {{ "name": "string or null", "title": "string or null", "specialty_original": "string or null", "specialty_canonical": "string or null", "specialty_mapped": false }},
+  "facility": {{ "name": "string or null", "type": "hospital|clinic|lab|pharmacy|imaging_center|other|null", "address": "string or null", "city": "string or null", "country": "string or null", "phone": "string or null" }},
+  "specialty": {{ "original": "string or null", "canonical": "string or null", "mapped": false }},
+  "insurance": {{ "company": "string or null", "policy_number": "string or null" }},
+  "summary_en": "1-3 sentence English summary",
+  "summary_original": "1-3 sentence summary in source language"
+}}
+
+Document classification hints:
+- "specialist_report" = visit report, consultation, checkup, referto, Befund — MOST COMMON
+- "bloodtest" = table of lab values with numbers and units
+- "prescription" = ONLY medication prescription (ricetta, Rezept)
+- "invoice" = prices, amounts, billing codes, TARMED
+- "discharge" = hospital discharge letter
+- "radiology_report" = imaging findings
+- Look at the document TITLE/HEADING first
+
+OCR text:
+---
+{ocr_text}
+---"""
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Type-specific extraction prompts
+# ---------------------------------------------------------------------------
+
+TYPE_EXTRACTION_PROMPTS = {
+    # --- Lab tests ---
+    "bloodtest": """You are a medical lab result parser. Extract ONLY the lab test results from this document.
+
+Known lab test mappings: {lab_test_mappings}
+
+When a test name matches an existing mapping, use the canonical_code. If no mapping exists,
+provide your best English canonical name and set "test_mapped": false.
+
+Respond in JSON only. No markdown.
+
+{{
+  "lab_results": [
+    {{
+      "test_name_original": "name as written in document",
+      "test_name_canonical": "canonical code (e.g. LOINC short name) or best English name",
+      "test_mapped": true,
+      "value": null,
+      "value_text": "string for non-numeric (e.g. 'positive', 'reactive')",
+      "unit": "string",
+      "reference_range_low": null,
+      "reference_range_high": null,
+      "is_abnormal": false,
+      "sample_type": "blood|urine|stool|saliva|csf|other|null",
+      "panel_name": "string or null (e.g. 'CBC', 'lipid panel')"
+    }}
+  ]
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "labtest_other": """You are a medical lab result parser. Extract ONLY the lab test results from this document.
+
+Known lab test mappings: {lab_test_mappings}
+
+When a test name matches an existing mapping, use the canonical_code. If no mapping exists,
+provide your best English canonical name and set "test_mapped": false.
+
+Respond in JSON only. No markdown.
+
+{{
+  "lab_results": [
+    {{
+      "test_name_original": "name as written in document",
+      "test_name_canonical": "canonical code or best English name",
+      "test_mapped": true,
+      "value": null,
+      "value_text": "string for non-numeric",
+      "unit": "string",
+      "reference_range_low": null,
+      "reference_range_high": null,
+      "is_abnormal": false,
+      "sample_type": "blood|urine|stool|saliva|csf|other|null",
+      "panel_name": "string or null"
+    }}
+  ]
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    # --- Clinical reports ---
+    "specialist_report": """You are a medical report parser. Extract diagnoses, encounter details, and medications from this specialist report.
+
+Known diagnosis mappings: {diagnosis_mappings}
+Known medication mappings: {medication_mappings}
+Known specialty mappings: {specialty_mappings}
+
+Use canonical_code from mappings when available. Set "mapped": false for new terms.
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "medications": [
+    {{
+      "brand_name": "string or null",
+      "active_ingredient_original": "as written",
+      "active_ingredient_canonical": "INN name or best English name",
+      "medication_mapped": true,
+      "dosage": "string (e.g. '500mg')",
+      "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+      "frequency": "string (e.g. '2x daily')",
+      "duration": "string or null",
+      "quantity": "string or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "findings": "string or null",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "discharge": """You are a medical report parser. Extract diagnoses, encounter details, medications, and follow-up info from this discharge letter.
+
+Known diagnosis mappings: {diagnosis_mappings}
+Known medication mappings: {medication_mappings}
+Known specialty mappings: {specialty_mappings}
+
+Use canonical_code from mappings when available. Set "mapped": false for new terms.
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "medications": [
+    {{
+      "brand_name": "string or null",
+      "active_ingredient_original": "as written",
+      "active_ingredient_canonical": "INN name or best English name",
+      "medication_mapped": true,
+      "dosage": "string",
+      "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+      "frequency": "string",
+      "duration": "string or null",
+      "quantity": "string or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "admission_date": "YYYY-MM-DD or null",
+    "discharge_date": "YYYY-MM-DD or null",
+    "findings": "string or null",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "radiology_report": """You are a radiology report parser. Extract encounter details with imaging findings.
+
+Known diagnosis mappings: {diagnosis_mappings}
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "findings": "string — the full radiology findings text",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "pathology_report": """You are a pathology report parser. Extract encounter details with pathology findings.
+
+Known diagnosis mappings: {diagnosis_mappings}
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "findings": "string — the full pathology findings text",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "surgical_report": """You are a surgical report parser. Extract encounter details with operative findings.
+
+Known diagnosis mappings: {diagnosis_mappings}
+Known medication mappings: {medication_mappings}
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "medications": [
+    {{
+      "brand_name": "string or null",
+      "active_ingredient_original": "as written",
+      "active_ingredient_canonical": "INN name or best English name",
+      "medication_mapped": true,
+      "dosage": "string",
+      "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+      "frequency": "string",
+      "duration": "string or null",
+      "quantity": "string or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "admission_date": "YYYY-MM-DD or null",
+    "discharge_date": "YYYY-MM-DD or null",
+    "findings": "string — the operative findings",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "er_report": """You are an emergency report parser. Extract encounter details, diagnoses, and medications.
+
+Known diagnosis mappings: {diagnosis_mappings}
+Known medication mappings: {medication_mappings}
+
+Respond in JSON only. No markdown.
+
+{{
+  "diagnoses": [
+    {{
+      "diagnosis_original": "text as written",
+      "diagnosis_canonical": "canonical code or best English name",
+      "diagnosis_mapped": true,
+      "icd10_code": "ICD-10 code or null"
+    }}
+  ],
+  "medications": [
+    {{
+      "brand_name": "string or null",
+      "active_ingredient_original": "as written",
+      "active_ingredient_canonical": "INN name or best English name",
+      "medication_mapped": true,
+      "dosage": "string",
+      "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+      "frequency": "string",
+      "duration": "string or null",
+      "quantity": "string or null"
+    }}
+  ],
+  "encounter": {{
+    "encounter_date": "YYYY-MM-DD or null",
+    "admission_date": "YYYY-MM-DD or null",
+    "discharge_date": "YYYY-MM-DD or null",
+    "findings": "string or null",
+    "follow_up_date": "YYYY-MM-DD or null",
+    "follow_up_instructions": "string or null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    # --- Medications ---
+    "prescription": """You are a prescription parser. Extract ONLY the prescribed medications.
+
+Known medication mappings: {medication_mappings}
+
+Use canonical_code from mappings when available. Set "medication_mapped": false for new terms.
+
+Respond in JSON only. No markdown.
+
+{{
+  "medications": [
+    {{
+      "brand_name": "string or null",
+      "active_ingredient_original": "as written",
+      "active_ingredient_canonical": "INN name or best English name",
+      "medication_mapped": true,
+      "dosage": "string (e.g. '500mg')",
+      "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+      "frequency": "string (e.g. '2x daily')",
+      "duration": "string or null",
+      "quantity": "string or null"
+    }}
+  ]
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    # --- Financial ---
+    "invoice": """You are a medical invoice parser. Extract cost information with all line items.
+
+Respond in JSON only. No markdown.
+
+{{
+  "cost": {{
+    "total_amount": null,
+    "currency": "ISO 4217 code",
+    "subtotal": null,
+    "tax_amount": null,
+    "tax_rate": null,
+    "line_items": [
+      {{
+        "description": "string",
+        "quantity": 1,
+        "unit_price": null,
+        "amount": 0,
+        "tariff_code": "string or null",
+        "category": "consultation|procedure|medication|lab|imaging|admin|other"
+      }}
+    ]
+  }},
+  "insurance": {{
+    "company": "string or null",
+    "policy_number": "string or null",
+    "claim_status": "approved|partially_approved|denied|pending|null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "receipt": """You are a medical receipt parser. Extract cost totals.
+
+Respond in JSON only. No markdown.
+
+{{
+  "cost": {{
+    "total_amount": null,
+    "currency": "ISO 4217 code"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    "insurance_claim": """You are an insurance claim parser. Extract cost and insurance details.
+
+Respond in JSON only. No markdown.
+
+{{
+  "cost": {{
+    "total_amount": null,
+    "currency": "ISO 4217 code",
+    "subtotal": null,
+    "tax_amount": null,
+    "tax_rate": null,
+    "line_items": [
+      {{
+        "description": "string",
+        "quantity": 1,
+        "unit_price": null,
+        "amount": 0,
+        "tariff_code": "string or null",
+        "category": "consultation|procedure|medication|lab|imaging|admin|other"
+      }}
+    ]
+  }},
+  "insurance": {{
+    "company": "string or null",
+    "policy_number": "string or null",
+    "claim_status": "approved|partially_approved|denied|pending|null"
+  }}
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+
+    # --- Vaccinations ---
+    "vaccination": """You are a vaccination record parser. Extract ONLY vaccination details.
+
+Respond in JSON only. No markdown.
+
+{{
+  "vaccinations": [
+    {{
+      "vaccine_name": "string",
+      "manufacturer": "string or null",
+      "lot_number": "string or null",
+      "dose_number": null,
+      "date_administered": "YYYY-MM-DD or null"
+    }}
+  ]
+}}
+
+OCR text:
+---
+{ocr_text}
+---""",
+}
+
+
+# ---------------------------------------------------------------------------
+# Legacy monolithic prompt (kept for fallback / backward compat)
+# ---------------------------------------------------------------------------
+
+EXTRACTION_PROMPT_LEGACY = """You are a medical document parser. Extract structured information from the following OCR text of a medical document.
 
 CRITICAL RULES:
 
@@ -154,6 +651,9 @@ OCR text:
 {ocr_text}
 ---"""
 
+# Keep backward-compat alias
+EXTRACTION_PROMPT = EXTRACTION_PROMPT_LEGACY
+
 
 DOCUMENT_EDIT_PROMPT = """You are a medical document metadata editor. The user is correcting or adding information about a medical document.
 
@@ -235,3 +735,43 @@ Tables:
 - norm_diagnoses(id, canonical_code, canonical_display, icd10_code)
 - norm_medications(id, canonical_code, canonical_display, atc_code)
 """
+
+
+LINK_SUGGESTION_PROMPT = """You are a medical records analyst. Given a document and a list of other documents for the same patient, suggest which documents are likely related.
+
+Current document:
+- ID: {doc_id}
+- Type: {doc_type}
+- Date: {doc_date}
+- Doctor: {doctor_name}
+- Facility: {facility_name}
+- Summary: {summary}
+
+Other documents for the same patient:
+{other_documents}
+
+Link types:
+- "invoice_for" = an invoice/bill for a visit or procedure documented elsewhere
+- "report_for" = a report (lab, radiology, pathology) related to a visit
+- "imaging_for" = imaging study related to a clinical report
+- "follow_up" = a follow-up visit to a previous visit
+- "related" = otherwise clinically related documents
+
+Rules:
+- Only suggest links with high confidence.
+- Consider date proximity, same doctor/facility, and clinical context.
+- An invoice near the same date from the same facility likely relates to a specialist report.
+- Lab results near a visit date likely relate to that visit.
+- Do NOT suggest links between completely unrelated specialties unless there is a clear reason.
+
+Respond in JSON only. No markdown.
+
+{{
+  "suggestions": [
+    {{
+      "document_id": 0,
+      "link_type": "one of: invoice_for, report_for, imaging_for, follow_up, related",
+      "reason": "brief explanation"
+    }}
+  ]
+}}"""

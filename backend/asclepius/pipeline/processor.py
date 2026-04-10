@@ -11,7 +11,7 @@ from asclepius.config import AppConfig
 from asclepius.db.connection import get_db
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
-from asclepius.pipeline.extractor import extract_and_store
+from asclepius.pipeline.extractor import classify_and_extract, extract_and_store
 from asclepius.pipeline.organizer import build_organized_path, move_file
 
 logger = logging.getLogger(__name__)
@@ -228,7 +228,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
                 extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
             else:
-                extraction = await extract_and_store(db, llm, doc_id, ocr_text, config)
+                extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
                 pipeline_status["total_errors"] += 1
@@ -447,6 +447,11 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
                 return {"error": f"File not found: {doc['file_path']}"}
 
             logger.info("Re-running OCR on doc %d", doc_id)
+            await db.execute(
+                "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
             ocr_text, confidence, engine = await extract_text(str(file_path), config)
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
@@ -466,18 +471,19 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
         # Clear old extracted data
         for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
-
-        await db.execute(
-            "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (doc_id,),
-        )
         await db.commit()
 
-        # Run LLM extraction
+        # Run LLM extraction — only set 'processing' right before actual work begins
         logger.info("Re-running LLM extraction on doc %d", doc_id)
         try:
+            await db.execute(
+                "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+
             llm = get_llm_provider(config)
-            extraction = await extract_and_store(db, llm, doc_id, ocr_text, config)
+            extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
                 await db.execute(

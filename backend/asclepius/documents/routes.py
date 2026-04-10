@@ -488,6 +488,89 @@ class DocumentEditRequest(BaseModel):
     instruction: str
 
 
+@router.post("/{doc_id}/suggest-links")
+async def suggest_document_links(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Use LLM to suggest related documents for linking."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.get("patient_id"):
+        raise HTTPException(status_code=400, detail="Document has no patient assigned — cannot suggest links")
+
+    # Check access
+    role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+    if not role:
+        raise HTTPException(status_code=403, detail="No access")
+
+    # Get all other documents for the same patient
+    cursor = await db.execute(
+        """SELECT d.id, d.doc_type, d.doc_date, d.summary_en, d.original_filename,
+                  doc.name as doctor_name, f.name as facility_name
+           FROM documents d
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
+           WHERE d.patient_id = ? AND d.id != ? AND d.status = 'done'
+           ORDER BY d.doc_date DESC
+           LIMIT 50""",
+        (doc["patient_id"], doc_id),
+    )
+    rows = await cursor.fetchall()
+    other_docs = [dict(r) for r in rows]
+
+    if not other_docs:
+        return {"suggestions": []}
+
+    # Format other documents for the prompt
+    other_docs_text = "\n".join(
+        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('doc_date', 'unknown')}, "
+        f"Doctor: {d.get('doctor_name', 'unknown')}, Facility: {d.get('facility_name', 'unknown')}, "
+        f"Summary: {d.get('summary_en', 'N/A')}"
+        for d in other_docs
+    )
+
+    from asclepius.llm.prompts import LINK_SUGGESTION_PROMPT
+    from asclepius.pipeline.processor import get_llm_provider
+
+    config = get_config()
+    llm = get_llm_provider(config)
+
+    prompt = LINK_SUGGESTION_PROMPT.format(
+        doc_id=doc_id,
+        doc_type=doc.get("doc_type", "unknown"),
+        doc_date=doc.get("doc_date", "unknown"),
+        doctor_name=doc.get("doctor_name", "unknown"),
+        facility_name=doc.get("facility_name", "unknown"),
+        summary=doc.get("summary_en", "N/A"),
+        other_documents=other_docs_text,
+    )
+
+    try:
+        if hasattr(llm, "_generate"):
+            response_text = await llm._generate(prompt)
+            result = llm._parse_json(response_text)
+        else:
+            raise HTTPException(status_code=500, detail="LLM provider does not support direct generation")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+
+    suggestions = result.get("suggestions", [])
+
+    # Validate that suggested document IDs actually exist in the other_docs list
+    valid_ids = {d["id"] for d in other_docs}
+    valid_link_types = {"invoice_for", "report_for", "imaging_for", "follow_up", "related"}
+    validated = [
+        s for s in suggestions
+        if s.get("document_id") in valid_ids and s.get("link_type") in valid_link_types
+    ]
+
+    return {"suggestions": validated}
+
+
 @router.post("/{doc_id}/edit-with-ai")
 async def edit_document_with_ai(
     doc_id: int,

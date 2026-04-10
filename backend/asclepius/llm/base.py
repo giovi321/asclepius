@@ -7,6 +7,20 @@ class LLMProvider(ABC):
     """Base class for LLM providers (Ollama, Claude)."""
 
     @abstractmethod
+    async def classify(self, ocr_text: str, context: dict) -> dict:
+        """Classify document and extract basic metadata.
+
+        Args:
+            ocr_text: The OCR text from the document.
+            context: Dict with keys: patient_list, facility_list, doctor_list.
+
+        Returns:
+            Classification dict with doc_type, patient_name, dates, doctor,
+            facility, summary, etc.
+        """
+        ...
+
+    @abstractmethod
     async def extract(self, ocr_text: str, context: dict) -> dict:
         """Extract structured data from OCR text.
 

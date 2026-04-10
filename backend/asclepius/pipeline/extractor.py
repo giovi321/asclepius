@@ -68,6 +68,87 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     }
 
 
+async def _extract_type_specific(llm: LLMProvider, ocr_text: str, doc_type: str, context: dict) -> dict:
+    """Call the type-specific extraction prompt for phase 2."""
+    from asclepius.llm.prompts import TYPE_EXTRACTION_PROMPTS
+
+    prompt_template = TYPE_EXTRACTION_PROMPTS.get(doc_type)
+    if not prompt_template:
+        # No type-specific prompt for this doc_type — return empty
+        return {}
+
+    # Build format kwargs with only the placeholders that exist in this template
+    format_kwargs: dict[str, str] = {"ocr_text": ocr_text}
+    import json as _json
+    mapping_keys = {
+        "lab_test_mappings": "lab_test_mappings",
+        "specialty_mappings": "specialty_mappings",
+        "diagnosis_mappings": "diagnosis_mappings",
+        "medication_mappings": "medication_mappings",
+    }
+    for placeholder, ctx_key in mapping_keys.items():
+        if "{" + placeholder + "}" in prompt_template:
+            format_kwargs[placeholder] = _json.dumps(context.get(ctx_key, []), indent=2)
+
+    prompt = prompt_template.format(**format_kwargs)
+
+    # Use the LLM's internal generate + parse (works for both Ollama and Claude)
+    if hasattr(llm, "_generate"):
+        response_text = await llm._generate(prompt)
+        return llm._parse_json(response_text)
+    else:
+        # Fallback: use extract with the formatted prompt as ocr_text
+        # This shouldn't normally happen since both providers have _generate
+        return {}
+
+
+async def classify_and_extract(
+    db: aiosqlite.Connection,
+    llm: LLMProvider,
+    doc_id: int,
+    ocr_text: str,
+    config: AppConfig,
+    extraction_override: dict | None = None,
+) -> dict:
+    """Two-phase extraction: classify first, then extract type-specific data.
+
+    Phase 1: Classify document and extract universal fields (patient, doctor,
+             facility, dates, summary).
+    Phase 2: Run a type-specific prompt to extract structured data (lab results,
+             medications, diagnoses, etc.)
+
+    If extraction_override is provided, skip both LLM calls and use that data directly.
+    """
+    context = await build_extraction_context(db)
+
+    if extraction_override:
+        extraction = extraction_override
+    else:
+        # Phase 1: Classify
+        logger.info("Phase 1 — classifying doc %d", doc_id)
+        classification = await llm.classify(ocr_text, context)
+
+        if "error" in classification:
+            logger.error("Classification failed for doc %d: %s", doc_id, classification.get("error"))
+            await db.execute(
+                "UPDATE documents SET status = 'failed', raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (json.dumps(classification), doc_id),
+            )
+            await db.commit()
+            return classification
+
+        # Phase 2: Type-specific extraction
+        doc_type = classification.get("doc_type", "other")
+        logger.info("Phase 2 — extracting type-specific data for doc %d (type=%s)", doc_id, doc_type)
+        type_extraction = await _extract_type_specific(llm, ocr_text, doc_type, context)
+
+        # Merge: classification provides the base, type-specific adds structured arrays
+        extraction = {**classification, **type_extraction}
+
+    # Delegate to extract_and_store for DB writes
+    return await extract_and_store(db, llm, doc_id, ocr_text, config, extraction_override=extraction)
+
+
 async def extract_and_store(
     db: aiosqlite.Connection,
     llm: LLMProvider,

@@ -483,12 +483,15 @@ export default function DocumentDetailPage() {
               <p className="text-sm text-muted-foreground">No linked documents</p>
             )}
             {!showLinkSearch ? (
-              <button
-                onClick={() => setShowLinkSearch(true)}
-                className="mt-2 flex items-center gap-1 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                <Plus className="h-3 w-3" /> Link document
-              </button>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => setShowLinkSearch(true)}
+                  className="flex items-center gap-1 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Plus className="h-3 w-3" /> Link manually
+                </button>
+                <SuggestLinksButton docId={doc.id} onLink={loadDoc} />
+              </div>
             ) : (
               <div className="mt-2 space-y-2 rounded-md border p-3">
                 <div className="flex gap-2">
@@ -629,6 +632,86 @@ function OcrSection({ text }: { text: string | null }) {
         <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap border-t bg-muted/30 p-4 text-xs">
           {text}
         </pre>
+      )}
+    </div>
+  );
+}
+
+function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[] | null>(null);
+
+  const handleSuggest = async () => {
+    setLoading(true);
+    setSuggestions(null);
+    try {
+      const res = await api.post(`/documents/${docId}/suggest-links`);
+      setSuggestions(res.data.suggestions || []);
+    } catch {
+      alert("Failed to get suggestions");
+    }
+    setLoading(false);
+  };
+
+  const handleAccept = async (targetId: number, linkType: string) => {
+    try {
+      await api.post(`/documents/${docId}/link`, { target_document_id: targetId, link_type: linkType });
+      setSuggestions((s) => s?.filter((sg) => sg.document_id !== targetId) || null);
+      onLink();
+    } catch {
+      alert("Failed to link");
+    }
+  };
+
+  return (
+    <div>
+      <button
+        onClick={handleSuggest}
+        disabled={loading}
+        className="flex items-center gap-1 rounded-md border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+      >
+        {loading ? (
+          <>
+            <div className="animate-spin h-3 w-3 border border-primary border-t-transparent rounded-full" />
+            Analyzing...
+          </>
+        ) : (
+          <>
+            <Stethoscope className="h-3 w-3" /> Suggest links (AI)
+          </>
+        )}
+      </button>
+
+      {suggestions !== null && (
+        <div className="mt-2 space-y-2">
+          {suggestions.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No related documents found</p>
+          ) : (
+            suggestions.map((sg: any) => (
+              <div key={sg.document_id} className="flex items-start gap-2 rounded-md border p-2 text-xs">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{sg.filename || `Document #${sg.document_id}`}</p>
+                  <p className="text-muted-foreground">{sg.reason}</p>
+                  <span className="inline-block mt-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">{sg.link_type?.replace(/_/g, " ")}</span>
+                </div>
+                <div className="flex gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => handleAccept(sg.document_id, sg.link_type)}
+                    className="rounded bg-primary px-2 py-1 text-primary-foreground hover:bg-primary/90"
+                  >
+                    Link
+                  </button>
+                  <button
+                    onClick={() => setSuggestions((s) => s?.filter((x) => x.document_id !== sg.document_id) || null)}
+                    className="rounded border px-2 py-1 hover:bg-accent"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       )}
     </div>
   );

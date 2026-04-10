@@ -27,16 +27,36 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "ollama_model": config.llm.ollama_model,
             "claude_model": config.llm.claude_model,
             "has_claude_key": bool(config.llm.claude_api_key),
+            "extraction_timeout": config.llm.extraction_timeout,
         },
         "ocr": {
             "engine": config.ocr.engine,
             "language": config.ocr.language,
             "confidence_threshold": config.ocr.confidence_threshold,
             "cloud_ocr_enabled": config.ocr.cloud_ocr_enabled,
+            "remote_url": config.ocr.remote_url,
+            "has_remote_api_key": bool(config.ocr.remote_api_key),
+            "llm_vision_model": config.ocr.llm_vision_model,
+            "has_google_vision_key": bool(config.ocr.google_vision_key),
         },
         "pipeline": {
             "watch_enabled": config.pipeline.watch_enabled,
             "poll_interval_seconds": config.pipeline.poll_interval_seconds,
+            "retry_interval_seconds": config.pipeline.retry_interval_seconds,
+            "max_retries": config.pipeline.max_retries,
+        },
+        "auth": {
+            "session_ttl_hours": config.auth.session_ttl_hours,
+        },
+        "oidc": {
+            "enabled": config.oidc.enabled,
+            "provider_url": config.oidc.provider_url,
+            "client_id": config.oidc.client_id,
+            "has_client_secret": bool(config.oidc.client_secret),
+            "scopes": config.oidc.scopes,
+            "auto_create_user": config.oidc.auto_create_user,
+            "username_claim": config.oidc.username_claim,
+            "display_name_claim": config.oidc.display_name_claim,
         },
         "vault": {
             "root_path": config.vault.root_path,
@@ -46,14 +66,70 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
 
 
 class SettingsUpdate(BaseModel):
+    # LLM
     llm_provider: str | None = None
     ollama_base_url: str | None = None
     ollama_model: str | None = None
     claude_api_key: str | None = None
     claude_model: str | None = None
+    extraction_timeout: int | None = None
+    # OCR
+    ocr_engine: str | None = None
     ocr_language: str | None = None
     ocr_confidence_threshold: float | None = None
     cloud_ocr_enabled: bool | None = None
+    ocr_remote_url: str | None = None
+    ocr_remote_api_key: str | None = None
+    llm_vision_model: str | None = None
+    google_vision_key: str | None = None
+    # Pipeline
+    pipeline_watch_enabled: bool | None = None
+    pipeline_poll_interval: int | None = None
+    pipeline_retry_interval: int | None = None
+    pipeline_max_retries: int | None = None
+    # Auth
+    session_ttl_hours: int | None = None
+    # OIDC
+    oidc_enabled: bool | None = None
+    oidc_provider_url: str | None = None
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None
+    oidc_scopes: str | None = None
+    oidc_auto_create_user: bool | None = None
+    oidc_username_claim: str | None = None
+    oidc_display_name_claim: str | None = None
+
+
+# Mapping: API field -> (yaml_section, yaml_key, config_dotpath)
+_SETTINGS_MAP = {
+    "llm_provider": ("llm", "provider", "llm.provider"),
+    "ollama_base_url": ("llm", "ollama_base_url", "llm.ollama_base_url"),
+    "ollama_model": ("llm", "ollama_model", "llm.ollama_model"),
+    "claude_api_key": ("llm", "claude_api_key", "llm.claude_api_key"),
+    "claude_model": ("llm", "claude_model", "llm.claude_model"),
+    "extraction_timeout": ("llm", "extraction_timeout", "llm.extraction_timeout"),
+    "ocr_engine": ("ocr", "engine", "ocr.engine"),
+    "ocr_language": ("ocr", "language", "ocr.language"),
+    "ocr_confidence_threshold": ("ocr", "confidence_threshold", "ocr.confidence_threshold"),
+    "cloud_ocr_enabled": ("ocr", "cloud_ocr_enabled", "ocr.cloud_ocr_enabled"),
+    "ocr_remote_url": ("ocr", "remote_url", "ocr.remote_url"),
+    "ocr_remote_api_key": ("ocr", "remote_api_key", "ocr.remote_api_key"),
+    "llm_vision_model": ("ocr", "llm_vision_model", "ocr.llm_vision_model"),
+    "google_vision_key": ("ocr", "google_vision_key", "ocr.google_vision_key"),
+    "pipeline_watch_enabled": ("pipeline", "watch_enabled", "pipeline.watch_enabled"),
+    "pipeline_poll_interval": ("pipeline", "poll_interval_seconds", "pipeline.poll_interval_seconds"),
+    "pipeline_retry_interval": ("pipeline", "retry_interval_seconds", "pipeline.retry_interval_seconds"),
+    "pipeline_max_retries": ("pipeline", "max_retries", "pipeline.max_retries"),
+    "session_ttl_hours": ("auth", "session_ttl_hours", "auth.session_ttl_hours"),
+    "oidc_enabled": ("oidc", "enabled", "oidc.enabled"),
+    "oidc_provider_url": ("oidc", "provider_url", "oidc.provider_url"),
+    "oidc_client_id": ("oidc", "client_id", "oidc.client_id"),
+    "oidc_client_secret": ("oidc", "client_secret", "oidc.client_secret"),
+    "oidc_scopes": ("oidc", "scopes", "oidc.scopes"),
+    "oidc_auto_create_user": ("oidc", "auto_create_user", "oidc.auto_create_user"),
+    "oidc_username_claim": ("oidc", "username_claim", "oidc.username_claim"),
+    "oidc_display_name_claim": ("oidc", "display_name_claim", "oidc.display_name_claim"),
+}
 
 
 @router.patch("")
@@ -61,60 +137,40 @@ async def update_settings(
     body: SettingsUpdate,
     current_user: dict = Depends(get_current_user),
 ):
-    """Update settings and persist to settings.yaml. Requires restart for most changes."""
+    """Update settings: persists to YAML and updates in-memory config."""
     config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
     path = Path(config_path)
 
-    # Load existing YAML
     data = {}
     if path.exists():
         data = yaml.safe_load(path.read_text()) or {}
 
-    # Apply updates
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status_code=400, detail="No settings to update")
 
-    mapping = {
-        "llm_provider": ("llm", "provider"),
-        "ollama_base_url": ("llm", "ollama_base_url"),
-        "ollama_model": ("llm", "ollama_model"),
-        "claude_api_key": ("llm", "claude_api_key"),
-        "claude_model": ("llm", "claude_model"),
-        "ocr_language": ("ocr", "language"),
-        "ocr_confidence_threshold": ("ocr", "confidence_threshold"),
-        "cloud_ocr_enabled": ("ocr", "cloud_ocr_enabled"),
-    }
+    config = get_config()
 
     for key, value in changes.items():
-        if key in mapping:
-            section, field = mapping[key]
-            if section not in data:
-                data[section] = {}
-            data[section][field] = value
+        if key not in _SETTINGS_MAP:
+            continue
+        yaml_section, yaml_key, config_dotpath = _SETTINGS_MAP[key]
 
-    # Write back
+        # Write to YAML
+        if yaml_section not in data:
+            data[yaml_section] = {}
+        data[yaml_section][yaml_key] = value
+
+        # Update in-memory config
+        parts = config_dotpath.split(".")
+        obj = config
+        for part in parts[:-1]:
+            obj = getattr(obj, part)
+        setattr(obj, parts[-1], value)
+
+    # Persist
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
-
-    # Also update in-memory config for immediate effect where possible
-    config = get_config()
-    if body.llm_provider:
-        config.llm.provider = body.llm_provider
-    if body.ollama_base_url:
-        config.llm.ollama_base_url = body.ollama_base_url
-    if body.ollama_model:
-        config.llm.ollama_model = body.ollama_model
-    if body.claude_api_key:
-        config.llm.claude_api_key = body.claude_api_key
-    if body.claude_model:
-        config.llm.claude_model = body.claude_model
-    if body.ocr_language:
-        config.ocr.language = body.ocr_language
-    if body.ocr_confidence_threshold is not None:
-        config.ocr.confidence_threshold = body.ocr_confidence_threshold
-    if body.cloud_ocr_enabled is not None:
-        config.ocr.cloud_ocr_enabled = body.cloud_ocr_enabled
 
     return {"status": "saved", "changes": changes}
 

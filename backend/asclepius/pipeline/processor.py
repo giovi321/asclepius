@@ -91,38 +91,56 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             file_size = os.path.getsize(file_path)
             page_count = _count_pages(file_path)
 
-            # Check for duplicates via file hash
+            # Check for duplicates via file hash (only skip if already processed)
             cursor = await db.execute(
-                "SELECT id FROM documents WHERE file_hash = ?",
+                "SELECT id, status FROM documents WHERE file_hash = ?",
                 (file_hash,),
             )
             existing = await cursor.fetchone()
             if existing:
-                logger.info("Duplicate detected by hash, skipping: %s", path.name)
-                path.unlink()
-                return
+                if existing["status"] == "done":
+                    logger.info("Duplicate detected by hash (already done), skipping: %s", path.name)
+                    path.unlink()
+                    return
+                # Existing record is pending/failed — reuse it
+                doc_id = existing["id"]
+                await db.execute(
+                    """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (file_size, page_count, doc_id),
+                )
+                await db.commit()
+                logger.info("Reusing existing record %d for: %s", doc_id, path.name)
+            else:
+                ext = path.suffix.lower()
+
+                # DICOM path
+                if ext in {".dcm", ".dicom"}:
+                    from asclepius.pipeline.dicom_ingest import process_dicom
+                    doc_id = await process_dicom(file_path, config, db)
+                    if doc_id:
+                        pipeline_status["total_processed"] += 1
+                        pipeline_status["last_processed"] = path.name
+                    return
+
+                # Create new document record
+                cursor = await db.execute(
+                    """INSERT INTO documents
+                       (file_path, original_filename, file_hash, file_size, page_count,
+                        date_received, status)
+                       VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
+                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
+                )
+                doc_id = cursor.lastrowid
+                await db.commit()
 
             ext = path.suffix.lower()
-
-            # DICOM path
             if ext in {".dcm", ".dicom"}:
                 from asclepius.pipeline.dicom_ingest import process_dicom
-                doc_id = await process_dicom(file_path, config, db)
-                if doc_id:
-                    pipeline_status["total_processed"] += 1
-                    pipeline_status["last_processed"] = path.name
+                await process_dicom(file_path, config, db)
+                pipeline_status["total_processed"] += 1
+                pipeline_status["last_processed"] = path.name
                 return
-
-            # Create initial document record with file metadata
-            cursor = await db.execute(
-                """INSERT INTO documents
-                   (file_path, original_filename, file_hash, file_size, page_count,
-                    date_received, status)
-                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
-                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
-            )
-            doc_id = cursor.lastrowid
-            await db.commit()
 
             # OCR
             logger.info("Running OCR on doc %d: %s", doc_id, path.name)

@@ -103,23 +103,31 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             file_size = os.path.getsize(file_path)
             page_count = _count_pages(file_path)
 
-            # Check for duplicates via file hash (only skip if already processed)
+            # Check for existing records (by hash or filename)
             cursor = await db.execute(
-                "SELECT id, status FROM documents WHERE file_hash = ?",
-                (file_hash,),
+                "SELECT id, status FROM documents WHERE file_hash = ? OR (original_filename = ? AND file_hash IS NULL) ORDER BY id",
+                (file_hash, path.name),
             )
-            existing = await cursor.fetchone()
-            if existing:
-                if existing["status"] == "done":
-                    logger.info("Duplicate detected by hash (already done), skipping: %s", path.name)
+            existing_rows = await cursor.fetchall()
+
+            if existing_rows:
+                # Check if any are already done
+                done_row = next((r for r in existing_rows if r["status"] == "done"), None)
+                if done_row:
+                    logger.info("Already processed (doc %d), skipping: %s", done_row["id"], path.name)
                     path.unlink()
                     return
-                # Existing record is pending/failed — reuse it
-                doc_id = existing["id"]
+
+                # Reuse the first pending/failed record, delete any duplicates
+                doc_id = existing_rows[0]["id"]
+                for dup in existing_rows[1:]:
+                    logger.info("Removing duplicate record %d for: %s", dup["id"], path.name)
+                    await db.execute("DELETE FROM documents WHERE id = ?", (dup["id"],))
+
                 await db.execute(
-                    """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
+                    """UPDATE documents SET status = 'processing', file_hash = ?, file_size = ?, page_count = ?,
                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (file_size, page_count, doc_id),
+                    (file_hash, file_size, page_count, doc_id),
                 )
                 await db.commit()
                 logger.info("Reusing existing record %d for: %s", doc_id, path.name)

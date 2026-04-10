@@ -10,7 +10,7 @@ services:
       - ASCLEPIUS_VAULT_PATH=/vault
       - ASCLEPIUS_CONFIG_PATH=/config/settings.yaml
       - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:-change-me-in-production}
-      - ASCLEPIUS_OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
+      - ASCLEPIUS_OLLAMA_URL=${OLLAMA_URL:-}
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
     # Remove depends_on if using external Ollama

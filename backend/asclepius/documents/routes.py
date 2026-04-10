@@ -578,7 +578,11 @@ async def edit_document_with_ai(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Edit document metadata using natural language instruction via LLM."""
+    """Edit document metadata using natural language instruction via LLM.
+
+    Uses a compact prompt to minimize token usage. For simple field changes,
+    the LLM returns only the changed fields as JSON.
+    """
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -586,65 +590,111 @@ async def edit_document_with_ai(
     config = get_config()
     from asclepius.pipeline.processor import get_llm_provider
     from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
-    from asclepius.llm.prompts import DOCUMENT_EDIT_PROMPT, EXTRACTION_PROMPT
     import json as _json
+    import asyncio as _asyncio
 
     llm = get_llm_provider(config)
     context = await build_extraction_context(db)
 
-    # Build current data summary
-    current_data = {
+    # Build a compact current data summary (only non-null fields)
+    current_data = {k: v for k, v in {
         "patient_name": doc.get("patient_name"),
         "doc_type": doc.get("doc_type"),
         "doc_date": doc.get("doc_date"),
         "date_issued": doc.get("date_issued"),
         "date_visit": doc.get("date_visit"),
-        "summary_en": doc.get("summary_en"),
         "doctor_name": doc.get("doctor_name"),
         "facility_name": doc.get("facility_name"),
         "specialty_original": doc.get("specialty_original"),
-    }
+        "summary_en": doc.get("summary_en"),
+    }.items() if v}
 
-    # Get the JSON schema from the extraction prompt (reuse the structure)
-    json_schema = EXTRACTION_PROMPT.split("Respond in JSON only. No markdown, no explanation.")[-1].split("OCR text:")[0].strip()
+    # Compact prompt — no huge JSON schema, just the fields
+    prompt = f"""You are editing a medical document's metadata. The user wants to make changes.
 
-    prompt = DOCUMENT_EDIT_PROMPT.format(
-        current_data=_json.dumps(current_data, indent=2),
-        patient_list=_json.dumps(context.get("patient_list", []), indent=2),
-        facility_list=_json.dumps(context.get("facility_list", []), indent=2),
-        doctor_list=_json.dumps(context.get("doctor_list", []), indent=2),
-        user_instruction=body.instruction,
-        json_schema=json_schema,
-    )
+Current data: {_json.dumps(current_data)}
 
-    # Call LLM
-    try:
-        if hasattr(llm, '_generate'):
-            response_text = await llm._generate(prompt)
-            extraction = llm._parse_json(response_text)
-        else:
-            extraction = await llm.extract(doc.get("ocr_text", ""), context)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+Known patients: {_json.dumps([p.get("name","") for p in context.get("patient_list", [])[:20]])}
 
-    if "error" in extraction:
-        raise HTTPException(status_code=500, detail=extraction.get("error"))
+User instruction: "{body.instruction}"
 
-    # Clear old extracted data and re-write with LLM output
-    for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items"]:
-        await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
+Return ONLY a JSON object with the fields that should change. Use these field names:
+- patient_name, doc_type, doc_date (YYYY-MM-DD), date_issued, date_visit
+- doctor (object: name, title, specialty_original)
+- facility (object: name, type, city)
+- summary_en, summary_original
 
-    # Store the new extraction
-    await db.execute(
-        "UPDATE documents SET raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (_json.dumps(extraction), doc_id),
-    )
-    await db.commit()
+Only include fields the user mentioned. JSON only, no explanation."""
 
-    # Write structured data using the existing extractor
-    await extract_and_store(db, llm, doc_id, doc.get("ocr_text", ""), config, extraction_override=extraction)
+    # Call LLM with retry for rate limits
+    for attempt in range(3):
+        try:
+            if hasattr(llm, '_generate'):
+                response_text = await llm._generate(prompt)
+                changes = llm._parse_json(response_text)
+            else:
+                raise HTTPException(status_code=500, detail="LLM provider does not support direct generation")
+            break
+        except Exception as e:
+            if "429" in str(e) or "rate_limit" in str(e):
+                wait = 30 * (attempt + 1)
+                await _asyncio.sleep(wait)
+                if attempt == 2:
+                    raise HTTPException(status_code=429, detail="Rate limited — please try again in a minute")
+            else:
+                raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
 
-    return {"status": "updated", "document_id": doc_id}
+    if "error" in changes:
+        raise HTTPException(status_code=500, detail=changes.get("error"))
+
+    # Apply changes directly to the documents table
+    updates = {}
+    if "doc_type" in changes:
+        updates["doc_type"] = changes["doc_type"]
+    if "doc_date" in changes:
+        updates["doc_date"] = changes["doc_date"]
+    if "date_issued" in changes:
+        updates["date_issued"] = changes["date_issued"]
+    if "date_visit" in changes:
+        updates["date_visit"] = changes["date_visit"]
+    if "summary_en" in changes:
+        updates["summary_en"] = changes["summary_en"]
+    if "summary_original" in changes:
+        updates["summary_original"] = changes["summary_original"]
+    if "specialty_original" in changes.get("specialty", changes):
+        updates["specialty_original"] = changes.get("specialty", {}).get("original", changes.get("specialty_original"))
+
+    # Handle patient name change
+    if "patient_name" in changes:
+        from asclepius.pipeline.extractor import _match_patient
+        patient_id = await _match_patient(db, changes["patient_name"])
+        if patient_id:
+            updates["patient_id"] = patient_id
+
+    # Handle doctor change
+    doctor_data = changes.get("doctor")
+    if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
+        from asclepius.pipeline.extractor import _upsert_doctor
+        doctor_id = await _upsert_doctor(db, doctor_data)
+        updates["doctor_id"] = doctor_id
+
+    # Handle facility change
+    facility_data = changes.get("facility")
+    if facility_data and isinstance(facility_data, dict) and facility_data.get("name"):
+        from asclepius.pipeline.extractor import _upsert_facility
+        facility_id = await _upsert_facility(db, facility_data)
+        updates["facility_id"] = facility_id
+
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [doc_id]
+        await db.execute(
+            f"UPDATE documents SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            values,
+        )
+        await db.commit()
+
+    return {"status": "updated", "document_id": doc_id, "changes": changes}
 
 
 async def _get_related(db: aiosqlite.Connection, table: str, doc_id: int) -> list[dict]:

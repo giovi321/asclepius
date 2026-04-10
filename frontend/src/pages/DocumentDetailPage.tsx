@@ -131,7 +131,7 @@ export default function DocumentDetailPage() {
 
   const handleLinkDocument = async (targetId: number) => {
     try {
-      await api.post(`/documents/${id}/links`, { target_document_id: targetId, link_type: linkType });
+      await api.post(`/documents/${id}/link`, { target_document_id: targetId, link_type: linkType });
       await loadDoc();
       setShowLinkSearch(false);
       setLinkSearch("");
@@ -510,9 +510,10 @@ export default function DocumentDetailPage() {
                     className="rounded-md border bg-background px-2 py-1.5 text-xs"
                   >
                     <option value="related">Related</option>
+                    <option value="invoice_for">Invoice for</option>
+                    <option value="report_for">Report for</option>
+                    <option value="imaging_for">Imaging for</option>
                     <option value="follow_up">Follow-up</option>
-                    <option value="supersedes">Supersedes</option>
-                    <option value="references">References</option>
                   </select>
                   <button
                     onClick={handleSearchLink}
@@ -528,17 +529,30 @@ export default function DocumentDetailPage() {
                   </button>
                 </div>
                 {linkResults.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto divide-y rounded-md border">
-                    {linkResults.map((d: any) => (
-                      <button
-                        key={d.id}
-                        onClick={() => handleLinkDocument(d.id)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
-                      >
-                        <FileText className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{d.original_filename}</span>
-                        <span className="ml-auto text-muted-foreground">{d.doc_date || ""}</span>
-                      </button>
+                  <div className="max-h-60 overflow-y-auto divide-y rounded-md border">
+                    {linkResults.filter((d: any) => d.id !== doc.id).map((d: any) => (
+                      <div key={d.id} className="group relative">
+                        <button
+                          onClick={() => handleLinkDocument(d.id)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
+                        >
+                          <FileText className="h-3 w-3 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="block truncate font-medium">{d.original_filename}</span>
+                            <span className="block text-muted-foreground">
+                              {d.doc_type?.replace(/_/g, " ") || "—"} | {d.doc_date || "no date"}
+                              {d.doctor_name && ` | ${d.doctor_name}`}
+                              {d.facility_name && ` | ${d.facility_name}`}
+                            </span>
+                            {d.summary_en && (
+                              <span className="block text-muted-foreground truncate">{d.summary_en}</span>
+                            )}
+                          </div>
+                          <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] whitespace-nowrap">
+                            Link
+                          </span>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

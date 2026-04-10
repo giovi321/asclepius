@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
-import { Settings, Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check } from "lucide-react";
+import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check } from "lucide-react";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("llm");

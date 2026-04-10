@@ -19,12 +19,17 @@ async def extract_text(file_path: str, config: AppConfig) -> tuple[str, float, s
     Routes to the appropriate engine based on config.ocr.engine:
     - 'tesseract': local Tesseract OCR (default)
     - 'tesseract_remote': remote Tesseract server
+    - 'llm_vision': send page images to LLM for OCR (combined OCR+extraction)
     - 'google_vision': Google Cloud Vision API
 
     Returns: (text, confidence, engine_used)
     """
     path = Path(file_path)
     ext = path.suffix.lower()
+
+    # LLM Vision OCR — send page images directly to LLM
+    if config.ocr.engine == "llm_vision":
+        return await _extract_llm_vision(file_path, config)
 
     # Remote OCR — send the file directly
     if config.ocr.engine == "tesseract_remote" and config.ocr.remote_url:
@@ -123,6 +128,114 @@ async def _extract_from_image(path: Path, config: AppConfig) -> tuple[str, float
     avg_confidence = (sum(confidences) / len(confidences) / 100.0) if confidences else 0.0
 
     return text, avg_confidence, "tesseract"
+
+
+async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, float, str]:
+    """Use LLM with vision capability to OCR document pages.
+
+    Renders each page as an image and sends it to the LLM.
+    Works with Claude (native vision) or Ollama vision models (llava, llama3.2-vision).
+    """
+    import base64
+    import io
+
+    path = Path(file_path)
+    ext = path.suffix.lower()
+
+    from asclepius.pipeline.processor import pipeline_status
+
+    # Determine which model/provider to use
+    vision_model = config.ocr.llm_vision_model
+
+    if ext == ".pdf":
+        doc = fitz.open(str(path))
+        total_pages = len(doc)
+        pipeline_status["processing_pages"] = total_pages
+        text_parts = []
+
+        for page_idx, page in enumerate(doc):
+            pipeline_status["processing_page_current"] = page_idx + 1
+            logger.info("LLM vision OCR: page %d/%d of %s", page_idx + 1, total_pages, path.name)
+
+            # Render page as PNG
+            pix = page.get_pixmap(dpi=200)
+            img_data = pix.tobytes("png")
+            b64_image = base64.b64encode(img_data).decode("utf-8")
+
+            page_text = await _llm_vision_page(b64_image, config, vision_model)
+            text_parts.append(page_text)
+
+        doc.close()
+        full_text = "\n\n".join(text_parts)
+        return full_text, 0.95, "llm_vision"
+
+    elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+        img = Image.open(str(path))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64_image = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+        text = await _llm_vision_page(b64_image, config, vision_model)
+        return text, 0.95, "llm_vision"
+
+    return "", 0.0, "none"
+
+
+async def _llm_vision_page(
+    b64_image: str, config: AppConfig, vision_model: str
+) -> str:
+    """Send a single page image to the LLM for text extraction."""
+    prompt = (
+        "Extract ALL text from this medical document image. "
+        "Reproduce the text exactly as written, preserving the original language. "
+        "Include all headers, dates, names, addresses, values, and notes. "
+        "If there are tables, preserve the tabular structure using spaces or pipes. "
+        "Do not translate, summarize, or interpret — just transcribe everything you see."
+    )
+
+    if config.llm.provider == "claude" and config.llm.claude_api_key:
+        from anthropic import AsyncAnthropic
+        client = AsyncAnthropic(api_key=config.llm.claude_api_key)
+        model = vision_model or config.llm.claude_model
+
+        response = await client.messages.create(
+            model=model,
+            max_tokens=4096,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": b64_image,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        return response.content[0].text
+
+    else:
+        # Ollama with vision model
+        model = vision_model or config.llm.ollama_model
+        timeout = httpx.Timeout(connect=10.0, read=float(config.llm.extraction_timeout), write=10.0, pool=10.0)
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{config.llm.ollama_base_url}/api/generate",
+                json={
+                    "model": model,
+                    "prompt": prompt,
+                    "images": [b64_image],
+                    "stream": False,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("response", "")
 
 
 async def _extract_remote_ocr(file_path: str, config: AppConfig) -> tuple[str, float, str]:

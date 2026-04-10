@@ -27,11 +27,18 @@ oidc:
   display_name_claim: "name"
 
 ocr:
-  engine: "tesseract"  # tesseract
+  engine: "tesseract"  # tesseract, tesseract_remote, llm_vision, google_vision
   language: "eng+ita+deu"  # Tesseract language codes
   confidence_threshold: 0.7
   cloud_ocr_enabled: false
   google_vision_key: ""
+  remote_url: ""  # URL for remote Tesseract server (when engine=tesseract_remote)
+  remote_api_key: ""
+  # LLM Vision OCR (when engine=llm_vision):
+  # Uses the LLM to read page images directly — best accuracy for messy docs.
+  # For Ollama: set llm_vision_model to a vision model (e.g. "llava", "llama3.2-vision")
+  # For Claude: uses Claude's native vision capability
+  llm_vision_model: ""  # e.g. "llava:13b" or "llama3.2-vision" (empty = use main llm model)
 
 llm:
   provider: "ollama"  # ollama or claude

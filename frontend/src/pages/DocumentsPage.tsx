@@ -191,7 +191,7 @@ export default function DocumentsPage() {
               <th className="px-4 py-2 text-left font-medium">Type</th>
               <th className="px-4 py-2 text-left font-medium">Date</th>
               <th className="px-4 py-2 text-left font-medium">Patient</th>
-              <th className="px-4 py-2 text-left font-medium">Provider</th>
+              <th className="px-4 py-2 text-left font-medium">Doctor / Facility</th>
               <th className="px-4 py-2 text-left font-medium">Status</th>
             </tr>
           </thead>
@@ -212,7 +212,7 @@ export default function DocumentsPage() {
                   <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "\u2014"}</td>
                   <td className="px-4 py-2 text-muted-foreground">{doc.doc_date || "\u2014"}</td>
                   <td className="px-4 py-2">{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.provider_name || "\u2014"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{doc.doctor_name || doc.facility_name || "\u2014"}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${
                       doc.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :

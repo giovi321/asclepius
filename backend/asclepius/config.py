@@ -44,13 +44,23 @@ class OidcConfig(BaseModel):
 
 
 class OcrConfig(BaseModel):
-    engine: str = "tesseract"  # 'tesseract', 'tesseract_remote', 'google_vision'
+    # Engine options:
+    # 'tesseract' — local Tesseract OCR (default)
+    # 'tesseract_remote' — remote Tesseract server
+    # 'llm_vision' — use LLM with vision (sends page images to LLM for OCR+extraction)
+    # 'google_vision' — Google Cloud Vision API
+    engine: str = "tesseract"
     language: str = "eng+ita+deu"
     confidence_threshold: float = 0.7
     remote_url: str = ""  # URL for remote OCR server
     remote_api_key: str = ""
     cloud_ocr_enabled: bool = False
     google_vision_key: str = ""
+    # LLM vision settings (when engine = 'llm_vision')
+    # Uses the same LLM provider configured in llm section
+    # For Ollama: use a vision model like 'llava' or 'llama3.2-vision'
+    # For Claude: uses claude's native vision capability
+    llm_vision_model: str = ""  # Override model for vision OCR (empty = use llm.ollama_model or llm.claude_model)
 
 
 class LlmConfig(BaseModel):

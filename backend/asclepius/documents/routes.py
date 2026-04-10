@@ -46,28 +46,25 @@ async def upload_document(
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Create a document record immediately so it shows in the list
-    db_dep = get_db()
-    db = await db_dep.__anext__()
+    # Create document record immediately via a proper DB connection
+    import os
+    import aiosqlite
+    from asclepius.documents.service import compute_file_hash
     try:
-        import os
-        from asclepius.documents.service import compute_file_hash
         file_hash = compute_file_hash(str(dest))
         file_size = os.path.getsize(str(dest))
-        await db.execute(
-            """INSERT INTO documents
-               (file_path, original_filename, file_hash, file_size, date_received, status)
-               VALUES (?, ?, ?, ?, DATE('now'), 'pending')""",
-            (f"inbox/{dest.name}", original_name, file_hash, file_size),
-        )
-        await db.commit()
+        async with aiosqlite.connect(config.database.path) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA foreign_keys=ON")
+            await db.execute(
+                """INSERT INTO documents
+                   (file_path, original_filename, file_hash, file_size, date_received, status)
+                   VALUES (?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{dest.name}", original_name, file_hash, file_size),
+            )
+            await db.commit()
     except Exception:
         pass  # Pipeline will create the record if this fails
-    finally:
-        try:
-            await db_dep.__anext__()
-        except StopAsyncIteration:
-            pass
 
     return {"filename": dest.name, "status": "pending", "message": "File uploaded and queued for processing"}
 

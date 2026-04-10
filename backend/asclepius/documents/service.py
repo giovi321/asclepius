@@ -43,20 +43,8 @@ async def list_documents(
     conditions = []
     params: list = []
 
-    # Check if user has any explicit access grants
-    cursor = await db.execute(
-        "SELECT COUNT(*) FROM user_patient_access WHERE user_id = ?", (user_id,)
-    )
-    has_access_grants = (await cursor.fetchone())[0] > 0
-
-    if has_access_grants:
-        # Show documents for patients the user has access to, plus unclassified
-        conditions.append(
-            "(d.patient_id IN (SELECT patient_id FROM user_patient_access WHERE user_id = ?) "
-            "OR d.patient_id IS NULL)"
-        )
-        params.append(user_id)
-    # else: no access filter — show all documents (admin fallback)
+    # No blanket access filter — all authenticated users can see all documents.
+    # Per-patient access control is enforced when viewing individual documents.
 
     if patient_id is not None:
         conditions.append("d.patient_id = ?")

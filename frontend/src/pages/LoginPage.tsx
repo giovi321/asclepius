@@ -19,10 +19,9 @@ export default function LoginPage() {
     }).catch(() => {});
   }, []);
 
-  if (user) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) navigate("/");
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -74,10 +74,17 @@ async def extract_and_store(
     doc_id: int,
     ocr_text: str,
     config: AppConfig,
+    extraction_override: dict | None = None,
 ) -> dict:
-    """Run LLM extraction and write results to DB tables."""
+    """Run LLM extraction and write results to DB tables.
+
+    If extraction_override is provided, skip the LLM call and use that data directly.
+    """
     context = await build_extraction_context(db)
-    extraction = await llm.extract(ocr_text, context)
+    if extraction_override:
+        extraction = extraction_override
+    else:
+        extraction = await llm.extract(ocr_text, context)
 
     if "error" in extraction:
         logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))

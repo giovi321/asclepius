@@ -484,6 +484,86 @@ async def reprocess_doc(
     return {"status": "reprocessing", "document_id": doc_id}
 
 
+class DocumentEditRequest(BaseModel):
+    instruction: str
+
+
+@router.post("/{doc_id}/edit-with-ai")
+async def edit_document_with_ai(
+    doc_id: int,
+    body: DocumentEditRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Edit document metadata using natural language instruction via LLM."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    config = get_config()
+    from asclepius.pipeline.processor import get_llm_provider
+    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
+    from asclepius.llm.prompts import DOCUMENT_EDIT_PROMPT, EXTRACTION_PROMPT
+    import json as _json
+
+    llm = get_llm_provider(config)
+    context = await build_extraction_context(db)
+
+    # Build current data summary
+    current_data = {
+        "patient_name": doc.get("patient_name"),
+        "doc_type": doc.get("doc_type"),
+        "doc_date": doc.get("doc_date"),
+        "date_issued": doc.get("date_issued"),
+        "date_visit": doc.get("date_visit"),
+        "summary_en": doc.get("summary_en"),
+        "doctor_name": doc.get("doctor_name"),
+        "facility_name": doc.get("facility_name"),
+        "specialty_original": doc.get("specialty_original"),
+    }
+
+    # Get the JSON schema from the extraction prompt (reuse the structure)
+    json_schema = EXTRACTION_PROMPT.split("Respond in JSON only. No markdown, no explanation.")[-1].split("OCR text:")[0].strip()
+
+    prompt = DOCUMENT_EDIT_PROMPT.format(
+        current_data=_json.dumps(current_data, indent=2),
+        patient_list=_json.dumps(context.get("patient_list", []), indent=2),
+        facility_list=_json.dumps(context.get("facility_list", []), indent=2),
+        doctor_list=_json.dumps(context.get("doctor_list", []), indent=2),
+        user_instruction=body.instruction,
+        json_schema=json_schema,
+    )
+
+    # Call LLM
+    try:
+        if hasattr(llm, '_generate'):
+            response_text = await llm._generate(prompt)
+            extraction = llm._parse_json(response_text)
+        else:
+            extraction = await llm.extract(doc.get("ocr_text", ""), context)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+
+    if "error" in extraction:
+        raise HTTPException(status_code=500, detail=extraction.get("error"))
+
+    # Clear old extracted data and re-write with LLM output
+    for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items"]:
+        await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
+
+    # Store the new extraction
+    await db.execute(
+        "UPDATE documents SET raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (_json.dumps(extraction), doc_id),
+    )
+    await db.commit()
+
+    # Write structured data using the existing extractor
+    await extract_and_store(db, llm, doc_id, doc.get("ocr_text", ""), config, extraction_override=extraction)
+
+    return {"status": "updated", "document_id": doc_id}
+
+
 async def _get_related(db: aiosqlite.Connection, table: str, doc_id: int) -> list[dict]:
     """Get related records from a child table."""
     cursor = await db.execute(f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,))

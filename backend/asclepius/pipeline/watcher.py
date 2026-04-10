@@ -69,8 +69,18 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue) -> None:
                 await process_file(file_path, config)
             except Exception:
                 logger.exception("Pipeline error for: %s", file_path)
+            except BaseException:
+                logger.exception("Pipeline critical error for: %s", file_path)
             finally:
-                queue.task_done()
+                try:
+                    queue.task_done()
+                except ValueError:
+                    pass  # task_done called too many times
+                # Always reset pipeline status
+                from asclepius.pipeline.processor import pipeline_status
+                pipeline_status["processing"] = None
+                pipeline_status["processing_step"] = None
+                pipeline_status["processing_doc_id"] = None
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

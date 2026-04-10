@@ -155,6 +155,36 @@ OCR text:
 ---"""
 
 
+DOCUMENT_EDIT_PROMPT = """You are a medical document metadata editor. The user is correcting or adding information about a medical document.
+
+Current document data:
+{current_data}
+
+Known patients: {patient_list}
+Known facilities: {facility_list}
+Known doctors: {doctor_list}
+
+The user says:
+"{user_instruction}"
+
+Based on the user's instruction, produce an UPDATED version of the document data as JSON.
+Rules:
+- Keep all existing fields that the user did NOT mention — do not clear them.
+- Only modify the fields the user explicitly mentions.
+- If the user mentions a patient name, match it against known patients and set "patient_name" to the exact known name.
+- If the user mentions a doctor, set the "doctor" object.
+- If the user mentions a facility/hospital/clinic, set the "facility" object.
+- If the user mentions a date, determine which date field it belongs to (doc_date, date_issued, date_visit).
+- If the user mentions a document type, set "doc_type" using the standard codes.
+- If the user mentions a diagnosis, add it to "diagnoses".
+- If the user mentions medications, add them to "medications".
+- Respond in JSON only. Use the same schema as the extraction output.
+
+Respond in JSON only. No markdown, no explanation.
+
+{json_schema}"""
+
+
 SQL_GENERATION_PROMPT = """You are a SQL query generator for a medical records database.
 Generate a read-only SELECT query to answer the user's question.
 

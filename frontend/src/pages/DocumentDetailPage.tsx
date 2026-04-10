@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag,
+  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag, Save,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
@@ -36,9 +36,28 @@ export default function DocumentDetailPage() {
     loadDoc();
   }, [id]);
 
+  const [aiInstruction, setAiInstruction] = useState("");
+  const [aiEditing, setAiEditing] = useState(false);
+  const [showAiEdit, setShowAiEdit] = useState(false);
+
   const handleReprocess = async () => {
     await api.post(`/documents/${id}/reprocess`);
     await loadDoc();
+  };
+
+  const handleAiEdit = async () => {
+    if (!aiInstruction.trim()) return;
+    setAiEditing(true);
+    try {
+      await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
+      setAiInstruction("");
+      setShowAiEdit(false);
+      await loadDoc();
+    } catch (e: any) {
+      alert("AI edit failed: " + (e.response?.data?.detail || e.message));
+    } finally {
+      setAiEditing(false);
+    }
   };
 
   const handleCancel = async () => {
@@ -160,6 +179,12 @@ export default function DocumentDetailPage() {
             </button>
           )}
           <button
+            onClick={() => setShowAiEdit(!showAiEdit)}
+            className="flex items-center gap-1 rounded-md border border-primary/50 px-3 py-1.5 text-sm text-primary hover:bg-primary/10"
+          >
+            <Stethoscope className="h-4 w-4" /> Edit with AI
+          </button>
+          <button
             onClick={handleDelete}
             className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
           >
@@ -167,6 +192,47 @@ export default function DocumentDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* AI Edit Panel */}
+      {showAiEdit && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <p className="text-sm font-medium">Edit with AI</p>
+          <p className="text-xs text-muted-foreground">
+            Describe what to change in natural language. The AI will update the document metadata accordingly.
+          </p>
+          <textarea
+            value={aiInstruction}
+            onChange={(e) => setAiInstruction(e.target.value)}
+            placeholder='e.g. "This is a discharge letter for patient Giovanni Crapelli, dated 15/03/2024, diagnosis was hypertension, doctor was Dr. Müller from Ospedale Civico"'
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[80px]"
+            disabled={aiEditing}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleAiEdit}
+              disabled={aiEditing || !aiInstruction.trim()}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {aiEditing ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" /> Apply
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => { setShowAiEdit(false); setAiInstruction(""); }}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {doc.summary_en && (

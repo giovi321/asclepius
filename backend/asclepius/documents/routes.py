@@ -47,6 +47,10 @@ async def upload_document(
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+    # Write patient_id hint so the pipeline can pick it up even if it wins the race
+    if patient_id:
+        Path(str(dest) + ".patient_hint").write_text(str(patient_id))
+
     # Create DB record immediately so the document is visible in the list.
     # The pipeline will find this record by file_hash and reuse it (not duplicate).
     import os

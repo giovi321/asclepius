@@ -114,20 +114,29 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["last_processed"] = path.name
                 return
 
+            # Read patient_id hint from upload (if present)
+            hint_patient_id = None
+            hint_path = Path(str(path) + ".patient_hint")
+            if hint_path.exists():
+                try:
+                    hint_patient_id = int(hint_path.read_text().strip())
+                except (ValueError, OSError):
+                    pass
+                hint_path.unlink(missing_ok=True)
+
             # Try to INSERT — if file_hash already exists (from upload), it'll be ignored
-            # thanks to UNIQUE constraint on file_hash
             await db.execute(
                 """INSERT OR IGNORE INTO documents
                    (file_path, original_filename, file_hash, file_size, page_count,
-                    date_received, status)
-                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
+                    patient_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id),
             )
             await db.commit()
 
             # Now SELECT the record (whether just inserted or pre-existing from upload)
             cursor = await db.execute(
-                "SELECT id, status FROM documents WHERE file_hash = ?", (file_hash,),
+                "SELECT id, status, patient_id FROM documents WHERE file_hash = ?", (file_hash,),
             )
             existing = await cursor.fetchone()
             if not existing:
@@ -140,13 +149,23 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 return
 
             doc_id = existing["id"]
+
+            # Ensure patient_id is set even if pipeline created the record first
+            patient_update = ""
+            params = [file_size, page_count]
+            if hint_patient_id and not existing["patient_id"]:
+                patient_update = ", patient_id = ?"
+                params.append(hint_patient_id)
+            params.append(doc_id)
+
             await db.execute(
-                """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
+                f"""UPDATE documents SET status = 'processing', file_size = ?, page_count = ?{patient_update},
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (file_size, page_count, doc_id),
+                params,
             )
             await db.commit()
-            logger.info("Processing doc %d: %s", doc_id, path.name)
+            logger.info("Processing doc %d (patient=%s): %s",
+                        doc_id, existing["patient_id"] or hint_patient_id, path.name)
 
             ext = path.suffix.lower()
             if ext in {".dcm", ".dicom"}:

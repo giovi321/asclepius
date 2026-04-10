@@ -157,12 +157,8 @@ async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, f
             pipeline_status["processing_page_current"] = page_idx + 1
             logger.info("LLM vision OCR: page %d/%d of %s", page_idx + 1, total_pages, path.name)
 
-            # Render page as PNG
-            pix = page.get_pixmap(dpi=200)
-            img_data = pix.tobytes("png")
-            b64_image = base64.b64encode(img_data).decode("utf-8")
-
-            page_text = await _llm_vision_page(b64_image, config, vision_model)
+            b64_image = _render_page_for_vision(page)
+            page_text = await _llm_vision_page_with_retry(b64_image, config, vision_model)
             text_parts.append(page_text)
 
         doc.close()
@@ -171,14 +167,84 @@ async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, f
 
     elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
         img = Image.open(str(path))
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        b64_image = base64.b64encode(buf.getvalue()).decode("utf-8")
+        b64_image = _compress_image_for_vision(img)
 
-        text = await _llm_vision_page(b64_image, config, vision_model)
+        text = await _llm_vision_page_with_retry(b64_image, config, vision_model)
         return text, 0.95, "llm_vision"
 
     return "", 0.0, "none"
+
+
+MAX_IMAGE_BYTES = 4_500_000  # Stay under Claude's 5MB limit
+
+
+def _render_page_for_vision(page) -> str:
+    """Render a PDF page to a base64 JPEG, sized to stay under the API limit."""
+    # Start with 150 DPI, reduce if too large
+    for dpi in [150, 100, 72]:
+        pix = page.get_pixmap(dpi=dpi)
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        b64 = _compress_image_for_vision(img)
+        raw_size = len(base64.b64decode(b64))
+        if raw_size <= MAX_IMAGE_BYTES:
+            return b64
+    # Last resort: very small
+    pix = page.get_pixmap(dpi=50)
+    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    return _compress_image_for_vision(img, quality=60)
+
+
+def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
+    """Compress an image to JPEG base64, resizing if needed to stay under limit."""
+    import io as _io
+
+    # Resize if very large
+    max_dim = 2000
+    if img.width > max_dim or img.height > max_dim:
+        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+    # Convert to RGB if needed (RGBA, P, etc.)
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # Try JPEG at given quality
+    for q in [quality, 70, 50]:
+        buf = _io.BytesIO()
+        img.save(buf, format="JPEG", quality=q)
+        data = buf.getvalue()
+        if len(data) <= MAX_IMAGE_BYTES:
+            return base64.b64encode(data).decode("utf-8")
+
+    # Absolute fallback
+    buf = _io.BytesIO()
+    img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+    img.save(buf, format="JPEG", quality=40)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
+async def _llm_vision_page_with_retry(
+    b64_image: str, config: AppConfig, vision_model: str,
+    max_retries: int = 3,
+) -> str:
+    """Call _llm_vision_page with retry + backoff for rate limits."""
+    import asyncio as _asyncio
+
+    for attempt in range(max_retries):
+        try:
+            return await _llm_vision_page(b64_image, config, vision_model)
+        except Exception as e:
+            error_str = str(e)
+            if "rate_limit" in error_str or "429" in error_str:
+                wait = 30 * (attempt + 1)  # 30s, 60s, 90s
+                logger.warning("Rate limited, waiting %ds before retry (attempt %d/%d)", wait, attempt + 1, max_retries)
+                await _asyncio.sleep(wait)
+            elif "exceeds" in error_str and "MB" in error_str:
+                logger.error("Image still too large after compression: %s", error_str)
+                return "[Image too large for vision OCR — falling back to empty text]"
+            else:
+                raise
+    # Final attempt without catching
+    return await _llm_vision_page(b64_image, config, vision_model)
 
 
 async def _llm_vision_page(
@@ -208,7 +274,7 @@ async def _llm_vision_page(
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": "image/jpeg",
                             "data": b64_image,
                         },
                     },

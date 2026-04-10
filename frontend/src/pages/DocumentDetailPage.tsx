@@ -120,10 +120,37 @@ export default function DocumentDetailPage() {
   };
 
   const handleSearchLink = async () => {
-    if (!linkSearch.trim()) return;
+    if (!linkSearch.trim()) {
+      // Show all documents if search is empty
+      try {
+        const res = await api.get("/documents", { params: { limit: 20 } });
+        setLinkResults((res.data.items || []).filter((d: any) => d.id !== Number(id)));
+      } catch { setLinkResults([]); }
+      return;
+    }
     try {
-      const res = await api.get("/documents", { params: { q: linkSearch, limit: 10 } });
-      setLinkResults((res.data.items || []).filter((d: any) => d.id !== Number(id)));
+      // Try FTS search first
+      const res = await api.get("/documents", { params: { q: linkSearch, limit: 20 } });
+      let results = (res.data.items || []).filter((d: any) => d.id !== Number(id));
+
+      // If FTS returns nothing, fallback to fetching all and filtering client-side
+      if (results.length === 0) {
+        const allRes = await api.get("/documents", { params: { limit: 100 } });
+        const all = allRes.data.items || [];
+        const term = linkSearch.toLowerCase();
+        results = all.filter((d: any) =>
+          d.id !== Number(id) && (
+            d.original_filename?.toLowerCase().includes(term) ||
+            d.doc_type?.toLowerCase().includes(term) ||
+            d.doctor_name?.toLowerCase().includes(term) ||
+            d.facility_name?.toLowerCase().includes(term) ||
+            d.summary_en?.toLowerCase().includes(term) ||
+            d.patient_name?.toLowerCase().includes(term)
+          )
+        ).slice(0, 20);
+      }
+
+      setLinkResults(results);
     } catch {
       setLinkResults([]);
     }
@@ -485,7 +512,7 @@ export default function DocumentDetailPage() {
             {!showLinkSearch ? (
               <div className="mt-2 flex gap-2">
                 <button
-                  onClick={() => setShowLinkSearch(true)}
+                  onClick={() => { setShowLinkSearch(true); setLinkSearch(""); handleSearchLink(); }}
                   className="flex items-center gap-1 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   <Plus className="h-3 w-3" /> Link manually

@@ -68,7 +68,9 @@ CREATE TABLE IF NOT EXISTS documents (
     doc_type TEXT,
     doc_date DATE,
     doctor_id INTEGER REFERENCES doctors(id),
+    doctor_name TEXT,  -- denormalized: doctor name as extracted
     facility_id INTEGER REFERENCES facilities(id),
+    facility_name TEXT,  -- denormalized: facility name as extracted
     date_issued DATE,
     date_visit DATE,
     date_received DATE,

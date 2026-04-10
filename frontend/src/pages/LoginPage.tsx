@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Activity } from "lucide-react";
+import api from "@/api/client";
+import { Activity, Shield } from "lucide-react";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
   const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get("/auth/oidc/enabled").then((res) => {
+      setOidcEnabled(res.data.enabled);
+    }).catch(() => {});
+  }, []);
 
   if (user) {
     navigate("/");
@@ -30,6 +38,10 @@ export default function LoginPage() {
     }
   };
 
+  const handleOidcLogin = () => {
+    window.location.href = "/api/auth/oidc/login";
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
       <div className="w-full max-w-sm rounded-lg border bg-card p-8 shadow-sm">
@@ -40,6 +52,26 @@ export default function LoginPage() {
             Sign in to your medical records
           </p>
         </div>
+
+        {oidcEnabled && (
+          <>
+            <button
+              onClick={handleOidcLogin}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
+            >
+              <Shield className="h-4 w-4" />
+              Sign in with SSO
+            </button>
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-card px-2 text-xs text-muted-foreground">or</span>
+              </div>
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (

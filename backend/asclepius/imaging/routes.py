@@ -129,6 +129,7 @@ async def get_frame(
     study_id: int,
     series_id: int,
     index: int,
+    format: str = Query(default="png", regex="^(png|dicom)$"),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -149,7 +150,46 @@ async def get_frame(
     if index < 0 or index >= len(frames):
         raise HTTPException(status_code=404, detail="Frame not found")
 
-    return FileResponse(
-        path=str(frames[index]),
-        media_type="application/dicom",
-    )
+    if format == "dicom":
+        return FileResponse(
+            path=str(frames[index]),
+            media_type="application/dicom",
+        )
+
+    # Convert DICOM to PNG for browser display
+    try:
+        import pydicom
+        from PIL import Image as PILImage
+        import numpy as np
+        import io
+
+        ds = pydicom.dcmread(str(frames[index]))
+        pixel_array = ds.pixel_array.astype(float)
+
+        # Apply windowing if available
+        if hasattr(ds, "WindowCenter") and hasattr(ds, "WindowWidth"):
+            wc = float(ds.WindowCenter) if not isinstance(ds.WindowCenter, pydicom.multival.MultiValue) else float(ds.WindowCenter[0])
+            ww = float(ds.WindowWidth) if not isinstance(ds.WindowWidth, pydicom.multival.MultiValue) else float(ds.WindowWidth[0])
+            img_min = wc - ww / 2
+            img_max = wc + ww / 2
+            pixel_array = np.clip(pixel_array, img_min, img_max)
+
+        # Normalize to 0-255
+        if pixel_array.max() != pixel_array.min():
+            pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min()) * 255
+        pixel_array = pixel_array.astype(np.uint8)
+
+        img = PILImage.fromarray(pixel_array)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        buf.seek(0)
+
+        from fastapi.responses import StreamingResponse
+        return StreamingResponse(buf, media_type="image/png")
+
+    except Exception:
+        # Fallback: serve raw DICOM
+        return FileResponse(
+            path=str(frames[index]),
+            media_type="application/dicom",
+        )

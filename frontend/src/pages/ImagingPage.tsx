@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Image } from "lucide-react";
+import DicomViewer from "@/components/DicomViewer";
 
 export default function ImagingPage() {
   const { selectedPatient } = usePatient();
   const [studies, setStudies] = useState<any[]>([]);
+  const [viewingSeries, setViewingSeries] = useState<{ studyId: number; seriesId: number } | null>(null);
   const [selectedStudy, setSelectedStudy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -98,20 +100,32 @@ export default function ImagingPage() {
               <div className="mt-4">
                 <h4 className="mb-2 font-medium">Series</h4>
                 {selectedStudy.series.map((s: any) => (
-                  <div key={s.id} className="flex items-center justify-between border-b py-2 text-sm">
+                  <button
+                    key={s.id}
+                    onClick={() => setViewingSeries({ studyId: selectedStudy.id, seriesId: s.id })}
+                    className={`flex w-full items-center justify-between border-b py-2 text-sm text-left hover:bg-accent/50 ${
+                      viewingSeries?.seriesId === s.id ? "bg-primary/5 text-primary" : ""
+                    }`}
+                  >
                     <span>Series {s.series_number}: {s.series_description || s.modality}</span>
                     <span className="text-muted-foreground">{s.num_images} images</span>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
-
-            <p className="mt-4 text-xs text-muted-foreground">
-              DICOM viewer (Cornerstone.js) integration available in full deployment.
-            </p>
           </div>
         )}
       </div>
+
+      {/* DICOM Viewer */}
+      {viewingSeries && (
+        <div className="rounded-lg border overflow-hidden h-[600px]">
+          <DicomViewer
+            studyId={viewingSeries.studyId}
+            seriesId={viewingSeries.seriesId}
+          />
+        </div>
+      )}
     </div>
   );
 }

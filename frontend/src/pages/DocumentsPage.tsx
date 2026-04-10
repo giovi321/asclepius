@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { FileText, Search } from "lucide-react";
+import { FileText, Search, Upload } from "lucide-react";
+import FileUpload from "@/components/FileUpload";
 
 const DOC_TYPES = [
   "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
@@ -18,6 +19,7 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(0);
+  const [showUpload, setShowUpload] = useState(false);
   const limit = 20;
 
   useEffect(() => {
@@ -36,7 +38,31 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Documents</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Documents</h1>
+        <button
+          onClick={() => setShowUpload(!showUpload)}
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+        >
+          <Upload className="h-4 w-4" />
+          Upload
+        </button>
+      </div>
+
+      {showUpload && (
+        <FileUpload onUploadComplete={() => {
+          // Refresh document list after upload
+          setPage(0);
+          setLoading(true);
+          const params: Record<string, any> = { limit, offset: 0 };
+          if (selectedPatient) params.patient_id = selectedPatient.id;
+          api.get("/documents", { params }).then((res) => {
+            setDocuments(res.data.items || []);
+            setTotal(res.data.total || 0);
+            setLoading(false);
+          });
+        }} />
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">

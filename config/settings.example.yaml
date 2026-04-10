@@ -15,6 +15,17 @@ auth:
   secret_key: "change-me-in-production"
   session_ttl_hours: 720  # 30 days
 
+# OIDC / SSO (Authentik, Keycloak, etc.)
+oidc:
+  enabled: false
+  provider_url: ""  # e.g. https://auth.example.com/application/o/asclepius/
+  client_id: ""
+  client_secret: ""
+  scopes: "openid profile email"
+  auto_create_user: true  # create user on first OIDC login
+  username_claim: "preferred_username"
+  display_name_claim: "name"
+
 ocr:
   engine: "tesseract"  # tesseract
   language: "eng+ita+deu"  # Tesseract language codes

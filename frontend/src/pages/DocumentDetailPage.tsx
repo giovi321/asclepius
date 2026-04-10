@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "@/api/client";
-import { RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope } from "lucide-react";
+import { RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download, Eye, EyeOff } from "lucide-react";
+import PdfViewer from "@/components/PdfViewer";
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
@@ -55,7 +56,37 @@ export default function DocumentDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Metadata */}
+        {/* Document viewer */}
+        <div className="space-y-4">
+          {doc.file_path?.endsWith(".pdf") ? (
+            <div className="rounded-lg border overflow-hidden h-[700px]">
+              <PdfViewer url={`/api/documents/${id}/file`} />
+            </div>
+          ) : doc.file_path?.match(/\.(jpg|jpeg|png|tiff|tif)$/i) ? (
+            <div className="rounded-lg border overflow-hidden">
+              <img
+                src={`/api/documents/${id}/file`}
+                alt={doc.original_filename}
+                className="w-full object-contain max-h-[700px]"
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border p-8 text-center text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-2" />
+              <p>Preview not available for this file type</p>
+              <a
+                href={`/api/documents/${id}/file`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 mt-2 text-sm text-primary hover:underline"
+              >
+                <Download className="h-4 w-4" /> Download file
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Extracted data */}
         <div className="space-y-4">
           <Section title="Document Info">
             <InfoRow label="Status" value={doc.status} />
@@ -140,13 +171,11 @@ export default function DocumentDetailPage() {
           )}
         </div>
 
-        {/* OCR Text */}
-        <Section title="OCR Text">
-          <pre className="max-h-[600px] overflow-auto whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-xs">
-            {doc.ocr_text || "No text extracted"}
-          </pre>
-        </Section>
+        </div>
       </div>
+
+      {/* OCR Text — collapsible below */}
+      <OcrSection text={doc.ocr_text} />
     </div>
   );
 }
@@ -159,6 +188,32 @@ function Section({ title, icon: Icon, children }: { title: string; icon?: any; c
         {title}
       </h3>
       <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function OcrSection({ text }: { text: string | null }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-4 hover:bg-accent/50"
+      >
+        <h3 className="flex items-center gap-2 font-medium">
+          {open ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          OCR Text
+        </h3>
+        <span className="text-xs text-muted-foreground">
+          {open ? "Hide" : "Show"} ({text.length} chars)
+        </span>
+      </button>
+      {open && (
+        <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap border-t bg-muted/30 p-4 text-xs">
+          {text}
+        </pre>
+      )}
     </div>
   );
 }

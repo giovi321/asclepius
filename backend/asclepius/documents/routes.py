@@ -1,9 +1,10 @@
 """Document API routes."""
 
 import json
+import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -15,6 +16,36 @@ from asclepius.documents.service import get_document, list_documents
 from asclepius.patients.service import check_patient_access
 
 router = APIRouter()
+
+
+@router.post("/upload", status_code=201)
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload a document file to the inbox for processing."""
+    config = get_config()
+    inbox = Path(config.vault.inbox_path)
+    inbox.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize filename
+    original_name = file.filename or "upload"
+    safe_name = "".join(c if c.isalnum() or c in ".-_ " else "_" for c in original_name)
+
+    dest = inbox / safe_name
+    # Handle conflicts
+    counter = 1
+    while dest.exists():
+        stem = Path(safe_name).stem
+        suffix = Path(safe_name).suffix
+        dest = inbox / f"{stem}_{counter}{suffix}"
+        counter += 1
+
+    # Save file
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return {"filename": dest.name, "status": "queued", "message": "File uploaded to inbox for processing"}
 
 
 class DocumentUpdate(BaseModel):

@@ -29,6 +29,20 @@ class AuthConfig(BaseModel):
     session_ttl_hours: int = 720
 
 
+class OidcConfig(BaseModel):
+    enabled: bool = False
+    provider_url: str = ""  # e.g. https://auth.example.com/application/o/asclepius/
+    client_id: str = ""
+    client_secret: str = ""
+    scopes: str = "openid profile email"
+    # Auto-create user on first OIDC login
+    auto_create_user: bool = True
+    # Claim to use as username
+    username_claim: str = "preferred_username"
+    # Claim to use as display name
+    display_name_claim: str = "name"
+
+
 class OcrConfig(BaseModel):
     engine: str = "tesseract"
     language: str = "eng+ita+deu"
@@ -58,6 +72,7 @@ class AppConfig(BaseModel):
     database: DatabaseConfig = DatabaseConfig()
     vault: VaultConfig = VaultConfig()
     auth: AuthConfig = AuthConfig()
+    oidc: OidcConfig = OidcConfig()
     ocr: OcrConfig = OcrConfig()
     llm: LlmConfig = LlmConfig()
     pipeline: PipelineConfig = PipelineConfig()

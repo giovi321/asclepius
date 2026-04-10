@@ -3,11 +3,15 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from asclepius.config import get_config
 from asclepius.db.init import initialize_database
+
+STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
 @asynccontextmanager
@@ -74,6 +78,9 @@ def create_app() -> FastAPI:
     from asclepius.auth.routes import router as auth_router
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 
+    from asclepius.auth.oidc import router as oidc_router
+    app.include_router(oidc_router, prefix="/api/auth", tags=["oidc"])
+
     from asclepius.patients.routes import router as patients_router
     app.include_router(patients_router, prefix="/api/patients", tags=["patients"])
 
@@ -97,6 +104,18 @@ def create_app() -> FastAPI:
 
     from asclepius.settings.routes import router as settings_router
     app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
+
+    # Serve frontend static files (production build)
+    if STATIC_DIR.exists():
+        app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+
+        @app.get("/{path:path}")
+        async def serve_spa(path: str):
+            """Serve frontend SPA — return index.html for all non-API routes."""
+            file_path = STATIC_DIR / path
+            if file_path.is_file():
+                return FileResponse(str(file_path))
+            return FileResponse(str(STATIC_DIR / "index.html"))
 
     return app
 

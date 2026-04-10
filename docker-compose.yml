@@ -1,6 +1,6 @@
 services:
   asclepius:
-    build: ./backend
+    build: .
     ports:
       - "8070:8000"
     volumes:

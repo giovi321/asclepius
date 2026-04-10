@@ -12,9 +12,14 @@ import {
 interface PipelineStatus {
   queue_depth: number;
   processing: string | null;
+  processing_step: string | null;
+  processing_doc_id: number | null;
+  processing_pages: number | null;
+  processing_page_current: number | null;
   total_processed: number;
   total_errors: number;
   recent_errors: { file: string; error: string }[];
+  queued_files: { filename: string; size: number }[];
 }
 
 export default function DashboardPage() {

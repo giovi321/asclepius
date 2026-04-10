@@ -252,7 +252,11 @@ async def _llm_vision_page_with_retry(
 async def _llm_vision_page(
     b64_image: str, config: AppConfig, vision_model: str
 ) -> str:
-    """Send a single page image to the LLM for text extraction."""
+    """Send a single page image to the LLM for text extraction.
+
+    Uses the vision-specific provider/model/URL if configured,
+    otherwise falls back to the main LLM settings.
+    """
     prompt = (
         "Extract ALL text from this medical document image. "
         "Reproduce the text exactly as written, preserving the original language. "
@@ -261,7 +265,10 @@ async def _llm_vision_page(
         "Do not translate, summarize, or interpret — just transcribe everything you see."
     )
 
-    if config.llm.provider == "claude" and config.llm.claude_api_key:
+    # Determine which provider to use for vision
+    vision_provider = config.ocr.llm_vision_provider or config.llm.provider
+
+    if vision_provider == "claude" and config.llm.claude_api_key:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=config.llm.claude_api_key)
         model = vision_model or config.llm.claude_model
@@ -287,13 +294,15 @@ async def _llm_vision_page(
         return response.content[0].text
 
     else:
-        # Ollama with vision model
+        # Ollama with vision model — can use a different URL than the extraction LLM
         model = vision_model or config.llm.ollama_model
+        ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
         timeout = httpx.Timeout(connect=10.0, read=float(config.llm.extraction_timeout), write=10.0, pool=10.0)
+        logger.info("Vision OCR: model=%s, url=%s", model, ollama_url)
 
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
-                f"{config.llm.ollama_base_url}/api/generate",
+                f"{ollama_url}/api/generate",
                 json={
                     "model": model,
                     "prompt": prompt,

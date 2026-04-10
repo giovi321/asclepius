@@ -36,7 +36,9 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "cloud_ocr_enabled": config.ocr.cloud_ocr_enabled,
             "remote_url": config.ocr.remote_url,
             "has_remote_api_key": bool(config.ocr.remote_api_key),
+            "llm_vision_provider": config.ocr.llm_vision_provider,
             "llm_vision_model": config.ocr.llm_vision_model,
+            "llm_vision_ollama_url": config.ocr.llm_vision_ollama_url,
             "has_google_vision_key": bool(config.ocr.google_vision_key),
         },
         "pipeline": {
@@ -80,7 +82,9 @@ class SettingsUpdate(BaseModel):
     cloud_ocr_enabled: bool | None = None
     ocr_remote_url: str | None = None
     ocr_remote_api_key: str | None = None
+    llm_vision_provider: str | None = None
     llm_vision_model: str | None = None
+    llm_vision_ollama_url: str | None = None
     google_vision_key: str | None = None
     # Pipeline
     pipeline_watch_enabled: bool | None = None
@@ -114,7 +118,9 @@ _SETTINGS_MAP = {
     "cloud_ocr_enabled": ("ocr", "cloud_ocr_enabled", "ocr.cloud_ocr_enabled"),
     "ocr_remote_url": ("ocr", "remote_url", "ocr.remote_url"),
     "ocr_remote_api_key": ("ocr", "remote_api_key", "ocr.remote_api_key"),
+    "llm_vision_provider": ("ocr", "llm_vision_provider", "ocr.llm_vision_provider"),
     "llm_vision_model": ("ocr", "llm_vision_model", "ocr.llm_vision_model"),
+    "llm_vision_ollama_url": ("ocr", "llm_vision_ollama_url", "ocr.llm_vision_ollama_url"),
     "google_vision_key": ("ocr", "google_vision_key", "ocr.google_vision_key"),
     "pipeline_watch_enabled": ("pipeline", "watch_enabled", "pipeline.watch_enabled"),
     "pipeline_poll_interval": ("pipeline", "poll_interval_seconds", "pipeline.poll_interval_seconds"),

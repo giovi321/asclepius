@@ -57,10 +57,11 @@ class OcrConfig(BaseModel):
     cloud_ocr_enabled: bool = False
     google_vision_key: str = ""
     # LLM vision settings (when engine = 'llm_vision')
-    # Uses the same LLM provider configured in llm section
-    # For Ollama: use a vision model like 'llava' or 'llama3.2-vision'
-    # For Claude: uses claude's native vision capability
-    llm_vision_model: str = ""  # Override model for vision OCR (empty = use llm.ollama_model or llm.claude_model)
+    # The vision OCR can use a DIFFERENT provider/model than the extraction LLM.
+    # This allows e.g. Chandra for OCR + llama3.1 for extraction.
+    llm_vision_provider: str = ""  # 'ollama' or 'claude' (empty = use llm.provider)
+    llm_vision_model: str = ""  # e.g. 'fredrezones55/chandra-ocr-2' (empty = use llm model)
+    llm_vision_ollama_url: str = ""  # Ollama URL for vision model (empty = use llm.ollama_base_url)
 
 
 class LlmConfig(BaseModel):

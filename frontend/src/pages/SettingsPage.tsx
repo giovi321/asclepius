@@ -202,7 +202,9 @@ function OcrTab() {
         cloud_ocr_enabled: res.data.ocr.cloud_ocr_enabled,
         ocr_remote_url: res.data.ocr.remote_url || "",
         ocr_remote_api_key: "",
+        llm_vision_provider: res.data.ocr.llm_vision_provider || "",
         llm_vision_model: res.data.ocr.llm_vision_model || "",
+        llm_vision_ollama_url: res.data.ocr.llm_vision_ollama_url || "",
         google_vision_key: "",
       });
     });
@@ -219,7 +221,9 @@ function OcrTab() {
         cloud_ocr_enabled: f.cloud_ocr_enabled !== s.ocr.cloud_ocr_enabled ? f.cloud_ocr_enabled : undefined,
         ocr_remote_url: f.ocr_remote_url !== (s.ocr.remote_url || "") ? f.ocr_remote_url : undefined,
         ocr_remote_api_key: f.ocr_remote_api_key || undefined,
+        llm_vision_provider: f.llm_vision_provider !== (s.ocr.llm_vision_provider || "") ? f.llm_vision_provider : undefined,
         llm_vision_model: f.llm_vision_model !== (s.ocr.llm_vision_model || "") ? f.llm_vision_model : undefined,
+        llm_vision_ollama_url: f.llm_vision_ollama_url !== (s.ocr.llm_vision_ollama_url || "") ? f.llm_vision_ollama_url : undefined,
         google_vision_key: f.google_vision_key || undefined,
       })}>
       <SelectField label="OCR Engine" value={f.ocr_engine} onChange={(v) => setF({ ...f, ocr_engine: v })}
@@ -247,15 +251,24 @@ function OcrTab() {
       {f.ocr_engine === "llm_vision" && (
         <>
           <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-            LLM Vision uses the provider configured in the <strong>LLM tab</strong>.
-            {s.llm.provider === "claude"
-              ? " Claude has built-in vision — no extra model needed."
-              : " For Ollama, specify a vision-capable model below (e.g. llava, llama3.2-vision)."}
+            Vision OCR can use a <strong>different provider and model</strong> than the extraction LLM.
+            For example: Chandra for OCR + llama3.1 for extraction.
+            Leave fields empty to use the same provider/model as the LLM tab.
           </div>
-          {s.llm.provider !== "claude" && (
-            <TextField label="Vision Model (Ollama)" value={f.llm_vision_model}
-              onChange={(v) => setF({ ...f, llm_vision_model: v })}
-              placeholder="e.g. llava:13b or llama3.2-vision" />
+          <SelectField label="Vision Provider" value={f.llm_vision_provider}
+            onChange={(v) => setF({ ...f, llm_vision_provider: v })}
+            options={[
+              { value: "", label: "Same as LLM tab" },
+              { value: "ollama", label: "Ollama" },
+              { value: "claude", label: "Claude" },
+            ]} />
+          <TextField label="Vision Model" value={f.llm_vision_model}
+            onChange={(v) => setF({ ...f, llm_vision_model: v })}
+            placeholder="e.g. fredrezones55/chandra-ocr-2, llama3.2-vision" />
+          {(f.llm_vision_provider === "ollama" || (!f.llm_vision_provider && s.llm.provider === "ollama")) && (
+            <TextField label="Vision Ollama URL" value={f.llm_vision_ollama_url}
+              onChange={(v) => setF({ ...f, llm_vision_ollama_url: v })}
+              placeholder="Same as LLM Ollama URL if empty" />
           )}
         </>
       )}

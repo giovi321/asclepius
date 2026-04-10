@@ -2,7 +2,9 @@
 
 import asyncio
 import logging
+import threading
 from pathlib import Path
+from queue import Queue, Empty
 
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 from watchdog.observers import Observer
@@ -17,15 +19,12 @@ SUPPORTED_EXTENSIONS = {
     ".dcm", ".dicom", ".iso",
 }
 
-# Global queue for processing
-file_queue: asyncio.Queue[str] = asyncio.Queue()
-
 
 class InboxHandler(FileSystemEventHandler):
     """Handles new files appearing in the inbox directory."""
 
-    def __init__(self, loop: asyncio.AbstractEventLoop):
-        self.loop = loop
+    def __init__(self, queue: Queue):
+        self.queue = queue
 
     def on_created(self, event: FileCreatedEvent) -> None:
         if event.is_directory:
@@ -43,52 +42,79 @@ class InboxHandler(FileSystemEventHandler):
             return
 
         logger.info("New file detected: %s", path.name)
-        # Schedule with a delay to let file finish writing
-        self.loop.call_later(2.0, self._enqueue, str(path))
+        self.queue.put(str(path))
 
-    def _enqueue(self, file_path: str) -> None:
-        asyncio.run_coroutine_threadsafe(
-            file_queue.put(file_path), self.loop
-        )
+
+def _pipeline_worker(config: AppConfig, queue: Queue) -> None:
+    """Worker thread that processes files. Runs in its own thread with its own event loop."""
+    import asyncio
+
+    async def _run():
+        from asclepius.pipeline.processor import process_file
+
+        while True:
+            try:
+                file_path = queue.get(timeout=2)
+            except Empty:
+                continue
+
+            try:
+                logger.info("Pipeline worker processing: %s", Path(file_path).name)
+                await process_file(file_path, config)
+            except Exception:
+                logger.exception("Pipeline error for: %s", file_path)
+            finally:
+                queue.task_done()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_run())
+    except Exception:
+        logger.exception("Pipeline worker crashed")
+    finally:
+        loop.close()
 
 
 async def start_watcher(config: AppConfig) -> None:
-    """Start the file watcher and processing loop."""
-    from asclepius.pipeline.processor import process_file
+    """Start the file watcher and pipeline worker thread.
 
+    The pipeline runs in a SEPARATE THREAD with its own event loop,
+    so it never blocks the main web server event loop.
+    """
     inbox_path = config.vault.inbox_path
     Path(inbox_path).mkdir(parents=True, exist_ok=True)
 
-    loop = asyncio.get_event_loop()
-    handler = InboxHandler(loop)
+    # Thread-safe queue (not asyncio.Queue)
+    queue: Queue[str] = Queue()
+
+    # Start pipeline worker in a daemon thread
+    worker = threading.Thread(
+        target=_pipeline_worker,
+        args=(config, queue),
+        daemon=True,
+        name="pipeline-worker",
+    )
+    worker.start()
+    logger.info("Pipeline worker thread started")
+
+    # Start file watcher
+    handler = InboxHandler(queue)
     observer = Observer()
     observer.schedule(handler, inbox_path, recursive=True)
     observer.start()
-
     logger.info("File watcher started on %s", inbox_path)
 
-    # Also scan for existing files in inbox
+    # Scan for existing files in inbox
     for f in Path(inbox_path).iterdir():
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith("."):
-            await file_queue.put(str(f))
+            logger.info("Queuing existing inbox file: %s", f.name)
+            queue.put(str(f))
 
+    # Keep the coroutine alive (so the task isn't garbage collected)
     try:
         while True:
-            file_path = await file_queue.get()
-            # Process in a way that doesn't block the event loop
-            # Use asyncio.shield + timeout to prevent server hangs
-            try:
-                await asyncio.wait_for(
-                    process_file(file_path, config),
-                    timeout=600,  # 10 min max per document
-                )
-            except asyncio.TimeoutError:
-                logger.error("Processing timed out for: %s", file_path)
-            except Exception:
-                logger.exception("Error processing file: %s", file_path)
-            file_queue.task_done()
-            # Small yield to let the event loop handle HTTP requests
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(60)
     except asyncio.CancelledError:
         observer.stop()
         observer.join()

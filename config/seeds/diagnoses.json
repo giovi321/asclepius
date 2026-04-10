@@ -1,0 +1,2427 @@
+[
+  {
+    "canonical_code": "essential_hypertension",
+    "canonical_display": "Essential Hypertension",
+    "icd10_code": "I10",
+    "aliases": [
+      {"alias": "Essential Hypertension", "language": "en"},
+      {"alias": "High Blood Pressure", "language": "en"},
+      {"alias": "Hypertension", "language": "en"},
+      {"alias": "HTN", "language": "en"},
+      {"alias": "Ipertensione arteriosa essenziale", "language": "it"},
+      {"alias": "Ipertensione", "language": "it"},
+      {"alias": "Pressione alta", "language": "it"},
+      {"alias": "Essentielle Hypertonie", "language": "de"},
+      {"alias": "Bluthochdruck", "language": "de"},
+      {"alias": "Hypertension artérielle essentielle", "language": "fr"},
+      {"alias": "Tension artérielle élevée", "language": "fr"},
+      {"alias": "Hipertensión arterial esencial", "language": "es"},
+      {"alias": "Presión arterial alta", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "coronary_artery_disease",
+    "canonical_display": "Coronary Artery Disease",
+    "icd10_code": "I25.10",
+    "aliases": [
+      {"alias": "Coronary Artery Disease", "language": "en"},
+      {"alias": "CAD", "language": "en"},
+      {"alias": "Ischemic Heart Disease", "language": "en"},
+      {"alias": "Coronary Heart Disease", "language": "en"},
+      {"alias": "Malattia coronarica", "language": "it"},
+      {"alias": "Cardiopatia ischemica", "language": "it"},
+      {"alias": "Koronare Herzkrankheit", "language": "de"},
+      {"alias": "KHK", "language": "de"},
+      {"alias": "Maladie coronarienne", "language": "fr"},
+      {"alias": "Cardiopathie ischémique", "language": "fr"},
+      {"alias": "Enfermedad coronaria", "language": "es"},
+      {"alias": "Cardiopatía isquémica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "heart_failure",
+    "canonical_display": "Heart Failure",
+    "icd10_code": "I50.9",
+    "aliases": [
+      {"alias": "Heart Failure", "language": "en"},
+      {"alias": "Congestive Heart Failure", "language": "en"},
+      {"alias": "CHF", "language": "en"},
+      {"alias": "HF", "language": "en"},
+      {"alias": "Scompenso cardiaco", "language": "it"},
+      {"alias": "Insufficienza cardiaca", "language": "it"},
+      {"alias": "Herzinsuffizienz", "language": "de"},
+      {"alias": "Herzschwäche", "language": "de"},
+      {"alias": "Insuffisance cardiaque", "language": "fr"},
+      {"alias": "Insuficiencia cardíaca", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "atrial_fibrillation",
+    "canonical_display": "Atrial Fibrillation",
+    "icd10_code": "I48.91",
+    "aliases": [
+      {"alias": "Atrial Fibrillation", "language": "en"},
+      {"alias": "AFib", "language": "en"},
+      {"alias": "AF", "language": "en"},
+      {"alias": "Fibrillazione atriale", "language": "it"},
+      {"alias": "FA", "language": "it"},
+      {"alias": "Vorhofflimmern", "language": "de"},
+      {"alias": "Fibrillation auriculaire", "language": "fr"},
+      {"alias": "FA", "language": "fr"},
+      {"alias": "Fibrilación auricular", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "myocardial_infarction",
+    "canonical_display": "Myocardial Infarction",
+    "icd10_code": "I21.9",
+    "aliases": [
+      {"alias": "Myocardial Infarction", "language": "en"},
+      {"alias": "Heart Attack", "language": "en"},
+      {"alias": "MI", "language": "en"},
+      {"alias": "Infarto miocardico", "language": "it"},
+      {"alias": "Infarto", "language": "it"},
+      {"alias": "Attacco cardiaco", "language": "it"},
+      {"alias": "Herzinfarkt", "language": "de"},
+      {"alias": "Myokardinfarkt", "language": "de"},
+      {"alias": "Infarctus du myocarde", "language": "fr"},
+      {"alias": "Crise cardiaque", "language": "fr"},
+      {"alias": "Infarto de miocardio", "language": "es"},
+      {"alias": "Ataque al corazón", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "angina_pectoris",
+    "canonical_display": "Angina Pectoris",
+    "icd10_code": "I20.9",
+    "aliases": [
+      {"alias": "Angina Pectoris", "language": "en"},
+      {"alias": "Angina", "language": "en"},
+      {"alias": "Chest Pain", "language": "en"},
+      {"alias": "Angina pectoris", "language": "it"},
+      {"alias": "Dolore anginoso", "language": "it"},
+      {"alias": "Angina pectoris", "language": "de"},
+      {"alias": "Brustenge", "language": "de"},
+      {"alias": "Angine de poitrine", "language": "fr"},
+      {"alias": "Angor", "language": "fr"},
+      {"alias": "Angina de pecho", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "deep_vein_thrombosis",
+    "canonical_display": "Deep Vein Thrombosis",
+    "icd10_code": "I82.40",
+    "aliases": [
+      {"alias": "Deep Vein Thrombosis", "language": "en"},
+      {"alias": "DVT", "language": "en"},
+      {"alias": "Trombosi venosa profonda", "language": "it"},
+      {"alias": "TVP", "language": "it"},
+      {"alias": "Tiefe Venenthrombose", "language": "de"},
+      {"alias": "TVT", "language": "de"},
+      {"alias": "Thrombose veineuse profonde", "language": "fr"},
+      {"alias": "TVP", "language": "fr"},
+      {"alias": "Trombosis venosa profunda", "language": "es"},
+      {"alias": "TVP", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pulmonary_embolism",
+    "canonical_display": "Pulmonary Embolism",
+    "icd10_code": "I26.99",
+    "aliases": [
+      {"alias": "Pulmonary Embolism", "language": "en"},
+      {"alias": "PE", "language": "en"},
+      {"alias": "Embolia polmonare", "language": "it"},
+      {"alias": "EP", "language": "it"},
+      {"alias": "Lungenembolie", "language": "de"},
+      {"alias": "Embolie pulmonaire", "language": "fr"},
+      {"alias": "Embolia pulmonar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "aortic_stenosis",
+    "canonical_display": "Aortic Stenosis",
+    "icd10_code": "I35.0",
+    "aliases": [
+      {"alias": "Aortic Stenosis", "language": "en"},
+      {"alias": "AS", "language": "en"},
+      {"alias": "Aortic Valve Stenosis", "language": "en"},
+      {"alias": "Stenosi aortica", "language": "it"},
+      {"alias": "Aortenklappenstenose", "language": "de"},
+      {"alias": "Aortenstenose", "language": "de"},
+      {"alias": "Sténose aortique", "language": "fr"},
+      {"alias": "Estenosis aórtica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mitral_valve_prolapse",
+    "canonical_display": "Mitral Valve Prolapse",
+    "icd10_code": "I34.1",
+    "aliases": [
+      {"alias": "Mitral Valve Prolapse", "language": "en"},
+      {"alias": "MVP", "language": "en"},
+      {"alias": "Prolasso della valvola mitrale", "language": "it"},
+      {"alias": "Mitralklappenprolaps", "language": "de"},
+      {"alias": "Prolapsus de la valve mitrale", "language": "fr"},
+      {"alias": "Prolapso de la válvula mitral", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "peripheral_artery_disease",
+    "canonical_display": "Peripheral Artery Disease",
+    "icd10_code": "I73.9",
+    "aliases": [
+      {"alias": "Peripheral Artery Disease", "language": "en"},
+      {"alias": "PAD", "language": "en"},
+      {"alias": "Peripheral Vascular Disease", "language": "en"},
+      {"alias": "Arteriopatia periferica", "language": "it"},
+      {"alias": "Periphere arterielle Verschlusskrankheit", "language": "de"},
+      {"alias": "pAVK", "language": "de"},
+      {"alias": "Artériopathie périphérique", "language": "fr"},
+      {"alias": "Enfermedad arterial periférica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cardiomyopathy",
+    "canonical_display": "Cardiomyopathy",
+    "icd10_code": "I42.9",
+    "aliases": [
+      {"alias": "Cardiomyopathy", "language": "en"},
+      {"alias": "CMP", "language": "en"},
+      {"alias": "Cardiomiopatia", "language": "it"},
+      {"alias": "Kardiomyopathie", "language": "de"},
+      {"alias": "Cardiomyopathie", "language": "fr"},
+      {"alias": "Miocardiopatía", "language": "es"},
+      {"alias": "Cardiomiopatía", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pericarditis",
+    "canonical_display": "Pericarditis",
+    "icd10_code": "I30.9",
+    "aliases": [
+      {"alias": "Pericarditis", "language": "en"},
+      {"alias": "Pericardite", "language": "it"},
+      {"alias": "Perikarditis", "language": "de"},
+      {"alias": "Herzbeutelentzündung", "language": "de"},
+      {"alias": "Péricardite", "language": "fr"},
+      {"alias": "Pericarditis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "endocarditis",
+    "canonical_display": "Infective Endocarditis",
+    "icd10_code": "I33.0",
+    "aliases": [
+      {"alias": "Infective Endocarditis", "language": "en"},
+      {"alias": "Endocarditis", "language": "en"},
+      {"alias": "Endocardite infettiva", "language": "it"},
+      {"alias": "Endocardite", "language": "it"},
+      {"alias": "Infektiöse Endokarditis", "language": "de"},
+      {"alias": "Endokarditis", "language": "de"},
+      {"alias": "Endocardite infectieuse", "language": "fr"},
+      {"alias": "Endocarditis infecciosa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hypotension",
+    "canonical_display": "Hypotension",
+    "icd10_code": "I95.9",
+    "aliases": [
+      {"alias": "Hypotension", "language": "en"},
+      {"alias": "Low Blood Pressure", "language": "en"},
+      {"alias": "Ipotensione", "language": "it"},
+      {"alias": "Pressione bassa", "language": "it"},
+      {"alias": "Hypotonie", "language": "de"},
+      {"alias": "Niedriger Blutdruck", "language": "de"},
+      {"alias": "Hypotension artérielle", "language": "fr"},
+      {"alias": "Tension basse", "language": "fr"},
+      {"alias": "Hipotensión", "language": "es"},
+      {"alias": "Presión arterial baja", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "varicose_veins",
+    "canonical_display": "Varicose Veins",
+    "icd10_code": "I83.90",
+    "aliases": [
+      {"alias": "Varicose Veins", "language": "en"},
+      {"alias": "Varicosities", "language": "en"},
+      {"alias": "Vene varicose", "language": "it"},
+      {"alias": "Varici", "language": "it"},
+      {"alias": "Krampfadern", "language": "de"},
+      {"alias": "Varizen", "language": "de"},
+      {"alias": "Varices", "language": "fr"},
+      {"alias": "Veines variqueuses", "language": "fr"},
+      {"alias": "Varices", "language": "es"},
+      {"alias": "Venas varicosas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "aortic_aneurysm",
+    "canonical_display": "Aortic Aneurysm",
+    "icd10_code": "I71.9",
+    "aliases": [
+      {"alias": "Aortic Aneurysm", "language": "en"},
+      {"alias": "AAA", "language": "en"},
+      {"alias": "Aneurisma aortico", "language": "it"},
+      {"alias": "Aortenaneurysma", "language": "de"},
+      {"alias": "Anévrisme aortique", "language": "fr"},
+      {"alias": "Aneurisma aórtico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "stroke",
+    "canonical_display": "Cerebrovascular Accident",
+    "icd10_code": "I63.9",
+    "aliases": [
+      {"alias": "Stroke", "language": "en"},
+      {"alias": "Cerebrovascular Accident", "language": "en"},
+      {"alias": "CVA", "language": "en"},
+      {"alias": "Ictus", "language": "it"},
+      {"alias": "Ictus cerebrale", "language": "it"},
+      {"alias": "Schlaganfall", "language": "de"},
+      {"alias": "Hirninfarkt", "language": "de"},
+      {"alias": "Accident vasculaire cérébral", "language": "fr"},
+      {"alias": "AVC", "language": "fr"},
+      {"alias": "Accidente cerebrovascular", "language": "es"},
+      {"alias": "Ictus", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "transient_ischemic_attack",
+    "canonical_display": "Transient Ischemic Attack",
+    "icd10_code": "G45.9",
+    "aliases": [
+      {"alias": "Transient Ischemic Attack", "language": "en"},
+      {"alias": "TIA", "language": "en"},
+      {"alias": "Mini-Stroke", "language": "en"},
+      {"alias": "Attacco ischemico transitorio", "language": "it"},
+      {"alias": "TIA", "language": "it"},
+      {"alias": "Transitorische ischämische Attacke", "language": "de"},
+      {"alias": "TIA", "language": "de"},
+      {"alias": "Accident ischémique transitoire", "language": "fr"},
+      {"alias": "AIT", "language": "fr"},
+      {"alias": "Ataque isquémico transitorio", "language": "es"},
+      {"alias": "AIT", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "carotid_stenosis",
+    "canonical_display": "Carotid Artery Stenosis",
+    "icd10_code": "I65.29",
+    "aliases": [
+      {"alias": "Carotid Artery Stenosis", "language": "en"},
+      {"alias": "Carotid Stenosis", "language": "en"},
+      {"alias": "Stenosi carotidea", "language": "it"},
+      {"alias": "Karotisstenose", "language": "de"},
+      {"alias": "Sténose carotidienne", "language": "fr"},
+      {"alias": "Estenosis carotídea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "type_1_diabetes",
+    "canonical_display": "Type 1 Diabetes Mellitus",
+    "icd10_code": "E10",
+    "aliases": [
+      {"alias": "Type 1 Diabetes", "language": "en"},
+      {"alias": "T1DM", "language": "en"},
+      {"alias": "Insulin-Dependent Diabetes", "language": "en"},
+      {"alias": "Juvenile Diabetes", "language": "en"},
+      {"alias": "Diabete mellito tipo 1", "language": "it"},
+      {"alias": "Diabete tipo 1", "language": "it"},
+      {"alias": "Diabete giovanile", "language": "it"},
+      {"alias": "Diabetes mellitus Typ 1", "language": "de"},
+      {"alias": "Jugenddiabetes", "language": "de"},
+      {"alias": "Diabète de type 1", "language": "fr"},
+      {"alias": "Diabète insulinodépendant", "language": "fr"},
+      {"alias": "Diabetes mellitus tipo 1", "language": "es"},
+      {"alias": "Diabetes juvenil", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "type_2_diabetes",
+    "canonical_display": "Type 2 Diabetes Mellitus",
+    "icd10_code": "E11",
+    "aliases": [
+      {"alias": "Type 2 Diabetes", "language": "en"},
+      {"alias": "T2DM", "language": "en"},
+      {"alias": "Diabetes Mellitus Type 2", "language": "en"},
+      {"alias": "Adult-Onset Diabetes", "language": "en"},
+      {"alias": "Diabete mellito tipo 2", "language": "it"},
+      {"alias": "Diabete tipo 2", "language": "it"},
+      {"alias": "Diabetes mellitus Typ 2", "language": "de"},
+      {"alias": "Alterszucker", "language": "de"},
+      {"alias": "Diabète de type 2", "language": "fr"},
+      {"alias": "Diabète non insulinodépendant", "language": "fr"},
+      {"alias": "Diabetes mellitus tipo 2", "language": "es"},
+      {"alias": "Diabetes del adulto", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hypothyroidism",
+    "canonical_display": "Hypothyroidism",
+    "icd10_code": "E03.9",
+    "aliases": [
+      {"alias": "Hypothyroidism", "language": "en"},
+      {"alias": "Underactive Thyroid", "language": "en"},
+      {"alias": "Ipotiroidismo", "language": "it"},
+      {"alias": "Tiroide pigra", "language": "it"},
+      {"alias": "Hypothyreose", "language": "de"},
+      {"alias": "Schilddrüsenunterfunktion", "language": "de"},
+      {"alias": "Hypothyroïdie", "language": "fr"},
+      {"alias": "Hipotiroidismo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hyperthyroidism",
+    "canonical_display": "Hyperthyroidism",
+    "icd10_code": "E05.90",
+    "aliases": [
+      {"alias": "Hyperthyroidism", "language": "en"},
+      {"alias": "Overactive Thyroid", "language": "en"},
+      {"alias": "Ipertiroidismo", "language": "it"},
+      {"alias": "Hyperthyreose", "language": "de"},
+      {"alias": "Schilddrüsenüberfunktion", "language": "de"},
+      {"alias": "Hyperthyroïdie", "language": "fr"},
+      {"alias": "Hipertiroidismo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "graves_disease",
+    "canonical_display": "Graves Disease",
+    "icd10_code": "E05.00",
+    "aliases": [
+      {"alias": "Graves Disease", "language": "en"},
+      {"alias": "Graves' Disease", "language": "en"},
+      {"alias": "Morbo di Basedow-Graves", "language": "it"},
+      {"alias": "Malattia di Graves", "language": "it"},
+      {"alias": "Morbus Basedow", "language": "de"},
+      {"alias": "Basedow-Krankheit", "language": "de"},
+      {"alias": "Maladie de Basedow", "language": "fr"},
+      {"alias": "Enfermedad de Graves", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hashimoto_thyroiditis",
+    "canonical_display": "Hashimoto Thyroiditis",
+    "icd10_code": "E06.3",
+    "aliases": [
+      {"alias": "Hashimoto Thyroiditis", "language": "en"},
+      {"alias": "Hashimoto's Disease", "language": "en"},
+      {"alias": "Chronic Lymphocytic Thyroiditis", "language": "en"},
+      {"alias": "Tiroidite di Hashimoto", "language": "it"},
+      {"alias": "Hashimoto-Thyreoiditis", "language": "de"},
+      {"alias": "Thyroïdite de Hashimoto", "language": "fr"},
+      {"alias": "Tiroiditis de Hashimoto", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hyperlipidemia",
+    "canonical_display": "Hyperlipidemia",
+    "icd10_code": "E78.5",
+    "aliases": [
+      {"alias": "Hyperlipidemia", "language": "en"},
+      {"alias": "High Cholesterol", "language": "en"},
+      {"alias": "Dyslipidemia", "language": "en"},
+      {"alias": "Iperlipidemia", "language": "it"},
+      {"alias": "Colesterolo alto", "language": "it"},
+      {"alias": "Dislipidemia", "language": "it"},
+      {"alias": "Hyperlipidämie", "language": "de"},
+      {"alias": "Fettstoffwechselstörung", "language": "de"},
+      {"alias": "Hyperlipidémie", "language": "fr"},
+      {"alias": "Cholestérol élevé", "language": "fr"},
+      {"alias": "Hiperlipidemia", "language": "es"},
+      {"alias": "Colesterol alto", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "obesity",
+    "canonical_display": "Obesity",
+    "icd10_code": "E66.9",
+    "aliases": [
+      {"alias": "Obesity", "language": "en"},
+      {"alias": "Morbid Obesity", "language": "en"},
+      {"alias": "Obesità", "language": "it"},
+      {"alias": "Adipositas", "language": "de"},
+      {"alias": "Fettleibigkeit", "language": "de"},
+      {"alias": "Obésité", "language": "fr"},
+      {"alias": "Obesidad", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "metabolic_syndrome",
+    "canonical_display": "Metabolic Syndrome",
+    "icd10_code": "E88.81",
+    "aliases": [
+      {"alias": "Metabolic Syndrome", "language": "en"},
+      {"alias": "Syndrome X", "language": "en"},
+      {"alias": "Sindrome metabolica", "language": "it"},
+      {"alias": "Metabolisches Syndrom", "language": "de"},
+      {"alias": "Syndrome métabolique", "language": "fr"},
+      {"alias": "Síndrome metabólico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "gout",
+    "canonical_display": "Gout",
+    "icd10_code": "M10.9",
+    "aliases": [
+      {"alias": "Gout", "language": "en"},
+      {"alias": "Gouty Arthritis", "language": "en"},
+      {"alias": "Gotta", "language": "it"},
+      {"alias": "Artrite gottosa", "language": "it"},
+      {"alias": "Gicht", "language": "de"},
+      {"alias": "Goutte", "language": "fr"},
+      {"alias": "Arthrite goutteuse", "language": "fr"},
+      {"alias": "Gota", "language": "es"},
+      {"alias": "Artritis gotosa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "osteoporosis",
+    "canonical_display": "Osteoporosis",
+    "icd10_code": "M81.0",
+    "aliases": [
+      {"alias": "Osteoporosis", "language": "en"},
+      {"alias": "Bone Loss", "language": "en"},
+      {"alias": "Osteoporosi", "language": "it"},
+      {"alias": "Osteoporose", "language": "de"},
+      {"alias": "Knochenschwund", "language": "de"},
+      {"alias": "Ostéoporose", "language": "fr"},
+      {"alias": "Osteoporosis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_d_deficiency",
+    "canonical_display": "Vitamin D Deficiency",
+    "icd10_code": "E55.9",
+    "aliases": [
+      {"alias": "Vitamin D Deficiency", "language": "en"},
+      {"alias": "Low Vitamin D", "language": "en"},
+      {"alias": "Carenza di vitamina D", "language": "it"},
+      {"alias": "Ipovitaminosi D", "language": "it"},
+      {"alias": "Vitamin-D-Mangel", "language": "de"},
+      {"alias": "Carence en vitamine D", "language": "fr"},
+      {"alias": "Deficiencia de vitamina D", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "iron_deficiency",
+    "canonical_display": "Iron Deficiency",
+    "icd10_code": "E61.1",
+    "aliases": [
+      {"alias": "Iron Deficiency", "language": "en"},
+      {"alias": "Low Iron", "language": "en"},
+      {"alias": "Carenza di ferro", "language": "it"},
+      {"alias": "Sideropenia", "language": "it"},
+      {"alias": "Eisenmangel", "language": "de"},
+      {"alias": "Carence en fer", "language": "fr"},
+      {"alias": "Deficiencia de hierro", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hyperparathyroidism",
+    "canonical_display": "Hyperparathyroidism",
+    "icd10_code": "E21.3",
+    "aliases": [
+      {"alias": "Hyperparathyroidism", "language": "en"},
+      {"alias": "HPT", "language": "en"},
+      {"alias": "Iperparatiroidismo", "language": "it"},
+      {"alias": "Hyperparathyreoidismus", "language": "de"},
+      {"alias": "Hyperparathyroïdie", "language": "fr"},
+      {"alias": "Hiperparatiroidismo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "addison_disease",
+    "canonical_display": "Addison Disease",
+    "icd10_code": "E27.1",
+    "aliases": [
+      {"alias": "Addison Disease", "language": "en"},
+      {"alias": "Addison's Disease", "language": "en"},
+      {"alias": "Primary Adrenal Insufficiency", "language": "en"},
+      {"alias": "Morbo di Addison", "language": "it"},
+      {"alias": "Insufficienza surrenalica", "language": "it"},
+      {"alias": "Morbus Addison", "language": "de"},
+      {"alias": "Nebenniereninsuffizienz", "language": "de"},
+      {"alias": "Maladie d'Addison", "language": "fr"},
+      {"alias": "Insuffisance surrénalienne", "language": "fr"},
+      {"alias": "Enfermedad de Addison", "language": "es"},
+      {"alias": "Insuficiencia suprarrenal", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "asthma",
+    "canonical_display": "Asthma",
+    "icd10_code": "J45.909",
+    "aliases": [
+      {"alias": "Asthma", "language": "en"},
+      {"alias": "Bronchial Asthma", "language": "en"},
+      {"alias": "Asma", "language": "it"},
+      {"alias": "Asma bronchiale", "language": "it"},
+      {"alias": "Asthma bronchiale", "language": "de"},
+      {"alias": "Asthma", "language": "de"},
+      {"alias": "Asthme", "language": "fr"},
+      {"alias": "Asthme bronchique", "language": "fr"},
+      {"alias": "Asma", "language": "es"},
+      {"alias": "Asma bronquial", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "copd",
+    "canonical_display": "Chronic Obstructive Pulmonary Disease",
+    "icd10_code": "J44.1",
+    "aliases": [
+      {"alias": "COPD", "language": "en"},
+      {"alias": "Chronic Obstructive Pulmonary Disease", "language": "en"},
+      {"alias": "Chronic Bronchitis and Emphysema", "language": "en"},
+      {"alias": "BPCO", "language": "it"},
+      {"alias": "Broncopneumopatia cronica ostruttiva", "language": "it"},
+      {"alias": "COPD", "language": "de"},
+      {"alias": "Chronisch obstruktive Lungenerkrankung", "language": "de"},
+      {"alias": "BPCO", "language": "fr"},
+      {"alias": "Bronchopneumopathie chronique obstructive", "language": "fr"},
+      {"alias": "EPOC", "language": "es"},
+      {"alias": "Enfermedad pulmonar obstructiva crónica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pneumonia",
+    "canonical_display": "Pneumonia",
+    "icd10_code": "J18.9",
+    "aliases": [
+      {"alias": "Pneumonia", "language": "en"},
+      {"alias": "Lung Infection", "language": "en"},
+      {"alias": "Polmonite", "language": "it"},
+      {"alias": "Pneumonie", "language": "de"},
+      {"alias": "Lungenentzündung", "language": "de"},
+      {"alias": "Pneumonie", "language": "fr"},
+      {"alias": "Neumonía", "language": "es"},
+      {"alias": "Pulmonía", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "acute_bronchitis",
+    "canonical_display": "Acute Bronchitis",
+    "icd10_code": "J20.9",
+    "aliases": [
+      {"alias": "Acute Bronchitis", "language": "en"},
+      {"alias": "Chest Cold", "language": "en"},
+      {"alias": "Bronchite acuta", "language": "it"},
+      {"alias": "Akute Bronchitis", "language": "de"},
+      {"alias": "Bronchite aiguë", "language": "fr"},
+      {"alias": "Bronquitis aguda", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "chronic_bronchitis",
+    "canonical_display": "Chronic Bronchitis",
+    "icd10_code": "J42",
+    "aliases": [
+      {"alias": "Chronic Bronchitis", "language": "en"},
+      {"alias": "Bronchite cronica", "language": "it"},
+      {"alias": "Chronische Bronchitis", "language": "de"},
+      {"alias": "Bronchite chronique", "language": "fr"},
+      {"alias": "Bronquitis crónica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "sinusitis",
+    "canonical_display": "Sinusitis",
+    "icd10_code": "J32.9",
+    "aliases": [
+      {"alias": "Sinusitis", "language": "en"},
+      {"alias": "Sinus Infection", "language": "en"},
+      {"alias": "Rhinosinusitis", "language": "en"},
+      {"alias": "Sinusite", "language": "it"},
+      {"alias": "Sinusitis", "language": "de"},
+      {"alias": "Nasennebenhöhlenentzündung", "language": "de"},
+      {"alias": "Sinusite", "language": "fr"},
+      {"alias": "Sinusitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "allergic_rhinitis",
+    "canonical_display": "Allergic Rhinitis",
+    "icd10_code": "J30.9",
+    "aliases": [
+      {"alias": "Allergic Rhinitis", "language": "en"},
+      {"alias": "Hay Fever", "language": "en"},
+      {"alias": "Seasonal Allergies", "language": "en"},
+      {"alias": "Rinite allergica", "language": "it"},
+      {"alias": "Febbre da fieno", "language": "it"},
+      {"alias": "Allergische Rhinitis", "language": "de"},
+      {"alias": "Heuschnupfen", "language": "de"},
+      {"alias": "Rhinite allergique", "language": "fr"},
+      {"alias": "Rhume des foins", "language": "fr"},
+      {"alias": "Rinitis alérgica", "language": "es"},
+      {"alias": "Fiebre del heno", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "obstructive_sleep_apnea",
+    "canonical_display": "Obstructive Sleep Apnea",
+    "icd10_code": "G47.33",
+    "aliases": [
+      {"alias": "Obstructive Sleep Apnea", "language": "en"},
+      {"alias": "OSA", "language": "en"},
+      {"alias": "Sleep Apnea", "language": "en"},
+      {"alias": "Apnea ostruttiva del sonno", "language": "it"},
+      {"alias": "OSAS", "language": "it"},
+      {"alias": "Obstruktive Schlafapnoe", "language": "de"},
+      {"alias": "Schlafapnoe-Syndrom", "language": "de"},
+      {"alias": "Apnée obstructive du sommeil", "language": "fr"},
+      {"alias": "SAOS", "language": "fr"},
+      {"alias": "Apnea obstructiva del sueño", "language": "es"},
+      {"alias": "SAOS", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pulmonary_fibrosis",
+    "canonical_display": "Pulmonary Fibrosis",
+    "icd10_code": "J84.10",
+    "aliases": [
+      {"alias": "Pulmonary Fibrosis", "language": "en"},
+      {"alias": "IPF", "language": "en"},
+      {"alias": "Idiopathic Pulmonary Fibrosis", "language": "en"},
+      {"alias": "Fibrosi polmonare", "language": "it"},
+      {"alias": "Lungenfibrose", "language": "de"},
+      {"alias": "Fibrose pulmonaire", "language": "fr"},
+      {"alias": "Fibrosis pulmonar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pleural_effusion",
+    "canonical_display": "Pleural Effusion",
+    "icd10_code": "J90",
+    "aliases": [
+      {"alias": "Pleural Effusion", "language": "en"},
+      {"alias": "Fluid on the Lung", "language": "en"},
+      {"alias": "Versamento pleurico", "language": "it"},
+      {"alias": "Pleuraerguss", "language": "de"},
+      {"alias": "Épanchement pleural", "language": "fr"},
+      {"alias": "Derrame pleural", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tuberculosis",
+    "canonical_display": "Tuberculosis",
+    "icd10_code": "A15.9",
+    "aliases": [
+      {"alias": "Tuberculosis", "language": "en"},
+      {"alias": "TB", "language": "en"},
+      {"alias": "Tubercolosi", "language": "it"},
+      {"alias": "TBC", "language": "it"},
+      {"alias": "Tuberkulose", "language": "de"},
+      {"alias": "TBC", "language": "de"},
+      {"alias": "Tuberculose", "language": "fr"},
+      {"alias": "Tuberculosis", "language": "es"},
+      {"alias": "TBC", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "influenza",
+    "canonical_display": "Influenza",
+    "icd10_code": "J11.1",
+    "aliases": [
+      {"alias": "Influenza", "language": "en"},
+      {"alias": "Flu", "language": "en"},
+      {"alias": "Influenza", "language": "it"},
+      {"alias": "Grippe", "language": "de"},
+      {"alias": "Influenza", "language": "de"},
+      {"alias": "Grippe", "language": "fr"},
+      {"alias": "Influenza", "language": "fr"},
+      {"alias": "Gripe", "language": "es"},
+      {"alias": "Influenza", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "gerd",
+    "canonical_display": "Gastroesophageal Reflux Disease",
+    "icd10_code": "K21.0",
+    "aliases": [
+      {"alias": "GERD", "language": "en"},
+      {"alias": "Gastroesophageal Reflux Disease", "language": "en"},
+      {"alias": "Acid Reflux", "language": "en"},
+      {"alias": "Heartburn", "language": "en"},
+      {"alias": "Malattia da reflusso gastroesofageo", "language": "it"},
+      {"alias": "Reflusso gastroesofageo", "language": "it"},
+      {"alias": "MRGE", "language": "it"},
+      {"alias": "Gastroösophageale Refluxkrankheit", "language": "de"},
+      {"alias": "Sodbrennen", "language": "de"},
+      {"alias": "Reflux gastro-œsophagien", "language": "fr"},
+      {"alias": "RGO", "language": "fr"},
+      {"alias": "Enfermedad por reflujo gastroesofágico", "language": "es"},
+      {"alias": "ERGE", "language": "es"},
+      {"alias": "Acidez estomacal", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "gastritis",
+    "canonical_display": "Gastritis",
+    "icd10_code": "K29.70",
+    "aliases": [
+      {"alias": "Gastritis", "language": "en"},
+      {"alias": "Stomach Inflammation", "language": "en"},
+      {"alias": "Gastrite", "language": "it"},
+      {"alias": "Gastritis", "language": "de"},
+      {"alias": "Magenschleimhautentzündung", "language": "de"},
+      {"alias": "Gastrite", "language": "fr"},
+      {"alias": "Gastritis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "peptic_ulcer",
+    "canonical_display": "Peptic Ulcer Disease",
+    "icd10_code": "K27.9",
+    "aliases": [
+      {"alias": "Peptic Ulcer Disease", "language": "en"},
+      {"alias": "Peptic Ulcer", "language": "en"},
+      {"alias": "Stomach Ulcer", "language": "en"},
+      {"alias": "PUD", "language": "en"},
+      {"alias": "Ulcera peptica", "language": "it"},
+      {"alias": "Ulcera gastrica", "language": "it"},
+      {"alias": "Magengeschwür", "language": "de"},
+      {"alias": "Peptisches Ulkus", "language": "de"},
+      {"alias": "Ulcère peptique", "language": "fr"},
+      {"alias": "Ulcère gastrique", "language": "fr"},
+      {"alias": "Úlcera péptica", "language": "es"},
+      {"alias": "Úlcera gástrica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "irritable_bowel_syndrome",
+    "canonical_display": "Irritable Bowel Syndrome",
+    "icd10_code": "K58.9",
+    "aliases": [
+      {"alias": "Irritable Bowel Syndrome", "language": "en"},
+      {"alias": "IBS", "language": "en"},
+      {"alias": "Spastic Colon", "language": "en"},
+      {"alias": "Sindrome dell'intestino irritabile", "language": "it"},
+      {"alias": "Colon irritabile", "language": "it"},
+      {"alias": "Reizdarmsyndrom", "language": "de"},
+      {"alias": "RDS", "language": "de"},
+      {"alias": "Syndrome du côlon irritable", "language": "fr"},
+      {"alias": "SCI", "language": "fr"},
+      {"alias": "Síndrome del intestino irritable", "language": "es"},
+      {"alias": "SII", "language": "es"},
+      {"alias": "Colon irritable", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "crohn_disease",
+    "canonical_display": "Crohn Disease",
+    "icd10_code": "K50.90",
+    "aliases": [
+      {"alias": "Crohn Disease", "language": "en"},
+      {"alias": "Crohn's Disease", "language": "en"},
+      {"alias": "Inflammatory Bowel Disease", "language": "en"},
+      {"alias": "IBD", "language": "en"},
+      {"alias": "Morbo di Crohn", "language": "it"},
+      {"alias": "Malattia di Crohn", "language": "it"},
+      {"alias": "Morbus Crohn", "language": "de"},
+      {"alias": "Crohn-Krankheit", "language": "de"},
+      {"alias": "Maladie de Crohn", "language": "fr"},
+      {"alias": "Enfermedad de Crohn", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ulcerative_colitis",
+    "canonical_display": "Ulcerative Colitis",
+    "icd10_code": "K51.90",
+    "aliases": [
+      {"alias": "Ulcerative Colitis", "language": "en"},
+      {"alias": "UC", "language": "en"},
+      {"alias": "Colite ulcerosa", "language": "it"},
+      {"alias": "Rettocolite ulcerosa", "language": "it"},
+      {"alias": "Colitis ulcerosa", "language": "de"},
+      {"alias": "Rectocolite hémorragique", "language": "fr"},
+      {"alias": "Colite ulcéreuse", "language": "fr"},
+      {"alias": "Colitis ulcerosa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "celiac_disease",
+    "canonical_display": "Celiac Disease",
+    "icd10_code": "K90.0",
+    "aliases": [
+      {"alias": "Celiac Disease", "language": "en"},
+      {"alias": "Coeliac Disease", "language": "en"},
+      {"alias": "Gluten Intolerance", "language": "en"},
+      {"alias": "Malattia celiaca", "language": "it"},
+      {"alias": "Celiachia", "language": "it"},
+      {"alias": "Zöliakie", "language": "de"},
+      {"alias": "Glutenunverträglichkeit", "language": "de"},
+      {"alias": "Maladie cœliaque", "language": "fr"},
+      {"alias": "Enfermedad celíaca", "language": "es"},
+      {"alias": "Celiaquía", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "diverticulitis",
+    "canonical_display": "Diverticulitis",
+    "icd10_code": "K57.92",
+    "aliases": [
+      {"alias": "Diverticulitis", "language": "en"},
+      {"alias": "Diverticular Disease", "language": "en"},
+      {"alias": "Diverticolite", "language": "it"},
+      {"alias": "Divertikulitis", "language": "de"},
+      {"alias": "Diverticulite", "language": "fr"},
+      {"alias": "Diverticulitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cholelithiasis",
+    "canonical_display": "Cholelithiasis",
+    "icd10_code": "K80.20",
+    "aliases": [
+      {"alias": "Cholelithiasis", "language": "en"},
+      {"alias": "Gallstones", "language": "en"},
+      {"alias": "Gallbladder Stones", "language": "en"},
+      {"alias": "Colelitiasi", "language": "it"},
+      {"alias": "Calcoli biliari", "language": "it"},
+      {"alias": "Cholelithiasis", "language": "de"},
+      {"alias": "Gallensteine", "language": "de"},
+      {"alias": "Cholélithiase", "language": "fr"},
+      {"alias": "Calculs biliaires", "language": "fr"},
+      {"alias": "Colelitiasis", "language": "es"},
+      {"alias": "Cálculos biliares", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "nafld",
+    "canonical_display": "Non-Alcoholic Fatty Liver Disease",
+    "icd10_code": "K76.0",
+    "aliases": [
+      {"alias": "Non-Alcoholic Fatty Liver Disease", "language": "en"},
+      {"alias": "NAFLD", "language": "en"},
+      {"alias": "Fatty Liver", "language": "en"},
+      {"alias": "MASLD", "language": "en"},
+      {"alias": "Steatosi epatica non alcolica", "language": "it"},
+      {"alias": "Fegato grasso", "language": "it"},
+      {"alias": "Nichtalkoholische Fettlebererkrankung", "language": "de"},
+      {"alias": "Fettleber", "language": "de"},
+      {"alias": "Stéatose hépatique non alcoolique", "language": "fr"},
+      {"alias": "NAFLD", "language": "fr"},
+      {"alias": "Enfermedad del hígado graso no alcohólico", "language": "es"},
+      {"alias": "Hígado graso", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hepatitis_b",
+    "canonical_display": "Hepatitis B",
+    "icd10_code": "B18.1",
+    "aliases": [
+      {"alias": "Hepatitis B", "language": "en"},
+      {"alias": "HBV", "language": "en"},
+      {"alias": "Epatite B", "language": "it"},
+      {"alias": "Hepatitis B", "language": "de"},
+      {"alias": "Hépatite B", "language": "fr"},
+      {"alias": "Hepatitis B", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hepatitis_c",
+    "canonical_display": "Hepatitis C",
+    "icd10_code": "B18.2",
+    "aliases": [
+      {"alias": "Hepatitis C", "language": "en"},
+      {"alias": "HCV", "language": "en"},
+      {"alias": "Epatite C", "language": "it"},
+      {"alias": "Hepatitis C", "language": "de"},
+      {"alias": "Hépatite C", "language": "fr"},
+      {"alias": "Hepatitis C", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cirrhosis",
+    "canonical_display": "Liver Cirrhosis",
+    "icd10_code": "K74.60",
+    "aliases": [
+      {"alias": "Liver Cirrhosis", "language": "en"},
+      {"alias": "Cirrhosis", "language": "en"},
+      {"alias": "Cirrosi epatica", "language": "it"},
+      {"alias": "Cirrosi", "language": "it"},
+      {"alias": "Leberzirrhose", "language": "de"},
+      {"alias": "Zirrhose", "language": "de"},
+      {"alias": "Cirrhose hépatique", "language": "fr"},
+      {"alias": "Cirrhose", "language": "fr"},
+      {"alias": "Cirrosis hepática", "language": "es"},
+      {"alias": "Cirrosis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pancreatitis",
+    "canonical_display": "Pancreatitis",
+    "icd10_code": "K85.9",
+    "aliases": [
+      {"alias": "Pancreatitis", "language": "en"},
+      {"alias": "Acute Pancreatitis", "language": "en"},
+      {"alias": "Pancreatite", "language": "it"},
+      {"alias": "Pankreatitis", "language": "de"},
+      {"alias": "Bauchspeicheldrüsenentzündung", "language": "de"},
+      {"alias": "Pancréatite", "language": "fr"},
+      {"alias": "Pancreatitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hemorrhoids",
+    "canonical_display": "Hemorrhoids",
+    "icd10_code": "K64.9",
+    "aliases": [
+      {"alias": "Hemorrhoids", "language": "en"},
+      {"alias": "Piles", "language": "en"},
+      {"alias": "Emorroidi", "language": "it"},
+      {"alias": "Hämorrhoiden", "language": "de"},
+      {"alias": "Hémorroïdes", "language": "fr"},
+      {"alias": "Hemorroides", "language": "es"},
+      {"alias": "Almorranas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "osteoarthritis",
+    "canonical_display": "Osteoarthritis",
+    "icd10_code": "M19.90",
+    "aliases": [
+      {"alias": "Osteoarthritis", "language": "en"},
+      {"alias": "OA", "language": "en"},
+      {"alias": "Degenerative Joint Disease", "language": "en"},
+      {"alias": "Wear and Tear Arthritis", "language": "en"},
+      {"alias": "Artrosi", "language": "it"},
+      {"alias": "Osteoartrosi", "language": "it"},
+      {"alias": "Arthrose", "language": "de"},
+      {"alias": "Gelenkverschleiß", "language": "de"},
+      {"alias": "Arthrose", "language": "fr"},
+      {"alias": "Artrosis", "language": "es"},
+      {"alias": "Osteoartritis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rheumatoid_arthritis",
+    "canonical_display": "Rheumatoid Arthritis",
+    "icd10_code": "M06.9",
+    "aliases": [
+      {"alias": "Rheumatoid Arthritis", "language": "en"},
+      {"alias": "RA", "language": "en"},
+      {"alias": "Artrite reumatoide", "language": "it"},
+      {"alias": "AR", "language": "it"},
+      {"alias": "Rheumatoide Arthritis", "language": "de"},
+      {"alias": "Rheuma", "language": "de"},
+      {"alias": "Polyarthrite rhumatoïde", "language": "fr"},
+      {"alias": "PR", "language": "fr"},
+      {"alias": "Artritis reumatoide", "language": "es"},
+      {"alias": "AR", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "low_back_pain",
+    "canonical_display": "Low Back Pain",
+    "icd10_code": "M54.5",
+    "aliases": [
+      {"alias": "Low Back Pain", "language": "en"},
+      {"alias": "Lumbago", "language": "en"},
+      {"alias": "LBP", "language": "en"},
+      {"alias": "Lower Back Pain", "language": "en"},
+      {"alias": "Lombalgia", "language": "it"},
+      {"alias": "Mal di schiena", "language": "it"},
+      {"alias": "Lumbago", "language": "de"},
+      {"alias": "Rückenschmerzen", "language": "de"},
+      {"alias": "Kreuzschmerzen", "language": "de"},
+      {"alias": "Lombalgie", "language": "fr"},
+      {"alias": "Mal de dos", "language": "fr"},
+      {"alias": "Lumbalgia", "language": "es"},
+      {"alias": "Dolor lumbar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "disc_herniation",
+    "canonical_display": "Intervertebral Disc Herniation",
+    "icd10_code": "M51.16",
+    "aliases": [
+      {"alias": "Disc Herniation", "language": "en"},
+      {"alias": "Herniated Disc", "language": "en"},
+      {"alias": "Slipped Disc", "language": "en"},
+      {"alias": "Bulging Disc", "language": "en"},
+      {"alias": "Ernia del disco", "language": "it"},
+      {"alias": "Ernia discale", "language": "it"},
+      {"alias": "Bandscheibenvorfall", "language": "de"},
+      {"alias": "Diskushernie", "language": "de"},
+      {"alias": "Hernie discale", "language": "fr"},
+      {"alias": "Hernia discal", "language": "es"},
+      {"alias": "Hernia de disco", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fibromyalgia",
+    "canonical_display": "Fibromyalgia",
+    "icd10_code": "M79.7",
+    "aliases": [
+      {"alias": "Fibromyalgia", "language": "en"},
+      {"alias": "FMS", "language": "en"},
+      {"alias": "Fibromialgia", "language": "it"},
+      {"alias": "Fibromyalgie", "language": "de"},
+      {"alias": "Fibromyalgie", "language": "fr"},
+      {"alias": "Fibromialgia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "carpal_tunnel_syndrome",
+    "canonical_display": "Carpal Tunnel Syndrome",
+    "icd10_code": "G56.00",
+    "aliases": [
+      {"alias": "Carpal Tunnel Syndrome", "language": "en"},
+      {"alias": "CTS", "language": "en"},
+      {"alias": "Sindrome del tunnel carpale", "language": "it"},
+      {"alias": "Karpaltunnelsyndrom", "language": "de"},
+      {"alias": "KTS", "language": "de"},
+      {"alias": "Syndrome du canal carpien", "language": "fr"},
+      {"alias": "Síndrome del túnel carpiano", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rotator_cuff_tear",
+    "canonical_display": "Rotator Cuff Injury",
+    "icd10_code": "M75.10",
+    "aliases": [
+      {"alias": "Rotator Cuff Injury", "language": "en"},
+      {"alias": "Rotator Cuff Tear", "language": "en"},
+      {"alias": "Rotator Cuff Syndrome", "language": "en"},
+      {"alias": "Lesione della cuffia dei rotatori", "language": "it"},
+      {"alias": "Rotatorenmanschettenruptur", "language": "de"},
+      {"alias": "Rupture de la coiffe des rotateurs", "language": "fr"},
+      {"alias": "Lesión del manguito rotador", "language": "es"},
+      {"alias": "Desgarro del manguito rotador", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tendinitis",
+    "canonical_display": "Tendinitis",
+    "icd10_code": "M77.9",
+    "aliases": [
+      {"alias": "Tendinitis", "language": "en"},
+      {"alias": "Tendonitis", "language": "en"},
+      {"alias": "Tendinite", "language": "it"},
+      {"alias": "Tendinitis", "language": "de"},
+      {"alias": "Sehnenentzündung", "language": "de"},
+      {"alias": "Tendinite", "language": "fr"},
+      {"alias": "Tendinitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "plantar_fasciitis",
+    "canonical_display": "Plantar Fasciitis",
+    "icd10_code": "M72.2",
+    "aliases": [
+      {"alias": "Plantar Fasciitis", "language": "en"},
+      {"alias": "Heel Pain", "language": "en"},
+      {"alias": "Fascite plantare", "language": "it"},
+      {"alias": "Plantarfasziitis", "language": "de"},
+      {"alias": "Fersensporn", "language": "de"},
+      {"alias": "Fasciite plantaire", "language": "fr"},
+      {"alias": "Fascitis plantar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "scoliosis",
+    "canonical_display": "Scoliosis",
+    "icd10_code": "M41.9",
+    "aliases": [
+      {"alias": "Scoliosis", "language": "en"},
+      {"alias": "Curvature of the Spine", "language": "en"},
+      {"alias": "Scoliosi", "language": "it"},
+      {"alias": "Skoliose", "language": "de"},
+      {"alias": "Scoliose", "language": "fr"},
+      {"alias": "Escoliosis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "migraine",
+    "canonical_display": "Migraine",
+    "icd10_code": "G43.909",
+    "aliases": [
+      {"alias": "Migraine", "language": "en"},
+      {"alias": "Migraine Headache", "language": "en"},
+      {"alias": "Emicrania", "language": "it"},
+      {"alias": "Migräne", "language": "de"},
+      {"alias": "Migraine", "language": "fr"},
+      {"alias": "Migraña", "language": "es"},
+      {"alias": "Jaqueca", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tension_headache",
+    "canonical_display": "Tension-Type Headache",
+    "icd10_code": "G44.209",
+    "aliases": [
+      {"alias": "Tension-Type Headache", "language": "en"},
+      {"alias": "Tension Headache", "language": "en"},
+      {"alias": "Stress Headache", "language": "en"},
+      {"alias": "Cefalea tensiva", "language": "it"},
+      {"alias": "Mal di testa", "language": "it"},
+      {"alias": "Spannungskopfschmerz", "language": "de"},
+      {"alias": "Céphalée de tension", "language": "fr"},
+      {"alias": "Cefalea tensional", "language": "es"},
+      {"alias": "Dolor de cabeza tensional", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "epilepsy",
+    "canonical_display": "Epilepsy",
+    "icd10_code": "G40.909",
+    "aliases": [
+      {"alias": "Epilepsy", "language": "en"},
+      {"alias": "Seizure Disorder", "language": "en"},
+      {"alias": "Epilessia", "language": "it"},
+      {"alias": "Epilepsie", "language": "de"},
+      {"alias": "Épilepsie", "language": "fr"},
+      {"alias": "Epilepsia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "parkinson_disease",
+    "canonical_display": "Parkinson Disease",
+    "icd10_code": "G20",
+    "aliases": [
+      {"alias": "Parkinson Disease", "language": "en"},
+      {"alias": "Parkinson's Disease", "language": "en"},
+      {"alias": "PD", "language": "en"},
+      {"alias": "Morbo di Parkinson", "language": "it"},
+      {"alias": "Malattia di Parkinson", "language": "it"},
+      {"alias": "Morbus Parkinson", "language": "de"},
+      {"alias": "Parkinson-Krankheit", "language": "de"},
+      {"alias": "Maladie de Parkinson", "language": "fr"},
+      {"alias": "Enfermedad de Parkinson", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "alzheimer_disease",
+    "canonical_display": "Alzheimer Disease",
+    "icd10_code": "G30.9",
+    "aliases": [
+      {"alias": "Alzheimer Disease", "language": "en"},
+      {"alias": "Alzheimer's Disease", "language": "en"},
+      {"alias": "AD", "language": "en"},
+      {"alias": "Dementia", "language": "en"},
+      {"alias": "Morbo di Alzheimer", "language": "it"},
+      {"alias": "Malattia di Alzheimer", "language": "it"},
+      {"alias": "Demenza", "language": "it"},
+      {"alias": "Morbus Alzheimer", "language": "de"},
+      {"alias": "Alzheimer-Krankheit", "language": "de"},
+      {"alias": "Maladie d'Alzheimer", "language": "fr"},
+      {"alias": "Démence", "language": "fr"},
+      {"alias": "Enfermedad de Alzheimer", "language": "es"},
+      {"alias": "Demencia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "multiple_sclerosis",
+    "canonical_display": "Multiple Sclerosis",
+    "icd10_code": "G35",
+    "aliases": [
+      {"alias": "Multiple Sclerosis", "language": "en"},
+      {"alias": "MS", "language": "en"},
+      {"alias": "Sclerosi multipla", "language": "it"},
+      {"alias": "SM", "language": "it"},
+      {"alias": "Multiple Sklerose", "language": "de"},
+      {"alias": "MS", "language": "de"},
+      {"alias": "Sclérose en plaques", "language": "fr"},
+      {"alias": "SEP", "language": "fr"},
+      {"alias": "Esclerosis múltiple", "language": "es"},
+      {"alias": "EM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "peripheral_neuropathy",
+    "canonical_display": "Peripheral Neuropathy",
+    "icd10_code": "G62.9",
+    "aliases": [
+      {"alias": "Peripheral Neuropathy", "language": "en"},
+      {"alias": "Neuropathy", "language": "en"},
+      {"alias": "Nerve Damage", "language": "en"},
+      {"alias": "Neuropatia periferica", "language": "it"},
+      {"alias": "Periphere Neuropathie", "language": "de"},
+      {"alias": "Polyneuropathie", "language": "de"},
+      {"alias": "Neuropathie périphérique", "language": "fr"},
+      {"alias": "Neuropatía periférica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "sciatica",
+    "canonical_display": "Sciatica",
+    "icd10_code": "M54.30",
+    "aliases": [
+      {"alias": "Sciatica", "language": "en"},
+      {"alias": "Sciatic Nerve Pain", "language": "en"},
+      {"alias": "Sciatica", "language": "it"},
+      {"alias": "Sciatalgia", "language": "it"},
+      {"alias": "Ischialgie", "language": "de"},
+      {"alias": "Ischiasschmerz", "language": "de"},
+      {"alias": "Sciatique", "language": "fr"},
+      {"alias": "Ciática", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bppv",
+    "canonical_display": "Benign Paroxysmal Positional Vertigo",
+    "icd10_code": "H81.10",
+    "aliases": [
+      {"alias": "Benign Paroxysmal Positional Vertigo", "language": "en"},
+      {"alias": "BPPV", "language": "en"},
+      {"alias": "Vertigo", "language": "en"},
+      {"alias": "Dizziness", "language": "en"},
+      {"alias": "Vertigine parossistica posizionale benigna", "language": "it"},
+      {"alias": "VPPB", "language": "it"},
+      {"alias": "Vertigini", "language": "it"},
+      {"alias": "Benigner paroxysmaler Lagerungsschwindel", "language": "de"},
+      {"alias": "Schwindel", "language": "de"},
+      {"alias": "Vertige paroxystique positionnel bénin", "language": "fr"},
+      {"alias": "VPPB", "language": "fr"},
+      {"alias": "Vértigo posicional paroxístico benigno", "language": "es"},
+      {"alias": "VPPB", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bell_palsy",
+    "canonical_display": "Bell Palsy",
+    "icd10_code": "G51.0",
+    "aliases": [
+      {"alias": "Bell Palsy", "language": "en"},
+      {"alias": "Bell's Palsy", "language": "en"},
+      {"alias": "Facial Nerve Paralysis", "language": "en"},
+      {"alias": "Paralisi di Bell", "language": "it"},
+      {"alias": "Paralisi del nervo facciale", "language": "it"},
+      {"alias": "Fazialisparese", "language": "de"},
+      {"alias": "Bell-Parese", "language": "de"},
+      {"alias": "Paralysie de Bell", "language": "fr"},
+      {"alias": "Paralysie faciale", "language": "fr"},
+      {"alias": "Parálisis de Bell", "language": "es"},
+      {"alias": "Parálisis facial", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "depression",
+    "canonical_display": "Major Depressive Disorder",
+    "icd10_code": "F32.9",
+    "aliases": [
+      {"alias": "Major Depressive Disorder", "language": "en"},
+      {"alias": "Depression", "language": "en"},
+      {"alias": "Major Depression", "language": "en"},
+      {"alias": "MDD", "language": "en"},
+      {"alias": "Clinical Depression", "language": "en"},
+      {"alias": "Depressione", "language": "it"},
+      {"alias": "Disturbo depressivo maggiore", "language": "it"},
+      {"alias": "Depression", "language": "de"},
+      {"alias": "Depressive Störung", "language": "de"},
+      {"alias": "Schwere depressive Episoden", "language": "de"},
+      {"alias": "Dépression", "language": "fr"},
+      {"alias": "Trouble dépressif majeur", "language": "fr"},
+      {"alias": "Depresión", "language": "es"},
+      {"alias": "Trastorno depresivo mayor", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anxiety_disorder",
+    "canonical_display": "Generalized Anxiety Disorder",
+    "icd10_code": "F41.1",
+    "aliases": [
+      {"alias": "Generalized Anxiety Disorder", "language": "en"},
+      {"alias": "Anxiety Disorder", "language": "en"},
+      {"alias": "GAD", "language": "en"},
+      {"alias": "Anxiety", "language": "en"},
+      {"alias": "Disturbo d'ansia generalizzato", "language": "it"},
+      {"alias": "Ansia", "language": "it"},
+      {"alias": "Generalisierte Angststörung", "language": "de"},
+      {"alias": "Angststörung", "language": "de"},
+      {"alias": "Trouble anxieux généralisé", "language": "fr"},
+      {"alias": "Anxiété", "language": "fr"},
+      {"alias": "Trastorno de ansiedad generalizada", "language": "es"},
+      {"alias": "Ansiedad", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "panic_disorder",
+    "canonical_display": "Panic Disorder",
+    "icd10_code": "F41.0",
+    "aliases": [
+      {"alias": "Panic Disorder", "language": "en"},
+      {"alias": "Panic Attacks", "language": "en"},
+      {"alias": "Disturbo di panico", "language": "it"},
+      {"alias": "Attacchi di panico", "language": "it"},
+      {"alias": "Panikstörung", "language": "de"},
+      {"alias": "Panikattacken", "language": "de"},
+      {"alias": "Trouble panique", "language": "fr"},
+      {"alias": "Attaques de panique", "language": "fr"},
+      {"alias": "Trastorno de pánico", "language": "es"},
+      {"alias": "Ataques de pánico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ptsd",
+    "canonical_display": "Post-Traumatic Stress Disorder",
+    "icd10_code": "F43.10",
+    "aliases": [
+      {"alias": "Post-Traumatic Stress Disorder", "language": "en"},
+      {"alias": "PTSD", "language": "en"},
+      {"alias": "Disturbo da stress post-traumatico", "language": "it"},
+      {"alias": "DSPT", "language": "it"},
+      {"alias": "Posttraumatische Belastungsstörung", "language": "de"},
+      {"alias": "PTBS", "language": "de"},
+      {"alias": "Trouble de stress post-traumatique", "language": "fr"},
+      {"alias": "TSPT", "language": "fr"},
+      {"alias": "Trastorno de estrés postraumático", "language": "es"},
+      {"alias": "TEPT", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bipolar_disorder",
+    "canonical_display": "Bipolar Disorder",
+    "icd10_code": "F31.9",
+    "aliases": [
+      {"alias": "Bipolar Disorder", "language": "en"},
+      {"alias": "Manic Depression", "language": "en"},
+      {"alias": "Bipolar", "language": "en"},
+      {"alias": "Disturbo bipolare", "language": "it"},
+      {"alias": "Bipolare Störung", "language": "de"},
+      {"alias": "Manisch-depressive Erkrankung", "language": "de"},
+      {"alias": "Trouble bipolaire", "language": "fr"},
+      {"alias": "Trastorno bipolar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "adhd",
+    "canonical_display": "Attention Deficit Hyperactivity Disorder",
+    "icd10_code": "F90.9",
+    "aliases": [
+      {"alias": "Attention Deficit Hyperactivity Disorder", "language": "en"},
+      {"alias": "ADHD", "language": "en"},
+      {"alias": "ADD", "language": "en"},
+      {"alias": "Disturbo da deficit di attenzione e iperattività", "language": "it"},
+      {"alias": "DDAI", "language": "it"},
+      {"alias": "Aufmerksamkeitsdefizit-Hyperaktivitätsstörung", "language": "de"},
+      {"alias": "ADHS", "language": "de"},
+      {"alias": "Trouble du déficit de l'attention avec hyperactivité", "language": "fr"},
+      {"alias": "TDAH", "language": "fr"},
+      {"alias": "Trastorno por déficit de atención e hiperactividad", "language": "es"},
+      {"alias": "TDAH", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "insomnia",
+    "canonical_display": "Insomnia",
+    "icd10_code": "G47.00",
+    "aliases": [
+      {"alias": "Insomnia", "language": "en"},
+      {"alias": "Sleeplessness", "language": "en"},
+      {"alias": "Sleep Disorder", "language": "en"},
+      {"alias": "Insonnia", "language": "it"},
+      {"alias": "Insomnie", "language": "de"},
+      {"alias": "Schlaflosigkeit", "language": "de"},
+      {"alias": "Insomnie", "language": "fr"},
+      {"alias": "Insomnio", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ocd",
+    "canonical_display": "Obsessive-Compulsive Disorder",
+    "icd10_code": "F42.9",
+    "aliases": [
+      {"alias": "Obsessive-Compulsive Disorder", "language": "en"},
+      {"alias": "OCD", "language": "en"},
+      {"alias": "Disturbo ossessivo-compulsivo", "language": "it"},
+      {"alias": "DOC", "language": "it"},
+      {"alias": "Zwangsstörung", "language": "de"},
+      {"alias": "Trouble obsessionnel compulsif", "language": "fr"},
+      {"alias": "TOC", "language": "fr"},
+      {"alias": "Trastorno obsesivo-compulsivo", "language": "es"},
+      {"alias": "TOC", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "schizophrenia",
+    "canonical_display": "Schizophrenia",
+    "icd10_code": "F20.9",
+    "aliases": [
+      {"alias": "Schizophrenia", "language": "en"},
+      {"alias": "Schizofrenia", "language": "it"},
+      {"alias": "Schizophrenie", "language": "de"},
+      {"alias": "Schizophrénie", "language": "fr"},
+      {"alias": "Esquizofrenia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "eating_disorder",
+    "canonical_display": "Eating Disorder",
+    "icd10_code": "F50.9",
+    "aliases": [
+      {"alias": "Eating Disorder", "language": "en"},
+      {"alias": "Anorexia Nervosa", "language": "en"},
+      {"alias": "Bulimia Nervosa", "language": "en"},
+      {"alias": "Disturbo del comportamento alimentare", "language": "it"},
+      {"alias": "DCA", "language": "it"},
+      {"alias": "Anoressia", "language": "it"},
+      {"alias": "Essstörung", "language": "de"},
+      {"alias": "Magersucht", "language": "de"},
+      {"alias": "Trouble du comportement alimentaire", "language": "fr"},
+      {"alias": "TCA", "language": "fr"},
+      {"alias": "Trastorno de la conducta alimentaria", "language": "es"},
+      {"alias": "TCA", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urinary_tract_infection",
+    "canonical_display": "Urinary Tract Infection",
+    "icd10_code": "N39.0",
+    "aliases": [
+      {"alias": "Urinary Tract Infection", "language": "en"},
+      {"alias": "UTI", "language": "en"},
+      {"alias": "Bladder Infection", "language": "en"},
+      {"alias": "Infezione delle vie urinarie", "language": "it"},
+      {"alias": "IVU", "language": "it"},
+      {"alias": "Cistite", "language": "it"},
+      {"alias": "Harnwegsinfekt", "language": "de"},
+      {"alias": "HWI", "language": "de"},
+      {"alias": "Blasenentzündung", "language": "de"},
+      {"alias": "Infection urinaire", "language": "fr"},
+      {"alias": "Cystite", "language": "fr"},
+      {"alias": "Infección urinaria", "language": "es"},
+      {"alias": "Cistitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "kidney_stones",
+    "canonical_display": "Nephrolithiasis",
+    "icd10_code": "N20.0",
+    "aliases": [
+      {"alias": "Nephrolithiasis", "language": "en"},
+      {"alias": "Kidney Stones", "language": "en"},
+      {"alias": "Renal Calculi", "language": "en"},
+      {"alias": "Nefrolitiasi", "language": "it"},
+      {"alias": "Calcoli renali", "language": "it"},
+      {"alias": "Nephrolithiasis", "language": "de"},
+      {"alias": "Nierensteine", "language": "de"},
+      {"alias": "Lithiase rénale", "language": "fr"},
+      {"alias": "Calculs rénaux", "language": "fr"},
+      {"alias": "Nefrolitiasis", "language": "es"},
+      {"alias": "Cálculos renales", "language": "es"},
+      {"alias": "Piedras en el riñón", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "chronic_kidney_disease",
+    "canonical_display": "Chronic Kidney Disease",
+    "icd10_code": "N18.9",
+    "aliases": [
+      {"alias": "Chronic Kidney Disease", "language": "en"},
+      {"alias": "CKD", "language": "en"},
+      {"alias": "Chronic Renal Failure", "language": "en"},
+      {"alias": "Malattia renale cronica", "language": "it"},
+      {"alias": "Insufficienza renale cronica", "language": "it"},
+      {"alias": "IRC", "language": "it"},
+      {"alias": "Chronische Nierenerkrankung", "language": "de"},
+      {"alias": "Chronische Niereninsuffizienz", "language": "de"},
+      {"alias": "Maladie rénale chronique", "language": "fr"},
+      {"alias": "Insuffisance rénale chronique", "language": "fr"},
+      {"alias": "Enfermedad renal crónica", "language": "es"},
+      {"alias": "Insuficiencia renal crónica", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "benign_prostatic_hyperplasia",
+    "canonical_display": "Benign Prostatic Hyperplasia",
+    "icd10_code": "N40.0",
+    "aliases": [
+      {"alias": "Benign Prostatic Hyperplasia", "language": "en"},
+      {"alias": "BPH", "language": "en"},
+      {"alias": "Enlarged Prostate", "language": "en"},
+      {"alias": "Iperplasia prostatica benigna", "language": "it"},
+      {"alias": "IPB", "language": "it"},
+      {"alias": "Prostata ingrossata", "language": "it"},
+      {"alias": "Benigne Prostatahyperplasie", "language": "de"},
+      {"alias": "BPH", "language": "de"},
+      {"alias": "Prostatavergrößerung", "language": "de"},
+      {"alias": "Hyperplasie bénigne de la prostate", "language": "fr"},
+      {"alias": "HBP", "language": "fr"},
+      {"alias": "Hiperplasia prostática benigna", "language": "es"},
+      {"alias": "HPB", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "prostatitis",
+    "canonical_display": "Prostatitis",
+    "icd10_code": "N41.9",
+    "aliases": [
+      {"alias": "Prostatitis", "language": "en"},
+      {"alias": "Prostate Infection", "language": "en"},
+      {"alias": "Prostatite", "language": "it"},
+      {"alias": "Prostatitis", "language": "de"},
+      {"alias": "Prostataentzündung", "language": "de"},
+      {"alias": "Prostatite", "language": "fr"},
+      {"alias": "Prostatitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urinary_incontinence",
+    "canonical_display": "Urinary Incontinence",
+    "icd10_code": "R32",
+    "aliases": [
+      {"alias": "Urinary Incontinence", "language": "en"},
+      {"alias": "Bladder Leakage", "language": "en"},
+      {"alias": "Incontinenza urinaria", "language": "it"},
+      {"alias": "Harninkontinenz", "language": "de"},
+      {"alias": "Blasenschwäche", "language": "de"},
+      {"alias": "Incontinence urinaire", "language": "fr"},
+      {"alias": "Incontinencia urinaria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "overactive_bladder",
+    "canonical_display": "Overactive Bladder",
+    "icd10_code": "N32.81",
+    "aliases": [
+      {"alias": "Overactive Bladder", "language": "en"},
+      {"alias": "OAB", "language": "en"},
+      {"alias": "Vescica iperattiva", "language": "it"},
+      {"alias": "Überaktive Blase", "language": "de"},
+      {"alias": "Reizblase", "language": "de"},
+      {"alias": "Vessie hyperactive", "language": "fr"},
+      {"alias": "Vejiga hiperactiva", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pyelonephritis",
+    "canonical_display": "Pyelonephritis",
+    "icd10_code": "N10",
+    "aliases": [
+      {"alias": "Pyelonephritis", "language": "en"},
+      {"alias": "Kidney Infection", "language": "en"},
+      {"alias": "Pielonefrite", "language": "it"},
+      {"alias": "Pyelonephritis", "language": "de"},
+      {"alias": "Nierenbeckenentzündung", "language": "de"},
+      {"alias": "Pyélonéphrite", "language": "fr"},
+      {"alias": "Pielonefritis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hematuria",
+    "canonical_display": "Hematuria",
+    "icd10_code": "R31.9",
+    "aliases": [
+      {"alias": "Hematuria", "language": "en"},
+      {"alias": "Blood in Urine", "language": "en"},
+      {"alias": "Ematuria", "language": "it"},
+      {"alias": "Sangue nelle urine", "language": "it"},
+      {"alias": "Hämaturie", "language": "de"},
+      {"alias": "Blut im Urin", "language": "de"},
+      {"alias": "Hématurie", "language": "fr"},
+      {"alias": "Hematuria", "language": "es"},
+      {"alias": "Sangre en la orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "renal_cyst",
+    "canonical_display": "Renal Cyst",
+    "icd10_code": "N28.1",
+    "aliases": [
+      {"alias": "Renal Cyst", "language": "en"},
+      {"alias": "Kidney Cyst", "language": "en"},
+      {"alias": "Cisti renale", "language": "it"},
+      {"alias": "Nierenzyste", "language": "de"},
+      {"alias": "Kyste rénal", "language": "fr"},
+      {"alias": "Quiste renal", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "atopic_dermatitis",
+    "canonical_display": "Atopic Dermatitis",
+    "icd10_code": "L30.9",
+    "aliases": [
+      {"alias": "Atopic Dermatitis", "language": "en"},
+      {"alias": "Eczema", "language": "en"},
+      {"alias": "Dermatitis", "language": "en"},
+      {"alias": "Dermatite atopica", "language": "it"},
+      {"alias": "Eczema", "language": "it"},
+      {"alias": "Neurodermitis", "language": "de"},
+      {"alias": "Atopisches Ekzem", "language": "de"},
+      {"alias": "Dermatite atopique", "language": "fr"},
+      {"alias": "Eczéma", "language": "fr"},
+      {"alias": "Dermatitis atópica", "language": "es"},
+      {"alias": "Eccema", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "psoriasis",
+    "canonical_display": "Psoriasis",
+    "icd10_code": "L40.9",
+    "aliases": [
+      {"alias": "Psoriasis", "language": "en"},
+      {"alias": "Plaque Psoriasis", "language": "en"},
+      {"alias": "Psoriasi", "language": "it"},
+      {"alias": "Psoriasis", "language": "de"},
+      {"alias": "Schuppenflechte", "language": "de"},
+      {"alias": "Psoriasis", "language": "fr"},
+      {"alias": "Psoriasis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "acne",
+    "canonical_display": "Acne Vulgaris",
+    "icd10_code": "L70.0",
+    "aliases": [
+      {"alias": "Acne Vulgaris", "language": "en"},
+      {"alias": "Acne", "language": "en"},
+      {"alias": "Pimples", "language": "en"},
+      {"alias": "Acne volgare", "language": "it"},
+      {"alias": "Acne", "language": "it"},
+      {"alias": "Brufoli", "language": "it"},
+      {"alias": "Akne vulgaris", "language": "de"},
+      {"alias": "Akne", "language": "de"},
+      {"alias": "Acné vulgaire", "language": "fr"},
+      {"alias": "Acné", "language": "fr"},
+      {"alias": "Acné vulgar", "language": "es"},
+      {"alias": "Acné", "language": "es"},
+      {"alias": "Granos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urticaria",
+    "canonical_display": "Urticaria",
+    "icd10_code": "L50.9",
+    "aliases": [
+      {"alias": "Urticaria", "language": "en"},
+      {"alias": "Hives", "language": "en"},
+      {"alias": "Orticaria", "language": "it"},
+      {"alias": "Urtikaria", "language": "de"},
+      {"alias": "Nesselsucht", "language": "de"},
+      {"alias": "Urticaire", "language": "fr"},
+      {"alias": "Urticaria", "language": "es"},
+      {"alias": "Ronchas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fungal_skin_infection",
+    "canonical_display": "Dermatophytosis",
+    "icd10_code": "B35.9",
+    "aliases": [
+      {"alias": "Dermatophytosis", "language": "en"},
+      {"alias": "Fungal Skin Infection", "language": "en"},
+      {"alias": "Ringworm", "language": "en"},
+      {"alias": "Athlete's Foot", "language": "en"},
+      {"alias": "Tinea", "language": "en"},
+      {"alias": "Dermatofitosi", "language": "it"},
+      {"alias": "Micosi cutanea", "language": "it"},
+      {"alias": "Dermatophytose", "language": "de"},
+      {"alias": "Hautpilz", "language": "de"},
+      {"alias": "Dermatophytose", "language": "fr"},
+      {"alias": "Mycose cutanée", "language": "fr"},
+      {"alias": "Dermatofitosis", "language": "es"},
+      {"alias": "Tiña", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "herpes_zoster",
+    "canonical_display": "Herpes Zoster",
+    "icd10_code": "B02.9",
+    "aliases": [
+      {"alias": "Herpes Zoster", "language": "en"},
+      {"alias": "Shingles", "language": "en"},
+      {"alias": "Herpes zoster", "language": "it"},
+      {"alias": "Fuoco di Sant'Antonio", "language": "it"},
+      {"alias": "Herpes zoster", "language": "de"},
+      {"alias": "Gürtelrose", "language": "de"},
+      {"alias": "Zona", "language": "fr"},
+      {"alias": "Herpès zoster", "language": "fr"},
+      {"alias": "Herpes zóster", "language": "es"},
+      {"alias": "Culebrilla", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "melanoma",
+    "canonical_display": "Melanoma",
+    "icd10_code": "C43.9",
+    "aliases": [
+      {"alias": "Melanoma", "language": "en"},
+      {"alias": "Malignant Melanoma", "language": "en"},
+      {"alias": "Melanoma", "language": "it"},
+      {"alias": "Melanoma maligno", "language": "it"},
+      {"alias": "Melanom", "language": "de"},
+      {"alias": "Malignes Melanom", "language": "de"},
+      {"alias": "Mélanome", "language": "fr"},
+      {"alias": "Mélanome malin", "language": "fr"},
+      {"alias": "Melanoma", "language": "es"},
+      {"alias": "Melanoma maligno", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "basal_cell_carcinoma",
+    "canonical_display": "Basal Cell Carcinoma",
+    "icd10_code": "C44.91",
+    "aliases": [
+      {"alias": "Basal Cell Carcinoma", "language": "en"},
+      {"alias": "BCC", "language": "en"},
+      {"alias": "Carcinoma basocellulare", "language": "it"},
+      {"alias": "Basaliom", "language": "de"},
+      {"alias": "Basalzellkarzinom", "language": "de"},
+      {"alias": "Carcinome basocellulaire", "language": "fr"},
+      {"alias": "Carcinoma basocelular", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rosacea",
+    "canonical_display": "Rosacea",
+    "icd10_code": "L71.9",
+    "aliases": [
+      {"alias": "Rosacea", "language": "en"},
+      {"alias": "Rosacea", "language": "it"},
+      {"alias": "Rosazea", "language": "de"},
+      {"alias": "Kupferrose", "language": "de"},
+      {"alias": "Rosacée", "language": "fr"},
+      {"alias": "Couperose", "language": "fr"},
+      {"alias": "Rosácea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitiligo",
+    "canonical_display": "Vitiligo",
+    "icd10_code": "L80",
+    "aliases": [
+      {"alias": "Vitiligo", "language": "en"},
+      {"alias": "Vitiligine", "language": "it"},
+      {"alias": "Vitiligo", "language": "de"},
+      {"alias": "Weißfleckenkrankheit", "language": "de"},
+      {"alias": "Vitiligo", "language": "fr"},
+      {"alias": "Vitíligo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pcos",
+    "canonical_display": "Polycystic Ovary Syndrome",
+    "icd10_code": "E28.2",
+    "aliases": [
+      {"alias": "Polycystic Ovary Syndrome", "language": "en"},
+      {"alias": "PCOS", "language": "en"},
+      {"alias": "Polycystic Ovarian Syndrome", "language": "en"},
+      {"alias": "Sindrome dell'ovaio policistico", "language": "it"},
+      {"alias": "PCOS", "language": "it"},
+      {"alias": "Polyzystisches Ovarialsyndrom", "language": "de"},
+      {"alias": "PCO-Syndrom", "language": "de"},
+      {"alias": "Syndrome des ovaires polykystiques", "language": "fr"},
+      {"alias": "SOPK", "language": "fr"},
+      {"alias": "Síndrome de ovario poliquístico", "language": "es"},
+      {"alias": "SOP", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "endometriosis",
+    "canonical_display": "Endometriosis",
+    "icd10_code": "N80.9",
+    "aliases": [
+      {"alias": "Endometriosis", "language": "en"},
+      {"alias": "Endometriosi", "language": "it"},
+      {"alias": "Endometriose", "language": "de"},
+      {"alias": "Endométriose", "language": "fr"},
+      {"alias": "Endometriosis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "uterine_fibroids",
+    "canonical_display": "Uterine Fibroids",
+    "icd10_code": "D25.9",
+    "aliases": [
+      {"alias": "Uterine Fibroids", "language": "en"},
+      {"alias": "Fibroids", "language": "en"},
+      {"alias": "Uterine Leiomyoma", "language": "en"},
+      {"alias": "Fibromi uterini", "language": "it"},
+      {"alias": "Miomi uterini", "language": "it"},
+      {"alias": "Uterusmyome", "language": "de"},
+      {"alias": "Gebärmuttermyome", "language": "de"},
+      {"alias": "Fibromes utérins", "language": "fr"},
+      {"alias": "Myomes utérins", "language": "fr"},
+      {"alias": "Fibromas uterinos", "language": "es"},
+      {"alias": "Miomas uterinos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "menopause",
+    "canonical_display": "Menopause",
+    "icd10_code": "N95.1",
+    "aliases": [
+      {"alias": "Menopause", "language": "en"},
+      {"alias": "Menopausal Syndrome", "language": "en"},
+      {"alias": "Climacteric", "language": "en"},
+      {"alias": "Menopausa", "language": "it"},
+      {"alias": "Climaterio", "language": "it"},
+      {"alias": "Menopause", "language": "de"},
+      {"alias": "Wechseljahre", "language": "de"},
+      {"alias": "Ménopause", "language": "fr"},
+      {"alias": "Menopausia", "language": "es"},
+      {"alias": "Climaterio", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vaginitis",
+    "canonical_display": "Vaginitis",
+    "icd10_code": "N76.0",
+    "aliases": [
+      {"alias": "Vaginitis", "language": "en"},
+      {"alias": "Vaginal Infection", "language": "en"},
+      {"alias": "Vaginosis", "language": "en"},
+      {"alias": "Vaginite", "language": "it"},
+      {"alias": "Vaginitis", "language": "de"},
+      {"alias": "Scheidenentzündung", "language": "de"},
+      {"alias": "Vaginite", "language": "fr"},
+      {"alias": "Vaginitis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cervical_dysplasia",
+    "canonical_display": "Cervical Dysplasia",
+    "icd10_code": "N87.9",
+    "aliases": [
+      {"alias": "Cervical Dysplasia", "language": "en"},
+      {"alias": "CIN", "language": "en"},
+      {"alias": "Abnormal Pap Smear", "language": "en"},
+      {"alias": "Displasia cervicale", "language": "it"},
+      {"alias": "Zervikale Dysplasie", "language": "de"},
+      {"alias": "Dysplasie cervicale", "language": "fr"},
+      {"alias": "Displasia cervical", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "premenstrual_syndrome",
+    "canonical_display": "Premenstrual Syndrome",
+    "icd10_code": "N94.3",
+    "aliases": [
+      {"alias": "Premenstrual Syndrome", "language": "en"},
+      {"alias": "PMS", "language": "en"},
+      {"alias": "Sindrome premestruale", "language": "it"},
+      {"alias": "SPM", "language": "it"},
+      {"alias": "Prämenstruelles Syndrom", "language": "de"},
+      {"alias": "PMS", "language": "de"},
+      {"alias": "Syndrome prémenstruel", "language": "fr"},
+      {"alias": "SPM", "language": "fr"},
+      {"alias": "Síndrome premenstrual", "language": "es"},
+      {"alias": "SPM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ovarian_cyst",
+    "canonical_display": "Ovarian Cyst",
+    "icd10_code": "N83.20",
+    "aliases": [
+      {"alias": "Ovarian Cyst", "language": "en"},
+      {"alias": "Cisti ovarica", "language": "it"},
+      {"alias": "Ovarialzyste", "language": "de"},
+      {"alias": "Eierstockzyste", "language": "de"},
+      {"alias": "Kyste ovarien", "language": "fr"},
+      {"alias": "Quiste ovárico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "glaucoma",
+    "canonical_display": "Glaucoma",
+    "icd10_code": "H40.9",
+    "aliases": [
+      {"alias": "Glaucoma", "language": "en"},
+      {"alias": "Glaucoma", "language": "it"},
+      {"alias": "Glaukom", "language": "de"},
+      {"alias": "Grüner Star", "language": "de"},
+      {"alias": "Glaucome", "language": "fr"},
+      {"alias": "Glaucoma", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cataract",
+    "canonical_display": "Cataract",
+    "icd10_code": "H26.9",
+    "aliases": [
+      {"alias": "Cataract", "language": "en"},
+      {"alias": "Cataracts", "language": "en"},
+      {"alias": "Cataratta", "language": "it"},
+      {"alias": "Katarakt", "language": "de"},
+      {"alias": "Grauer Star", "language": "de"},
+      {"alias": "Cataracte", "language": "fr"},
+      {"alias": "Catarata", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "macular_degeneration",
+    "canonical_display": "Age-Related Macular Degeneration",
+    "icd10_code": "H35.30",
+    "aliases": [
+      {"alias": "Age-Related Macular Degeneration", "language": "en"},
+      {"alias": "Macular Degeneration", "language": "en"},
+      {"alias": "AMD", "language": "en"},
+      {"alias": "Degenerazione maculare", "language": "it"},
+      {"alias": "Maculopatia", "language": "it"},
+      {"alias": "Altersbedingte Makuladegeneration", "language": "de"},
+      {"alias": "AMD", "language": "de"},
+      {"alias": "Dégénérescence maculaire", "language": "fr"},
+      {"alias": "DMLA", "language": "fr"},
+      {"alias": "Degeneración macular", "language": "es"},
+      {"alias": "DMAE", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "diabetic_retinopathy",
+    "canonical_display": "Diabetic Retinopathy",
+    "icd10_code": "H36",
+    "aliases": [
+      {"alias": "Diabetic Retinopathy", "language": "en"},
+      {"alias": "Retinopatia diabetica", "language": "it"},
+      {"alias": "Diabetische Retinopathie", "language": "de"},
+      {"alias": "Rétinopathie diabétique", "language": "fr"},
+      {"alias": "Retinopatía diabética", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "conjunctivitis",
+    "canonical_display": "Conjunctivitis",
+    "icd10_code": "H10.9",
+    "aliases": [
+      {"alias": "Conjunctivitis", "language": "en"},
+      {"alias": "Pink Eye", "language": "en"},
+      {"alias": "Red Eye", "language": "en"},
+      {"alias": "Congiuntivite", "language": "it"},
+      {"alias": "Konjunktivitis", "language": "de"},
+      {"alias": "Bindehautentzündung", "language": "de"},
+      {"alias": "Conjonctivite", "language": "fr"},
+      {"alias": "Conjuntivitis", "language": "es"},
+      {"alias": "Ojo rojo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "otitis_media",
+    "canonical_display": "Otitis Media",
+    "icd10_code": "H66.90",
+    "aliases": [
+      {"alias": "Otitis Media", "language": "en"},
+      {"alias": "Middle Ear Infection", "language": "en"},
+      {"alias": "Ear Infection", "language": "en"},
+      {"alias": "Otite media", "language": "it"},
+      {"alias": "Mal d'orecchio", "language": "it"},
+      {"alias": "Mittelohrentzündung", "language": "de"},
+      {"alias": "Otitis media", "language": "de"},
+      {"alias": "Otite moyenne", "language": "fr"},
+      {"alias": "Otitis media", "language": "es"},
+      {"alias": "Infección de oído", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tonsillitis",
+    "canonical_display": "Tonsillitis",
+    "icd10_code": "J03.90",
+    "aliases": [
+      {"alias": "Tonsillitis", "language": "en"},
+      {"alias": "Sore Throat", "language": "en"},
+      {"alias": "Tonsillite", "language": "it"},
+      {"alias": "Mal di gola", "language": "it"},
+      {"alias": "Tonsillitis", "language": "de"},
+      {"alias": "Mandelentzündung", "language": "de"},
+      {"alias": "Angine", "language": "fr"},
+      {"alias": "Amygdalite", "language": "fr"},
+      {"alias": "Amigdalitis", "language": "es"},
+      {"alias": "Anginas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hearing_loss",
+    "canonical_display": "Hearing Loss",
+    "icd10_code": "H91.90",
+    "aliases": [
+      {"alias": "Hearing Loss", "language": "en"},
+      {"alias": "Deafness", "language": "en"},
+      {"alias": "Hearing Impairment", "language": "en"},
+      {"alias": "Ipoacusia", "language": "it"},
+      {"alias": "Perdita dell'udito", "language": "it"},
+      {"alias": "Schwerhörigkeit", "language": "de"},
+      {"alias": "Hörverlust", "language": "de"},
+      {"alias": "Perte auditive", "language": "fr"},
+      {"alias": "Surdité", "language": "fr"},
+      {"alias": "Pérdida auditiva", "language": "es"},
+      {"alias": "Hipoacusia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tinnitus",
+    "canonical_display": "Tinnitus",
+    "icd10_code": "H93.19",
+    "aliases": [
+      {"alias": "Tinnitus", "language": "en"},
+      {"alias": "Ringing in the Ears", "language": "en"},
+      {"alias": "Acufene", "language": "it"},
+      {"alias": "Tinnito", "language": "it"},
+      {"alias": "Tinnitus", "language": "de"},
+      {"alias": "Ohrgeräusche", "language": "de"},
+      {"alias": "Acouphène", "language": "fr"},
+      {"alias": "Tinnitus", "language": "es"},
+      {"alias": "Acúfenos", "language": "es"},
+      {"alias": "Zumbido de oídos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "deviated_septum",
+    "canonical_display": "Deviated Nasal Septum",
+    "icd10_code": "J34.2",
+    "aliases": [
+      {"alias": "Deviated Nasal Septum", "language": "en"},
+      {"alias": "Deviated Septum", "language": "en"},
+      {"alias": "Deviazione del setto nasale", "language": "it"},
+      {"alias": "Setto deviato", "language": "it"},
+      {"alias": "Nasenseptumdeviation", "language": "de"},
+      {"alias": "Nasenscheidewandverkrümmung", "language": "de"},
+      {"alias": "Déviation de la cloison nasale", "language": "fr"},
+      {"alias": "Desviación del tabique nasal", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "covid_19",
+    "canonical_display": "COVID-19",
+    "icd10_code": "U07.1",
+    "aliases": [
+      {"alias": "COVID-19", "language": "en"},
+      {"alias": "Coronavirus Disease", "language": "en"},
+      {"alias": "SARS-CoV-2 Infection", "language": "en"},
+      {"alias": "COVID-19", "language": "it"},
+      {"alias": "Infezione da SARS-CoV-2", "language": "it"},
+      {"alias": "COVID-19", "language": "de"},
+      {"alias": "Coronavirus-Krankheit", "language": "de"},
+      {"alias": "COVID-19", "language": "fr"},
+      {"alias": "Maladie à coronavirus", "language": "fr"},
+      {"alias": "COVID-19", "language": "es"},
+      {"alias": "Enfermedad por coronavirus", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mononucleosis",
+    "canonical_display": "Infectious Mononucleosis",
+    "icd10_code": "B27.90",
+    "aliases": [
+      {"alias": "Infectious Mononucleosis", "language": "en"},
+      {"alias": "Mononucleosis", "language": "en"},
+      {"alias": "Mono", "language": "en"},
+      {"alias": "Glandular Fever", "language": "en"},
+      {"alias": "Kissing Disease", "language": "en"},
+      {"alias": "Mononucleosi infettiva", "language": "it"},
+      {"alias": "Mononucleosi", "language": "it"},
+      {"alias": "Infektiöse Mononukleose", "language": "de"},
+      {"alias": "Pfeiffersches Drüsenfieber", "language": "de"},
+      {"alias": "Mononucléose infectieuse", "language": "fr"},
+      {"alias": "Mononucleosis infecciosa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lyme_disease",
+    "canonical_display": "Lyme Disease",
+    "icd10_code": "A69.20",
+    "aliases": [
+      {"alias": "Lyme Disease", "language": "en"},
+      {"alias": "Lyme Borreliosis", "language": "en"},
+      {"alias": "Malattia di Lyme", "language": "it"},
+      {"alias": "Borreliosi di Lyme", "language": "it"},
+      {"alias": "Lyme-Borreliose", "language": "de"},
+      {"alias": "Lyme-Krankheit", "language": "de"},
+      {"alias": "Maladie de Lyme", "language": "fr"},
+      {"alias": "Borréliose de Lyme", "language": "fr"},
+      {"alias": "Enfermedad de Lyme", "language": "es"},
+      {"alias": "Borreliosis de Lyme", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "candidiasis",
+    "canonical_display": "Candidiasis",
+    "icd10_code": "B37.9",
+    "aliases": [
+      {"alias": "Candidiasis", "language": "en"},
+      {"alias": "Yeast Infection", "language": "en"},
+      {"alias": "Thrush", "language": "en"},
+      {"alias": "Candidosi", "language": "it"},
+      {"alias": "Candida", "language": "it"},
+      {"alias": "Kandidose", "language": "de"},
+      {"alias": "Pilzinfektion", "language": "de"},
+      {"alias": "Candidose", "language": "fr"},
+      {"alias": "Muguet", "language": "fr"},
+      {"alias": "Candidiasis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hiv",
+    "canonical_display": "HIV Infection",
+    "icd10_code": "B20",
+    "aliases": [
+      {"alias": "HIV Infection", "language": "en"},
+      {"alias": "HIV", "language": "en"},
+      {"alias": "Human Immunodeficiency Virus", "language": "en"},
+      {"alias": "Infezione da HIV", "language": "it"},
+      {"alias": "HIV", "language": "it"},
+      {"alias": "HIV-Infektion", "language": "de"},
+      {"alias": "Infection par le VIH", "language": "fr"},
+      {"alias": "VIH", "language": "fr"},
+      {"alias": "Infección por VIH", "language": "es"},
+      {"alias": "VIH", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hepatitis_a",
+    "canonical_display": "Hepatitis A",
+    "icd10_code": "B15.9",
+    "aliases": [
+      {"alias": "Hepatitis A", "language": "en"},
+      {"alias": "HAV", "language": "en"},
+      {"alias": "Epatite A", "language": "it"},
+      {"alias": "Hepatitis A", "language": "de"},
+      {"alias": "Hépatite A", "language": "fr"},
+      {"alias": "Hepatitis A", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "malaria",
+    "canonical_display": "Malaria",
+    "icd10_code": "B54",
+    "aliases": [
+      {"alias": "Malaria", "language": "en"},
+      {"alias": "Malaria", "language": "it"},
+      {"alias": "Malaria", "language": "de"},
+      {"alias": "Paludisme", "language": "fr"},
+      {"alias": "Malaria", "language": "fr"},
+      {"alias": "Malaria", "language": "es"},
+      {"alias": "Paludismo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "breast_cancer",
+    "canonical_display": "Breast Cancer",
+    "icd10_code": "C50.919",
+    "aliases": [
+      {"alias": "Breast Cancer", "language": "en"},
+      {"alias": "Breast Carcinoma", "language": "en"},
+      {"alias": "Tumore al seno", "language": "it"},
+      {"alias": "Carcinoma mammario", "language": "it"},
+      {"alias": "Cancro al seno", "language": "it"},
+      {"alias": "Brustkrebs", "language": "de"},
+      {"alias": "Mammakarzinom", "language": "de"},
+      {"alias": "Cancer du sein", "language": "fr"},
+      {"alias": "Cáncer de mama", "language": "es"},
+      {"alias": "Cáncer de seno", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lung_cancer",
+    "canonical_display": "Lung Cancer",
+    "icd10_code": "C34.90",
+    "aliases": [
+      {"alias": "Lung Cancer", "language": "en"},
+      {"alias": "Bronchogenic Carcinoma", "language": "en"},
+      {"alias": "Tumore al polmone", "language": "it"},
+      {"alias": "Carcinoma polmonare", "language": "it"},
+      {"alias": "Cancro al polmone", "language": "it"},
+      {"alias": "Lungenkrebs", "language": "de"},
+      {"alias": "Bronchialkarzinom", "language": "de"},
+      {"alias": "Cancer du poumon", "language": "fr"},
+      {"alias": "Cáncer de pulmón", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "colorectal_cancer",
+    "canonical_display": "Colorectal Cancer",
+    "icd10_code": "C18.9",
+    "aliases": [
+      {"alias": "Colorectal Cancer", "language": "en"},
+      {"alias": "Colon Cancer", "language": "en"},
+      {"alias": "Bowel Cancer", "language": "en"},
+      {"alias": "CRC", "language": "en"},
+      {"alias": "Tumore del colon-retto", "language": "it"},
+      {"alias": "Cancro al colon", "language": "it"},
+      {"alias": "Darmkrebs", "language": "de"},
+      {"alias": "Kolorektales Karzinom", "language": "de"},
+      {"alias": "Cancer colorectal", "language": "fr"},
+      {"alias": "Cancer du côlon", "language": "fr"},
+      {"alias": "Cáncer colorrectal", "language": "es"},
+      {"alias": "Cáncer de colon", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "prostate_cancer",
+    "canonical_display": "Prostate Cancer",
+    "icd10_code": "C61",
+    "aliases": [
+      {"alias": "Prostate Cancer", "language": "en"},
+      {"alias": "Prostatic Carcinoma", "language": "en"},
+      {"alias": "Tumore alla prostata", "language": "it"},
+      {"alias": "Carcinoma prostatico", "language": "it"},
+      {"alias": "Cancro alla prostata", "language": "it"},
+      {"alias": "Prostatakrebs", "language": "de"},
+      {"alias": "Prostatakarzinom", "language": "de"},
+      {"alias": "Cancer de la prostate", "language": "fr"},
+      {"alias": "Cáncer de próstata", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "skin_cancer",
+    "canonical_display": "Skin Cancer",
+    "icd10_code": "C44.90",
+    "aliases": [
+      {"alias": "Skin Cancer", "language": "en"},
+      {"alias": "Non-Melanoma Skin Cancer", "language": "en"},
+      {"alias": "Tumore della pelle", "language": "it"},
+      {"alias": "Cancro della pelle", "language": "it"},
+      {"alias": "Hautkrebs", "language": "de"},
+      {"alias": "Cancer de la peau", "language": "fr"},
+      {"alias": "Cáncer de piel", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "thyroid_cancer",
+    "canonical_display": "Thyroid Cancer",
+    "icd10_code": "C73",
+    "aliases": [
+      {"alias": "Thyroid Cancer", "language": "en"},
+      {"alias": "Thyroid Carcinoma", "language": "en"},
+      {"alias": "Tumore alla tiroide", "language": "it"},
+      {"alias": "Carcinoma tiroideo", "language": "it"},
+      {"alias": "Schilddrüsenkrebs", "language": "de"},
+      {"alias": "Schilddrüsenkarzinom", "language": "de"},
+      {"alias": "Cancer de la thyroïde", "language": "fr"},
+      {"alias": "Cáncer de tiroides", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lymphoma",
+    "canonical_display": "Lymphoma",
+    "icd10_code": "C85.90",
+    "aliases": [
+      {"alias": "Lymphoma", "language": "en"},
+      {"alias": "Non-Hodgkin Lymphoma", "language": "en"},
+      {"alias": "Hodgkin Lymphoma", "language": "en"},
+      {"alias": "Linfoma", "language": "it"},
+      {"alias": "Lymphom", "language": "de"},
+      {"alias": "Lymphome", "language": "fr"},
+      {"alias": "Linfoma", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "leukemia",
+    "canonical_display": "Leukemia",
+    "icd10_code": "C95.90",
+    "aliases": [
+      {"alias": "Leukemia", "language": "en"},
+      {"alias": "Blood Cancer", "language": "en"},
+      {"alias": "Leucemia", "language": "it"},
+      {"alias": "Leukämie", "language": "de"},
+      {"alias": "Blutkrebs", "language": "de"},
+      {"alias": "Leucémie", "language": "fr"},
+      {"alias": "Leucemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bladder_cancer",
+    "canonical_display": "Bladder Cancer",
+    "icd10_code": "C67.9",
+    "aliases": [
+      {"alias": "Bladder Cancer", "language": "en"},
+      {"alias": "Bladder Carcinoma", "language": "en"},
+      {"alias": "Tumore alla vescica", "language": "it"},
+      {"alias": "Carcinoma vescicale", "language": "it"},
+      {"alias": "Blasenkrebs", "language": "de"},
+      {"alias": "Harnblasenkarzinom", "language": "de"},
+      {"alias": "Cancer de la vessie", "language": "fr"},
+      {"alias": "Cáncer de vejiga", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pancreatic_cancer",
+    "canonical_display": "Pancreatic Cancer",
+    "icd10_code": "C25.9",
+    "aliases": [
+      {"alias": "Pancreatic Cancer", "language": "en"},
+      {"alias": "Pancreatic Carcinoma", "language": "en"},
+      {"alias": "Tumore al pancreas", "language": "it"},
+      {"alias": "Carcinoma pancreatico", "language": "it"},
+      {"alias": "Bauchspeicheldrüsenkrebs", "language": "de"},
+      {"alias": "Pankreaskarzinom", "language": "de"},
+      {"alias": "Cancer du pancréas", "language": "fr"},
+      {"alias": "Cáncer de páncreas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "iron_deficiency_anemia",
+    "canonical_display": "Iron Deficiency Anemia",
+    "icd10_code": "D50.9",
+    "aliases": [
+      {"alias": "Iron Deficiency Anemia", "language": "en"},
+      {"alias": "IDA", "language": "en"},
+      {"alias": "Anemia", "language": "en"},
+      {"alias": "Anemia sideropenica", "language": "it"},
+      {"alias": "Anemia da carenza di ferro", "language": "it"},
+      {"alias": "Eisenmangelanämie", "language": "de"},
+      {"alias": "Blutarmut", "language": "de"},
+      {"alias": "Anémie ferriprive", "language": "fr"},
+      {"alias": "Anémie par carence en fer", "language": "fr"},
+      {"alias": "Anemia ferropénica", "language": "es"},
+      {"alias": "Anemia por deficiencia de hierro", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "b12_deficiency_anemia",
+    "canonical_display": "Vitamin B12 Deficiency Anemia",
+    "icd10_code": "D51.9",
+    "aliases": [
+      {"alias": "Vitamin B12 Deficiency Anemia", "language": "en"},
+      {"alias": "B12 Deficiency", "language": "en"},
+      {"alias": "Pernicious Anemia", "language": "en"},
+      {"alias": "Anemia da carenza di vitamina B12", "language": "it"},
+      {"alias": "Anemia perniciosa", "language": "it"},
+      {"alias": "Vitamin-B12-Mangelanämie", "language": "de"},
+      {"alias": "Perniziöse Anämie", "language": "de"},
+      {"alias": "Anémie par carence en vitamine B12", "language": "fr"},
+      {"alias": "Anémie pernicieuse", "language": "fr"},
+      {"alias": "Anemia por deficiencia de vitamina B12", "language": "es"},
+      {"alias": "Anemia perniciosa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "thrombocytopenia",
+    "canonical_display": "Thrombocytopenia",
+    "icd10_code": "D69.6",
+    "aliases": [
+      {"alias": "Thrombocytopenia", "language": "en"},
+      {"alias": "Low Platelets", "language": "en"},
+      {"alias": "Trombocitopenia", "language": "it"},
+      {"alias": "Piastrine basse", "language": "it"},
+      {"alias": "Thrombozytopenie", "language": "de"},
+      {"alias": "Thrombocytopénie", "language": "fr"},
+      {"alias": "Trombocitopenia", "language": "es"},
+      {"alias": "Plaquetas bajas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "polycythemia",
+    "canonical_display": "Polycythemia Vera",
+    "icd10_code": "D45",
+    "aliases": [
+      {"alias": "Polycythemia Vera", "language": "en"},
+      {"alias": "Polycythemia", "language": "en"},
+      {"alias": "PV", "language": "en"},
+      {"alias": "Policitemia vera", "language": "it"},
+      {"alias": "Polycythaemia vera", "language": "de"},
+      {"alias": "Polyglobulie de Vaquez", "language": "fr"},
+      {"alias": "Policitemia vera", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "thalassemia",
+    "canonical_display": "Thalassemia",
+    "icd10_code": "D56.9",
+    "aliases": [
+      {"alias": "Thalassemia", "language": "en"},
+      {"alias": "Mediterranean Anemia", "language": "en"},
+      {"alias": "Talassemia", "language": "it"},
+      {"alias": "Anemia mediterranea", "language": "it"},
+      {"alias": "Thalassämie", "language": "de"},
+      {"alias": "Mittelmeeranämie", "language": "de"},
+      {"alias": "Thalassémie", "language": "fr"},
+      {"alias": "Talasemia", "language": "es"},
+      {"alias": "Anemia mediterránea", "language": "es"}
+    ]
+  }
+]

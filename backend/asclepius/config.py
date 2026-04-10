@@ -1,0 +1,102 @@
+"""Application configuration loaded from YAML + environment variables."""
+
+import os
+from functools import lru_cache
+from pathlib import Path
+
+import yaml
+from pydantic import BaseModel
+
+
+class ServerConfig(BaseModel):
+    host: str = "0.0.0.0"
+    port: int = 8000
+
+
+class DatabaseConfig(BaseModel):
+    path: str = "/vault/asclepius.sqlite"
+
+
+class VaultConfig(BaseModel):
+    root_path: str = "/vault"
+    inbox_path: str = "/vault/inbox"
+    patients_path: str = "/vault/patients"
+    unclassified_path: str = "/vault/unclassified"
+
+
+class AuthConfig(BaseModel):
+    secret_key: str = "change-me-in-production"
+    session_ttl_hours: int = 720
+
+
+class OcrConfig(BaseModel):
+    engine: str = "tesseract"
+    language: str = "eng+ita+deu"
+    confidence_threshold: float = 0.7
+    cloud_ocr_enabled: bool = False
+    google_vision_key: str = ""
+
+
+class LlmConfig(BaseModel):
+    provider: str = "ollama"
+    ollama_base_url: str = "http://ollama:11434"
+    ollama_model: str = "llama3.1"
+    claude_api_key: str = ""
+    claude_model: str = "claude-sonnet-4-20250514"
+    extraction_timeout: int = 120
+
+
+class PipelineConfig(BaseModel):
+    watch_enabled: bool = True
+    poll_interval_seconds: int = 5
+    retry_interval_seconds: int = 300
+    max_retries: int = 3
+
+
+class AppConfig(BaseModel):
+    server: ServerConfig = ServerConfig()
+    database: DatabaseConfig = DatabaseConfig()
+    vault: VaultConfig = VaultConfig()
+    auth: AuthConfig = AuthConfig()
+    ocr: OcrConfig = OcrConfig()
+    llm: LlmConfig = LlmConfig()
+    pipeline: PipelineConfig = PipelineConfig()
+
+
+def load_config() -> AppConfig:
+    """Load configuration from YAML file with environment variable overrides."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+
+    data = {}
+    if Path(config_path).exists():
+        with open(config_path) as f:
+            data = yaml.safe_load(f) or {}
+
+    config = AppConfig(**data)
+
+    # Environment variable overrides
+    if secret := os.environ.get("ASCLEPIUS_SECRET_KEY"):
+        config.auth.secret_key = secret
+    if vault_path := os.environ.get("ASCLEPIUS_VAULT_PATH"):
+        config.vault.root_path = vault_path
+        config.vault.inbox_path = f"{vault_path}/inbox"
+        config.vault.patients_path = f"{vault_path}/patients"
+        config.vault.unclassified_path = f"{vault_path}/unclassified"
+        config.database.path = f"{vault_path}/asclepius.sqlite"
+    if ollama_url := os.environ.get("ASCLEPIUS_OLLAMA_URL"):
+        config.llm.ollama_base_url = ollama_url
+    if api_key := os.environ.get("ASCLEPIUS_ANTHROPIC_API_KEY"):
+        if api_key:
+            config.llm.claude_api_key = api_key
+    if vision_key := os.environ.get("ASCLEPIUS_GOOGLE_VISION_KEY"):
+        if vision_key:
+            config.ocr.google_vision_key = vision_key
+            config.ocr.cloud_ocr_enabled = True
+
+    return config
+
+
+@lru_cache
+def get_config() -> AppConfig:
+    """Get cached application configuration."""
+    return load_config()

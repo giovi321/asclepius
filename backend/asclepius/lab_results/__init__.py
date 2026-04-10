@@ -1,0 +1,1 @@
+"""Lab results module."""

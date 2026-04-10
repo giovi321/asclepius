@@ -1,0 +1,418 @@
+"""LLM-based data extraction and DB insertion."""
+
+import json
+import logging
+
+import aiosqlite
+
+from asclepius.config import AppConfig
+from asclepius.llm.base import LLMProvider
+
+logger = logging.getLogger(__name__)
+
+
+async def build_extraction_context(db: aiosqlite.Connection) -> dict:
+    """Build context dict for LLM extraction prompt."""
+    # Get known patients
+    cursor = await db.execute("SELECT id, slug, display_name FROM patients")
+    patients = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
+
+    # Get known providers
+    cursor = await db.execute("SELECT id, slug, name FROM providers")
+    providers = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
+
+    # Get lab test mappings
+    cursor = await db.execute(
+        """SELECT nlt.canonical_code, nlta.alias
+           FROM norm_lab_tests nlt
+           JOIN norm_lab_test_aliases nlta ON nlta.norm_lab_test_id = nlt.id"""
+    )
+    lab_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
+
+    # Get specialty mappings
+    cursor = await db.execute(
+        """SELECT ns.canonical_code, nsa.alias
+           FROM norm_specialties ns
+           JOIN norm_specialty_aliases nsa ON nsa.norm_specialty_id = ns.id"""
+    )
+    specialty_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
+
+    # Get diagnosis mappings
+    cursor = await db.execute(
+        """SELECT nd.canonical_code, nda.alias
+           FROM norm_diagnoses nd
+           JOIN norm_diagnosis_aliases nda ON nda.norm_diagnosis_id = nd.id"""
+    )
+    diagnosis_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
+
+    # Get medication mappings
+    cursor = await db.execute(
+        """SELECT nm.canonical_code, nma.alias
+           FROM norm_medications nm
+           JOIN norm_medication_aliases nma ON nma.norm_medication_id = nm.id"""
+    )
+    medication_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
+
+    return {
+        "patient_list": patients,
+        "provider_list": providers,
+        "lab_test_mappings": lab_mappings,
+        "specialty_mappings": specialty_mappings,
+        "diagnosis_mappings": diagnosis_mappings,
+        "medication_mappings": medication_mappings,
+    }
+
+
+async def extract_and_store(
+    db: aiosqlite.Connection,
+    llm: LLMProvider,
+    doc_id: int,
+    ocr_text: str,
+    config: AppConfig,
+) -> dict:
+    """Run LLM extraction and write results to DB tables."""
+    context = await build_extraction_context(db)
+    extraction = await llm.extract(ocr_text, context)
+
+    if "error" in extraction:
+        logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))
+        await db.execute(
+            "UPDATE documents SET status = 'failed', raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (json.dumps(extraction), doc_id),
+        )
+        await db.commit()
+        return extraction
+
+    # Store raw extraction
+    await db.execute(
+        "UPDATE documents SET raw_extraction = ?, llm_provider = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (json.dumps(extraction), config.llm.provider, doc_id),
+    )
+
+    # Get the document's patient_id
+    cursor = await db.execute("SELECT patient_id FROM documents WHERE id = ?", (doc_id,))
+    row = await cursor.fetchone()
+    patient_id = row[0] if row else None
+
+    if not patient_id:
+        # Try to match patient from extraction
+        patient_id = await _match_patient(db, extraction.get("patient_name"))
+        if patient_id:
+            await db.execute(
+                "UPDATE documents SET patient_id = ? WHERE id = ?", (patient_id, doc_id)
+            )
+
+    # Update document metadata
+    updates = {}
+    if extraction.get("doc_type"):
+        updates["doc_type"] = extraction["doc_type"]
+    if extraction.get("doc_date"):
+        updates["doc_date"] = extraction["doc_date"]
+    if extraction.get("language_detected"):
+        updates["language_source"] = extraction["language_detected"]
+    if extraction.get("cost", {}).get("amount"):
+        updates["cost_amount"] = extraction["cost"]["amount"]
+        updates["cost_currency"] = extraction["cost"].get("currency")
+
+    if updates:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [doc_id]
+        await db.execute(f"UPDATE documents SET {set_clause} WHERE id = ?", values)
+
+    # Upsert provider
+    provider_id = None
+    if extraction.get("provider", {}).get("name"):
+        provider_id = await _upsert_provider(db, extraction["provider"])
+        await db.execute(
+            "UPDATE documents SET provider_id = ? WHERE id = ?", (provider_id, doc_id)
+        )
+
+    # Insert lab results
+    if patient_id:
+        for lab in extraction.get("lab_results", []):
+            norm_id = await _resolve_lab_test(db, lab)
+            await db.execute(
+                """INSERT INTO lab_results
+                   (document_id, patient_id, test_name_original, norm_lab_test_id,
+                    value, value_text, unit, reference_range_low, reference_range_high,
+                    is_abnormal, sample_type, panel_name, test_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, lab.get("test_name_original"),
+                 norm_id, lab.get("value"), lab.get("value_text"),
+                 lab.get("unit"), lab.get("reference_range_low"),
+                 lab.get("reference_range_high"), lab.get("is_abnormal"),
+                 lab.get("sample_type"), lab.get("panel_name"),
+                 extraction.get("doc_date")),
+            )
+
+        # Insert encounters/diagnoses
+        encounter = extraction.get("encounter", {})
+        for diag in extraction.get("diagnoses", []):
+            norm_diag_id = await _resolve_diagnosis(db, diag)
+            norm_spec_id = None
+            if extraction.get("provider", {}).get("specialty_canonical"):
+                norm_spec_id = await _resolve_specialty(
+                    db, extraction["provider"]
+                )
+
+            await db.execute(
+                """INSERT INTO encounters
+                   (document_id, patient_id, provider_id, encounter_date,
+                    admission_date, discharge_date, norm_diagnosis_id,
+                    diagnosis_original, diagnosis_code, norm_specialty_id,
+                    notes, findings, follow_up_date, follow_up_instructions)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, provider_id,
+                 encounter.get("encounter_date") or extraction.get("doc_date"),
+                 encounter.get("admission_date"), encounter.get("discharge_date"),
+                 norm_diag_id, diag.get("diagnosis_original"),
+                 diag.get("icd10_code"), norm_spec_id,
+                 extraction.get("summary_en"),
+                 encounter.get("findings"),
+                 encounter.get("follow_up_date"),
+                 encounter.get("follow_up_instructions")),
+            )
+
+        # If no diagnoses but encounter data exists, still create encounter
+        if not extraction.get("diagnoses") and encounter.get("encounter_date"):
+            await db.execute(
+                """INSERT INTO encounters
+                   (document_id, patient_id, provider_id, encounter_date,
+                    notes, findings, follow_up_date, follow_up_instructions)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, provider_id,
+                 encounter.get("encounter_date"),
+                 extraction.get("summary_en"),
+                 encounter.get("findings"),
+                 encounter.get("follow_up_date"),
+                 encounter.get("follow_up_instructions")),
+            )
+
+        # Insert medications
+        for med in extraction.get("medications", []):
+            norm_med_id = await _resolve_medication(db, med)
+            await db.execute(
+                """INSERT INTO medications
+                   (document_id, patient_id, norm_medication_id, brand_name,
+                    active_ingredient_original, dosage, form, frequency,
+                    duration, quantity, prescribed_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, norm_med_id, med.get("brand_name"),
+                 med.get("active_ingredient_original"), med.get("dosage"),
+                 med.get("form"), med.get("frequency"),
+                 med.get("duration"), med.get("quantity"),
+                 extraction.get("doc_date")),
+            )
+
+        # Insert vaccinations
+        for vax in extraction.get("vaccinations", []):
+            await db.execute(
+                """INSERT INTO vaccinations
+                   (document_id, patient_id, vaccine_name, manufacturer,
+                    lot_number, dose_number, date_administered)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (doc_id, patient_id, vax.get("vaccine_name"),
+                 vax.get("manufacturer"), vax.get("lot_number"),
+                 vax.get("dose_number"), vax.get("date_administered")),
+            )
+
+    await db.commit()
+    return extraction
+
+
+async def _match_patient(db: aiosqlite.Connection, name: str | None) -> int | None:
+    """Try to match a patient name from the extraction to a known patient."""
+    if not name:
+        return None
+
+    # Simple fuzzy match: try exact, then LIKE
+    cursor = await db.execute(
+        "SELECT id FROM patients WHERE display_name = ? COLLATE NOCASE",
+        (name,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    # Try partial match
+    cursor = await db.execute(
+        "SELECT id FROM patients WHERE display_name LIKE ? COLLATE NOCASE",
+        (f"%{name}%",),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    # Try matching parts of the name
+    parts = name.split()
+    for part in parts:
+        if len(part) < 3:
+            continue
+        cursor = await db.execute(
+            "SELECT id FROM patients WHERE display_name LIKE ? COLLATE NOCASE",
+            (f"%{part}%",),
+        )
+        rows = await cursor.fetchall()
+        if len(rows) == 1:
+            return rows[0][0]
+
+    return None
+
+
+async def _upsert_provider(db: aiosqlite.Connection, provider_data: dict) -> int:
+    """Insert or get existing provider."""
+    from asclepius.patients.service import slugify
+
+    name = provider_data["name"]
+    slug = slugify(name)
+
+    cursor = await db.execute("SELECT id FROM providers WHERE slug = ?", (slug,))
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    cursor = await db.execute(
+        "INSERT INTO providers (name, slug, specialty) VALUES (?, ?, ?)",
+        (name, slug, provider_data.get("specialty_original")),
+    )
+    return cursor.lastrowid
+
+
+async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
+    """Resolve lab test to norm_lab_tests ID, creating if needed."""
+    canonical = lab.get("test_name_canonical", "")
+    original = lab.get("test_name_original", "")
+    mapped = lab.get("test_mapped", False)
+
+    if mapped and canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    # Try alias lookup
+    cursor = await db.execute(
+        "SELECT norm_lab_test_id FROM norm_lab_test_aliases WHERE alias = ? COLLATE NOCASE",
+        (original,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    # Create new entry if canonical provided
+    if canonical:
+        display = canonical.replace("_", " ").title()
+        cursor = await db.execute(
+            "INSERT OR IGNORE INTO norm_lab_tests (canonical_code, canonical_display) VALUES (?, ?)",
+            (canonical, display),
+        )
+        if cursor.lastrowid:
+            test_id = cursor.lastrowid
+            await db.execute(
+                "INSERT OR IGNORE INTO norm_lab_test_aliases (norm_lab_test_id, alias, auto_mapped) VALUES (?, ?, 1)",
+                (test_id, original),
+            )
+            return test_id
+        else:
+            cursor = await db.execute(
+                "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
+            )
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    return None
+
+
+async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None:
+    """Resolve diagnosis to norm_diagnoses ID."""
+    canonical = diag.get("diagnosis_canonical", "")
+    original = diag.get("diagnosis_original", "")
+
+    if canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_diagnoses WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    # Try alias
+    cursor = await db.execute(
+        "SELECT norm_diagnosis_id FROM norm_diagnosis_aliases WHERE alias = ? COLLATE NOCASE",
+        (original,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    if canonical:
+        display = canonical.replace("_", " ").title()
+        cursor = await db.execute(
+            "INSERT OR IGNORE INTO norm_diagnoses (canonical_code, canonical_display, icd10_code) VALUES (?, ?, ?)",
+            (canonical, display, diag.get("icd10_code")),
+        )
+        if cursor.lastrowid:
+            diag_id = cursor.lastrowid
+            await db.execute(
+                "INSERT OR IGNORE INTO norm_diagnosis_aliases (norm_diagnosis_id, alias, auto_mapped) VALUES (?, ?, 1)",
+                (diag_id, original),
+            )
+            return diag_id
+
+    return None
+
+
+async def _resolve_specialty(db: aiosqlite.Connection, provider_data: dict) -> int | None:
+    """Resolve specialty to norm_specialties ID."""
+    canonical = provider_data.get("specialty_canonical", "")
+
+    if canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    return None
+
+
+async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None:
+    """Resolve medication to norm_medications ID."""
+    canonical = med.get("active_ingredient_canonical", "")
+    original = med.get("active_ingredient_original", "")
+
+    if canonical:
+        cursor = await db.execute(
+            "SELECT id FROM norm_medications WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    # Try alias
+    cursor = await db.execute(
+        "SELECT norm_medication_id FROM norm_medication_aliases WHERE alias = ? COLLATE NOCASE",
+        (original,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    if canonical:
+        display = canonical.replace("_", " ").title()
+        cursor = await db.execute(
+            "INSERT OR IGNORE INTO norm_medications (canonical_code, canonical_display) VALUES (?, ?)",
+            (canonical, display),
+        )
+        if cursor.lastrowid:
+            med_id = cursor.lastrowid
+            await db.execute(
+                "INSERT OR IGNORE INTO norm_medication_aliases (norm_medication_id, alias, auto_mapped) VALUES (?, ?, 1)",
+                (med_id, original),
+            )
+            return med_id
+
+    return None

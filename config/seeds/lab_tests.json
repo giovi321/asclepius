@@ -1,0 +1,3204 @@
+[
+  {
+    "canonical_code": "hemoglobin",
+    "canonical_display": "Hemoglobin",
+    "loinc_code": "718-7",
+    "category": "cbc",
+    "unit_preferred": "g/dL",
+    "aliases": [
+      {"alias": "Hemoglobin", "language": "en"},
+      {"alias": "Hb", "language": "en"},
+      {"alias": "Hgb", "language": "en"},
+      {"alias": "Emoglobina", "language": "it"},
+      {"alias": "Hb", "language": "it"},
+      {"alias": "Hämoglobin", "language": "de"},
+      {"alias": "Hémoglobine", "language": "fr"},
+      {"alias": "Hemoglobina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hematocrit",
+    "canonical_display": "Hematocrit",
+    "loinc_code": "4544-3",
+    "category": "cbc",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Hematocrit", "language": "en"},
+      {"alias": "Hct", "language": "en"},
+      {"alias": "Ematocrito", "language": "it"},
+      {"alias": "Hämatokrit", "language": "de"},
+      {"alias": "Hématocrite", "language": "fr"},
+      {"alias": "Hematocrito", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "wbc",
+    "canonical_display": "White Blood Cell Count",
+    "loinc_code": "6690-2",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "WBC", "language": "en"},
+      {"alias": "White Blood Cells", "language": "en"},
+      {"alias": "White Blood Cell Count", "language": "en"},
+      {"alias": "Leucociti", "language": "it"},
+      {"alias": "Globuli bianchi", "language": "it"},
+      {"alias": "GB", "language": "it"},
+      {"alias": "Leukozyten", "language": "de"},
+      {"alias": "Weiße Blutkörperchen", "language": "de"},
+      {"alias": "Leucocytes", "language": "fr"},
+      {"alias": "Globules blancs", "language": "fr"},
+      {"alias": "Leucocitos", "language": "es"},
+      {"alias": "Glóbulos blancos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rbc",
+    "canonical_display": "Red Blood Cell Count",
+    "loinc_code": "789-8",
+    "category": "cbc",
+    "unit_preferred": "10^6/µL",
+    "aliases": [
+      {"alias": "RBC", "language": "en"},
+      {"alias": "Red Blood Cells", "language": "en"},
+      {"alias": "Red Blood Cell Count", "language": "en"},
+      {"alias": "Eritrociti", "language": "it"},
+      {"alias": "Globuli rossi", "language": "it"},
+      {"alias": "GR", "language": "it"},
+      {"alias": "Erythrozyten", "language": "de"},
+      {"alias": "Rote Blutkörperchen", "language": "de"},
+      {"alias": "Érythrocytes", "language": "fr"},
+      {"alias": "Globules rouges", "language": "fr"},
+      {"alias": "Eritrocitos", "language": "es"},
+      {"alias": "Glóbulos rojos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "platelets",
+    "canonical_display": "Platelet Count",
+    "loinc_code": "777-3",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Platelets", "language": "en"},
+      {"alias": "PLT", "language": "en"},
+      {"alias": "Platelet Count", "language": "en"},
+      {"alias": "Piastrine", "language": "it"},
+      {"alias": "Thrombozyten", "language": "de"},
+      {"alias": "Blutplättchen", "language": "de"},
+      {"alias": "Plaquettes", "language": "fr"},
+      {"alias": "Plaquetas", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mcv",
+    "canonical_display": "Mean Corpuscular Volume",
+    "loinc_code": "787-2",
+    "category": "cbc",
+    "unit_preferred": "fL",
+    "aliases": [
+      {"alias": "MCV", "language": "en"},
+      {"alias": "Mean Corpuscular Volume", "language": "en"},
+      {"alias": "Volume corpuscolare medio", "language": "it"},
+      {"alias": "MCV", "language": "it"},
+      {"alias": "Mittleres Erythrozytenvolumen", "language": "de"},
+      {"alias": "MCV", "language": "de"},
+      {"alias": "Volume globulaire moyen", "language": "fr"},
+      {"alias": "VGM", "language": "fr"},
+      {"alias": "Volumen corpuscular medio", "language": "es"},
+      {"alias": "VCM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mch",
+    "canonical_display": "Mean Corpuscular Hemoglobin",
+    "loinc_code": "785-6",
+    "category": "cbc",
+    "unit_preferred": "pg",
+    "aliases": [
+      {"alias": "MCH", "language": "en"},
+      {"alias": "Mean Corpuscular Hemoglobin", "language": "en"},
+      {"alias": "Contenuto emoglobinico medio", "language": "it"},
+      {"alias": "MCH", "language": "it"},
+      {"alias": "Mittleres Erythrozyten-Hämoglobin", "language": "de"},
+      {"alias": "Teneur corpusculaire moyenne en hémoglobine", "language": "fr"},
+      {"alias": "TCMH", "language": "fr"},
+      {"alias": "Hemoglobina corpuscular media", "language": "es"},
+      {"alias": "HCM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mchc",
+    "canonical_display": "Mean Corpuscular Hemoglobin Concentration",
+    "loinc_code": "786-4",
+    "category": "cbc",
+    "unit_preferred": "g/dL",
+    "aliases": [
+      {"alias": "MCHC", "language": "en"},
+      {"alias": "Mean Corpuscular Hemoglobin Concentration", "language": "en"},
+      {"alias": "Concentrazione emoglobinica media", "language": "it"},
+      {"alias": "MCHC", "language": "it"},
+      {"alias": "Mittlere Erythrozyten-Hämoglobinkonzentration", "language": "de"},
+      {"alias": "Concentration corpusculaire moyenne en hémoglobine", "language": "fr"},
+      {"alias": "CCMH", "language": "fr"},
+      {"alias": "Concentración de hemoglobina corpuscular media", "language": "es"},
+      {"alias": "CHCM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rdw",
+    "canonical_display": "Red Cell Distribution Width",
+    "loinc_code": "788-0",
+    "category": "cbc",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "RDW", "language": "en"},
+      {"alias": "Red Cell Distribution Width", "language": "en"},
+      {"alias": "RDW-CV", "language": "en"},
+      {"alias": "Ampiezza distribuzione eritrocitaria", "language": "it"},
+      {"alias": "RDW", "language": "it"},
+      {"alias": "Erythrozytenverteilungsbreite", "language": "de"},
+      {"alias": "Indice de distribution des globules rouges", "language": "fr"},
+      {"alias": "IDR", "language": "fr"},
+      {"alias": "Ancho de distribución eritrocitaria", "language": "es"},
+      {"alias": "ADE", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "mpv",
+    "canonical_display": "Mean Platelet Volume",
+    "loinc_code": "32623-1",
+    "category": "cbc",
+    "unit_preferred": "fL",
+    "aliases": [
+      {"alias": "MPV", "language": "en"},
+      {"alias": "Mean Platelet Volume", "language": "en"},
+      {"alias": "Volume piastrinico medio", "language": "it"},
+      {"alias": "MPV", "language": "it"},
+      {"alias": "Mittleres Thrombozytenvolumen", "language": "de"},
+      {"alias": "Volume plaquettaire moyen", "language": "fr"},
+      {"alias": "VPM", "language": "fr"},
+      {"alias": "Volumen plaquetario medio", "language": "es"},
+      {"alias": "VPM", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "neutrophils",
+    "canonical_display": "Neutrophils",
+    "loinc_code": "751-8",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Neutrophils", "language": "en"},
+      {"alias": "Neutrophil Count", "language": "en"},
+      {"alias": "ANC", "language": "en"},
+      {"alias": "Neutrofili", "language": "it"},
+      {"alias": "Neutrophile", "language": "de"},
+      {"alias": "Neutrophiles", "language": "fr"},
+      {"alias": "Neutrófilos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lymphocytes",
+    "canonical_display": "Lymphocytes",
+    "loinc_code": "731-0",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Lymphocytes", "language": "en"},
+      {"alias": "Lymphocyte Count", "language": "en"},
+      {"alias": "Linfociti", "language": "it"},
+      {"alias": "Lymphozyten", "language": "de"},
+      {"alias": "Lymphocytes", "language": "fr"},
+      {"alias": "Linfocitos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "monocytes",
+    "canonical_display": "Monocytes",
+    "loinc_code": "742-7",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Monocytes", "language": "en"},
+      {"alias": "Monocyte Count", "language": "en"},
+      {"alias": "Monociti", "language": "it"},
+      {"alias": "Monozyten", "language": "de"},
+      {"alias": "Monocytes", "language": "fr"},
+      {"alias": "Monocitos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "eosinophils",
+    "canonical_display": "Eosinophils",
+    "loinc_code": "711-2",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Eosinophils", "language": "en"},
+      {"alias": "Eosinophil Count", "language": "en"},
+      {"alias": "Eos", "language": "en"},
+      {"alias": "Eosinofili", "language": "it"},
+      {"alias": "Eosinophile", "language": "de"},
+      {"alias": "Éosinophiles", "language": "fr"},
+      {"alias": "Eosinófilos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "basophils",
+    "canonical_display": "Basophils",
+    "loinc_code": "704-7",
+    "category": "cbc",
+    "unit_preferred": "10^3/µL",
+    "aliases": [
+      {"alias": "Basophils", "language": "en"},
+      {"alias": "Basophil Count", "language": "en"},
+      {"alias": "Baso", "language": "en"},
+      {"alias": "Basofili", "language": "it"},
+      {"alias": "Basophile", "language": "de"},
+      {"alias": "Basophiles", "language": "fr"},
+      {"alias": "Basófilos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "reticulocytes",
+    "canonical_display": "Reticulocyte Count",
+    "loinc_code": "17849-1",
+    "category": "cbc",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Reticulocytes", "language": "en"},
+      {"alias": "Reticulocyte Count", "language": "en"},
+      {"alias": "Retic Count", "language": "en"},
+      {"alias": "Reticolociti", "language": "it"},
+      {"alias": "Retikulozyten", "language": "de"},
+      {"alias": "Réticulocytes", "language": "fr"},
+      {"alias": "Reticulocitos", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "total_cholesterol",
+    "canonical_display": "Total Cholesterol",
+    "loinc_code": "2093-3",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Total Cholesterol", "language": "en"},
+      {"alias": "Cholesterol", "language": "en"},
+      {"alias": "TC", "language": "en"},
+      {"alias": "Colesterolo totale", "language": "it"},
+      {"alias": "Gesamtcholesterin", "language": "de"},
+      {"alias": "Cholestérol total", "language": "fr"},
+      {"alias": "Colesterol total", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hdl_cholesterol",
+    "canonical_display": "HDL Cholesterol",
+    "loinc_code": "2085-9",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "HDL Cholesterol", "language": "en"},
+      {"alias": "HDL", "language": "en"},
+      {"alias": "HDL-C", "language": "en"},
+      {"alias": "Colesterolo HDL", "language": "it"},
+      {"alias": "HDL-Cholesterin", "language": "de"},
+      {"alias": "Cholestérol HDL", "language": "fr"},
+      {"alias": "Colesterol HDL", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ldl_cholesterol",
+    "canonical_display": "LDL Cholesterol",
+    "loinc_code": "2089-1",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "LDL Cholesterol", "language": "en"},
+      {"alias": "LDL", "language": "en"},
+      {"alias": "LDL-C", "language": "en"},
+      {"alias": "Colesterolo LDL", "language": "it"},
+      {"alias": "LDL-Cholesterin", "language": "de"},
+      {"alias": "Cholestérol LDL", "language": "fr"},
+      {"alias": "Colesterol LDL", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "triglycerides",
+    "canonical_display": "Triglycerides",
+    "loinc_code": "2571-8",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Triglycerides", "language": "en"},
+      {"alias": "TG", "language": "en"},
+      {"alias": "Trigliceridi", "language": "it"},
+      {"alias": "Triglyzeride", "language": "de"},
+      {"alias": "Triglycerides", "language": "fr"},
+      {"alias": "Triglicéridos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vldl_cholesterol",
+    "canonical_display": "VLDL Cholesterol",
+    "loinc_code": "2091-7",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "VLDL Cholesterol", "language": "en"},
+      {"alias": "VLDL", "language": "en"},
+      {"alias": "Colesterolo VLDL", "language": "it"},
+      {"alias": "VLDL-Cholesterin", "language": "de"},
+      {"alias": "Cholestérol VLDL", "language": "fr"},
+      {"alias": "Colesterol VLDL", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lipoprotein_a",
+    "canonical_display": "Lipoprotein(a)",
+    "loinc_code": "10835-7",
+    "category": "lipids",
+    "unit_preferred": "nmol/L",
+    "aliases": [
+      {"alias": "Lipoprotein(a)", "language": "en"},
+      {"alias": "Lp(a)", "language": "en"},
+      {"alias": "Lipoproteina(a)", "language": "it"},
+      {"alias": "Lipoprotein(a)", "language": "de"},
+      {"alias": "Lipoprotéine(a)", "language": "fr"},
+      {"alias": "Lipoproteína(a)", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "apolipoprotein_a1",
+    "canonical_display": "Apolipoprotein A1",
+    "loinc_code": "1869-7",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Apolipoprotein A1", "language": "en"},
+      {"alias": "ApoA1", "language": "en"},
+      {"alias": "Apo A-I", "language": "en"},
+      {"alias": "Apolipoproteina A1", "language": "it"},
+      {"alias": "Apolipoprotein A1", "language": "de"},
+      {"alias": "Apolipoprotéine A1", "language": "fr"},
+      {"alias": "Apolipoproteína A1", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "apolipoprotein_b",
+    "canonical_display": "Apolipoprotein B",
+    "loinc_code": "1884-6",
+    "category": "lipids",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Apolipoprotein B", "language": "en"},
+      {"alias": "ApoB", "language": "en"},
+      {"alias": "Apo B", "language": "en"},
+      {"alias": "Apolipoproteina B", "language": "it"},
+      {"alias": "Apolipoprotein B", "language": "de"},
+      {"alias": "Apolipoprotéine B", "language": "fr"},
+      {"alias": "Apolipoproteína B", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "glucose_fasting",
+    "canonical_display": "Glucose, Fasting",
+    "loinc_code": "1558-6",
+    "category": "metabolic",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Fasting Glucose", "language": "en"},
+      {"alias": "Fasting Blood Glucose", "language": "en"},
+      {"alias": "FBG", "language": "en"},
+      {"alias": "Glicemia a digiuno", "language": "it"},
+      {"alias": "Nüchternglukose", "language": "de"},
+      {"alias": "Nüchternblutzucker", "language": "de"},
+      {"alias": "Glycémie à jeun", "language": "fr"},
+      {"alias": "Glucosa en ayunas", "language": "es"},
+      {"alias": "Glucemia basal", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "glucose_random",
+    "canonical_display": "Glucose, Random",
+    "loinc_code": "2345-7",
+    "category": "metabolic",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Random Glucose", "language": "en"},
+      {"alias": "Blood Glucose", "language": "en"},
+      {"alias": "Glucose", "language": "en"},
+      {"alias": "Glicemia", "language": "it"},
+      {"alias": "Blutzucker", "language": "de"},
+      {"alias": "Glukose", "language": "de"},
+      {"alias": "Glycémie", "language": "fr"},
+      {"alias": "Glucosa", "language": "es"},
+      {"alias": "Glucemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hba1c",
+    "canonical_display": "Hemoglobin A1c",
+    "loinc_code": "4548-4",
+    "category": "metabolic",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "HbA1c", "language": "en"},
+      {"alias": "Hemoglobin A1c", "language": "en"},
+      {"alias": "Glycated Hemoglobin", "language": "en"},
+      {"alias": "A1C", "language": "en"},
+      {"alias": "Emoglobina glicata", "language": "it"},
+      {"alias": "HbA1c", "language": "it"},
+      {"alias": "HbA1c", "language": "de"},
+      {"alias": "Glykiertes Hämoglobin", "language": "de"},
+      {"alias": "Hémoglobine glyquée", "language": "fr"},
+      {"alias": "HbA1c", "language": "fr"},
+      {"alias": "Hemoglobina glicosilada", "language": "es"},
+      {"alias": "HbA1c", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "insulin",
+    "canonical_display": "Insulin",
+    "loinc_code": "2484-4",
+    "category": "metabolic",
+    "unit_preferred": "µU/mL",
+    "aliases": [
+      {"alias": "Insulin", "language": "en"},
+      {"alias": "Fasting Insulin", "language": "en"},
+      {"alias": "Insulina", "language": "it"},
+      {"alias": "Insulinemia", "language": "it"},
+      {"alias": "Insulin", "language": "de"},
+      {"alias": "Insuline", "language": "fr"},
+      {"alias": "Insulina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "c_peptide",
+    "canonical_display": "C-Peptide",
+    "loinc_code": "1986-9",
+    "category": "metabolic",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "C-Peptide", "language": "en"},
+      {"alias": "Peptide C", "language": "en"},
+      {"alias": "Peptide C", "language": "it"},
+      {"alias": "C-Peptid", "language": "de"},
+      {"alias": "Peptide C", "language": "fr"},
+      {"alias": "Péptido C", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "uric_acid",
+    "canonical_display": "Uric Acid",
+    "loinc_code": "3084-1",
+    "category": "metabolic",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Uric Acid", "language": "en"},
+      {"alias": "Urate", "language": "en"},
+      {"alias": "Acido urico", "language": "it"},
+      {"alias": "Uricemia", "language": "it"},
+      {"alias": "Harnsäure", "language": "de"},
+      {"alias": "Acide urique", "language": "fr"},
+      {"alias": "Ácido úrico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lactate",
+    "canonical_display": "Lactate",
+    "loinc_code": "2524-7",
+    "category": "metabolic",
+    "unit_preferred": "mmol/L",
+    "aliases": [
+      {"alias": "Lactate", "language": "en"},
+      {"alias": "Lactic Acid", "language": "en"},
+      {"alias": "Lattato", "language": "it"},
+      {"alias": "Acido lattico", "language": "it"},
+      {"alias": "Laktat", "language": "de"},
+      {"alias": "Milchsäure", "language": "de"},
+      {"alias": "Lactate", "language": "fr"},
+      {"alias": "Acide lactique", "language": "fr"},
+      {"alias": "Lactato", "language": "es"},
+      {"alias": "Ácido láctico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ammonia",
+    "canonical_display": "Ammonia",
+    "loinc_code": "1841-6",
+    "category": "metabolic",
+    "unit_preferred": "µmol/L",
+    "aliases": [
+      {"alias": "Ammonia", "language": "en"},
+      {"alias": "NH3", "language": "en"},
+      {"alias": "Ammoniemia", "language": "it"},
+      {"alias": "Ammoniaca", "language": "it"},
+      {"alias": "Ammoniak", "language": "de"},
+      {"alias": "Ammoniaque", "language": "fr"},
+      {"alias": "Amonio", "language": "es"},
+      {"alias": "Amoníaco", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "homocysteine",
+    "canonical_display": "Homocysteine",
+    "loinc_code": "13965-9",
+    "category": "metabolic",
+    "unit_preferred": "µmol/L",
+    "aliases": [
+      {"alias": "Homocysteine", "language": "en"},
+      {"alias": "Hcy", "language": "en"},
+      {"alias": "Omocisteina", "language": "it"},
+      {"alias": "Homocystein", "language": "de"},
+      {"alias": "Homocystéine", "language": "fr"},
+      {"alias": "Homocisteína", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fructosamine",
+    "canonical_display": "Fructosamine",
+    "loinc_code": "1757-4",
+    "category": "metabolic",
+    "unit_preferred": "µmol/L",
+    "aliases": [
+      {"alias": "Fructosamine", "language": "en"},
+      {"alias": "Fruttosamina", "language": "it"},
+      {"alias": "Fruktosamin", "language": "de"},
+      {"alias": "Fructosamine", "language": "fr"},
+      {"alias": "Fructosamina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bun",
+    "canonical_display": "Blood Urea Nitrogen",
+    "loinc_code": "3094-0",
+    "category": "metabolic",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "BUN", "language": "en"},
+      {"alias": "Blood Urea Nitrogen", "language": "en"},
+      {"alias": "Urea Nitrogen", "language": "en"},
+      {"alias": "Azotemia", "language": "it"},
+      {"alias": "Urea", "language": "it"},
+      {"alias": "Harnstoff", "language": "de"},
+      {"alias": "BUN", "language": "de"},
+      {"alias": "Urée", "language": "fr"},
+      {"alias": "Azote uréique", "language": "fr"},
+      {"alias": "Nitrógeno ureico", "language": "es"},
+      {"alias": "BUN", "language": "es"},
+      {"alias": "Urea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "total_protein",
+    "canonical_display": "Total Protein",
+    "loinc_code": "2885-2",
+    "category": "metabolic",
+    "unit_preferred": "g/dL",
+    "aliases": [
+      {"alias": "Total Protein", "language": "en"},
+      {"alias": "TP", "language": "en"},
+      {"alias": "Proteine totali", "language": "it"},
+      {"alias": "Protidemia", "language": "it"},
+      {"alias": "Gesamteiweiß", "language": "de"},
+      {"alias": "Gesamtprotein", "language": "de"},
+      {"alias": "Protéines totales", "language": "fr"},
+      {"alias": "Proteínas totales", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "albumin",
+    "canonical_display": "Albumin",
+    "loinc_code": "1751-7",
+    "category": "metabolic",
+    "unit_preferred": "g/dL",
+    "aliases": [
+      {"alias": "Albumin", "language": "en"},
+      {"alias": "Alb", "language": "en"},
+      {"alias": "Albumina", "language": "it"},
+      {"alias": "Albuminemia", "language": "it"},
+      {"alias": "Albumin", "language": "de"},
+      {"alias": "Albumine", "language": "fr"},
+      {"alias": "Albúmina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "globulin",
+    "canonical_display": "Globulin",
+    "loinc_code": "10834-0",
+    "category": "metabolic",
+    "unit_preferred": "g/dL",
+    "aliases": [
+      {"alias": "Globulin", "language": "en"},
+      {"alias": "Globuline", "language": "it"},
+      {"alias": "Globulin", "language": "de"},
+      {"alias": "Globuline", "language": "fr"},
+      {"alias": "Globulina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ag_ratio",
+    "canonical_display": "Albumin/Globulin Ratio",
+    "loinc_code": "1759-0",
+    "category": "metabolic",
+    "unit_preferred": "ratio",
+    "aliases": [
+      {"alias": "A/G Ratio", "language": "en"},
+      {"alias": "Albumin/Globulin Ratio", "language": "en"},
+      {"alias": "Rapporto A/G", "language": "it"},
+      {"alias": "Rapporto albumina/globulina", "language": "it"},
+      {"alias": "Albumin-Globulin-Quotient", "language": "de"},
+      {"alias": "Rapport albumine/globuline", "language": "fr"},
+      {"alias": "Cociente albúmina/globulina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "alt",
+    "canonical_display": "Alanine Aminotransferase",
+    "loinc_code": "1742-6",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "ALT", "language": "en"},
+      {"alias": "Alanine Aminotransferase", "language": "en"},
+      {"alias": "SGPT", "language": "en"},
+      {"alias": "GPT", "language": "en"},
+      {"alias": "ALT", "language": "it"},
+      {"alias": "GPT", "language": "it"},
+      {"alias": "Alanina aminotransferasi", "language": "it"},
+      {"alias": "Transaminasi GPT", "language": "it"},
+      {"alias": "ALT", "language": "de"},
+      {"alias": "GPT", "language": "de"},
+      {"alias": "Alanin-Aminotransferase", "language": "de"},
+      {"alias": "ALAT", "language": "fr"},
+      {"alias": "GPT", "language": "fr"},
+      {"alias": "Alanine aminotransférase", "language": "fr"},
+      {"alias": "ALT", "language": "es"},
+      {"alias": "GPT", "language": "es"},
+      {"alias": "Alanina aminotransferasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ast",
+    "canonical_display": "Aspartate Aminotransferase",
+    "loinc_code": "1920-8",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "AST", "language": "en"},
+      {"alias": "Aspartate Aminotransferase", "language": "en"},
+      {"alias": "SGOT", "language": "en"},
+      {"alias": "GOT", "language": "en"},
+      {"alias": "AST", "language": "it"},
+      {"alias": "GOT", "language": "it"},
+      {"alias": "Aspartato aminotransferasi", "language": "it"},
+      {"alias": "Transaminasi GOT", "language": "it"},
+      {"alias": "AST", "language": "de"},
+      {"alias": "GOT", "language": "de"},
+      {"alias": "Aspartat-Aminotransferase", "language": "de"},
+      {"alias": "ASAT", "language": "fr"},
+      {"alias": "GOT", "language": "fr"},
+      {"alias": "Aspartate aminotransférase", "language": "fr"},
+      {"alias": "AST", "language": "es"},
+      {"alias": "GOT", "language": "es"},
+      {"alias": "Aspartato aminotransferasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ggt",
+    "canonical_display": "Gamma-Glutamyl Transferase",
+    "loinc_code": "2324-2",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "GGT", "language": "en"},
+      {"alias": "Gamma-GT", "language": "en"},
+      {"alias": "Gamma-Glutamyl Transferase", "language": "en"},
+      {"alias": "GGT", "language": "it"},
+      {"alias": "Gamma-GT", "language": "it"},
+      {"alias": "Gamma-glutamil transferasi", "language": "it"},
+      {"alias": "GGT", "language": "de"},
+      {"alias": "Gamma-GT", "language": "de"},
+      {"alias": "Gamma-Glutamyltransferase", "language": "de"},
+      {"alias": "GGT", "language": "fr"},
+      {"alias": "Gamma-GT", "language": "fr"},
+      {"alias": "Gamma-glutamyl transférase", "language": "fr"},
+      {"alias": "GGT", "language": "es"},
+      {"alias": "Gamma-glutamil transferasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "alp",
+    "canonical_display": "Alkaline Phosphatase",
+    "loinc_code": "6768-6",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "ALP", "language": "en"},
+      {"alias": "Alkaline Phosphatase", "language": "en"},
+      {"alias": "Alk Phos", "language": "en"},
+      {"alias": "Fosfatasi alcalina", "language": "it"},
+      {"alias": "ALP", "language": "it"},
+      {"alias": "Alkalische Phosphatase", "language": "de"},
+      {"alias": "AP", "language": "de"},
+      {"alias": "Phosphatase alcaline", "language": "fr"},
+      {"alias": "PAL", "language": "fr"},
+      {"alias": "Fosfatasa alcalina", "language": "es"},
+      {"alias": "FA", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bilirubin_total",
+    "canonical_display": "Bilirubin, Total",
+    "loinc_code": "1975-2",
+    "category": "liver",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Total Bilirubin", "language": "en"},
+      {"alias": "Bilirubin Total", "language": "en"},
+      {"alias": "T-Bil", "language": "en"},
+      {"alias": "Bilirubina totale", "language": "it"},
+      {"alias": "Gesamtbilirubin", "language": "de"},
+      {"alias": "Bilirubine totale", "language": "fr"},
+      {"alias": "Bilirrubina total", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bilirubin_direct",
+    "canonical_display": "Bilirubin, Direct",
+    "loinc_code": "1968-7",
+    "category": "liver",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Direct Bilirubin", "language": "en"},
+      {"alias": "Conjugated Bilirubin", "language": "en"},
+      {"alias": "D-Bil", "language": "en"},
+      {"alias": "Bilirubina diretta", "language": "it"},
+      {"alias": "Bilirubina coniugata", "language": "it"},
+      {"alias": "Direktes Bilirubin", "language": "de"},
+      {"alias": "Konjugiertes Bilirubin", "language": "de"},
+      {"alias": "Bilirubine directe", "language": "fr"},
+      {"alias": "Bilirubine conjuguée", "language": "fr"},
+      {"alias": "Bilirrubina directa", "language": "es"},
+      {"alias": "Bilirrubina conjugada", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bilirubin_indirect",
+    "canonical_display": "Bilirubin, Indirect",
+    "loinc_code": "1971-1",
+    "category": "liver",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Indirect Bilirubin", "language": "en"},
+      {"alias": "Unconjugated Bilirubin", "language": "en"},
+      {"alias": "Bilirubina indiretta", "language": "it"},
+      {"alias": "Bilirubina non coniugata", "language": "it"},
+      {"alias": "Indirektes Bilirubin", "language": "de"},
+      {"alias": "Unkonjugiertes Bilirubin", "language": "de"},
+      {"alias": "Bilirubine indirecte", "language": "fr"},
+      {"alias": "Bilirubine non conjuguée", "language": "fr"},
+      {"alias": "Bilirrubina indirecta", "language": "es"},
+      {"alias": "Bilirrubina no conjugada", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ldh",
+    "canonical_display": "Lactate Dehydrogenase",
+    "loinc_code": "2532-0",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "LDH", "language": "en"},
+      {"alias": "Lactate Dehydrogenase", "language": "en"},
+      {"alias": "Lactic Dehydrogenase", "language": "en"},
+      {"alias": "LDH", "language": "it"},
+      {"alias": "Lattico deidrogenasi", "language": "it"},
+      {"alias": "LDH", "language": "de"},
+      {"alias": "Laktatdehydrogenase", "language": "de"},
+      {"alias": "LDH", "language": "fr"},
+      {"alias": "Lactate déshydrogénase", "language": "fr"},
+      {"alias": "LDH", "language": "es"},
+      {"alias": "Lactato deshidrogenasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "prealbumin",
+    "canonical_display": "Prealbumin",
+    "loinc_code": "14338-8",
+    "category": "liver",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Prealbumin", "language": "en"},
+      {"alias": "Transthyretin", "language": "en"},
+      {"alias": "Prealbumina", "language": "it"},
+      {"alias": "Transtiretina", "language": "it"},
+      {"alias": "Präalbumin", "language": "de"},
+      {"alias": "Transthyretin", "language": "de"},
+      {"alias": "Préalbumine", "language": "fr"},
+      {"alias": "Transthyrétine", "language": "fr"},
+      {"alias": "Prealbúmina", "language": "es"},
+      {"alias": "Transtiretina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cholinesterase",
+    "canonical_display": "Cholinesterase",
+    "loinc_code": "2098-2",
+    "category": "liver",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "Cholinesterase", "language": "en"},
+      {"alias": "Pseudocholinesterase", "language": "en"},
+      {"alias": "CHE", "language": "en"},
+      {"alias": "Colinesterasi", "language": "it"},
+      {"alias": "Pseudocolinesterasi", "language": "it"},
+      {"alias": "CHE", "language": "it"},
+      {"alias": "Cholinesterase", "language": "de"},
+      {"alias": "CHE", "language": "de"},
+      {"alias": "Cholinestérase", "language": "fr"},
+      {"alias": "Colinesterasa", "language": "es"},
+      {"alias": "Pseudocolinesterasa", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "creatinine",
+    "canonical_display": "Creatinine",
+    "loinc_code": "2160-0",
+    "category": "kidney",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Creatinine", "language": "en"},
+      {"alias": "Creat", "language": "en"},
+      {"alias": "Cr", "language": "en"},
+      {"alias": "Creatinina", "language": "it"},
+      {"alias": "Kreatinin", "language": "de"},
+      {"alias": "Créatinine", "language": "fr"},
+      {"alias": "Creatinina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "egfr",
+    "canonical_display": "Estimated GFR",
+    "loinc_code": "33914-3",
+    "category": "kidney",
+    "unit_preferred": "mL/min/1.73m²",
+    "aliases": [
+      {"alias": "eGFR", "language": "en"},
+      {"alias": "Estimated GFR", "language": "en"},
+      {"alias": "Estimated Glomerular Filtration Rate", "language": "en"},
+      {"alias": "GFR", "language": "en"},
+      {"alias": "Filtrato glomerulare", "language": "it"},
+      {"alias": "VFG", "language": "it"},
+      {"alias": "eGFR", "language": "it"},
+      {"alias": "GFR", "language": "de"},
+      {"alias": "eGFR", "language": "de"},
+      {"alias": "Glomeruläre Filtrationsrate", "language": "de"},
+      {"alias": "DFG", "language": "fr"},
+      {"alias": "Débit de filtration glomérulaire", "language": "fr"},
+      {"alias": "TFG", "language": "es"},
+      {"alias": "Tasa de filtración glomerular", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urea",
+    "canonical_display": "Urea",
+    "loinc_code": "3091-6",
+    "category": "kidney",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urea", "language": "en"},
+      {"alias": "Blood Urea", "language": "en"},
+      {"alias": "Urea", "language": "it"},
+      {"alias": "Harnstoff", "language": "de"},
+      {"alias": "Urée", "language": "fr"},
+      {"alias": "Urea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cystatin_c",
+    "canonical_display": "Cystatin C",
+    "loinc_code": "33863-2",
+    "category": "kidney",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "Cystatin C", "language": "en"},
+      {"alias": "CysC", "language": "en"},
+      {"alias": "Cistatina C", "language": "it"},
+      {"alias": "Cystatin C", "language": "de"},
+      {"alias": "Cystatine C", "language": "fr"},
+      {"alias": "Cistatina C", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "microalbumin",
+    "canonical_display": "Microalbumin, Urine",
+    "loinc_code": "14957-5",
+    "category": "kidney",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "Microalbumin", "language": "en"},
+      {"alias": "Urine Microalbumin", "language": "en"},
+      {"alias": "Microalbuminuria", "language": "en"},
+      {"alias": "Microalbumina", "language": "it"},
+      {"alias": "Microalbuminuria", "language": "it"},
+      {"alias": "Mikroalbumin", "language": "de"},
+      {"alias": "Microalbumine", "language": "fr"},
+      {"alias": "Microalbúmina", "language": "es"},
+      {"alias": "Microalbuminuria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_protein",
+    "canonical_display": "Protein, Urine",
+    "loinc_code": "2888-6",
+    "category": "kidney",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Protein", "language": "en"},
+      {"alias": "Urine Total Protein", "language": "en"},
+      {"alias": "Proteinuria", "language": "en"},
+      {"alias": "Proteinuria", "language": "it"},
+      {"alias": "Proteine urinarie", "language": "it"},
+      {"alias": "Urinprotein", "language": "de"},
+      {"alias": "Eiweiß im Urin", "language": "de"},
+      {"alias": "Protéines urinaires", "language": "fr"},
+      {"alias": "Proteinuria", "language": "fr"},
+      {"alias": "Proteínas en orina", "language": "es"},
+      {"alias": "Proteinuria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_creatinine",
+    "canonical_display": "Creatinine, Urine",
+    "loinc_code": "2161-8",
+    "category": "kidney",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Creatinine", "language": "en"},
+      {"alias": "Creatinine Urine", "language": "en"},
+      {"alias": "Creatinina urinaria", "language": "it"},
+      {"alias": "Kreatinin im Urin", "language": "de"},
+      {"alias": "Créatinine urinaire", "language": "fr"},
+      {"alias": "Creatinina en orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "acr",
+    "canonical_display": "Albumin/Creatinine Ratio",
+    "loinc_code": "9318-7",
+    "category": "kidney",
+    "unit_preferred": "mg/g",
+    "aliases": [
+      {"alias": "ACR", "language": "en"},
+      {"alias": "Albumin/Creatinine Ratio", "language": "en"},
+      {"alias": "Urine Albumin-to-Creatinine Ratio", "language": "en"},
+      {"alias": "Rapporto albumina/creatinina", "language": "it"},
+      {"alias": "ACR", "language": "it"},
+      {"alias": "Albumin-Kreatinin-Quotient", "language": "de"},
+      {"alias": "Rapport albumine/créatinine", "language": "fr"},
+      {"alias": "RAC", "language": "fr"},
+      {"alias": "Cociente albúmina/creatinina", "language": "es"},
+      {"alias": "CAC", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_specific_gravity",
+    "canonical_display": "Specific Gravity, Urine",
+    "loinc_code": "2965-2",
+    "category": "kidney",
+    "unit_preferred": "ratio",
+    "aliases": [
+      {"alias": "Urine Specific Gravity", "language": "en"},
+      {"alias": "Specific Gravity", "language": "en"},
+      {"alias": "SG", "language": "en"},
+      {"alias": "Peso specifico urine", "language": "it"},
+      {"alias": "Spezifisches Gewicht Urin", "language": "de"},
+      {"alias": "Densité urinaire", "language": "fr"},
+      {"alias": "Densidad urinaria", "language": "es"},
+      {"alias": "Gravedad específica orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_ph",
+    "canonical_display": "pH, Urine",
+    "loinc_code": "2756-5",
+    "category": "kidney",
+    "unit_preferred": "pH",
+    "aliases": [
+      {"alias": "Urine pH", "language": "en"},
+      {"alias": "pH Urine", "language": "en"},
+      {"alias": "pH urine", "language": "it"},
+      {"alias": "pH urinario", "language": "it"},
+      {"alias": "Urin-pH", "language": "de"},
+      {"alias": "pH urinaire", "language": "fr"},
+      {"alias": "pH urinario", "language": "es"},
+      {"alias": "pH en orina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "sodium",
+    "canonical_display": "Sodium",
+    "loinc_code": "2951-2",
+    "category": "electrolytes",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Sodium", "language": "en"},
+      {"alias": "Na", "language": "en"},
+      {"alias": "Na+", "language": "en"},
+      {"alias": "Sodio", "language": "it"},
+      {"alias": "Natremia", "language": "it"},
+      {"alias": "Natrium", "language": "de"},
+      {"alias": "Sodium", "language": "fr"},
+      {"alias": "Natrémie", "language": "fr"},
+      {"alias": "Sodio", "language": "es"},
+      {"alias": "Natremia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "potassium",
+    "canonical_display": "Potassium",
+    "loinc_code": "2823-3",
+    "category": "electrolytes",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Potassium", "language": "en"},
+      {"alias": "K", "language": "en"},
+      {"alias": "K+", "language": "en"},
+      {"alias": "Potassio", "language": "it"},
+      {"alias": "Kaliemia", "language": "it"},
+      {"alias": "Kalium", "language": "de"},
+      {"alias": "Potassium", "language": "fr"},
+      {"alias": "Kaliémie", "language": "fr"},
+      {"alias": "Potasio", "language": "es"},
+      {"alias": "Kalemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "chloride",
+    "canonical_display": "Chloride",
+    "loinc_code": "2075-0",
+    "category": "electrolytes",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Chloride", "language": "en"},
+      {"alias": "Cl", "language": "en"},
+      {"alias": "Cl-", "language": "en"},
+      {"alias": "Cloro", "language": "it"},
+      {"alias": "Cloremia", "language": "it"},
+      {"alias": "Chlorid", "language": "de"},
+      {"alias": "Chlorure", "language": "fr"},
+      {"alias": "Cloruro", "language": "es"},
+      {"alias": "Cloro", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "calcium",
+    "canonical_display": "Calcium",
+    "loinc_code": "17861-6",
+    "category": "electrolytes",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Calcium", "language": "en"},
+      {"alias": "Ca", "language": "en"},
+      {"alias": "Ca2+", "language": "en"},
+      {"alias": "Total Calcium", "language": "en"},
+      {"alias": "Calcio", "language": "it"},
+      {"alias": "Calcemia", "language": "it"},
+      {"alias": "Kalzium", "language": "de"},
+      {"alias": "Calcium", "language": "de"},
+      {"alias": "Calcium", "language": "fr"},
+      {"alias": "Calcémie", "language": "fr"},
+      {"alias": "Calcio", "language": "es"},
+      {"alias": "Calcemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "magnesium",
+    "canonical_display": "Magnesium",
+    "loinc_code": "19123-9",
+    "category": "electrolytes",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Magnesium", "language": "en"},
+      {"alias": "Mg", "language": "en"},
+      {"alias": "Mg2+", "language": "en"},
+      {"alias": "Magnesio", "language": "it"},
+      {"alias": "Magnesiemia", "language": "it"},
+      {"alias": "Magnesium", "language": "de"},
+      {"alias": "Magnésium", "language": "fr"},
+      {"alias": "Magnésémie", "language": "fr"},
+      {"alias": "Magnesio", "language": "es"},
+      {"alias": "Magnesemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "phosphate",
+    "canonical_display": "Phosphate",
+    "loinc_code": "2777-1",
+    "category": "electrolytes",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Phosphate", "language": "en"},
+      {"alias": "Phosphorus", "language": "en"},
+      {"alias": "PO4", "language": "en"},
+      {"alias": "Phos", "language": "en"},
+      {"alias": "Fosforo", "language": "it"},
+      {"alias": "Fosforemia", "language": "it"},
+      {"alias": "Phosphat", "language": "de"},
+      {"alias": "Phosphore", "language": "fr"},
+      {"alias": "Phosphatémie", "language": "fr"},
+      {"alias": "Fósforo", "language": "es"},
+      {"alias": "Fosfatemia", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bicarbonate",
+    "canonical_display": "Bicarbonate",
+    "loinc_code": "1963-8",
+    "category": "electrolytes",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Bicarbonate", "language": "en"},
+      {"alias": "HCO3", "language": "en"},
+      {"alias": "CO2", "language": "en"},
+      {"alias": "Bicarbonato", "language": "it"},
+      {"alias": "Bicarbonat", "language": "de"},
+      {"alias": "Bicarbonate", "language": "fr"},
+      {"alias": "Bicarbonato", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anion_gap",
+    "canonical_display": "Anion Gap",
+    "loinc_code": "33037-3",
+    "category": "electrolytes",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Anion Gap", "language": "en"},
+      {"alias": "AG", "language": "en"},
+      {"alias": "Gap anionico", "language": "it"},
+      {"alias": "Anionenlücke", "language": "de"},
+      {"alias": "Trou anionique", "language": "fr"},
+      {"alias": "Brecha aniónica", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "tsh",
+    "canonical_display": "Thyroid Stimulating Hormone",
+    "loinc_code": "11580-8",
+    "category": "thyroid",
+    "unit_preferred": "mIU/L",
+    "aliases": [
+      {"alias": "TSH", "language": "en"},
+      {"alias": "Thyroid Stimulating Hormone", "language": "en"},
+      {"alias": "Thyrotropin", "language": "en"},
+      {"alias": "TSH", "language": "it"},
+      {"alias": "Tireotropina", "language": "it"},
+      {"alias": "TSH", "language": "de"},
+      {"alias": "Thyreotropin", "language": "de"},
+      {"alias": "TSH", "language": "fr"},
+      {"alias": "Thyréostimuline", "language": "fr"},
+      {"alias": "TSH", "language": "es"},
+      {"alias": "Tirotropina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "free_t4",
+    "canonical_display": "Free T4",
+    "loinc_code": "3024-7",
+    "category": "thyroid",
+    "unit_preferred": "ng/dL",
+    "aliases": [
+      {"alias": "Free T4", "language": "en"},
+      {"alias": "FT4", "language": "en"},
+      {"alias": "Free Thyroxine", "language": "en"},
+      {"alias": "FT4", "language": "it"},
+      {"alias": "T4 libera", "language": "it"},
+      {"alias": "Tiroxina libera", "language": "it"},
+      {"alias": "FT4", "language": "de"},
+      {"alias": "Freies Thyroxin", "language": "de"},
+      {"alias": "T4 libre", "language": "fr"},
+      {"alias": "T4L", "language": "fr"},
+      {"alias": "T4 libre", "language": "es"},
+      {"alias": "Tiroxina libre", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "free_t3",
+    "canonical_display": "Free T3",
+    "loinc_code": "3051-0",
+    "category": "thyroid",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "Free T3", "language": "en"},
+      {"alias": "FT3", "language": "en"},
+      {"alias": "Free Triiodothyronine", "language": "en"},
+      {"alias": "FT3", "language": "it"},
+      {"alias": "T3 libera", "language": "it"},
+      {"alias": "Triiodotironina libera", "language": "it"},
+      {"alias": "FT3", "language": "de"},
+      {"alias": "Freies Trijodthyronin", "language": "de"},
+      {"alias": "T3 libre", "language": "fr"},
+      {"alias": "T3L", "language": "fr"},
+      {"alias": "T3 libre", "language": "es"},
+      {"alias": "Triyodotironina libre", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "total_t4",
+    "canonical_display": "Total T4",
+    "loinc_code": "3026-2",
+    "category": "thyroid",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Total T4", "language": "en"},
+      {"alias": "T4", "language": "en"},
+      {"alias": "Thyroxine", "language": "en"},
+      {"alias": "T4 totale", "language": "it"},
+      {"alias": "Tiroxina totale", "language": "it"},
+      {"alias": "T4 gesamt", "language": "de"},
+      {"alias": "Gesamt-Thyroxin", "language": "de"},
+      {"alias": "T4 totale", "language": "fr"},
+      {"alias": "T4 total", "language": "es"},
+      {"alias": "Tiroxina total", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "total_t3",
+    "canonical_display": "Total T3",
+    "loinc_code": "3053-6",
+    "category": "thyroid",
+    "unit_preferred": "ng/dL",
+    "aliases": [
+      {"alias": "Total T3", "language": "en"},
+      {"alias": "T3", "language": "en"},
+      {"alias": "Triiodothyronine", "language": "en"},
+      {"alias": "T3 totale", "language": "it"},
+      {"alias": "Triiodotironina totale", "language": "it"},
+      {"alias": "T3 gesamt", "language": "de"},
+      {"alias": "Gesamt-Trijodthyronin", "language": "de"},
+      {"alias": "T3 totale", "language": "fr"},
+      {"alias": "T3 total", "language": "es"},
+      {"alias": "Triyodotironina total", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_tpo",
+    "canonical_display": "Anti-TPO Antibodies",
+    "loinc_code": "5382-1",
+    "category": "thyroid",
+    "unit_preferred": "IU/mL",
+    "aliases": [
+      {"alias": "Anti-TPO", "language": "en"},
+      {"alias": "TPO Antibodies", "language": "en"},
+      {"alias": "Thyroid Peroxidase Antibodies", "language": "en"},
+      {"alias": "Anti-TPO", "language": "it"},
+      {"alias": "Anticorpi anti-tireoperossidasi", "language": "it"},
+      {"alias": "Anti-TPO", "language": "de"},
+      {"alias": "Thyreoperoxidase-Antikörper", "language": "de"},
+      {"alias": "Anti-TPO", "language": "fr"},
+      {"alias": "Anticorps anti-thyroperoxydase", "language": "fr"},
+      {"alias": "Anti-TPO", "language": "es"},
+      {"alias": "Anticuerpos anti-peroxidasa tiroidea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_tg",
+    "canonical_display": "Anti-Thyroglobulin Antibodies",
+    "loinc_code": "5379-7",
+    "category": "thyroid",
+    "unit_preferred": "IU/mL",
+    "aliases": [
+      {"alias": "Anti-TG", "language": "en"},
+      {"alias": "Thyroglobulin Antibodies", "language": "en"},
+      {"alias": "Anti-Thyroglobulin", "language": "en"},
+      {"alias": "Anti-TG", "language": "it"},
+      {"alias": "Anticorpi anti-tireoglobulina", "language": "it"},
+      {"alias": "Anti-TG", "language": "de"},
+      {"alias": "Thyreoglobulin-Antikörper", "language": "de"},
+      {"alias": "Anti-TG", "language": "fr"},
+      {"alias": "Anticorps anti-thyroglobuline", "language": "fr"},
+      {"alias": "Anti-TG", "language": "es"},
+      {"alias": "Anticuerpos anti-tiroglobulina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "thyroglobulin",
+    "canonical_display": "Thyroglobulin",
+    "loinc_code": "3013-0",
+    "category": "thyroid",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Thyroglobulin", "language": "en"},
+      {"alias": "Tg", "language": "en"},
+      {"alias": "Tireoglobulina", "language": "it"},
+      {"alias": "Thyreoglobulin", "language": "de"},
+      {"alias": "Thyroglobuline", "language": "fr"},
+      {"alias": "Tiroglobulina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "iron",
+    "canonical_display": "Iron",
+    "loinc_code": "2498-4",
+    "category": "iron",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Iron", "language": "en"},
+      {"alias": "Serum Iron", "language": "en"},
+      {"alias": "Fe", "language": "en"},
+      {"alias": "Ferro", "language": "it"},
+      {"alias": "Sideremia", "language": "it"},
+      {"alias": "Eisen", "language": "de"},
+      {"alias": "Serumeisen", "language": "de"},
+      {"alias": "Fer", "language": "fr"},
+      {"alias": "Fer sérique", "language": "fr"},
+      {"alias": "Hierro", "language": "es"},
+      {"alias": "Hierro sérico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ferritin",
+    "canonical_display": "Ferritin",
+    "loinc_code": "2276-4",
+    "category": "iron",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Ferritin", "language": "en"},
+      {"alias": "Ferritina", "language": "it"},
+      {"alias": "Ferritin", "language": "de"},
+      {"alias": "Ferritine", "language": "fr"},
+      {"alias": "Ferritina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "tibc",
+    "canonical_display": "Total Iron Binding Capacity",
+    "loinc_code": "2500-7",
+    "category": "iron",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "TIBC", "language": "en"},
+      {"alias": "Total Iron Binding Capacity", "language": "en"},
+      {"alias": "Capacità totale di legare il ferro", "language": "it"},
+      {"alias": "TIBC", "language": "it"},
+      {"alias": "Totale Eisenbindungskapazität", "language": "de"},
+      {"alias": "TEBK", "language": "de"},
+      {"alias": "Capacité totale de fixation du fer", "language": "fr"},
+      {"alias": "CTF", "language": "fr"},
+      {"alias": "Capacidad total de fijación del hierro", "language": "es"},
+      {"alias": "CTFH", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "transferrin",
+    "canonical_display": "Transferrin",
+    "loinc_code": "3034-6",
+    "category": "iron",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Transferrin", "language": "en"},
+      {"alias": "Transferrina", "language": "it"},
+      {"alias": "Transferrin", "language": "de"},
+      {"alias": "Transferrine", "language": "fr"},
+      {"alias": "Transferrina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "transferrin_saturation",
+    "canonical_display": "Transferrin Saturation",
+    "loinc_code": "2502-3",
+    "category": "iron",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Transferrin Saturation", "language": "en"},
+      {"alias": "TSAT", "language": "en"},
+      {"alias": "Iron Saturation", "language": "en"},
+      {"alias": "Saturazione della transferrina", "language": "it"},
+      {"alias": "TSAT", "language": "it"},
+      {"alias": "Transferrinsättigung", "language": "de"},
+      {"alias": "Saturation de la transferrine", "language": "fr"},
+      {"alias": "CST", "language": "fr"},
+      {"alias": "Saturación de transferrina", "language": "es"},
+      {"alias": "IST", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "soluble_transferrin_receptor",
+    "canonical_display": "Soluble Transferrin Receptor",
+    "loinc_code": "30248-9",
+    "category": "iron",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "Soluble Transferrin Receptor", "language": "en"},
+      {"alias": "sTfR", "language": "en"},
+      {"alias": "Recettore solubile della transferrina", "language": "it"},
+      {"alias": "sTfR", "language": "it"},
+      {"alias": "Löslicher Transferrinrezeptor", "language": "de"},
+      {"alias": "sTfR", "language": "de"},
+      {"alias": "Récepteur soluble de la transferrine", "language": "fr"},
+      {"alias": "Receptor soluble de transferrina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "pt",
+    "canonical_display": "Prothrombin Time",
+    "loinc_code": "5902-2",
+    "category": "coagulation",
+    "unit_preferred": "seconds",
+    "aliases": [
+      {"alias": "PT", "language": "en"},
+      {"alias": "Prothrombin Time", "language": "en"},
+      {"alias": "Pro Time", "language": "en"},
+      {"alias": "PT", "language": "it"},
+      {"alias": "Tempo di protrombina", "language": "it"},
+      {"alias": "PT", "language": "de"},
+      {"alias": "Prothrombinzeit", "language": "de"},
+      {"alias": "TP", "language": "fr"},
+      {"alias": "Temps de prothrombine", "language": "fr"},
+      {"alias": "TP", "language": "es"},
+      {"alias": "Tiempo de protrombina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "inr",
+    "canonical_display": "International Normalized Ratio",
+    "loinc_code": "6301-6",
+    "category": "coagulation",
+    "unit_preferred": "ratio",
+    "aliases": [
+      {"alias": "INR", "language": "en"},
+      {"alias": "International Normalized Ratio", "language": "en"},
+      {"alias": "INR", "language": "it"},
+      {"alias": "Rapporto internazionale normalizzato", "language": "it"},
+      {"alias": "INR", "language": "de"},
+      {"alias": "International Normalisierte Ratio", "language": "de"},
+      {"alias": "INR", "language": "fr"},
+      {"alias": "Rapport normalisé international", "language": "fr"},
+      {"alias": "INR", "language": "es"},
+      {"alias": "Razón normalizada internacional", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "aptt",
+    "canonical_display": "Activated Partial Thromboplastin Time",
+    "loinc_code": "3173-2",
+    "category": "coagulation",
+    "unit_preferred": "seconds",
+    "aliases": [
+      {"alias": "aPTT", "language": "en"},
+      {"alias": "PTT", "language": "en"},
+      {"alias": "Activated Partial Thromboplastin Time", "language": "en"},
+      {"alias": "aPTT", "language": "it"},
+      {"alias": "PTT", "language": "it"},
+      {"alias": "Tempo di tromboplastina parziale attivata", "language": "it"},
+      {"alias": "aPTT", "language": "de"},
+      {"alias": "Partielle Thromboplastinzeit", "language": "de"},
+      {"alias": "TCA", "language": "fr"},
+      {"alias": "Temps de céphaline activé", "language": "fr"},
+      {"alias": "TTPa", "language": "es"},
+      {"alias": "Tiempo de tromboplastina parcial activado", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fibrinogen",
+    "canonical_display": "Fibrinogen",
+    "loinc_code": "3255-7",
+    "category": "coagulation",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Fibrinogen", "language": "en"},
+      {"alias": "Factor I", "language": "en"},
+      {"alias": "Fibrinogeno", "language": "it"},
+      {"alias": "Fibrinogen", "language": "de"},
+      {"alias": "Fibrinogène", "language": "fr"},
+      {"alias": "Fibrinógeno", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "d_dimer",
+    "canonical_display": "D-Dimer",
+    "loinc_code": "48066-5",
+    "category": "coagulation",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "D-Dimer", "language": "en"},
+      {"alias": "D-dimer", "language": "en"},
+      {"alias": "DDimer", "language": "en"},
+      {"alias": "D-dimero", "language": "it"},
+      {"alias": "D-Dimer", "language": "de"},
+      {"alias": "D-dimères", "language": "fr"},
+      {"alias": "Dímero D", "language": "es"},
+      {"alias": "D-dímero", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "antithrombin_iii",
+    "canonical_display": "Antithrombin III",
+    "loinc_code": "3174-0",
+    "category": "coagulation",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Antithrombin III", "language": "en"},
+      {"alias": "AT III", "language": "en"},
+      {"alias": "AT3", "language": "en"},
+      {"alias": "Antitrombina III", "language": "it"},
+      {"alias": "AT III", "language": "it"},
+      {"alias": "Antithrombin III", "language": "de"},
+      {"alias": "AT III", "language": "de"},
+      {"alias": "Antithrombine III", "language": "fr"},
+      {"alias": "Antitrombina III", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "protein_c",
+    "canonical_display": "Protein C",
+    "loinc_code": "27811-9",
+    "category": "coagulation",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Protein C", "language": "en"},
+      {"alias": "Proteina C", "language": "it"},
+      {"alias": "Protein C", "language": "de"},
+      {"alias": "Protéine C", "language": "fr"},
+      {"alias": "Proteína C", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "protein_s",
+    "canonical_display": "Protein S",
+    "loinc_code": "27816-8",
+    "category": "coagulation",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "Protein S", "language": "en"},
+      {"alias": "Free Protein S", "language": "en"},
+      {"alias": "Proteina S", "language": "it"},
+      {"alias": "Proteina S libera", "language": "it"},
+      {"alias": "Protein S", "language": "de"},
+      {"alias": "Protéine S", "language": "fr"},
+      {"alias": "Proteína S", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bleeding_time",
+    "canonical_display": "Bleeding Time",
+    "loinc_code": "11067-6",
+    "category": "coagulation",
+    "unit_preferred": "minutes",
+    "aliases": [
+      {"alias": "Bleeding Time", "language": "en"},
+      {"alias": "BT", "language": "en"},
+      {"alias": "Tempo di emorragia", "language": "it"},
+      {"alias": "Tempo di sanguinamento", "language": "it"},
+      {"alias": "Blutungszeit", "language": "de"},
+      {"alias": "Temps de saignement", "language": "fr"},
+      {"alias": "TS", "language": "fr"},
+      {"alias": "Tiempo de sangría", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "thrombin_time",
+    "canonical_display": "Thrombin Time",
+    "loinc_code": "3243-3",
+    "category": "coagulation",
+    "unit_preferred": "seconds",
+    "aliases": [
+      {"alias": "Thrombin Time", "language": "en"},
+      {"alias": "TT", "language": "en"},
+      {"alias": "Tempo di trombina", "language": "it"},
+      {"alias": "TT", "language": "it"},
+      {"alias": "Thrombinzeit", "language": "de"},
+      {"alias": "TZ", "language": "de"},
+      {"alias": "Temps de thrombine", "language": "fr"},
+      {"alias": "Tiempo de trombina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "troponin_i",
+    "canonical_display": "Troponin I",
+    "loinc_code": "10839-9",
+    "category": "cardiac",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Troponin I", "language": "en"},
+      {"alias": "TnI", "language": "en"},
+      {"alias": "cTnI", "language": "en"},
+      {"alias": "Troponina I", "language": "it"},
+      {"alias": "Troponin I", "language": "de"},
+      {"alias": "Troponine I", "language": "fr"},
+      {"alias": "Troponina I", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "troponin_t",
+    "canonical_display": "Troponin T",
+    "loinc_code": "6598-7",
+    "category": "cardiac",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Troponin T", "language": "en"},
+      {"alias": "TnT", "language": "en"},
+      {"alias": "cTnT", "language": "en"},
+      {"alias": "hs-TnT", "language": "en"},
+      {"alias": "Troponina T", "language": "it"},
+      {"alias": "Troponin T", "language": "de"},
+      {"alias": "Troponine T", "language": "fr"},
+      {"alias": "Troponina T", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ck",
+    "canonical_display": "Creatine Kinase",
+    "loinc_code": "2157-6",
+    "category": "cardiac",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "CK", "language": "en"},
+      {"alias": "Creatine Kinase", "language": "en"},
+      {"alias": "CPK", "language": "en"},
+      {"alias": "CK totale", "language": "it"},
+      {"alias": "CPK", "language": "it"},
+      {"alias": "Creatinchinasi", "language": "it"},
+      {"alias": "CK", "language": "de"},
+      {"alias": "Kreatinkinase", "language": "de"},
+      {"alias": "CPK", "language": "fr"},
+      {"alias": "Créatine kinase", "language": "fr"},
+      {"alias": "CK", "language": "es"},
+      {"alias": "Creatina quinasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ck_mb",
+    "canonical_display": "Creatine Kinase-MB",
+    "loinc_code": "2154-3",
+    "category": "cardiac",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "CK-MB", "language": "en"},
+      {"alias": "Creatine Kinase MB", "language": "en"},
+      {"alias": "CK-MB massa", "language": "it"},
+      {"alias": "CK-MB", "language": "it"},
+      {"alias": "CK-MB", "language": "de"},
+      {"alias": "CK-MB", "language": "fr"},
+      {"alias": "CK-MB", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bnp",
+    "canonical_display": "B-type Natriuretic Peptide",
+    "loinc_code": "30934-4",
+    "category": "cardiac",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "BNP", "language": "en"},
+      {"alias": "B-type Natriuretic Peptide", "language": "en"},
+      {"alias": "Brain Natriuretic Peptide", "language": "en"},
+      {"alias": "BNP", "language": "it"},
+      {"alias": "Peptide natriuretico tipo B", "language": "it"},
+      {"alias": "BNP", "language": "de"},
+      {"alias": "Brain natriuretisches Peptid", "language": "de"},
+      {"alias": "BNP", "language": "fr"},
+      {"alias": "Peptide natriurétique de type B", "language": "fr"},
+      {"alias": "BNP", "language": "es"},
+      {"alias": "Péptido natriurético tipo B", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "nt_probnp",
+    "canonical_display": "NT-proBNP",
+    "loinc_code": "33762-6",
+    "category": "cardiac",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "NT-proBNP", "language": "en"},
+      {"alias": "N-terminal pro-BNP", "language": "en"},
+      {"alias": "NT-proBNP", "language": "it"},
+      {"alias": "NT-proBNP", "language": "de"},
+      {"alias": "NT-proBNP", "language": "fr"},
+      {"alias": "NT-proBNP", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "myoglobin",
+    "canonical_display": "Myoglobin",
+    "loinc_code": "2639-3",
+    "category": "cardiac",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Myoglobin", "language": "en"},
+      {"alias": "Mioglobina", "language": "it"},
+      {"alias": "Myoglobin", "language": "de"},
+      {"alias": "Myoglobine", "language": "fr"},
+      {"alias": "Mioglobina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ldh_cardiac",
+    "canonical_display": "Lactate Dehydrogenase (Cardiac)",
+    "loinc_code": "2532-0",
+    "category": "cardiac",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "LDH", "language": "en"},
+      {"alias": "Lactate Dehydrogenase", "language": "en"},
+      {"alias": "LDH", "language": "it"},
+      {"alias": "Lattico deidrogenasi", "language": "it"},
+      {"alias": "LDH", "language": "de"},
+      {"alias": "Laktatdehydrogenase", "language": "de"},
+      {"alias": "LDH", "language": "fr"},
+      {"alias": "Lactate déshydrogénase", "language": "fr"},
+      {"alias": "LDH", "language": "es"},
+      {"alias": "Lactato deshidrogenasa", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "crp",
+    "canonical_display": "C-Reactive Protein",
+    "loinc_code": "1988-5",
+    "category": "inflammation",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "CRP", "language": "en"},
+      {"alias": "C-Reactive Protein", "language": "en"},
+      {"alias": "hs-CRP", "language": "en"},
+      {"alias": "PCR", "language": "it"},
+      {"alias": "Proteina C reattiva", "language": "it"},
+      {"alias": "CRP", "language": "de"},
+      {"alias": "C-reaktives Protein", "language": "de"},
+      {"alias": "CRP", "language": "fr"},
+      {"alias": "Protéine C réactive", "language": "fr"},
+      {"alias": "PCR", "language": "es"},
+      {"alias": "Proteína C reactiva", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "esr",
+    "canonical_display": "Erythrocyte Sedimentation Rate",
+    "loinc_code": "4537-7",
+    "category": "inflammation",
+    "unit_preferred": "mm/hr",
+    "aliases": [
+      {"alias": "ESR", "language": "en"},
+      {"alias": "Erythrocyte Sedimentation Rate", "language": "en"},
+      {"alias": "Sed Rate", "language": "en"},
+      {"alias": "VES", "language": "it"},
+      {"alias": "Velocità di eritrosedimentazione", "language": "it"},
+      {"alias": "BSG", "language": "de"},
+      {"alias": "Blutsenkungsgeschwindigkeit", "language": "de"},
+      {"alias": "VS", "language": "fr"},
+      {"alias": "Vitesse de sédimentation", "language": "fr"},
+      {"alias": "VSG", "language": "es"},
+      {"alias": "Velocidad de sedimentación globular", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "procalcitonin",
+    "canonical_display": "Procalcitonin",
+    "loinc_code": "33959-8",
+    "category": "inflammation",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Procalcitonin", "language": "en"},
+      {"alias": "PCT", "language": "en"},
+      {"alias": "Procalcitonina", "language": "it"},
+      {"alias": "PCT", "language": "it"},
+      {"alias": "Procalcitonin", "language": "de"},
+      {"alias": "PCT", "language": "de"},
+      {"alias": "Procalcitonine", "language": "fr"},
+      {"alias": "PCT", "language": "fr"},
+      {"alias": "Procalcitonina", "language": "es"},
+      {"alias": "PCT", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "il6",
+    "canonical_display": "Interleukin-6",
+    "loinc_code": "26881-3",
+    "category": "inflammation",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "IL-6", "language": "en"},
+      {"alias": "Interleukin-6", "language": "en"},
+      {"alias": "IL-6", "language": "it"},
+      {"alias": "Interleuchina 6", "language": "it"},
+      {"alias": "IL-6", "language": "de"},
+      {"alias": "Interleukin-6", "language": "de"},
+      {"alias": "IL-6", "language": "fr"},
+      {"alias": "Interleukine 6", "language": "fr"},
+      {"alias": "IL-6", "language": "es"},
+      {"alias": "Interleucina 6", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "complement_c3",
+    "canonical_display": "Complement C3",
+    "loinc_code": "4485-9",
+    "category": "inflammation",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Complement C3", "language": "en"},
+      {"alias": "C3", "language": "en"},
+      {"alias": "Complemento C3", "language": "it"},
+      {"alias": "C3", "language": "it"},
+      {"alias": "Komplement C3", "language": "de"},
+      {"alias": "C3", "language": "de"},
+      {"alias": "Complément C3", "language": "fr"},
+      {"alias": "Complemento C3", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "complement_c4",
+    "canonical_display": "Complement C4",
+    "loinc_code": "4498-2",
+    "category": "inflammation",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Complement C4", "language": "en"},
+      {"alias": "C4", "language": "en"},
+      {"alias": "Complemento C4", "language": "it"},
+      {"alias": "C4", "language": "it"},
+      {"alias": "Komplement C4", "language": "de"},
+      {"alias": "C4", "language": "de"},
+      {"alias": "Complément C4", "language": "fr"},
+      {"alias": "Complemento C4", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "vitamin_d",
+    "canonical_display": "Vitamin D, 25-Hydroxy",
+    "loinc_code": "1989-3",
+    "category": "vitamins",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Vitamin D", "language": "en"},
+      {"alias": "25-OH Vitamin D", "language": "en"},
+      {"alias": "25-Hydroxyvitamin D", "language": "en"},
+      {"alias": "Calcifediol", "language": "en"},
+      {"alias": "Vitamina D", "language": "it"},
+      {"alias": "25-OH vitamina D", "language": "it"},
+      {"alias": "Vitamin D", "language": "de"},
+      {"alias": "25-OH-Vitamin D", "language": "de"},
+      {"alias": "Vitamine D", "language": "fr"},
+      {"alias": "25-OH vitamine D", "language": "fr"},
+      {"alias": "Vitamina D", "language": "es"},
+      {"alias": "25-OH vitamina D", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_b12",
+    "canonical_display": "Vitamin B12",
+    "loinc_code": "2132-9",
+    "category": "vitamins",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "Vitamin B12", "language": "en"},
+      {"alias": "Cobalamin", "language": "en"},
+      {"alias": "B12", "language": "en"},
+      {"alias": "Vitamina B12", "language": "it"},
+      {"alias": "Cobalamina", "language": "it"},
+      {"alias": "Vitamin B12", "language": "de"},
+      {"alias": "Cobalamin", "language": "de"},
+      {"alias": "Vitamine B12", "language": "fr"},
+      {"alias": "Cobalamine", "language": "fr"},
+      {"alias": "Vitamina B12", "language": "es"},
+      {"alias": "Cobalamina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "folate",
+    "canonical_display": "Folate",
+    "loinc_code": "2284-8",
+    "category": "vitamins",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Folate", "language": "en"},
+      {"alias": "Folic Acid", "language": "en"},
+      {"alias": "Vitamin B9", "language": "en"},
+      {"alias": "Acido folico", "language": "it"},
+      {"alias": "Folati", "language": "it"},
+      {"alias": "Folsäure", "language": "de"},
+      {"alias": "Folat", "language": "de"},
+      {"alias": "Acide folique", "language": "fr"},
+      {"alias": "Folates", "language": "fr"},
+      {"alias": "Ácido fólico", "language": "es"},
+      {"alias": "Folato", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_a",
+    "canonical_display": "Vitamin A",
+    "loinc_code": "2923-0",
+    "category": "vitamins",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Vitamin A", "language": "en"},
+      {"alias": "Retinol", "language": "en"},
+      {"alias": "Vitamina A", "language": "it"},
+      {"alias": "Retinolo", "language": "it"},
+      {"alias": "Vitamin A", "language": "de"},
+      {"alias": "Retinol", "language": "de"},
+      {"alias": "Vitamine A", "language": "fr"},
+      {"alias": "Rétinol", "language": "fr"},
+      {"alias": "Vitamina A", "language": "es"},
+      {"alias": "Retinol", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_e",
+    "canonical_display": "Vitamin E",
+    "loinc_code": "2925-5",
+    "category": "vitamins",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "Vitamin E", "language": "en"},
+      {"alias": "Alpha-Tocopherol", "language": "en"},
+      {"alias": "Vitamina E", "language": "it"},
+      {"alias": "Alfa-tocoferolo", "language": "it"},
+      {"alias": "Vitamin E", "language": "de"},
+      {"alias": "Alpha-Tocopherol", "language": "de"},
+      {"alias": "Vitamine E", "language": "fr"},
+      {"alias": "Alpha-tocophérol", "language": "fr"},
+      {"alias": "Vitamina E", "language": "es"},
+      {"alias": "Alfa-tocoferol", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_b1",
+    "canonical_display": "Vitamin B1",
+    "loinc_code": "32552-2",
+    "category": "vitamins",
+    "unit_preferred": "nmol/L",
+    "aliases": [
+      {"alias": "Vitamin B1", "language": "en"},
+      {"alias": "Thiamine", "language": "en"},
+      {"alias": "Vitamina B1", "language": "it"},
+      {"alias": "Tiamina", "language": "it"},
+      {"alias": "Vitamin B1", "language": "de"},
+      {"alias": "Thiamin", "language": "de"},
+      {"alias": "Vitamine B1", "language": "fr"},
+      {"alias": "Thiamine", "language": "fr"},
+      {"alias": "Vitamina B1", "language": "es"},
+      {"alias": "Tiamina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_b6",
+    "canonical_display": "Vitamin B6",
+    "loinc_code": "2927-1",
+    "category": "vitamins",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Vitamin B6", "language": "en"},
+      {"alias": "Pyridoxine", "language": "en"},
+      {"alias": "Pyridoxal Phosphate", "language": "en"},
+      {"alias": "Vitamina B6", "language": "it"},
+      {"alias": "Piridossina", "language": "it"},
+      {"alias": "Vitamin B6", "language": "de"},
+      {"alias": "Pyridoxin", "language": "de"},
+      {"alias": "Vitamine B6", "language": "fr"},
+      {"alias": "Pyridoxine", "language": "fr"},
+      {"alias": "Vitamina B6", "language": "es"},
+      {"alias": "Piridoxina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "vitamin_k",
+    "canonical_display": "Vitamin K",
+    "loinc_code": "32621-5",
+    "category": "vitamins",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Vitamin K", "language": "en"},
+      {"alias": "Phylloquinone", "language": "en"},
+      {"alias": "Vitamina K", "language": "it"},
+      {"alias": "Fillochinone", "language": "it"},
+      {"alias": "Vitamin K", "language": "de"},
+      {"alias": "Phyllochinon", "language": "de"},
+      {"alias": "Vitamine K", "language": "fr"},
+      {"alias": "Phylloquinone", "language": "fr"},
+      {"alias": "Vitamina K", "language": "es"},
+      {"alias": "Filoquinona", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "cortisol",
+    "canonical_display": "Cortisol",
+    "loinc_code": "2143-6",
+    "category": "hormones",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Cortisol", "language": "en"},
+      {"alias": "Serum Cortisol", "language": "en"},
+      {"alias": "Cortisolo", "language": "it"},
+      {"alias": "Cortisolemia", "language": "it"},
+      {"alias": "Kortisol", "language": "de"},
+      {"alias": "Cortisol", "language": "de"},
+      {"alias": "Cortisol", "language": "fr"},
+      {"alias": "Cortisol", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "acth",
+    "canonical_display": "Adrenocorticotropic Hormone",
+    "loinc_code": "2141-0",
+    "category": "hormones",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "ACTH", "language": "en"},
+      {"alias": "Adrenocorticotropic Hormone", "language": "en"},
+      {"alias": "Corticotropin", "language": "en"},
+      {"alias": "ACTH", "language": "it"},
+      {"alias": "Ormone adrenocorticotropo", "language": "it"},
+      {"alias": "Corticotropina", "language": "it"},
+      {"alias": "ACTH", "language": "de"},
+      {"alias": "Adrenocorticotropes Hormon", "language": "de"},
+      {"alias": "ACTH", "language": "fr"},
+      {"alias": "Hormone adrénocorticotrope", "language": "fr"},
+      {"alias": "Corticotropine", "language": "fr"},
+      {"alias": "ACTH", "language": "es"},
+      {"alias": "Hormona adrenocorticotropa", "language": "es"},
+      {"alias": "Corticotropina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "testosterone",
+    "canonical_display": "Testosterone",
+    "loinc_code": "2986-8",
+    "category": "hormones",
+    "unit_preferred": "ng/dL",
+    "aliases": [
+      {"alias": "Testosterone", "language": "en"},
+      {"alias": "Total Testosterone", "language": "en"},
+      {"alias": "Testosterone totale", "language": "it"},
+      {"alias": "Testosterone", "language": "it"},
+      {"alias": "Testosteron", "language": "de"},
+      {"alias": "Testostérone", "language": "fr"},
+      {"alias": "Testosterona", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "estradiol",
+    "canonical_display": "Estradiol",
+    "loinc_code": "2243-4",
+    "category": "hormones",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "Estradiol", "language": "en"},
+      {"alias": "E2", "language": "en"},
+      {"alias": "17-beta-Estradiol", "language": "en"},
+      {"alias": "Estradiolo", "language": "it"},
+      {"alias": "E2", "language": "it"},
+      {"alias": "Estradiol", "language": "de"},
+      {"alias": "Östradiol", "language": "de"},
+      {"alias": "Estradiol", "language": "fr"},
+      {"alias": "Œstradiol", "language": "fr"},
+      {"alias": "Estradiol", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "progesterone",
+    "canonical_display": "Progesterone",
+    "loinc_code": "2839-9",
+    "category": "hormones",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Progesterone", "language": "en"},
+      {"alias": "Progesterone", "language": "it"},
+      {"alias": "Progesteron", "language": "de"},
+      {"alias": "Progestérone", "language": "fr"},
+      {"alias": "Progesterona", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lh",
+    "canonical_display": "Luteinizing Hormone",
+    "loinc_code": "10501-5",
+    "category": "hormones",
+    "unit_preferred": "mIU/mL",
+    "aliases": [
+      {"alias": "LH", "language": "en"},
+      {"alias": "Luteinizing Hormone", "language": "en"},
+      {"alias": "LH", "language": "it"},
+      {"alias": "Ormone luteinizzante", "language": "it"},
+      {"alias": "LH", "language": "de"},
+      {"alias": "Luteinisierendes Hormon", "language": "de"},
+      {"alias": "LH", "language": "fr"},
+      {"alias": "Hormone lutéinisante", "language": "fr"},
+      {"alias": "LH", "language": "es"},
+      {"alias": "Hormona luteinizante", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fsh",
+    "canonical_display": "Follicle Stimulating Hormone",
+    "loinc_code": "15067-2",
+    "category": "hormones",
+    "unit_preferred": "mIU/mL",
+    "aliases": [
+      {"alias": "FSH", "language": "en"},
+      {"alias": "Follicle Stimulating Hormone", "language": "en"},
+      {"alias": "FSH", "language": "it"},
+      {"alias": "Ormone follicolo-stimolante", "language": "it"},
+      {"alias": "FSH", "language": "de"},
+      {"alias": "Follikelstimulierendes Hormon", "language": "de"},
+      {"alias": "FSH", "language": "fr"},
+      {"alias": "Hormone folliculostimulante", "language": "fr"},
+      {"alias": "FSH", "language": "es"},
+      {"alias": "Hormona foliculoestimulante", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "prolactin",
+    "canonical_display": "Prolactin",
+    "loinc_code": "2842-3",
+    "category": "hormones",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Prolactin", "language": "en"},
+      {"alias": "PRL", "language": "en"},
+      {"alias": "Prolattina", "language": "it"},
+      {"alias": "PRL", "language": "it"},
+      {"alias": "Prolaktin", "language": "de"},
+      {"alias": "Prolactine", "language": "fr"},
+      {"alias": "PRL", "language": "fr"},
+      {"alias": "Prolactina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "dhea_s",
+    "canonical_display": "DHEA-Sulfate",
+    "loinc_code": "2191-5",
+    "category": "hormones",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "DHEA-S", "language": "en"},
+      {"alias": "DHEA Sulfate", "language": "en"},
+      {"alias": "Dehydroepiandrosterone Sulfate", "language": "en"},
+      {"alias": "DHEA-S", "language": "it"},
+      {"alias": "Deidroepiandrosterone solfato", "language": "it"},
+      {"alias": "DHEA-S", "language": "de"},
+      {"alias": "Dehydroepiandrosteronsulfat", "language": "de"},
+      {"alias": "DHEA-S", "language": "fr"},
+      {"alias": "Sulfate de DHEA", "language": "fr"},
+      {"alias": "DHEA-S", "language": "es"},
+      {"alias": "Sulfato de dehidroepiandrosterona", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "growth_hormone",
+    "canonical_display": "Growth Hormone",
+    "loinc_code": "2963-7",
+    "category": "hormones",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Growth Hormone", "language": "en"},
+      {"alias": "GH", "language": "en"},
+      {"alias": "HGH", "language": "en"},
+      {"alias": "Somatotropin", "language": "en"},
+      {"alias": "Ormone della crescita", "language": "it"},
+      {"alias": "GH", "language": "it"},
+      {"alias": "Somatotropina", "language": "it"},
+      {"alias": "Wachstumshormon", "language": "de"},
+      {"alias": "GH", "language": "de"},
+      {"alias": "Somatotropin", "language": "de"},
+      {"alias": "Hormone de croissance", "language": "fr"},
+      {"alias": "GH", "language": "fr"},
+      {"alias": "Hormona del crecimiento", "language": "es"},
+      {"alias": "GH", "language": "es"},
+      {"alias": "Somatotropina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "igf1",
+    "canonical_display": "Insulin-like Growth Factor 1",
+    "loinc_code": "2484-4",
+    "category": "hormones",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "IGF-1", "language": "en"},
+      {"alias": "Insulin-like Growth Factor 1", "language": "en"},
+      {"alias": "Somatomedin C", "language": "en"},
+      {"alias": "IGF-1", "language": "it"},
+      {"alias": "Somatomedina C", "language": "it"},
+      {"alias": "IGF-1", "language": "de"},
+      {"alias": "Insulinähnlicher Wachstumsfaktor 1", "language": "de"},
+      {"alias": "IGF-1", "language": "fr"},
+      {"alias": "Somatomédine C", "language": "fr"},
+      {"alias": "IGF-1", "language": "es"},
+      {"alias": "Somatomedina C", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pth",
+    "canonical_display": "Parathyroid Hormone",
+    "loinc_code": "2731-8",
+    "category": "hormones",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "PTH", "language": "en"},
+      {"alias": "Parathyroid Hormone", "language": "en"},
+      {"alias": "Parathormone", "language": "en"},
+      {"alias": "iPTH", "language": "en"},
+      {"alias": "PTH", "language": "it"},
+      {"alias": "Paratormone", "language": "it"},
+      {"alias": "PTH", "language": "de"},
+      {"alias": "Parathormon", "language": "de"},
+      {"alias": "PTH", "language": "fr"},
+      {"alias": "Parathormone", "language": "fr"},
+      {"alias": "PTH", "language": "es"},
+      {"alias": "Parathormona", "language": "es"},
+      {"alias": "Hormona paratiroidea", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "aldosterone",
+    "canonical_display": "Aldosterone",
+    "loinc_code": "1763-2",
+    "category": "hormones",
+    "unit_preferred": "ng/dL",
+    "aliases": [
+      {"alias": "Aldosterone", "language": "en"},
+      {"alias": "Aldosterone", "language": "it"},
+      {"alias": "Aldosteron", "language": "de"},
+      {"alias": "Aldostérone", "language": "fr"},
+      {"alias": "Aldosterona", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "renin",
+    "canonical_display": "Renin",
+    "loinc_code": "2915-6",
+    "category": "hormones",
+    "unit_preferred": "ng/mL/hr",
+    "aliases": [
+      {"alias": "Renin", "language": "en"},
+      {"alias": "Plasma Renin Activity", "language": "en"},
+      {"alias": "PRA", "language": "en"},
+      {"alias": "Renina", "language": "it"},
+      {"alias": "Attività reninica plasmatica", "language": "it"},
+      {"alias": "Renin", "language": "de"},
+      {"alias": "Plasmarenin-Aktivität", "language": "de"},
+      {"alias": "Rénine", "language": "fr"},
+      {"alias": "Activité rénine plasmatique", "language": "fr"},
+      {"alias": "Renina", "language": "es"},
+      {"alias": "Actividad de renina plasmática", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "beta_hcg",
+    "canonical_display": "Beta-hCG",
+    "loinc_code": "21198-7",
+    "category": "hormones",
+    "unit_preferred": "mIU/mL",
+    "aliases": [
+      {"alias": "Beta-hCG", "language": "en"},
+      {"alias": "hCG", "language": "en"},
+      {"alias": "Human Chorionic Gonadotropin", "language": "en"},
+      {"alias": "Pregnancy Test", "language": "en"},
+      {"alias": "Beta-HCG", "language": "it"},
+      {"alias": "Gonadotropina corionica", "language": "it"},
+      {"alias": "Beta-HCG", "language": "de"},
+      {"alias": "Humanes Choriongonadotropin", "language": "de"},
+      {"alias": "Bêta-HCG", "language": "fr"},
+      {"alias": "Gonadotrophine chorionique", "language": "fr"},
+      {"alias": "Beta-HCG", "language": "es"},
+      {"alias": "Gonadotropina coriónica humana", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "psa",
+    "canonical_display": "Prostate-Specific Antigen",
+    "loinc_code": "2857-1",
+    "category": "tumor_markers",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "PSA", "language": "en"},
+      {"alias": "Prostate-Specific Antigen", "language": "en"},
+      {"alias": "Total PSA", "language": "en"},
+      {"alias": "PSA", "language": "it"},
+      {"alias": "Antigene prostatico specifico", "language": "it"},
+      {"alias": "PSA", "language": "de"},
+      {"alias": "Prostataspezifisches Antigen", "language": "de"},
+      {"alias": "PSA", "language": "fr"},
+      {"alias": "Antigène prostatique spécifique", "language": "fr"},
+      {"alias": "PSA", "language": "es"},
+      {"alias": "Antígeno prostático específico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cea",
+    "canonical_display": "Carcinoembryonic Antigen",
+    "loinc_code": "2039-6",
+    "category": "tumor_markers",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "CEA", "language": "en"},
+      {"alias": "Carcinoembryonic Antigen", "language": "en"},
+      {"alias": "CEA", "language": "it"},
+      {"alias": "Antigene carcinoembrionario", "language": "it"},
+      {"alias": "CEA", "language": "de"},
+      {"alias": "Karzinoembryonales Antigen", "language": "de"},
+      {"alias": "ACE", "language": "fr"},
+      {"alias": "Antigène carcino-embryonnaire", "language": "fr"},
+      {"alias": "CEA", "language": "es"},
+      {"alias": "Antígeno carcinoembrionario", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ca125",
+    "canonical_display": "CA-125",
+    "loinc_code": "10334-1",
+    "category": "tumor_markers",
+    "unit_preferred": "U/mL",
+    "aliases": [
+      {"alias": "CA-125", "language": "en"},
+      {"alias": "CA 125", "language": "en"},
+      {"alias": "Cancer Antigen 125", "language": "en"},
+      {"alias": "CA-125", "language": "it"},
+      {"alias": "CA 125", "language": "it"},
+      {"alias": "CA-125", "language": "de"},
+      {"alias": "CA 125", "language": "de"},
+      {"alias": "CA-125", "language": "fr"},
+      {"alias": "CA 125", "language": "fr"},
+      {"alias": "CA-125", "language": "es"},
+      {"alias": "CA 125", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ca19_9",
+    "canonical_display": "CA 19-9",
+    "loinc_code": "24108-3",
+    "category": "tumor_markers",
+    "unit_preferred": "U/mL",
+    "aliases": [
+      {"alias": "CA 19-9", "language": "en"},
+      {"alias": "CA19-9", "language": "en"},
+      {"alias": "Cancer Antigen 19-9", "language": "en"},
+      {"alias": "CA 19-9", "language": "it"},
+      {"alias": "CA 19-9", "language": "de"},
+      {"alias": "CA 19-9", "language": "fr"},
+      {"alias": "CA 19-9", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ca15_3",
+    "canonical_display": "CA 15-3",
+    "loinc_code": "6875-9",
+    "category": "tumor_markers",
+    "unit_preferred": "U/mL",
+    "aliases": [
+      {"alias": "CA 15-3", "language": "en"},
+      {"alias": "CA15-3", "language": "en"},
+      {"alias": "Cancer Antigen 15-3", "language": "en"},
+      {"alias": "CA 15-3", "language": "it"},
+      {"alias": "CA 15-3", "language": "de"},
+      {"alias": "CA 15-3", "language": "fr"},
+      {"alias": "CA 15-3", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "afp",
+    "canonical_display": "Alpha-Fetoprotein",
+    "loinc_code": "1834-1",
+    "category": "tumor_markers",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "AFP", "language": "en"},
+      {"alias": "Alpha-Fetoprotein", "language": "en"},
+      {"alias": "AFP", "language": "it"},
+      {"alias": "Alfa-fetoproteina", "language": "it"},
+      {"alias": "AFP", "language": "de"},
+      {"alias": "Alpha-Fetoprotein", "language": "de"},
+      {"alias": "AFP", "language": "fr"},
+      {"alias": "Alpha-fœtoprotéine", "language": "fr"},
+      {"alias": "AFP", "language": "es"},
+      {"alias": "Alfa-fetoproteína", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "beta2_microglobulin",
+    "canonical_display": "Beta-2 Microglobulin",
+    "loinc_code": "1952-1",
+    "category": "tumor_markers",
+    "unit_preferred": "mg/L",
+    "aliases": [
+      {"alias": "Beta-2 Microglobulin", "language": "en"},
+      {"alias": "B2M", "language": "en"},
+      {"alias": "Beta-2-microglobulina", "language": "it"},
+      {"alias": "B2M", "language": "it"},
+      {"alias": "Beta-2-Mikroglobulin", "language": "de"},
+      {"alias": "Bêta-2-microglobuline", "language": "fr"},
+      {"alias": "Beta-2-microglobulina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "calcitonin",
+    "canonical_display": "Calcitonin",
+    "loinc_code": "1992-7",
+    "category": "tumor_markers",
+    "unit_preferred": "pg/mL",
+    "aliases": [
+      {"alias": "Calcitonin", "language": "en"},
+      {"alias": "Calcitonina", "language": "it"},
+      {"alias": "Calcitonin", "language": "de"},
+      {"alias": "Kalzitonin", "language": "de"},
+      {"alias": "Calcitonine", "language": "fr"},
+      {"alias": "Calcitonina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "chromogranin_a",
+    "canonical_display": "Chromogranin A",
+    "loinc_code": "56926-3",
+    "category": "tumor_markers",
+    "unit_preferred": "ng/mL",
+    "aliases": [
+      {"alias": "Chromogranin A", "language": "en"},
+      {"alias": "CgA", "language": "en"},
+      {"alias": "Cromogranina A", "language": "it"},
+      {"alias": "CgA", "language": "it"},
+      {"alias": "Chromogranin A", "language": "de"},
+      {"alias": "CgA", "language": "de"},
+      {"alias": "Chromogranine A", "language": "fr"},
+      {"alias": "Cromogranina A", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "ana",
+    "canonical_display": "Antinuclear Antibodies",
+    "loinc_code": "8061-4",
+    "category": "autoimmune",
+    "unit_preferred": "titer",
+    "aliases": [
+      {"alias": "ANA", "language": "en"},
+      {"alias": "Antinuclear Antibodies", "language": "en"},
+      {"alias": "ANA", "language": "it"},
+      {"alias": "Anticorpi anti-nucleo", "language": "it"},
+      {"alias": "ANA", "language": "de"},
+      {"alias": "Antinukleäre Antikörper", "language": "de"},
+      {"alias": "ANA", "language": "fr"},
+      {"alias": "Anticorps antinucléaires", "language": "fr"},
+      {"alias": "ANA", "language": "es"},
+      {"alias": "Anticuerpos antinucleares", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_dsdna",
+    "canonical_display": "Anti-dsDNA Antibodies",
+    "loinc_code": "5130-4",
+    "category": "autoimmune",
+    "unit_preferred": "IU/mL",
+    "aliases": [
+      {"alias": "Anti-dsDNA", "language": "en"},
+      {"alias": "Anti-double stranded DNA", "language": "en"},
+      {"alias": "dsDNA Antibodies", "language": "en"},
+      {"alias": "Anti-dsDNA", "language": "it"},
+      {"alias": "Anticorpi anti-DNA nativo", "language": "it"},
+      {"alias": "Anti-dsDNA", "language": "de"},
+      {"alias": "Anti-Doppelstrang-DNA-Antikörper", "language": "de"},
+      {"alias": "Anti-ADN natif", "language": "fr"},
+      {"alias": "Anti-ADNdb", "language": "fr"},
+      {"alias": "Anti-ADN bicatenario", "language": "es"},
+      {"alias": "Anti-dsDNA", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rheumatoid_factor",
+    "canonical_display": "Rheumatoid Factor",
+    "loinc_code": "11572-5",
+    "category": "autoimmune",
+    "unit_preferred": "IU/mL",
+    "aliases": [
+      {"alias": "Rheumatoid Factor", "language": "en"},
+      {"alias": "RF", "language": "en"},
+      {"alias": "Fattore reumatoide", "language": "it"},
+      {"alias": "FR", "language": "it"},
+      {"alias": "Rheumafaktor", "language": "de"},
+      {"alias": "RF", "language": "de"},
+      {"alias": "Facteur rhumatoïde", "language": "fr"},
+      {"alias": "FR", "language": "fr"},
+      {"alias": "Factor reumatoide", "language": "es"},
+      {"alias": "FR", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_ccp",
+    "canonical_display": "Anti-CCP Antibodies",
+    "loinc_code": "53027-9",
+    "category": "autoimmune",
+    "unit_preferred": "U/mL",
+    "aliases": [
+      {"alias": "Anti-CCP", "language": "en"},
+      {"alias": "Anti-Cyclic Citrullinated Peptide", "language": "en"},
+      {"alias": "CCP Antibodies", "language": "en"},
+      {"alias": "Anti-CCP", "language": "it"},
+      {"alias": "Anticorpi anti-peptide citrullinato ciclico", "language": "it"},
+      {"alias": "Anti-CCP", "language": "de"},
+      {"alias": "Antikörper gegen zyklisches citrulliniertes Peptid", "language": "de"},
+      {"alias": "Anti-CCP", "language": "fr"},
+      {"alias": "Anticorps anti-peptide citrulliné cyclique", "language": "fr"},
+      {"alias": "Anti-CCP", "language": "es"},
+      {"alias": "Anticuerpos anti-péptido citrulinado cíclico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anca",
+    "canonical_display": "Anti-Neutrophil Cytoplasmic Antibodies",
+    "loinc_code": "21419-7",
+    "category": "autoimmune",
+    "unit_preferred": "titer",
+    "aliases": [
+      {"alias": "ANCA", "language": "en"},
+      {"alias": "Anti-Neutrophil Cytoplasmic Antibodies", "language": "en"},
+      {"alias": "p-ANCA", "language": "en"},
+      {"alias": "c-ANCA", "language": "en"},
+      {"alias": "ANCA", "language": "it"},
+      {"alias": "Anticorpi anti-citoplasma dei neutrofili", "language": "it"},
+      {"alias": "ANCA", "language": "de"},
+      {"alias": "Antineutrophile zytoplasmatische Antikörper", "language": "de"},
+      {"alias": "ANCA", "language": "fr"},
+      {"alias": "Anticorps anti-cytoplasme des neutrophiles", "language": "fr"},
+      {"alias": "ANCA", "language": "es"},
+      {"alias": "Anticuerpos anticitoplasma de neutrófilos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_phospholipid",
+    "canonical_display": "Anti-Phospholipid Antibodies",
+    "loinc_code": "55941-3",
+    "category": "autoimmune",
+    "unit_preferred": "GPL U/mL",
+    "aliases": [
+      {"alias": "Anti-Phospholipid Antibodies", "language": "en"},
+      {"alias": "aPL", "language": "en"},
+      {"alias": "Anticardiolipin", "language": "en"},
+      {"alias": "Anticorpi anti-fosfolipidi", "language": "it"},
+      {"alias": "aPL", "language": "it"},
+      {"alias": "Antiphospholipid-Antikörper", "language": "de"},
+      {"alias": "Anticorps antiphospholipides", "language": "fr"},
+      {"alias": "Anticuerpos antifosfolípidos", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "igg",
+    "canonical_display": "Immunoglobulin G",
+    "loinc_code": "2465-3",
+    "category": "autoimmune",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "IgG", "language": "en"},
+      {"alias": "Immunoglobulin G", "language": "en"},
+      {"alias": "IgG", "language": "it"},
+      {"alias": "Immunoglobulina G", "language": "it"},
+      {"alias": "IgG", "language": "de"},
+      {"alias": "Immunglobulin G", "language": "de"},
+      {"alias": "IgG", "language": "fr"},
+      {"alias": "Immunoglobuline G", "language": "fr"},
+      {"alias": "IgG", "language": "es"},
+      {"alias": "Inmunoglobulina G", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "iga",
+    "canonical_display": "Immunoglobulin A",
+    "loinc_code": "2458-8",
+    "category": "autoimmune",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "IgA", "language": "en"},
+      {"alias": "Immunoglobulin A", "language": "en"},
+      {"alias": "IgA", "language": "it"},
+      {"alias": "Immunoglobulina A", "language": "it"},
+      {"alias": "IgA", "language": "de"},
+      {"alias": "Immunglobulin A", "language": "de"},
+      {"alias": "IgA", "language": "fr"},
+      {"alias": "Immunoglobuline A", "language": "fr"},
+      {"alias": "IgA", "language": "es"},
+      {"alias": "Inmunoglobulina A", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "igm",
+    "canonical_display": "Immunoglobulin M",
+    "loinc_code": "2472-9",
+    "category": "autoimmune",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "IgM", "language": "en"},
+      {"alias": "Immunoglobulin M", "language": "en"},
+      {"alias": "IgM", "language": "it"},
+      {"alias": "Immunoglobulina M", "language": "it"},
+      {"alias": "IgM", "language": "de"},
+      {"alias": "Immunglobulin M", "language": "de"},
+      {"alias": "IgM", "language": "fr"},
+      {"alias": "Immunoglobuline M", "language": "fr"},
+      {"alias": "IgM", "language": "es"},
+      {"alias": "Inmunoglobulina M", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "hiv_ab_ag",
+    "canonical_display": "HIV Ab/Ag Combo",
+    "loinc_code": "56888-1",
+    "category": "infectious",
+    "unit_preferred": "index",
+    "aliases": [
+      {"alias": "HIV Ab/Ag", "language": "en"},
+      {"alias": "HIV Combo Test", "language": "en"},
+      {"alias": "HIV 1/2 Ab/Ag", "language": "en"},
+      {"alias": "HIV Test", "language": "en"},
+      {"alias": "HIV Ab/Ag", "language": "it"},
+      {"alias": "Test HIV", "language": "it"},
+      {"alias": "HIV-Test", "language": "de"},
+      {"alias": "HIV Ak/Ag", "language": "de"},
+      {"alias": "Sérologie HIV", "language": "fr"},
+      {"alias": "Test VIH", "language": "fr"},
+      {"alias": "Test VIH", "language": "es"},
+      {"alias": "VIH Ac/Ag", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hbsag",
+    "canonical_display": "Hepatitis B Surface Antigen",
+    "loinc_code": "5196-1",
+    "category": "infectious",
+    "unit_preferred": "index",
+    "aliases": [
+      {"alias": "HBsAg", "language": "en"},
+      {"alias": "Hepatitis B Surface Antigen", "language": "en"},
+      {"alias": "HBsAg", "language": "it"},
+      {"alias": "Antigene di superficie epatite B", "language": "it"},
+      {"alias": "HBsAg", "language": "de"},
+      {"alias": "Hepatitis-B-Oberflächenantigen", "language": "de"},
+      {"alias": "AgHBs", "language": "fr"},
+      {"alias": "Antigène HBs", "language": "fr"},
+      {"alias": "HBsAg", "language": "es"},
+      {"alias": "Antígeno de superficie hepatitis B", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_hbs",
+    "canonical_display": "Anti-HBs Antibodies",
+    "loinc_code": "5193-8",
+    "category": "infectious",
+    "unit_preferred": "mIU/mL",
+    "aliases": [
+      {"alias": "Anti-HBs", "language": "en"},
+      {"alias": "Hepatitis B Surface Antibody", "language": "en"},
+      {"alias": "HBsAb", "language": "en"},
+      {"alias": "Anti-HBs", "language": "it"},
+      {"alias": "Anticorpi anti-HBs", "language": "it"},
+      {"alias": "Anti-HBs", "language": "de"},
+      {"alias": "Hepatitis-B-Oberflächenantikörper", "language": "de"},
+      {"alias": "Anti-HBs", "language": "fr"},
+      {"alias": "Anticorps anti-HBs", "language": "fr"},
+      {"alias": "Anti-HBs", "language": "es"},
+      {"alias": "Anticuerpos anti-HBs", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "anti_hbc",
+    "canonical_display": "Anti-HBc Antibodies",
+    "loinc_code": "16933-4",
+    "category": "infectious",
+    "unit_preferred": "index",
+    "aliases": [
+      {"alias": "Anti-HBc", "language": "en"},
+      {"alias": "Hepatitis B Core Antibody", "language": "en"},
+      {"alias": "HBcAb", "language": "en"},
+      {"alias": "Anti-HBc", "language": "it"},
+      {"alias": "Anticorpi anti-HBc", "language": "it"},
+      {"alias": "Anti-HBc", "language": "de"},
+      {"alias": "Hepatitis-B-Core-Antikörper", "language": "de"},
+      {"alias": "Anti-HBc", "language": "fr"},
+      {"alias": "Anticorps anti-HBc", "language": "fr"},
+      {"alias": "Anti-HBc", "language": "es"},
+      {"alias": "Anticuerpos anti-HBc", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hcv_ab",
+    "canonical_display": "Hepatitis C Antibody",
+    "loinc_code": "16128-1",
+    "category": "infectious",
+    "unit_preferred": "index",
+    "aliases": [
+      {"alias": "HCV Ab", "language": "en"},
+      {"alias": "Hepatitis C Antibody", "language": "en"},
+      {"alias": "Anti-HCV", "language": "en"},
+      {"alias": "Anti-HCV", "language": "it"},
+      {"alias": "Anticorpi anti-HCV", "language": "it"},
+      {"alias": "Anti-HCV", "language": "de"},
+      {"alias": "Hepatitis-C-Antikörper", "language": "de"},
+      {"alias": "Anti-VHC", "language": "fr"},
+      {"alias": "Anticorps anti-VHC", "language": "fr"},
+      {"alias": "Anti-VHC", "language": "es"},
+      {"alias": "Anticuerpos anti-VHC", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rpr_vdrl",
+    "canonical_display": "RPR/VDRL (Syphilis Screen)",
+    "loinc_code": "20507-0",
+    "category": "infectious",
+    "unit_preferred": "titer",
+    "aliases": [
+      {"alias": "RPR", "language": "en"},
+      {"alias": "VDRL", "language": "en"},
+      {"alias": "Syphilis Screen", "language": "en"},
+      {"alias": "VDRL", "language": "it"},
+      {"alias": "RPR", "language": "it"},
+      {"alias": "Sifilide screening", "language": "it"},
+      {"alias": "RPR", "language": "de"},
+      {"alias": "VDRL", "language": "de"},
+      {"alias": "Syphilis-Test", "language": "de"},
+      {"alias": "RPR", "language": "fr"},
+      {"alias": "VDRL", "language": "fr"},
+      {"alias": "Sérologie syphilis", "language": "fr"},
+      {"alias": "RPR", "language": "es"},
+      {"alias": "VDRL", "language": "es"},
+      {"alias": "Serología sífilis", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "blood_culture",
+    "canonical_display": "Blood Culture",
+    "loinc_code": "600-7",
+    "category": "infectious",
+    "unit_preferred": "qualitative",
+    "aliases": [
+      {"alias": "Blood Culture", "language": "en"},
+      {"alias": "BC", "language": "en"},
+      {"alias": "Emocoltura", "language": "it"},
+      {"alias": "Blutkultur", "language": "de"},
+      {"alias": "Hémoculture", "language": "fr"},
+      {"alias": "Hemocultivo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_culture",
+    "canonical_display": "Urine Culture",
+    "loinc_code": "630-4",
+    "category": "infectious",
+    "unit_preferred": "CFU/mL",
+    "aliases": [
+      {"alias": "Urine Culture", "language": "en"},
+      {"alias": "UC", "language": "en"},
+      {"alias": "Urinocoltura", "language": "it"},
+      {"alias": "Urinkultur", "language": "de"},
+      {"alias": "Uroculture", "language": "fr"},
+      {"alias": "ECBU", "language": "fr"},
+      {"alias": "Urocultivo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cmv_igg",
+    "canonical_display": "CMV IgG",
+    "loinc_code": "5124-7",
+    "category": "infectious",
+    "unit_preferred": "AU/mL",
+    "aliases": [
+      {"alias": "CMV IgG", "language": "en"},
+      {"alias": "Cytomegalovirus IgG", "language": "en"},
+      {"alias": "CMV IgG", "language": "it"},
+      {"alias": "Citomegalovirus IgG", "language": "it"},
+      {"alias": "CMV-IgG", "language": "de"},
+      {"alias": "Zytomegalievirus IgG", "language": "de"},
+      {"alias": "CMV IgG", "language": "fr"},
+      {"alias": "Cytomégalovirus IgG", "language": "fr"},
+      {"alias": "CMV IgG", "language": "es"},
+      {"alias": "Citomegalovirus IgG", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ebv_panel",
+    "canonical_display": "EBV Panel",
+    "loinc_code": "5157-7",
+    "category": "infectious",
+    "unit_preferred": "U/mL",
+    "aliases": [
+      {"alias": "EBV Panel", "language": "en"},
+      {"alias": "Epstein-Barr Virus", "language": "en"},
+      {"alias": "EBV Antibodies", "language": "en"},
+      {"alias": "Mono Test", "language": "en"},
+      {"alias": "EBV", "language": "it"},
+      {"alias": "Virus di Epstein-Barr", "language": "it"},
+      {"alias": "EBV", "language": "de"},
+      {"alias": "Epstein-Barr-Virus", "language": "de"},
+      {"alias": "EBV", "language": "fr"},
+      {"alias": "Virus d'Epstein-Barr", "language": "fr"},
+      {"alias": "EBV", "language": "es"},
+      {"alias": "Virus de Epstein-Barr", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "urine_glucose",
+    "canonical_display": "Glucose, Urine",
+    "loinc_code": "2350-7",
+    "category": "urinalysis",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Glucose", "language": "en"},
+      {"alias": "Glucosuria", "language": "en"},
+      {"alias": "Glucosio urine", "language": "it"},
+      {"alias": "Glicosuria", "language": "it"},
+      {"alias": "Glukose im Urin", "language": "de"},
+      {"alias": "Glucose urinaire", "language": "fr"},
+      {"alias": "Glucosuria", "language": "fr"},
+      {"alias": "Glucosa en orina", "language": "es"},
+      {"alias": "Glucosuria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_protein_dip",
+    "canonical_display": "Protein, Urine (Dipstick)",
+    "loinc_code": "20454-5",
+    "category": "urinalysis",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Protein", "language": "en"},
+      {"alias": "Protein Dipstick", "language": "en"},
+      {"alias": "Proteine urine", "language": "it"},
+      {"alias": "Proteinurie", "language": "it"},
+      {"alias": "Eiweiß im Urin", "language": "de"},
+      {"alias": "Protéines urinaires", "language": "fr"},
+      {"alias": "Proteínas en orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_blood",
+    "canonical_display": "Blood, Urine",
+    "loinc_code": "5794-3",
+    "category": "urinalysis",
+    "unit_preferred": "qualitative",
+    "aliases": [
+      {"alias": "Urine Blood", "language": "en"},
+      {"alias": "Hematuria", "language": "en"},
+      {"alias": "Urine Hemoglobin", "language": "en"},
+      {"alias": "Sangue nelle urine", "language": "it"},
+      {"alias": "Ematuria", "language": "it"},
+      {"alias": "Blut im Urin", "language": "de"},
+      {"alias": "Hämaturie", "language": "de"},
+      {"alias": "Sang dans les urines", "language": "fr"},
+      {"alias": "Hématurie", "language": "fr"},
+      {"alias": "Sangre en orina", "language": "es"},
+      {"alias": "Hematuria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_leukocyte_esterase",
+    "canonical_display": "Leukocyte Esterase, Urine",
+    "loinc_code": "5799-2",
+    "category": "urinalysis",
+    "unit_preferred": "qualitative",
+    "aliases": [
+      {"alias": "Leukocyte Esterase", "language": "en"},
+      {"alias": "Urine LE", "language": "en"},
+      {"alias": "Esterasi leucocitaria", "language": "it"},
+      {"alias": "Leukozytenesterase", "language": "de"},
+      {"alias": "Estérase leucocytaire", "language": "fr"},
+      {"alias": "Esterasa leucocitaria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_nitrite",
+    "canonical_display": "Nitrite, Urine",
+    "loinc_code": "5802-4",
+    "category": "urinalysis",
+    "unit_preferred": "qualitative",
+    "aliases": [
+      {"alias": "Urine Nitrite", "language": "en"},
+      {"alias": "Nitrites", "language": "en"},
+      {"alias": "Nitriti urine", "language": "it"},
+      {"alias": "Nitrit im Urin", "language": "de"},
+      {"alias": "Nitrites urinaires", "language": "fr"},
+      {"alias": "Nitritos en orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_ketones",
+    "canonical_display": "Ketones, Urine",
+    "loinc_code": "2514-8",
+    "category": "urinalysis",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Ketones", "language": "en"},
+      {"alias": "Ketonuria", "language": "en"},
+      {"alias": "Chetoni urine", "language": "it"},
+      {"alias": "Chetonuria", "language": "it"},
+      {"alias": "Ketone im Urin", "language": "de"},
+      {"alias": "Cétonurie", "language": "fr"},
+      {"alias": "Corps cétoniques urinaires", "language": "fr"},
+      {"alias": "Cetonas en orina", "language": "es"},
+      {"alias": "Cetonuria", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_bilirubin",
+    "canonical_display": "Bilirubin, Urine",
+    "loinc_code": "1977-8",
+    "category": "urinalysis",
+    "unit_preferred": "qualitative",
+    "aliases": [
+      {"alias": "Urine Bilirubin", "language": "en"},
+      {"alias": "Bilirubinuria", "language": "en"},
+      {"alias": "Bilirubina urine", "language": "it"},
+      {"alias": "Bilirubin im Urin", "language": "de"},
+      {"alias": "Bilirubine urinaire", "language": "fr"},
+      {"alias": "Bilirrubina en orina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "urine_urobilinogen",
+    "canonical_display": "Urobilinogen, Urine",
+    "loinc_code": "3107-0",
+    "category": "urinalysis",
+    "unit_preferred": "mg/dL",
+    "aliases": [
+      {"alias": "Urine Urobilinogen", "language": "en"},
+      {"alias": "Urobilinogen", "language": "en"},
+      {"alias": "Urobilinogeno urine", "language": "it"},
+      {"alias": "Urobilinogen im Urin", "language": "de"},
+      {"alias": "Urobilinogène urinaire", "language": "fr"},
+      {"alias": "Urobilinógeno en orina", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "blood_ph",
+    "canonical_display": "pH, Blood",
+    "loinc_code": "2744-1",
+    "category": "blood_gas",
+    "unit_preferred": "pH",
+    "aliases": [
+      {"alias": "Blood pH", "language": "en"},
+      {"alias": "Arterial pH", "language": "en"},
+      {"alias": "pH", "language": "en"},
+      {"alias": "pH ematico", "language": "it"},
+      {"alias": "pH arterioso", "language": "it"},
+      {"alias": "Blut-pH", "language": "de"},
+      {"alias": "pH sanguin", "language": "fr"},
+      {"alias": "pH artériel", "language": "fr"},
+      {"alias": "pH sanguíneo", "language": "es"},
+      {"alias": "pH arterial", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "po2",
+    "canonical_display": "Partial Pressure of Oxygen",
+    "loinc_code": "2703-7",
+    "category": "blood_gas",
+    "unit_preferred": "mmHg",
+    "aliases": [
+      {"alias": "pO2", "language": "en"},
+      {"alias": "PaO2", "language": "en"},
+      {"alias": "Partial Pressure of Oxygen", "language": "en"},
+      {"alias": "pO2", "language": "it"},
+      {"alias": "Pressione parziale di ossigeno", "language": "it"},
+      {"alias": "pO2", "language": "de"},
+      {"alias": "Sauerstoffpartialdruck", "language": "de"},
+      {"alias": "pO2", "language": "fr"},
+      {"alias": "Pression partielle en oxygène", "language": "fr"},
+      {"alias": "pO2", "language": "es"},
+      {"alias": "Presión parcial de oxígeno", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pco2",
+    "canonical_display": "Partial Pressure of Carbon Dioxide",
+    "loinc_code": "2019-8",
+    "category": "blood_gas",
+    "unit_preferred": "mmHg",
+    "aliases": [
+      {"alias": "pCO2", "language": "en"},
+      {"alias": "PaCO2", "language": "en"},
+      {"alias": "Partial Pressure of CO2", "language": "en"},
+      {"alias": "pCO2", "language": "it"},
+      {"alias": "Pressione parziale di anidride carbonica", "language": "it"},
+      {"alias": "pCO2", "language": "de"},
+      {"alias": "Kohlendioxidpartialdruck", "language": "de"},
+      {"alias": "pCO2", "language": "fr"},
+      {"alias": "Pression partielle en CO2", "language": "fr"},
+      {"alias": "pCO2", "language": "es"},
+      {"alias": "Presión parcial de CO2", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "hco3_blood",
+    "canonical_display": "Bicarbonate, Blood Gas",
+    "loinc_code": "1960-4",
+    "category": "blood_gas",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "HCO3", "language": "en"},
+      {"alias": "Bicarbonate", "language": "en"},
+      {"alias": "Actual Bicarbonate", "language": "en"},
+      {"alias": "HCO3", "language": "it"},
+      {"alias": "Bicarbonato", "language": "it"},
+      {"alias": "HCO3", "language": "de"},
+      {"alias": "Bikarbonat", "language": "de"},
+      {"alias": "HCO3", "language": "fr"},
+      {"alias": "Bicarbonate", "language": "fr"},
+      {"alias": "HCO3", "language": "es"},
+      {"alias": "Bicarbonato", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "base_excess",
+    "canonical_display": "Base Excess",
+    "loinc_code": "1925-7",
+    "category": "blood_gas",
+    "unit_preferred": "mEq/L",
+    "aliases": [
+      {"alias": "Base Excess", "language": "en"},
+      {"alias": "BE", "language": "en"},
+      {"alias": "BEecf", "language": "en"},
+      {"alias": "Eccesso di basi", "language": "it"},
+      {"alias": "BE", "language": "it"},
+      {"alias": "Basenüberschuss", "language": "de"},
+      {"alias": "BE", "language": "de"},
+      {"alias": "Excès de base", "language": "fr"},
+      {"alias": "EB", "language": "fr"},
+      {"alias": "Exceso de bases", "language": "es"},
+      {"alias": "EB", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "oxygen_saturation",
+    "canonical_display": "Oxygen Saturation",
+    "loinc_code": "2708-6",
+    "category": "blood_gas",
+    "unit_preferred": "%",
+    "aliases": [
+      {"alias": "O2 Saturation", "language": "en"},
+      {"alias": "SaO2", "language": "en"},
+      {"alias": "SpO2", "language": "en"},
+      {"alias": "Oxygen Saturation", "language": "en"},
+      {"alias": "Saturazione di ossigeno", "language": "it"},
+      {"alias": "SaO2", "language": "it"},
+      {"alias": "Sauerstoffsättigung", "language": "de"},
+      {"alias": "SaO2", "language": "de"},
+      {"alias": "Saturation en oxygène", "language": "fr"},
+      {"alias": "SaO2", "language": "fr"},
+      {"alias": "Saturación de oxígeno", "language": "es"},
+      {"alias": "SaO2", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "amylase",
+    "canonical_display": "Amylase",
+    "loinc_code": "1798-8",
+    "category": "pancreatic",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "Amylase", "language": "en"},
+      {"alias": "Amy", "language": "en"},
+      {"alias": "Amilasi", "language": "it"},
+      {"alias": "Amylase", "language": "de"},
+      {"alias": "Amylase", "language": "fr"},
+      {"alias": "Amilasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lipase",
+    "canonical_display": "Lipase",
+    "loinc_code": "3040-3",
+    "category": "pancreatic",
+    "unit_preferred": "U/L",
+    "aliases": [
+      {"alias": "Lipase", "language": "en"},
+      {"alias": "Lipasi", "language": "it"},
+      {"alias": "Lipase", "language": "de"},
+      {"alias": "Lipase", "language": "fr"},
+      {"alias": "Lipasa", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "elastase",
+    "canonical_display": "Pancreatic Elastase",
+    "loinc_code": "14928-6",
+    "category": "pancreatic",
+    "unit_preferred": "µg/g",
+    "aliases": [
+      {"alias": "Pancreatic Elastase", "language": "en"},
+      {"alias": "Fecal Elastase", "language": "en"},
+      {"alias": "Elastase", "language": "en"},
+      {"alias": "Elastasi pancreatica", "language": "it"},
+      {"alias": "Elastasi fecale", "language": "it"},
+      {"alias": "Pankreas-Elastase", "language": "de"},
+      {"alias": "Fäkale Elastase", "language": "de"},
+      {"alias": "Élastase pancréatique", "language": "fr"},
+      {"alias": "Élastase fécale", "language": "fr"},
+      {"alias": "Elastasa pancreática", "language": "es"},
+      {"alias": "Elastasa fecal", "language": "es"}
+    ]
+  },
+
+  {
+    "canonical_code": "zinc",
+    "canonical_display": "Zinc",
+    "loinc_code": "2601-3",
+    "category": "minerals",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Zinc", "language": "en"},
+      {"alias": "Zn", "language": "en"},
+      {"alias": "Zinco", "language": "it"},
+      {"alias": "Zink", "language": "de"},
+      {"alias": "Zinc", "language": "fr"},
+      {"alias": "Zinc", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "copper",
+    "canonical_display": "Copper",
+    "loinc_code": "2508-0",
+    "category": "minerals",
+    "unit_preferred": "µg/dL",
+    "aliases": [
+      {"alias": "Copper", "language": "en"},
+      {"alias": "Cu", "language": "en"},
+      {"alias": "Rame", "language": "it"},
+      {"alias": "Cupremia", "language": "it"},
+      {"alias": "Kupfer", "language": "de"},
+      {"alias": "Cuivre", "language": "fr"},
+      {"alias": "Cobre", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "selenium",
+    "canonical_display": "Selenium",
+    "loinc_code": "3526-1",
+    "category": "minerals",
+    "unit_preferred": "µg/L",
+    "aliases": [
+      {"alias": "Selenium", "language": "en"},
+      {"alias": "Se", "language": "en"},
+      {"alias": "Selenio", "language": "it"},
+      {"alias": "Selen", "language": "de"},
+      {"alias": "Sélénium", "language": "fr"},
+      {"alias": "Selenio", "language": "es"}
+    ]
+  }
+]

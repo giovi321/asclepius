@@ -1,0 +1,2654 @@
+[
+  {
+    "canonical_code": "atorvastatin",
+    "canonical_display": "Atorvastatin",
+    "atc_code": "C10AA05",
+    "aliases": [
+      {"alias": "Atorvastatin", "language": "en"},
+      {"alias": "Lipitor", "language": "en"},
+      {"alias": "Atorvastatina", "language": "it"},
+      {"alias": "Torvast", "language": "it"},
+      {"alias": "Totalip", "language": "it"},
+      {"alias": "Atorvastatin", "language": "de"},
+      {"alias": "Sortis", "language": "de"},
+      {"alias": "Atorvastatine", "language": "fr"},
+      {"alias": "Tahor", "language": "fr"},
+      {"alias": "Atorvastatina", "language": "es"},
+      {"alias": "Cardyl", "language": "es"},
+      {"alias": "Sortis", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "rosuvastatin",
+    "canonical_display": "Rosuvastatin",
+    "atc_code": "C10AA07",
+    "aliases": [
+      {"alias": "Rosuvastatin", "language": "en"},
+      {"alias": "Crestor", "language": "en"},
+      {"alias": "Rosuvastatina", "language": "it"},
+      {"alias": "Crestor", "language": "it"},
+      {"alias": "Provisacor", "language": "it"},
+      {"alias": "Rosuvastatin", "language": "de"},
+      {"alias": "Crestor", "language": "de"},
+      {"alias": "Rosuvastatine", "language": "fr"},
+      {"alias": "Crestor", "language": "fr"},
+      {"alias": "Rosuvastatina", "language": "es"},
+      {"alias": "Crestor", "language": "es"},
+      {"alias": "Crestor", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "simvastatin",
+    "canonical_display": "Simvastatin",
+    "atc_code": "C10AA01",
+    "aliases": [
+      {"alias": "Simvastatin", "language": "en"},
+      {"alias": "Zocor", "language": "en"},
+      {"alias": "Simvastatina", "language": "it"},
+      {"alias": "Sivastin", "language": "it"},
+      {"alias": "Zocor", "language": "it"},
+      {"alias": "Simvastatin", "language": "de"},
+      {"alias": "Zocor", "language": "de"},
+      {"alias": "Simvastatine", "language": "fr"},
+      {"alias": "Zocor", "language": "fr"},
+      {"alias": "Lodales", "language": "fr"},
+      {"alias": "Simvastatina", "language": "es"},
+      {"alias": "Zocor", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "pravastatin",
+    "canonical_display": "Pravastatin",
+    "atc_code": "C10AA03",
+    "aliases": [
+      {"alias": "Pravastatin", "language": "en"},
+      {"alias": "Pravachol", "language": "en"},
+      {"alias": "Pravastatina", "language": "it"},
+      {"alias": "Selectin", "language": "it"},
+      {"alias": "Pravastatin", "language": "de"},
+      {"alias": "Pravasin", "language": "de"},
+      {"alias": "Pravastatine", "language": "fr"},
+      {"alias": "Elisor", "language": "fr"},
+      {"alias": "Vasten", "language": "fr"},
+      {"alias": "Pravastatina", "language": "es"},
+      {"alias": "Liplat", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fluvastatin",
+    "canonical_display": "Fluvastatin",
+    "atc_code": "C10AA04",
+    "aliases": [
+      {"alias": "Fluvastatin", "language": "en"},
+      {"alias": "Lescol", "language": "en"},
+      {"alias": "Fluvastatina", "language": "it"},
+      {"alias": "Lescol", "language": "it"},
+      {"alias": "Fluvastatin", "language": "de"},
+      {"alias": "Lescol", "language": "de"},
+      {"alias": "Cranoc", "language": "de"},
+      {"alias": "Fluvastatine", "language": "fr"},
+      {"alias": "Lescol", "language": "fr"},
+      {"alias": "Fractal", "language": "fr"},
+      {"alias": "Fluvastatina", "language": "es"},
+      {"alias": "Lescol", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ramipril",
+    "canonical_display": "Ramipril",
+    "atc_code": "C09AA05",
+    "aliases": [
+      {"alias": "Ramipril", "language": "en"},
+      {"alias": "Altace", "language": "en"},
+      {"alias": "Ramipril", "language": "it"},
+      {"alias": "Triatec", "language": "it"},
+      {"alias": "Unipril", "language": "it"},
+      {"alias": "Ramipril", "language": "de"},
+      {"alias": "Delix", "language": "de"},
+      {"alias": "Ramipril", "language": "fr"},
+      {"alias": "Triatec", "language": "fr"},
+      {"alias": "Ramipril", "language": "es"},
+      {"alias": "Acovil", "language": "es"},
+      {"alias": "Triatec", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "enalapril",
+    "canonical_display": "Enalapril",
+    "atc_code": "C09AA02",
+    "aliases": [
+      {"alias": "Enalapril", "language": "en"},
+      {"alias": "Vasotec", "language": "en"},
+      {"alias": "Enalapril", "language": "it"},
+      {"alias": "Enapren", "language": "it"},
+      {"alias": "Enalapril", "language": "de"},
+      {"alias": "Xanef", "language": "de"},
+      {"alias": "Enalapril", "language": "fr"},
+      {"alias": "Renitec", "language": "fr"},
+      {"alias": "Enalapril", "language": "es"},
+      {"alias": "Renitec", "language": "es"},
+      {"alias": "Reniten", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "lisinopril",
+    "canonical_display": "Lisinopril",
+    "atc_code": "C09AA03",
+    "aliases": [
+      {"alias": "Lisinopril", "language": "en"},
+      {"alias": "Prinivil", "language": "en"},
+      {"alias": "Zestril", "language": "en"},
+      {"alias": "Lisinopril", "language": "it"},
+      {"alias": "Zestril", "language": "it"},
+      {"alias": "Lisinopril", "language": "de"},
+      {"alias": "Acerbon", "language": "de"},
+      {"alias": "Lisinopril", "language": "fr"},
+      {"alias": "Zestril", "language": "fr"},
+      {"alias": "Lisinopril", "language": "es"},
+      {"alias": "Zestril", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "perindopril",
+    "canonical_display": "Perindopril",
+    "atc_code": "C09AA04",
+    "aliases": [
+      {"alias": "Perindopril", "language": "en"},
+      {"alias": "Aceon", "language": "en"},
+      {"alias": "Coversyl", "language": "en"},
+      {"alias": "Perindopril", "language": "it"},
+      {"alias": "Coversyl", "language": "it"},
+      {"alias": "Perindopril", "language": "de"},
+      {"alias": "Coversum", "language": "de"},
+      {"alias": "Perindopril", "language": "fr"},
+      {"alias": "Coversyl", "language": "fr"},
+      {"alias": "Perindopril", "language": "es"},
+      {"alias": "Coversyl", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "losartan",
+    "canonical_display": "Losartan",
+    "atc_code": "C09CA01",
+    "aliases": [
+      {"alias": "Losartan", "language": "en"},
+      {"alias": "Cozaar", "language": "en"},
+      {"alias": "Losartan", "language": "it"},
+      {"alias": "Lortaan", "language": "it"},
+      {"alias": "Losartan", "language": "de"},
+      {"alias": "Lorzaar", "language": "de"},
+      {"alias": "Losartan", "language": "fr"},
+      {"alias": "Cozaar", "language": "fr"},
+      {"alias": "Losartan", "language": "es"},
+      {"alias": "Cozaar", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "valsartan",
+    "canonical_display": "Valsartan",
+    "atc_code": "C09CA03",
+    "aliases": [
+      {"alias": "Valsartan", "language": "en"},
+      {"alias": "Diovan", "language": "en"},
+      {"alias": "Valsartan", "language": "it"},
+      {"alias": "Tareg", "language": "it"},
+      {"alias": "Valsartan", "language": "de"},
+      {"alias": "Diovan", "language": "de"},
+      {"alias": "Valsartan", "language": "fr"},
+      {"alias": "Tareg", "language": "fr"},
+      {"alias": "Nisis", "language": "fr"},
+      {"alias": "Valsartan", "language": "es"},
+      {"alias": "Diovan", "language": "es"},
+      {"alias": "Diovan", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "candesartan",
+    "canonical_display": "Candesartan",
+    "atc_code": "C09CA06",
+    "aliases": [
+      {"alias": "Candesartan", "language": "en"},
+      {"alias": "Atacand", "language": "en"},
+      {"alias": "Candesartan", "language": "it"},
+      {"alias": "Blopress", "language": "it"},
+      {"alias": "Ratacand", "language": "it"},
+      {"alias": "Candesartan", "language": "de"},
+      {"alias": "Atacand", "language": "de"},
+      {"alias": "Blopress", "language": "de"},
+      {"alias": "Candesartan", "language": "fr"},
+      {"alias": "Atacand", "language": "fr"},
+      {"alias": "Kenzen", "language": "fr"},
+      {"alias": "Candesartan", "language": "es"},
+      {"alias": "Atacand", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "irbesartan",
+    "canonical_display": "Irbesartan",
+    "atc_code": "C09CA04",
+    "aliases": [
+      {"alias": "Irbesartan", "language": "en"},
+      {"alias": "Avapro", "language": "en"},
+      {"alias": "Irbesartan", "language": "it"},
+      {"alias": "Aprovel", "language": "it"},
+      {"alias": "Irbesartan", "language": "de"},
+      {"alias": "Aprovel", "language": "de"},
+      {"alias": "Irbesartan", "language": "fr"},
+      {"alias": "Aprovel", "language": "fr"},
+      {"alias": "Irbesartan", "language": "es"},
+      {"alias": "Aprovel", "language": "es"},
+      {"alias": "Aprovel", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "olmesartan",
+    "canonical_display": "Olmesartan",
+    "atc_code": "C09CA08",
+    "aliases": [
+      {"alias": "Olmesartan", "language": "en"},
+      {"alias": "Benicar", "language": "en"},
+      {"alias": "Olmesartan", "language": "it"},
+      {"alias": "Olmetec", "language": "it"},
+      {"alias": "Plaunac", "language": "it"},
+      {"alias": "Olmesartan", "language": "de"},
+      {"alias": "Olmetec", "language": "de"},
+      {"alias": "Votum", "language": "de"},
+      {"alias": "Olmesartan", "language": "fr"},
+      {"alias": "Olmetec", "language": "fr"},
+      {"alias": "Alteis", "language": "fr"},
+      {"alias": "Olmesartan", "language": "es"},
+      {"alias": "Olmetec", "language": "es"},
+      {"alias": "Olmesartan", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "amlodipine",
+    "canonical_display": "Amlodipine",
+    "atc_code": "C08CA01",
+    "aliases": [
+      {"alias": "Amlodipine", "language": "en"},
+      {"alias": "Norvasc", "language": "en"},
+      {"alias": "Amlodipina", "language": "it"},
+      {"alias": "Norvasc", "language": "it"},
+      {"alias": "Amlodipin", "language": "de"},
+      {"alias": "Norvasc", "language": "de"},
+      {"alias": "Amlodipine", "language": "fr"},
+      {"alias": "Amlor", "language": "fr"},
+      {"alias": "Amlodipino", "language": "es"},
+      {"alias": "Norvas", "language": "es"},
+      {"alias": "Norvasc", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "nifedipine",
+    "canonical_display": "Nifedipine",
+    "atc_code": "C08CA05",
+    "aliases": [
+      {"alias": "Nifedipine", "language": "en"},
+      {"alias": "Procardia", "language": "en"},
+      {"alias": "Adalat", "language": "en"},
+      {"alias": "Nifedipina", "language": "it"},
+      {"alias": "Adalat", "language": "it"},
+      {"alias": "Nifedipin", "language": "de"},
+      {"alias": "Adalat", "language": "de"},
+      {"alias": "Nifedipine", "language": "fr"},
+      {"alias": "Adalate", "language": "fr"},
+      {"alias": "Nifedipino", "language": "es"},
+      {"alias": "Adalat", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "lercanidipine",
+    "canonical_display": "Lercanidipine",
+    "atc_code": "C08CA13",
+    "aliases": [
+      {"alias": "Lercanidipine", "language": "en"},
+      {"alias": "Zanidip", "language": "en"},
+      {"alias": "Lercanidipina", "language": "it"},
+      {"alias": "Zanidip", "language": "it"},
+      {"alias": "Lercadip", "language": "it"},
+      {"alias": "Lercanidipin", "language": "de"},
+      {"alias": "Carmen", "language": "de"},
+      {"alias": "Lercanidipine", "language": "fr"},
+      {"alias": "Zanidip", "language": "fr"},
+      {"alias": "Lerpress", "language": "fr"},
+      {"alias": "Lercanidipino", "language": "es"},
+      {"alias": "Zanidip", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "bisoprolol",
+    "canonical_display": "Bisoprolol",
+    "atc_code": "C07AB07",
+    "aliases": [
+      {"alias": "Bisoprolol", "language": "en"},
+      {"alias": "Zebeta", "language": "en"},
+      {"alias": "Bisoprololo", "language": "it"},
+      {"alias": "Concor", "language": "it"},
+      {"alias": "Bisoprolol", "language": "de"},
+      {"alias": "Concor", "language": "de"},
+      {"alias": "Bisoprolol", "language": "fr"},
+      {"alias": "Detensiel", "language": "fr"},
+      {"alias": "Cardensiel", "language": "fr"},
+      {"alias": "Bisoprolol", "language": "es"},
+      {"alias": "Emconcor", "language": "es"},
+      {"alias": "Concor", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "metoprolol",
+    "canonical_display": "Metoprolol",
+    "atc_code": "C07AB02",
+    "aliases": [
+      {"alias": "Metoprolol", "language": "en"},
+      {"alias": "Lopressor", "language": "en"},
+      {"alias": "Toprol-XL", "language": "en"},
+      {"alias": "Metoprololo", "language": "it"},
+      {"alias": "Lopresor", "language": "it"},
+      {"alias": "Seloken", "language": "it"},
+      {"alias": "Metoprolol", "language": "de"},
+      {"alias": "Beloc", "language": "de"},
+      {"alias": "Lopresor", "language": "de"},
+      {"alias": "Metoprolol", "language": "fr"},
+      {"alias": "Seloken", "language": "fr"},
+      {"alias": "Lopressor", "language": "fr"},
+      {"alias": "Metoprolol", "language": "es"},
+      {"alias": "Beloken", "language": "es"},
+      {"alias": "Beloc Zok", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "nebivolol",
+    "canonical_display": "Nebivolol",
+    "atc_code": "C07AB12",
+    "aliases": [
+      {"alias": "Nebivolol", "language": "en"},
+      {"alias": "Bystolic", "language": "en"},
+      {"alias": "Nebivololo", "language": "it"},
+      {"alias": "Nebilox", "language": "it"},
+      {"alias": "Lobivon", "language": "it"},
+      {"alias": "Nebivolol", "language": "de"},
+      {"alias": "Nebilet", "language": "de"},
+      {"alias": "Nebivolol", "language": "fr"},
+      {"alias": "Temerit", "language": "fr"},
+      {"alias": "Nebilox", "language": "fr"},
+      {"alias": "Nebivolol", "language": "es"},
+      {"alias": "Lobivon", "language": "es"},
+      {"alias": "Nebilet", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "atenolol",
+    "canonical_display": "Atenolol",
+    "atc_code": "C07AB03",
+    "aliases": [
+      {"alias": "Atenolol", "language": "en"},
+      {"alias": "Tenormin", "language": "en"},
+      {"alias": "Atenololo", "language": "it"},
+      {"alias": "Tenormin", "language": "it"},
+      {"alias": "Atenolol", "language": "de"},
+      {"alias": "Tenormin", "language": "de"},
+      {"alias": "Atenolol", "language": "fr"},
+      {"alias": "Tenormine", "language": "fr"},
+      {"alias": "Atenolol", "language": "es"},
+      {"alias": "Tenormin", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "carvedilol",
+    "canonical_display": "Carvedilol",
+    "atc_code": "C07AG02",
+    "aliases": [
+      {"alias": "Carvedilol", "language": "en"},
+      {"alias": "Coreg", "language": "en"},
+      {"alias": "Carvedilolo", "language": "it"},
+      {"alias": "Dilatrend", "language": "it"},
+      {"alias": "Carvedilol", "language": "de"},
+      {"alias": "Dilatrend", "language": "de"},
+      {"alias": "Carvedilol", "language": "fr"},
+      {"alias": "Kredex", "language": "fr"},
+      {"alias": "Carvedilol", "language": "es"},
+      {"alias": "Coropres", "language": "es"},
+      {"alias": "Dilatrend", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "hydrochlorothiazide",
+    "canonical_display": "Hydrochlorothiazide",
+    "atc_code": "C03AA03",
+    "aliases": [
+      {"alias": "Hydrochlorothiazide", "language": "en"},
+      {"alias": "HCTZ", "language": "en"},
+      {"alias": "Microzide", "language": "en"},
+      {"alias": "Idroclorotiazide", "language": "it"},
+      {"alias": "Esidrex", "language": "it"},
+      {"alias": "Hydrochlorothiazid", "language": "de"},
+      {"alias": "Esidrix", "language": "de"},
+      {"alias": "HCT", "language": "de"},
+      {"alias": "Hydrochlorothiazide", "language": "fr"},
+      {"alias": "Esidrex", "language": "fr"},
+      {"alias": "Hidroclorotiazida", "language": "es"},
+      {"alias": "Hidrosaluretil", "language": "es"},
+      {"alias": "Esidrex", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "furosemide",
+    "canonical_display": "Furosemide",
+    "atc_code": "C03CA01",
+    "aliases": [
+      {"alias": "Furosemide", "language": "en"},
+      {"alias": "Lasix", "language": "en"},
+      {"alias": "Furosemide", "language": "it"},
+      {"alias": "Lasix", "language": "it"},
+      {"alias": "Furosemid", "language": "de"},
+      {"alias": "Lasix", "language": "de"},
+      {"alias": "Furosemide", "language": "fr"},
+      {"alias": "Lasilix", "language": "fr"},
+      {"alias": "Furosemida", "language": "es"},
+      {"alias": "Seguril", "language": "es"},
+      {"alias": "Lasix", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "spironolactone",
+    "canonical_display": "Spironolactone",
+    "atc_code": "C03DA01",
+    "aliases": [
+      {"alias": "Spironolactone", "language": "en"},
+      {"alias": "Aldactone", "language": "en"},
+      {"alias": "Spironolattone", "language": "it"},
+      {"alias": "Aldactone", "language": "it"},
+      {"alias": "Spironolacton", "language": "de"},
+      {"alias": "Aldactone", "language": "de"},
+      {"alias": "Spironolactone", "language": "fr"},
+      {"alias": "Aldactone", "language": "fr"},
+      {"alias": "Espironolactona", "language": "es"},
+      {"alias": "Aldactone", "language": "es"},
+      {"alias": "Aldactone", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "aspirin",
+    "canonical_display": "Acetylsalicylic Acid",
+    "atc_code": "B01AC06",
+    "aliases": [
+      {"alias": "Aspirin", "language": "en"},
+      {"alias": "ASA", "language": "en"},
+      {"alias": "Acetylsalicylic Acid", "language": "en"},
+      {"alias": "Aspirina", "language": "it"},
+      {"alias": "Cardioaspirina", "language": "it"},
+      {"alias": "Acido acetilsalicilico", "language": "it"},
+      {"alias": "Aspirin", "language": "de"},
+      {"alias": "ASS", "language": "de"},
+      {"alias": "Acetylsalicylsaeure", "language": "de"},
+      {"alias": "Aspirine", "language": "fr"},
+      {"alias": "Kardegic", "language": "fr"},
+      {"alias": "Aspirina", "language": "es"},
+      {"alias": "Adiro", "language": "es"},
+      {"alias": "Aspirin Cardio", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "clopidogrel",
+    "canonical_display": "Clopidogrel",
+    "atc_code": "B01AC04",
+    "aliases": [
+      {"alias": "Clopidogrel", "language": "en"},
+      {"alias": "Plavix", "language": "en"},
+      {"alias": "Clopidogrel", "language": "it"},
+      {"alias": "Plavix", "language": "it"},
+      {"alias": "Clopidogrel", "language": "de"},
+      {"alias": "Plavix", "language": "de"},
+      {"alias": "Iscover", "language": "de"},
+      {"alias": "Clopidogrel", "language": "fr"},
+      {"alias": "Plavix", "language": "fr"},
+      {"alias": "Clopidogrel", "language": "es"},
+      {"alias": "Plavix", "language": "es"},
+      {"alias": "Plavix", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "warfarin",
+    "canonical_display": "Warfarin",
+    "atc_code": "B01AA03",
+    "aliases": [
+      {"alias": "Warfarin", "language": "en"},
+      {"alias": "Coumadin", "language": "en"},
+      {"alias": "Warfarin", "language": "it"},
+      {"alias": "Coumadin", "language": "it"},
+      {"alias": "Warfarin", "language": "de"},
+      {"alias": "Coumadin", "language": "de"},
+      {"alias": "Warfarine", "language": "fr"},
+      {"alias": "Coumadine", "language": "fr"},
+      {"alias": "Warfarina", "language": "es"},
+      {"alias": "Aldocumar", "language": "es"},
+      {"alias": "Sintrom", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "rivaroxaban",
+    "canonical_display": "Rivaroxaban",
+    "atc_code": "B01AF01",
+    "aliases": [
+      {"alias": "Rivaroxaban", "language": "en"},
+      {"alias": "Xarelto", "language": "en"},
+      {"alias": "Rivaroxaban", "language": "it"},
+      {"alias": "Xarelto", "language": "it"},
+      {"alias": "Rivaroxaban", "language": "de"},
+      {"alias": "Xarelto", "language": "de"},
+      {"alias": "Rivaroxaban", "language": "fr"},
+      {"alias": "Xarelto", "language": "fr"},
+      {"alias": "Rivaroxaban", "language": "es"},
+      {"alias": "Xarelto", "language": "es"},
+      {"alias": "Xarelto", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "apixaban",
+    "canonical_display": "Apixaban",
+    "atc_code": "B01AF02",
+    "aliases": [
+      {"alias": "Apixaban", "language": "en"},
+      {"alias": "Eliquis", "language": "en"},
+      {"alias": "Apixaban", "language": "it"},
+      {"alias": "Eliquis", "language": "it"},
+      {"alias": "Apixaban", "language": "de"},
+      {"alias": "Eliquis", "language": "de"},
+      {"alias": "Apixaban", "language": "fr"},
+      {"alias": "Eliquis", "language": "fr"},
+      {"alias": "Apixaban", "language": "es"},
+      {"alias": "Eliquis", "language": "es"},
+      {"alias": "Eliquis", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "dabigatran",
+    "canonical_display": "Dabigatran",
+    "atc_code": "B01AE07",
+    "aliases": [
+      {"alias": "Dabigatran", "language": "en"},
+      {"alias": "Pradaxa", "language": "en"},
+      {"alias": "Dabigatran", "language": "it"},
+      {"alias": "Pradaxa", "language": "it"},
+      {"alias": "Dabigatran", "language": "de"},
+      {"alias": "Pradaxa", "language": "de"},
+      {"alias": "Dabigatran", "language": "fr"},
+      {"alias": "Pradaxa", "language": "fr"},
+      {"alias": "Dabigatran", "language": "es"},
+      {"alias": "Pradaxa", "language": "es"},
+      {"alias": "Pradaxa", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "enoxaparin",
+    "canonical_display": "Enoxaparin",
+    "atc_code": "B01AB05",
+    "aliases": [
+      {"alias": "Enoxaparin", "language": "en"},
+      {"alias": "Lovenox", "language": "en"},
+      {"alias": "Enoxaparina", "language": "it"},
+      {"alias": "Clexane", "language": "it"},
+      {"alias": "Enoxaparin", "language": "de"},
+      {"alias": "Clexane", "language": "de"},
+      {"alias": "Enoxaparine", "language": "fr"},
+      {"alias": "Lovenox", "language": "fr"},
+      {"alias": "Enoxaparina", "language": "es"},
+      {"alias": "Clexane", "language": "es"},
+      {"alias": "Clexane", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ticagrelor",
+    "canonical_display": "Ticagrelor",
+    "atc_code": "B01AC24",
+    "aliases": [
+      {"alias": "Ticagrelor", "language": "en"},
+      {"alias": "Brilinta", "language": "en"},
+      {"alias": "Ticagrelor", "language": "it"},
+      {"alias": "Brilique", "language": "it"},
+      {"alias": "Ticagrelor", "language": "de"},
+      {"alias": "Brilique", "language": "de"},
+      {"alias": "Ticagrelor", "language": "fr"},
+      {"alias": "Brilique", "language": "fr"},
+      {"alias": "Ticagrelor", "language": "es"},
+      {"alias": "Brilique", "language": "es"},
+      {"alias": "Brilique", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "metformin",
+    "canonical_display": "Metformin",
+    "atc_code": "A10BA02",
+    "aliases": [
+      {"alias": "Metformin", "language": "en"},
+      {"alias": "Glucophage", "language": "en"},
+      {"alias": "Metformina", "language": "it"},
+      {"alias": "Glucophage", "language": "it"},
+      {"alias": "Metforal", "language": "it"},
+      {"alias": "Metformin", "language": "de"},
+      {"alias": "Glucophage", "language": "de"},
+      {"alias": "Metformine", "language": "fr"},
+      {"alias": "Glucophage", "language": "fr"},
+      {"alias": "Metformina", "language": "es"},
+      {"alias": "Dianben", "language": "es"},
+      {"alias": "Glucophage", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "gliclazide",
+    "canonical_display": "Gliclazide",
+    "atc_code": "A10BB09",
+    "aliases": [
+      {"alias": "Gliclazide", "language": "en"},
+      {"alias": "Diamicron", "language": "en"},
+      {"alias": "Gliclazide", "language": "it"},
+      {"alias": "Diamicron", "language": "it"},
+      {"alias": "Gliclazid", "language": "de"},
+      {"alias": "Diamicron", "language": "de"},
+      {"alias": "Gliclazide", "language": "fr"},
+      {"alias": "Diamicron", "language": "fr"},
+      {"alias": "Gliclazida", "language": "es"},
+      {"alias": "Diamicron", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "glimepiride",
+    "canonical_display": "Glimepiride",
+    "atc_code": "A10BB12",
+    "aliases": [
+      {"alias": "Glimepiride", "language": "en"},
+      {"alias": "Amaryl", "language": "en"},
+      {"alias": "Glimepiride", "language": "it"},
+      {"alias": "Amaryl", "language": "it"},
+      {"alias": "Solosa", "language": "it"},
+      {"alias": "Glimepirid", "language": "de"},
+      {"alias": "Amaryl", "language": "de"},
+      {"alias": "Glimepiride", "language": "fr"},
+      {"alias": "Amarel", "language": "fr"},
+      {"alias": "Glimepirida", "language": "es"},
+      {"alias": "Amaryl", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "sitagliptin",
+    "canonical_display": "Sitagliptin",
+    "atc_code": "A10BH01",
+    "aliases": [
+      {"alias": "Sitagliptin", "language": "en"},
+      {"alias": "Januvia", "language": "en"},
+      {"alias": "Sitagliptin", "language": "it"},
+      {"alias": "Januvia", "language": "it"},
+      {"alias": "Xelevia", "language": "it"},
+      {"alias": "Sitagliptin", "language": "de"},
+      {"alias": "Januvia", "language": "de"},
+      {"alias": "Xelevia", "language": "de"},
+      {"alias": "Sitagliptine", "language": "fr"},
+      {"alias": "Januvia", "language": "fr"},
+      {"alias": "Xelevia", "language": "fr"},
+      {"alias": "Sitagliptina", "language": "es"},
+      {"alias": "Januvia", "language": "es"},
+      {"alias": "Januvia", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "empagliflozin",
+    "canonical_display": "Empagliflozin",
+    "atc_code": "A10BK03",
+    "aliases": [
+      {"alias": "Empagliflozin", "language": "en"},
+      {"alias": "Jardiance", "language": "en"},
+      {"alias": "Empagliflozin", "language": "it"},
+      {"alias": "Jardiance", "language": "it"},
+      {"alias": "Empagliflozin", "language": "de"},
+      {"alias": "Jardiance", "language": "de"},
+      {"alias": "Empagliflozine", "language": "fr"},
+      {"alias": "Jardiance", "language": "fr"},
+      {"alias": "Empagliflozina", "language": "es"},
+      {"alias": "Jardiance", "language": "es"},
+      {"alias": "Jardiance", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "dapagliflozin",
+    "canonical_display": "Dapagliflozin",
+    "atc_code": "A10BK01",
+    "aliases": [
+      {"alias": "Dapagliflozin", "language": "en"},
+      {"alias": "Farxiga", "language": "en"},
+      {"alias": "Forxiga", "language": "en"},
+      {"alias": "Dapagliflozin", "language": "it"},
+      {"alias": "Forxiga", "language": "it"},
+      {"alias": "Dapagliflozin", "language": "de"},
+      {"alias": "Forxiga", "language": "de"},
+      {"alias": "Dapagliflozine", "language": "fr"},
+      {"alias": "Forxiga", "language": "fr"},
+      {"alias": "Dapagliflozina", "language": "es"},
+      {"alias": "Forxiga", "language": "es"},
+      {"alias": "Forxiga", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "liraglutide",
+    "canonical_display": "Liraglutide",
+    "atc_code": "A10BJ02",
+    "aliases": [
+      {"alias": "Liraglutide", "language": "en"},
+      {"alias": "Victoza", "language": "en"},
+      {"alias": "Saxenda", "language": "en"},
+      {"alias": "Liraglutide", "language": "it"},
+      {"alias": "Victoza", "language": "it"},
+      {"alias": "Liraglutid", "language": "de"},
+      {"alias": "Victoza", "language": "de"},
+      {"alias": "Liraglutide", "language": "fr"},
+      {"alias": "Victoza", "language": "fr"},
+      {"alias": "Liraglutida", "language": "es"},
+      {"alias": "Victoza", "language": "es"},
+      {"alias": "Victoza", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "semaglutide",
+    "canonical_display": "Semaglutide",
+    "atc_code": "A10BJ06",
+    "aliases": [
+      {"alias": "Semaglutide", "language": "en"},
+      {"alias": "Ozempic", "language": "en"},
+      {"alias": "Rybelsus", "language": "en"},
+      {"alias": "Wegovy", "language": "en"},
+      {"alias": "Semaglutide", "language": "it"},
+      {"alias": "Ozempic", "language": "it"},
+      {"alias": "Rybelsus", "language": "it"},
+      {"alias": "Semaglutid", "language": "de"},
+      {"alias": "Ozempic", "language": "de"},
+      {"alias": "Rybelsus", "language": "de"},
+      {"alias": "Semaglutide", "language": "fr"},
+      {"alias": "Ozempic", "language": "fr"},
+      {"alias": "Rybelsus", "language": "fr"},
+      {"alias": "Semaglutida", "language": "es"},
+      {"alias": "Ozempic", "language": "es"},
+      {"alias": "Rybelsus", "language": "es"},
+      {"alias": "Ozempic", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "insulin_glargine",
+    "canonical_display": "Insulin Glargine",
+    "atc_code": "A10AE04",
+    "aliases": [
+      {"alias": "Insulin Glargine", "language": "en"},
+      {"alias": "Lantus", "language": "en"},
+      {"alias": "Toujeo", "language": "en"},
+      {"alias": "Insulina Glargine", "language": "it"},
+      {"alias": "Lantus", "language": "it"},
+      {"alias": "Insulin Glargin", "language": "de"},
+      {"alias": "Lantus", "language": "de"},
+      {"alias": "Toujeo", "language": "de"},
+      {"alias": "Insuline Glargine", "language": "fr"},
+      {"alias": "Lantus", "language": "fr"},
+      {"alias": "Insulina Glargina", "language": "es"},
+      {"alias": "Lantus", "language": "es"},
+      {"alias": "Lantus", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "insulin_aspart",
+    "canonical_display": "Insulin Aspart",
+    "atc_code": "A10AB05",
+    "aliases": [
+      {"alias": "Insulin Aspart", "language": "en"},
+      {"alias": "NovoLog", "language": "en"},
+      {"alias": "NovoRapid", "language": "en"},
+      {"alias": "Insulina Aspart", "language": "it"},
+      {"alias": "NovoRapid", "language": "it"},
+      {"alias": "Insulin Aspart", "language": "de"},
+      {"alias": "NovoRapid", "language": "de"},
+      {"alias": "Insuline Aspart", "language": "fr"},
+      {"alias": "NovoRapid", "language": "fr"},
+      {"alias": "Insulina Aspart", "language": "es"},
+      {"alias": "NovoRapid", "language": "es"},
+      {"alias": "NovoRapid", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "omeprazole",
+    "canonical_display": "Omeprazole",
+    "atc_code": "A02BC01",
+    "aliases": [
+      {"alias": "Omeprazole", "language": "en"},
+      {"alias": "Prilosec", "language": "en"},
+      {"alias": "Omeprazolo", "language": "it"},
+      {"alias": "Antra", "language": "it"},
+      {"alias": "Mepral", "language": "it"},
+      {"alias": "Omeprazol", "language": "de"},
+      {"alias": "Antra", "language": "de"},
+      {"alias": "Omeprazole", "language": "fr"},
+      {"alias": "Mopral", "language": "fr"},
+      {"alias": "Omeprazol", "language": "es"},
+      {"alias": "Losec", "language": "es"},
+      {"alias": "Antra", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "pantoprazole",
+    "canonical_display": "Pantoprazole",
+    "atc_code": "A02BC02",
+    "aliases": [
+      {"alias": "Pantoprazole", "language": "en"},
+      {"alias": "Protonix", "language": "en"},
+      {"alias": "Pantoprazolo", "language": "it"},
+      {"alias": "Pantorc", "language": "it"},
+      {"alias": "Pantecta", "language": "it"},
+      {"alias": "Pantoprazol", "language": "de"},
+      {"alias": "Pantozol", "language": "de"},
+      {"alias": "Pantoprazole", "language": "fr"},
+      {"alias": "Eupantol", "language": "fr"},
+      {"alias": "Inipomp", "language": "fr"},
+      {"alias": "Pantoprazol", "language": "es"},
+      {"alias": "Pantecta", "language": "es"},
+      {"alias": "Pantozol", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "esomeprazole",
+    "canonical_display": "Esomeprazole",
+    "atc_code": "A02BC05",
+    "aliases": [
+      {"alias": "Esomeprazole", "language": "en"},
+      {"alias": "Nexium", "language": "en"},
+      {"alias": "Esomeprazolo", "language": "it"},
+      {"alias": "Nexium", "language": "it"},
+      {"alias": "Lucen", "language": "it"},
+      {"alias": "Esomeprazol", "language": "de"},
+      {"alias": "Nexium", "language": "de"},
+      {"alias": "Esomeprazole", "language": "fr"},
+      {"alias": "Inexium", "language": "fr"},
+      {"alias": "Esomeprazol", "language": "es"},
+      {"alias": "Nexium", "language": "es"},
+      {"alias": "Nexium", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "lansoprazole",
+    "canonical_display": "Lansoprazole",
+    "atc_code": "A02BC03",
+    "aliases": [
+      {"alias": "Lansoprazole", "language": "en"},
+      {"alias": "Prevacid", "language": "en"},
+      {"alias": "Lansoprazolo", "language": "it"},
+      {"alias": "Lansox", "language": "it"},
+      {"alias": "Lansoprazol", "language": "de"},
+      {"alias": "Agopton", "language": "de"},
+      {"alias": "Lansoprazole", "language": "fr"},
+      {"alias": "Lanzor", "language": "fr"},
+      {"alias": "Ogast", "language": "fr"},
+      {"alias": "Lansoprazol", "language": "es"},
+      {"alias": "Opiren", "language": "es"},
+      {"alias": "Agopton", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ranitidine",
+    "canonical_display": "Ranitidine",
+    "atc_code": "A02BA02",
+    "aliases": [
+      {"alias": "Ranitidine", "language": "en"},
+      {"alias": "Zantac", "language": "en"},
+      {"alias": "Ranitidina", "language": "it"},
+      {"alias": "Zantac", "language": "it"},
+      {"alias": "Ranidil", "language": "it"},
+      {"alias": "Ranitidin", "language": "de"},
+      {"alias": "Zantic", "language": "de"},
+      {"alias": "Ranitidine", "language": "fr"},
+      {"alias": "Azantac", "language": "fr"},
+      {"alias": "Ranitidina", "language": "es"},
+      {"alias": "Zantac", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "metoclopramide",
+    "canonical_display": "Metoclopramide",
+    "atc_code": "A03FA01",
+    "aliases": [
+      {"alias": "Metoclopramide", "language": "en"},
+      {"alias": "Reglan", "language": "en"},
+      {"alias": "Metoclopramide", "language": "it"},
+      {"alias": "Plasil", "language": "it"},
+      {"alias": "Metoclopramid", "language": "de"},
+      {"alias": "Paspertin", "language": "de"},
+      {"alias": "MCP", "language": "de"},
+      {"alias": "Metoclopramide", "language": "fr"},
+      {"alias": "Primperan", "language": "fr"},
+      {"alias": "Metoclopramida", "language": "es"},
+      {"alias": "Primperan", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "domperidone",
+    "canonical_display": "Domperidone",
+    "atc_code": "A03FA03",
+    "aliases": [
+      {"alias": "Domperidone", "language": "en"},
+      {"alias": "Motilium", "language": "en"},
+      {"alias": "Domperidone", "language": "it"},
+      {"alias": "Motilium", "language": "it"},
+      {"alias": "Peridon", "language": "it"},
+      {"alias": "Domperidon", "language": "de"},
+      {"alias": "Motilium", "language": "de"},
+      {"alias": "Domperidone", "language": "fr"},
+      {"alias": "Motilium", "language": "fr"},
+      {"alias": "Domperidona", "language": "es"},
+      {"alias": "Motilium", "language": "es"},
+      {"alias": "Motilium", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ondansetron",
+    "canonical_display": "Ondansetron",
+    "atc_code": "A04AA01",
+    "aliases": [
+      {"alias": "Ondansetron", "language": "en"},
+      {"alias": "Zofran", "language": "en"},
+      {"alias": "Ondansetron", "language": "it"},
+      {"alias": "Zofran", "language": "it"},
+      {"alias": "Ondansetron", "language": "de"},
+      {"alias": "Zofran", "language": "de"},
+      {"alias": "Ondansetron", "language": "fr"},
+      {"alias": "Zophren", "language": "fr"},
+      {"alias": "Ondansetron", "language": "es"},
+      {"alias": "Zofran", "language": "es"},
+      {"alias": "Zofran", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "paracetamol",
+    "canonical_display": "Paracetamol",
+    "atc_code": "N02BE01",
+    "aliases": [
+      {"alias": "Paracetamol", "language": "en"},
+      {"alias": "Acetaminophen", "language": "en"},
+      {"alias": "Tylenol", "language": "en"},
+      {"alias": "Paracetamolo", "language": "it"},
+      {"alias": "Tachipirina", "language": "it"},
+      {"alias": "Efferalgan", "language": "it"},
+      {"alias": "Paracetamol", "language": "de"},
+      {"alias": "Dafalgan", "language": "de"},
+      {"alias": "Ben-u-ron", "language": "de"},
+      {"alias": "Paracetamol", "language": "fr"},
+      {"alias": "Doliprane", "language": "fr"},
+      {"alias": "Efferalgan", "language": "fr"},
+      {"alias": "Dafalgan", "language": "fr"},
+      {"alias": "Paracetamol", "language": "es"},
+      {"alias": "Gelocatil", "language": "es"},
+      {"alias": "Efferalgan", "language": "es"},
+      {"alias": "Dafalgan", "language": "ch"},
+      {"alias": "Panadol", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ibuprofen",
+    "canonical_display": "Ibuprofen",
+    "atc_code": "M01AE01",
+    "aliases": [
+      {"alias": "Ibuprofen", "language": "en"},
+      {"alias": "Advil", "language": "en"},
+      {"alias": "Motrin", "language": "en"},
+      {"alias": "Ibuprofene", "language": "it"},
+      {"alias": "Brufen", "language": "it"},
+      {"alias": "Moment", "language": "it"},
+      {"alias": "Nurofen", "language": "it"},
+      {"alias": "Ibuprofen", "language": "de"},
+      {"alias": "Nurofen", "language": "de"},
+      {"alias": "Ibuprofene", "language": "fr"},
+      {"alias": "Nurofen", "language": "fr"},
+      {"alias": "Advil", "language": "fr"},
+      {"alias": "Ibuprofeno", "language": "es"},
+      {"alias": "Nurofen", "language": "es"},
+      {"alias": "Espidifen", "language": "es"},
+      {"alias": "Ibuprofen", "language": "ch"},
+      {"alias": "Irfen", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "naproxen",
+    "canonical_display": "Naproxen",
+    "atc_code": "M01AE02",
+    "aliases": [
+      {"alias": "Naproxen", "language": "en"},
+      {"alias": "Aleve", "language": "en"},
+      {"alias": "Naprosyn", "language": "en"},
+      {"alias": "Naprossene", "language": "it"},
+      {"alias": "Naprosyn", "language": "it"},
+      {"alias": "Synflex", "language": "it"},
+      {"alias": "Naproxen", "language": "de"},
+      {"alias": "Naproxen", "language": "fr"},
+      {"alias": "Apranax", "language": "fr"},
+      {"alias": "Naproxeno", "language": "es"},
+      {"alias": "Antalgin", "language": "es"},
+      {"alias": "Naproxen", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "diclofenac",
+    "canonical_display": "Diclofenac",
+    "atc_code": "M01AB05",
+    "aliases": [
+      {"alias": "Diclofenac", "language": "en"},
+      {"alias": "Voltaren", "language": "en"},
+      {"alias": "Diclofenac", "language": "it"},
+      {"alias": "Voltaren", "language": "it"},
+      {"alias": "Diclofenac", "language": "de"},
+      {"alias": "Voltaren", "language": "de"},
+      {"alias": "Diclofenac", "language": "fr"},
+      {"alias": "Voltarene", "language": "fr"},
+      {"alias": "Diclofenaco", "language": "es"},
+      {"alias": "Voltaren", "language": "es"},
+      {"alias": "Voltaren", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "celecoxib",
+    "canonical_display": "Celecoxib",
+    "atc_code": "M01AH01",
+    "aliases": [
+      {"alias": "Celecoxib", "language": "en"},
+      {"alias": "Celebrex", "language": "en"},
+      {"alias": "Celecoxib", "language": "it"},
+      {"alias": "Celebrex", "language": "it"},
+      {"alias": "Celecoxib", "language": "de"},
+      {"alias": "Celebrex", "language": "de"},
+      {"alias": "Celecoxib", "language": "fr"},
+      {"alias": "Celebrex", "language": "fr"},
+      {"alias": "Celecoxib", "language": "es"},
+      {"alias": "Celebrex", "language": "es"},
+      {"alias": "Celebrex", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "tramadol",
+    "canonical_display": "Tramadol",
+    "atc_code": "N02AX02",
+    "aliases": [
+      {"alias": "Tramadol", "language": "en"},
+      {"alias": "Ultram", "language": "en"},
+      {"alias": "Tramadolo", "language": "it"},
+      {"alias": "Contramal", "language": "it"},
+      {"alias": "Tramadol", "language": "de"},
+      {"alias": "Tramal", "language": "de"},
+      {"alias": "Tramadol", "language": "fr"},
+      {"alias": "Topalgic", "language": "fr"},
+      {"alias": "Contramal", "language": "fr"},
+      {"alias": "Tramadol", "language": "es"},
+      {"alias": "Adolonta", "language": "es"},
+      {"alias": "Tramal", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "codeine",
+    "canonical_display": "Codeine",
+    "atc_code": "N02AA59",
+    "aliases": [
+      {"alias": "Codeine", "language": "en"},
+      {"alias": "Codeina", "language": "it"},
+      {"alias": "Codein", "language": "de"},
+      {"alias": "Codeine", "language": "fr"},
+      {"alias": "Codeina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "morphine",
+    "canonical_display": "Morphine",
+    "atc_code": "N02AA01",
+    "aliases": [
+      {"alias": "Morphine", "language": "en"},
+      {"alias": "MS Contin", "language": "en"},
+      {"alias": "Morfina", "language": "it"},
+      {"alias": "MS Contin", "language": "it"},
+      {"alias": "Morphin", "language": "de"},
+      {"alias": "MST Continus", "language": "de"},
+      {"alias": "Morphine", "language": "fr"},
+      {"alias": "Skenan", "language": "fr"},
+      {"alias": "Moscontin", "language": "fr"},
+      {"alias": "Morfina", "language": "es"},
+      {"alias": "MST Continus", "language": "es"},
+      {"alias": "MST Continus", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "fentanyl",
+    "canonical_display": "Fentanyl",
+    "atc_code": "N02AB03",
+    "aliases": [
+      {"alias": "Fentanyl", "language": "en"},
+      {"alias": "Duragesic", "language": "en"},
+      {"alias": "Fentanil", "language": "it"},
+      {"alias": "Durogesic", "language": "it"},
+      {"alias": "Fentanyl", "language": "de"},
+      {"alias": "Durogesic", "language": "de"},
+      {"alias": "Fentanyl", "language": "fr"},
+      {"alias": "Durogesic", "language": "fr"},
+      {"alias": "Fentanilo", "language": "es"},
+      {"alias": "Durogesic", "language": "es"},
+      {"alias": "Durogesic", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "pregabalin",
+    "canonical_display": "Pregabalin",
+    "atc_code": "N03AX16",
+    "aliases": [
+      {"alias": "Pregabalin", "language": "en"},
+      {"alias": "Lyrica", "language": "en"},
+      {"alias": "Pregabalin", "language": "it"},
+      {"alias": "Lyrica", "language": "it"},
+      {"alias": "Pregabalin", "language": "de"},
+      {"alias": "Lyrica", "language": "de"},
+      {"alias": "Pregabaline", "language": "fr"},
+      {"alias": "Lyrica", "language": "fr"},
+      {"alias": "Pregabalina", "language": "es"},
+      {"alias": "Lyrica", "language": "es"},
+      {"alias": "Lyrica", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "amoxicillin",
+    "canonical_display": "Amoxicillin",
+    "atc_code": "J01CA04",
+    "aliases": [
+      {"alias": "Amoxicillin", "language": "en"},
+      {"alias": "Amoxil", "language": "en"},
+      {"alias": "Amoxicillina", "language": "it"},
+      {"alias": "Zimox", "language": "it"},
+      {"alias": "Velamox", "language": "it"},
+      {"alias": "Amoxicillin", "language": "de"},
+      {"alias": "Amoxicilline", "language": "fr"},
+      {"alias": "Clamoxyl", "language": "fr"},
+      {"alias": "Amoxicilina", "language": "es"},
+      {"alias": "Clamoxyl", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "amoxicillin_clavulanate",
+    "canonical_display": "Amoxicillin/Clavulanate",
+    "atc_code": "J01CR02",
+    "aliases": [
+      {"alias": "Amoxicillin/Clavulanate", "language": "en"},
+      {"alias": "Augmentin", "language": "en"},
+      {"alias": "Amoxicillin-Clavulanic Acid", "language": "en"},
+      {"alias": "Co-Amoxiclav", "language": "en"},
+      {"alias": "Amoxicillina/Clavulanato", "language": "it"},
+      {"alias": "Augmentin", "language": "it"},
+      {"alias": "Clavulin", "language": "it"},
+      {"alias": "Amoxicillin/Clavulansaeure", "language": "de"},
+      {"alias": "Augmentan", "language": "de"},
+      {"alias": "Amoxicilline/Acide Clavulanique", "language": "fr"},
+      {"alias": "Augmentin", "language": "fr"},
+      {"alias": "Amoxicilina/Clavulanico", "language": "es"},
+      {"alias": "Augmentine", "language": "es"},
+      {"alias": "Augmentin", "language": "ch"},
+      {"alias": "Co-Amoxi", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "azithromycin",
+    "canonical_display": "Azithromycin",
+    "atc_code": "J01FA10",
+    "aliases": [
+      {"alias": "Azithromycin", "language": "en"},
+      {"alias": "Zithromax", "language": "en"},
+      {"alias": "Z-Pack", "language": "en"},
+      {"alias": "Azitromicina", "language": "it"},
+      {"alias": "Zitromax", "language": "it"},
+      {"alias": "Azithromycin", "language": "de"},
+      {"alias": "Zithromax", "language": "de"},
+      {"alias": "Azithromycine", "language": "fr"},
+      {"alias": "Zithromax", "language": "fr"},
+      {"alias": "Azitromicina", "language": "es"},
+      {"alias": "Zitromax", "language": "es"},
+      {"alias": "Zithromax", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ciprofloxacin",
+    "canonical_display": "Ciprofloxacin",
+    "atc_code": "J01MA02",
+    "aliases": [
+      {"alias": "Ciprofloxacin", "language": "en"},
+      {"alias": "Cipro", "language": "en"},
+      {"alias": "Ciprofloxacina", "language": "it"},
+      {"alias": "Ciproxin", "language": "it"},
+      {"alias": "Ciprofloxacin", "language": "de"},
+      {"alias": "Ciprobay", "language": "de"},
+      {"alias": "Ciprofloxacine", "language": "fr"},
+      {"alias": "Ciflox", "language": "fr"},
+      {"alias": "Ciprofloxacino", "language": "es"},
+      {"alias": "Ciprofloxacino", "language": "es"},
+      {"alias": "Ciproxin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "levofloxacin",
+    "canonical_display": "Levofloxacin",
+    "atc_code": "J01MA12",
+    "aliases": [
+      {"alias": "Levofloxacin", "language": "en"},
+      {"alias": "Levaquin", "language": "en"},
+      {"alias": "Levofloxacina", "language": "it"},
+      {"alias": "Levoxacin", "language": "it"},
+      {"alias": "Tavanic", "language": "it"},
+      {"alias": "Levofloxacin", "language": "de"},
+      {"alias": "Tavanic", "language": "de"},
+      {"alias": "Levofloxacine", "language": "fr"},
+      {"alias": "Tavanic", "language": "fr"},
+      {"alias": "Levofloxacino", "language": "es"},
+      {"alias": "Tavanic", "language": "es"},
+      {"alias": "Tavanic", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "doxycycline",
+    "canonical_display": "Doxycycline",
+    "atc_code": "J01AA02",
+    "aliases": [
+      {"alias": "Doxycycline", "language": "en"},
+      {"alias": "Vibramycin", "language": "en"},
+      {"alias": "Doxiciclina", "language": "it"},
+      {"alias": "Bassado", "language": "it"},
+      {"alias": "Doxycyclin", "language": "de"},
+      {"alias": "Vibramycin", "language": "de"},
+      {"alias": "Doxycycline", "language": "fr"},
+      {"alias": "Vibramycine", "language": "fr"},
+      {"alias": "Doxiciclina", "language": "es"},
+      {"alias": "Vibracina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cephalexin",
+    "canonical_display": "Cephalexin",
+    "atc_code": "J01DB01",
+    "aliases": [
+      {"alias": "Cephalexin", "language": "en"},
+      {"alias": "Cefalexin", "language": "en"},
+      {"alias": "Keflex", "language": "en"},
+      {"alias": "Cefalessina", "language": "it"},
+      {"alias": "Keforal", "language": "it"},
+      {"alias": "Cefalexin", "language": "de"},
+      {"alias": "Cefalexine", "language": "fr"},
+      {"alias": "Keforal", "language": "fr"},
+      {"alias": "Cefalexina", "language": "es"},
+      {"alias": "Kefloridina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "ceftriaxone",
+    "canonical_display": "Ceftriaxone",
+    "atc_code": "J01DD04",
+    "aliases": [
+      {"alias": "Ceftriaxone", "language": "en"},
+      {"alias": "Rocephin", "language": "en"},
+      {"alias": "Ceftriaxone", "language": "it"},
+      {"alias": "Rocefin", "language": "it"},
+      {"alias": "Ceftriaxon", "language": "de"},
+      {"alias": "Rocephin", "language": "de"},
+      {"alias": "Ceftriaxone", "language": "fr"},
+      {"alias": "Rocephine", "language": "fr"},
+      {"alias": "Ceftriaxona", "language": "es"},
+      {"alias": "Rocefalin", "language": "es"},
+      {"alias": "Rocephin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "trimethoprim_sulfamethoxazole",
+    "canonical_display": "Trimethoprim/Sulfamethoxazole",
+    "atc_code": "J01EE01",
+    "aliases": [
+      {"alias": "Trimethoprim/Sulfamethoxazole", "language": "en"},
+      {"alias": "Bactrim", "language": "en"},
+      {"alias": "Co-trimoxazole", "language": "en"},
+      {"alias": "TMP-SMX", "language": "en"},
+      {"alias": "Trimetoprim/Sulfametossazolo", "language": "it"},
+      {"alias": "Bactrim", "language": "it"},
+      {"alias": "Trimethoprim/Sulfamethoxazol", "language": "de"},
+      {"alias": "Bactrim", "language": "de"},
+      {"alias": "Cotrimoxazol", "language": "de"},
+      {"alias": "Trimethoprime/Sulfamethoxazole", "language": "fr"},
+      {"alias": "Bactrim", "language": "fr"},
+      {"alias": "Trimetoprim/Sulfametoxazol", "language": "es"},
+      {"alias": "Septrin", "language": "es"},
+      {"alias": "Bactrim", "language": "ch"},
+      {"alias": "Nopil", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "metronidazole",
+    "canonical_display": "Metronidazole",
+    "atc_code": "J01XD01",
+    "aliases": [
+      {"alias": "Metronidazole", "language": "en"},
+      {"alias": "Flagyl", "language": "en"},
+      {"alias": "Metronidazolo", "language": "it"},
+      {"alias": "Flagyl", "language": "it"},
+      {"alias": "Metronidazol", "language": "de"},
+      {"alias": "Flagyl", "language": "de"},
+      {"alias": "Clont", "language": "de"},
+      {"alias": "Metronidazole", "language": "fr"},
+      {"alias": "Flagyl", "language": "fr"},
+      {"alias": "Metronidazol", "language": "es"},
+      {"alias": "Flagyl", "language": "es"},
+      {"alias": "Flagyl", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "clindamycin",
+    "canonical_display": "Clindamycin",
+    "atc_code": "J01FF01",
+    "aliases": [
+      {"alias": "Clindamycin", "language": "en"},
+      {"alias": "Cleocin", "language": "en"},
+      {"alias": "Clindamicina", "language": "it"},
+      {"alias": "Dalacin", "language": "it"},
+      {"alias": "Clindamycin", "language": "de"},
+      {"alias": "Sobelin", "language": "de"},
+      {"alias": "Clindamycine", "language": "fr"},
+      {"alias": "Dalacine", "language": "fr"},
+      {"alias": "Clindamicina", "language": "es"},
+      {"alias": "Dalacin", "language": "es"},
+      {"alias": "Dalacin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "nitrofurantoin",
+    "canonical_display": "Nitrofurantoin",
+    "atc_code": "J01XE01",
+    "aliases": [
+      {"alias": "Nitrofurantoin", "language": "en"},
+      {"alias": "Macrobid", "language": "en"},
+      {"alias": "Macrodantin", "language": "en"},
+      {"alias": "Nitrofurantoina", "language": "it"},
+      {"alias": "Neofuradantin", "language": "it"},
+      {"alias": "Nitrofurantoin", "language": "de"},
+      {"alias": "Furadantin", "language": "de"},
+      {"alias": "Nitrofurantoine", "language": "fr"},
+      {"alias": "Furadantine", "language": "fr"},
+      {"alias": "Nitrofurantoina", "language": "es"},
+      {"alias": "Furantoina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "fluconazole",
+    "canonical_display": "Fluconazole",
+    "atc_code": "J02AC01",
+    "aliases": [
+      {"alias": "Fluconazole", "language": "en"},
+      {"alias": "Diflucan", "language": "en"},
+      {"alias": "Fluconazolo", "language": "it"},
+      {"alias": "Diflucan", "language": "it"},
+      {"alias": "Fluconazol", "language": "de"},
+      {"alias": "Diflucan", "language": "de"},
+      {"alias": "Fluconazole", "language": "fr"},
+      {"alias": "Triflucan", "language": "fr"},
+      {"alias": "Fluconazol", "language": "es"},
+      {"alias": "Diflucan", "language": "es"},
+      {"alias": "Diflucan", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "clarithromycin",
+    "canonical_display": "Clarithromycin",
+    "atc_code": "J01FA09",
+    "aliases": [
+      {"alias": "Clarithromycin", "language": "en"},
+      {"alias": "Biaxin", "language": "en"},
+      {"alias": "Claritromicina", "language": "it"},
+      {"alias": "Klacid", "language": "it"},
+      {"alias": "Macladin", "language": "it"},
+      {"alias": "Clarithromycin", "language": "de"},
+      {"alias": "Klacid", "language": "de"},
+      {"alias": "Clarithromycine", "language": "fr"},
+      {"alias": "Zeclar", "language": "fr"},
+      {"alias": "Claritromicina", "language": "es"},
+      {"alias": "Klacid", "language": "es"},
+      {"alias": "Klacid", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "moxifloxacin",
+    "canonical_display": "Moxifloxacin",
+    "atc_code": "J01MA14",
+    "aliases": [
+      {"alias": "Moxifloxacin", "language": "en"},
+      {"alias": "Avelox", "language": "en"},
+      {"alias": "Moxifloxacina", "language": "it"},
+      {"alias": "Avalox", "language": "it"},
+      {"alias": "Moxifloxacin", "language": "de"},
+      {"alias": "Avalox", "language": "de"},
+      {"alias": "Moxifloxacine", "language": "fr"},
+      {"alias": "Izilox", "language": "fr"},
+      {"alias": "Moxifloxacino", "language": "es"},
+      {"alias": "Actira", "language": "es"},
+      {"alias": "Avalox", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "sertraline",
+    "canonical_display": "Sertraline",
+    "atc_code": "N06AB06",
+    "aliases": [
+      {"alias": "Sertraline", "language": "en"},
+      {"alias": "Zoloft", "language": "en"},
+      {"alias": "Sertralina", "language": "it"},
+      {"alias": "Zoloft", "language": "it"},
+      {"alias": "Sertralin", "language": "de"},
+      {"alias": "Zoloft", "language": "de"},
+      {"alias": "Sertraline", "language": "fr"},
+      {"alias": "Zoloft", "language": "fr"},
+      {"alias": "Sertralina", "language": "es"},
+      {"alias": "Besitran", "language": "es"},
+      {"alias": "Zoloft", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "escitalopram",
+    "canonical_display": "Escitalopram",
+    "atc_code": "N06AB10",
+    "aliases": [
+      {"alias": "Escitalopram", "language": "en"},
+      {"alias": "Lexapro", "language": "en"},
+      {"alias": "Cipralex", "language": "en"},
+      {"alias": "Escitalopram", "language": "it"},
+      {"alias": "Cipralex", "language": "it"},
+      {"alias": "Entact", "language": "it"},
+      {"alias": "Escitalopram", "language": "de"},
+      {"alias": "Cipralex", "language": "de"},
+      {"alias": "Escitalopram", "language": "fr"},
+      {"alias": "Seroplex", "language": "fr"},
+      {"alias": "Escitalopram", "language": "es"},
+      {"alias": "Cipralex", "language": "es"},
+      {"alias": "Cipralex", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "fluoxetine",
+    "canonical_display": "Fluoxetine",
+    "atc_code": "N06AB03",
+    "aliases": [
+      {"alias": "Fluoxetine", "language": "en"},
+      {"alias": "Prozac", "language": "en"},
+      {"alias": "Fluoxetina", "language": "it"},
+      {"alias": "Prozac", "language": "it"},
+      {"alias": "Fluoxetin", "language": "de"},
+      {"alias": "Fluctin", "language": "de"},
+      {"alias": "Fluoxetine", "language": "fr"},
+      {"alias": "Prozac", "language": "fr"},
+      {"alias": "Fluoxetina", "language": "es"},
+      {"alias": "Prozac", "language": "es"},
+      {"alias": "Fluctine", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "paroxetine",
+    "canonical_display": "Paroxetine",
+    "atc_code": "N06AB05",
+    "aliases": [
+      {"alias": "Paroxetine", "language": "en"},
+      {"alias": "Paxil", "language": "en"},
+      {"alias": "Paroxetina", "language": "it"},
+      {"alias": "Sereupin", "language": "it"},
+      {"alias": "Daparox", "language": "it"},
+      {"alias": "Paroxetin", "language": "de"},
+      {"alias": "Seroxat", "language": "de"},
+      {"alias": "Paroxetine", "language": "fr"},
+      {"alias": "Deroxat", "language": "fr"},
+      {"alias": "Paroxetina", "language": "es"},
+      {"alias": "Seroxat", "language": "es"},
+      {"alias": "Deroxat", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "venlafaxine",
+    "canonical_display": "Venlafaxine",
+    "atc_code": "N06AX16",
+    "aliases": [
+      {"alias": "Venlafaxine", "language": "en"},
+      {"alias": "Effexor", "language": "en"},
+      {"alias": "Venlafaxina", "language": "it"},
+      {"alias": "Efexor", "language": "it"},
+      {"alias": "Venlafaxin", "language": "de"},
+      {"alias": "Trevilor", "language": "de"},
+      {"alias": "Venlafaxine", "language": "fr"},
+      {"alias": "Effexor", "language": "fr"},
+      {"alias": "Venlafaxina", "language": "es"},
+      {"alias": "Vandral", "language": "es"},
+      {"alias": "Efexor", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "duloxetine",
+    "canonical_display": "Duloxetine",
+    "atc_code": "N06AX21",
+    "aliases": [
+      {"alias": "Duloxetine", "language": "en"},
+      {"alias": "Cymbalta", "language": "en"},
+      {"alias": "Duloxetina", "language": "it"},
+      {"alias": "Cymbalta", "language": "it"},
+      {"alias": "Duloxetin", "language": "de"},
+      {"alias": "Cymbalta", "language": "de"},
+      {"alias": "Duloxetine", "language": "fr"},
+      {"alias": "Cymbalta", "language": "fr"},
+      {"alias": "Duloxetina", "language": "es"},
+      {"alias": "Cymbalta", "language": "es"},
+      {"alias": "Cymbalta", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "mirtazapine",
+    "canonical_display": "Mirtazapine",
+    "atc_code": "N06AX11",
+    "aliases": [
+      {"alias": "Mirtazapine", "language": "en"},
+      {"alias": "Remeron", "language": "en"},
+      {"alias": "Mirtazapina", "language": "it"},
+      {"alias": "Remeron", "language": "it"},
+      {"alias": "Mirtazapin", "language": "de"},
+      {"alias": "Remergil", "language": "de"},
+      {"alias": "Mirtazapine", "language": "fr"},
+      {"alias": "Norset", "language": "fr"},
+      {"alias": "Mirtazapina", "language": "es"},
+      {"alias": "Rexer", "language": "es"},
+      {"alias": "Remeron", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "amitriptyline",
+    "canonical_display": "Amitriptyline",
+    "atc_code": "N06AA09",
+    "aliases": [
+      {"alias": "Amitriptyline", "language": "en"},
+      {"alias": "Elavil", "language": "en"},
+      {"alias": "Amitriptilina", "language": "it"},
+      {"alias": "Laroxyl", "language": "it"},
+      {"alias": "Amitriptylin", "language": "de"},
+      {"alias": "Saroten", "language": "de"},
+      {"alias": "Amitriptyline", "language": "fr"},
+      {"alias": "Laroxyl", "language": "fr"},
+      {"alias": "Amitriptilina", "language": "es"},
+      {"alias": "Tryptizol", "language": "es"},
+      {"alias": "Saroten", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "bupropion",
+    "canonical_display": "Bupropion",
+    "atc_code": "N06AX12",
+    "aliases": [
+      {"alias": "Bupropion", "language": "en"},
+      {"alias": "Wellbutrin", "language": "en"},
+      {"alias": "Zyban", "language": "en"},
+      {"alias": "Bupropione", "language": "it"},
+      {"alias": "Wellbutrin", "language": "it"},
+      {"alias": "Elontril", "language": "it"},
+      {"alias": "Bupropion", "language": "de"},
+      {"alias": "Elontril", "language": "de"},
+      {"alias": "Bupropion", "language": "fr"},
+      {"alias": "Zyban", "language": "fr"},
+      {"alias": "Bupropion", "language": "es"},
+      {"alias": "Elontril", "language": "es"},
+      {"alias": "Wellbutrin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "trazodone",
+    "canonical_display": "Trazodone",
+    "atc_code": "N06AX05",
+    "aliases": [
+      {"alias": "Trazodone", "language": "en"},
+      {"alias": "Desyrel", "language": "en"},
+      {"alias": "Trazodone", "language": "it"},
+      {"alias": "Trittico", "language": "it"},
+      {"alias": "Trazodon", "language": "de"},
+      {"alias": "Trittico", "language": "de"},
+      {"alias": "Trazodone", "language": "fr"},
+      {"alias": "Trittico", "language": "fr"},
+      {"alias": "Trazodona", "language": "es"},
+      {"alias": "Deprax", "language": "es"},
+      {"alias": "Trittico", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "alprazolam",
+    "canonical_display": "Alprazolam",
+    "atc_code": "N05BA12",
+    "aliases": [
+      {"alias": "Alprazolam", "language": "en"},
+      {"alias": "Xanax", "language": "en"},
+      {"alias": "Alprazolam", "language": "it"},
+      {"alias": "Xanax", "language": "it"},
+      {"alias": "Alprazolam", "language": "de"},
+      {"alias": "Tafil", "language": "de"},
+      {"alias": "Alprazolam", "language": "fr"},
+      {"alias": "Xanax", "language": "fr"},
+      {"alias": "Alprazolam", "language": "es"},
+      {"alias": "Trankimazin", "language": "es"},
+      {"alias": "Xanax", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "lorazepam",
+    "canonical_display": "Lorazepam",
+    "atc_code": "N05BA06",
+    "aliases": [
+      {"alias": "Lorazepam", "language": "en"},
+      {"alias": "Ativan", "language": "en"},
+      {"alias": "Lorazepam", "language": "it"},
+      {"alias": "Tavor", "language": "it"},
+      {"alias": "Control", "language": "it"},
+      {"alias": "Lorazepam", "language": "de"},
+      {"alias": "Tavor", "language": "de"},
+      {"alias": "Lorazepam", "language": "fr"},
+      {"alias": "Temesta", "language": "fr"},
+      {"alias": "Lorazepam", "language": "es"},
+      {"alias": "Orfidal", "language": "es"},
+      {"alias": "Temesta", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "diazepam",
+    "canonical_display": "Diazepam",
+    "atc_code": "N05BA01",
+    "aliases": [
+      {"alias": "Diazepam", "language": "en"},
+      {"alias": "Valium", "language": "en"},
+      {"alias": "Diazepam", "language": "it"},
+      {"alias": "Valium", "language": "it"},
+      {"alias": "Diazepam", "language": "de"},
+      {"alias": "Valium", "language": "de"},
+      {"alias": "Diazepam", "language": "fr"},
+      {"alias": "Valium", "language": "fr"},
+      {"alias": "Diazepam", "language": "es"},
+      {"alias": "Valium", "language": "es"},
+      {"alias": "Valium", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "zolpidem",
+    "canonical_display": "Zolpidem",
+    "atc_code": "N05CF02",
+    "aliases": [
+      {"alias": "Zolpidem", "language": "en"},
+      {"alias": "Ambien", "language": "en"},
+      {"alias": "Zolpidem", "language": "it"},
+      {"alias": "Stilnox", "language": "it"},
+      {"alias": "Zolpidem", "language": "de"},
+      {"alias": "Stilnox", "language": "de"},
+      {"alias": "Zolpidem", "language": "fr"},
+      {"alias": "Stilnox", "language": "fr"},
+      {"alias": "Zolpidem", "language": "es"},
+      {"alias": "Stilnox", "language": "es"},
+      {"alias": "Stilnox", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "hydroxyzine",
+    "canonical_display": "Hydroxyzine",
+    "atc_code": "N05BB01",
+    "aliases": [
+      {"alias": "Hydroxyzine", "language": "en"},
+      {"alias": "Vistaril", "language": "en"},
+      {"alias": "Atarax", "language": "en"},
+      {"alias": "Idrossizina", "language": "it"},
+      {"alias": "Atarax", "language": "it"},
+      {"alias": "Hydroxyzin", "language": "de"},
+      {"alias": "Atarax", "language": "de"},
+      {"alias": "Hydroxyzine", "language": "fr"},
+      {"alias": "Atarax", "language": "fr"},
+      {"alias": "Hidroxizina", "language": "es"},
+      {"alias": "Atarax", "language": "es"},
+      {"alias": "Atarax", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "levothyroxine",
+    "canonical_display": "Levothyroxine",
+    "atc_code": "H03AA01",
+    "aliases": [
+      {"alias": "Levothyroxine", "language": "en"},
+      {"alias": "Synthroid", "language": "en"},
+      {"alias": "Levoxyl", "language": "en"},
+      {"alias": "Levotiroxina", "language": "it"},
+      {"alias": "Eutirox", "language": "it"},
+      {"alias": "Tirosint", "language": "it"},
+      {"alias": "Levothyroxin", "language": "de"},
+      {"alias": "L-Thyroxin", "language": "de"},
+      {"alias": "Euthyrox", "language": "de"},
+      {"alias": "Levothyroxine", "language": "fr"},
+      {"alias": "Levothyrox", "language": "fr"},
+      {"alias": "L-Thyroxine", "language": "fr"},
+      {"alias": "Levotiroxina", "language": "es"},
+      {"alias": "Eutirox", "language": "es"},
+      {"alias": "Euthyrox", "language": "ch"},
+      {"alias": "Eltroxin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "methimazole",
+    "canonical_display": "Methimazole",
+    "atc_code": "H03BB02",
+    "aliases": [
+      {"alias": "Methimazole", "language": "en"},
+      {"alias": "Tapazole", "language": "en"},
+      {"alias": "Metimazolo", "language": "it"},
+      {"alias": "Tapazole", "language": "it"},
+      {"alias": "Thiamazol", "language": "de"},
+      {"alias": "Favistan", "language": "de"},
+      {"alias": "Thiamazole", "language": "fr"},
+      {"alias": "Thyrozol", "language": "fr"},
+      {"alias": "Metimazol", "language": "es"},
+      {"alias": "Tirodril", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "propylthiouracil",
+    "canonical_display": "Propylthiouracil",
+    "atc_code": "H03BA02",
+    "aliases": [
+      {"alias": "Propylthiouracil", "language": "en"},
+      {"alias": "PTU", "language": "en"},
+      {"alias": "Propiltiouracile", "language": "it"},
+      {"alias": "Propycil", "language": "de"},
+      {"alias": "Propylthiouracile", "language": "fr"},
+      {"alias": "Propiltiouracilo", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "salbutamol",
+    "canonical_display": "Salbutamol",
+    "atc_code": "R03AC02",
+    "aliases": [
+      {"alias": "Salbutamol", "language": "en"},
+      {"alias": "Albuterol", "language": "en"},
+      {"alias": "Ventolin", "language": "en"},
+      {"alias": "ProAir", "language": "en"},
+      {"alias": "Salbutamolo", "language": "it"},
+      {"alias": "Ventolin", "language": "it"},
+      {"alias": "Salbutamol", "language": "de"},
+      {"alias": "Sultanol", "language": "de"},
+      {"alias": "Salbutamol", "language": "fr"},
+      {"alias": "Ventoline", "language": "fr"},
+      {"alias": "Salbutamol", "language": "es"},
+      {"alias": "Ventolin", "language": "es"},
+      {"alias": "Ventolin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "fluticasone",
+    "canonical_display": "Fluticasone",
+    "atc_code": "R03BA05",
+    "aliases": [
+      {"alias": "Fluticasone", "language": "en"},
+      {"alias": "Flovent", "language": "en"},
+      {"alias": "Flixotide", "language": "en"},
+      {"alias": "Fluticasone", "language": "it"},
+      {"alias": "Flixotide", "language": "it"},
+      {"alias": "Fluticason", "language": "de"},
+      {"alias": "Flutide", "language": "de"},
+      {"alias": "Fluticasone", "language": "fr"},
+      {"alias": "Flixotide", "language": "fr"},
+      {"alias": "Fluticasona", "language": "es"},
+      {"alias": "Flixotide", "language": "es"},
+      {"alias": "Axotide", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "budesonide",
+    "canonical_display": "Budesonide",
+    "atc_code": "R03BA02",
+    "aliases": [
+      {"alias": "Budesonide", "language": "en"},
+      {"alias": "Pulmicort", "language": "en"},
+      {"alias": "Budesonide", "language": "it"},
+      {"alias": "Pulmicort", "language": "it"},
+      {"alias": "Aircort", "language": "it"},
+      {"alias": "Budesonid", "language": "de"},
+      {"alias": "Pulmicort", "language": "de"},
+      {"alias": "Budesonide", "language": "fr"},
+      {"alias": "Pulmicort", "language": "fr"},
+      {"alias": "Budesonida", "language": "es"},
+      {"alias": "Pulmicort", "language": "es"},
+      {"alias": "Pulmicort", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "montelukast",
+    "canonical_display": "Montelukast",
+    "atc_code": "R03DC03",
+    "aliases": [
+      {"alias": "Montelukast", "language": "en"},
+      {"alias": "Singulair", "language": "en"},
+      {"alias": "Montelukast", "language": "it"},
+      {"alias": "Singulair", "language": "it"},
+      {"alias": "Montegen", "language": "it"},
+      {"alias": "Montelukast", "language": "de"},
+      {"alias": "Singulair", "language": "de"},
+      {"alias": "Montelukast", "language": "fr"},
+      {"alias": "Singulair", "language": "fr"},
+      {"alias": "Montelukast", "language": "es"},
+      {"alias": "Singulair", "language": "es"},
+      {"alias": "Singulair", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "tiotropium",
+    "canonical_display": "Tiotropium",
+    "atc_code": "R03BB04",
+    "aliases": [
+      {"alias": "Tiotropium", "language": "en"},
+      {"alias": "Spiriva", "language": "en"},
+      {"alias": "Tiotropio", "language": "it"},
+      {"alias": "Spiriva", "language": "it"},
+      {"alias": "Tiotropium", "language": "de"},
+      {"alias": "Spiriva", "language": "de"},
+      {"alias": "Tiotropium", "language": "fr"},
+      {"alias": "Spiriva", "language": "fr"},
+      {"alias": "Tiotropio", "language": "es"},
+      {"alias": "Spiriva", "language": "es"},
+      {"alias": "Spiriva", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "formoterol",
+    "canonical_display": "Formoterol",
+    "atc_code": "R03AC13",
+    "aliases": [
+      {"alias": "Formoterol", "language": "en"},
+      {"alias": "Foradil", "language": "en"},
+      {"alias": "Formoterolo", "language": "it"},
+      {"alias": "Foradil", "language": "it"},
+      {"alias": "Oxis", "language": "it"},
+      {"alias": "Formoterol", "language": "de"},
+      {"alias": "Foradil", "language": "de"},
+      {"alias": "Oxis", "language": "de"},
+      {"alias": "Formoterol", "language": "fr"},
+      {"alias": "Foradil", "language": "fr"},
+      {"alias": "Formoterol", "language": "es"},
+      {"alias": "Foradil", "language": "es"},
+      {"alias": "Foradil", "language": "ch"},
+      {"alias": "Oxis", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ipratropium",
+    "canonical_display": "Ipratropium",
+    "atc_code": "R03BB01",
+    "aliases": [
+      {"alias": "Ipratropium", "language": "en"},
+      {"alias": "Atrovent", "language": "en"},
+      {"alias": "Ipratropio", "language": "it"},
+      {"alias": "Atrovent", "language": "it"},
+      {"alias": "Ipratropium", "language": "de"},
+      {"alias": "Atrovent", "language": "de"},
+      {"alias": "Ipratropium", "language": "fr"},
+      {"alias": "Atrovent", "language": "fr"},
+      {"alias": "Ipratropio", "language": "es"},
+      {"alias": "Atrovent", "language": "es"},
+      {"alias": "Atrovent", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "theophylline",
+    "canonical_display": "Theophylline",
+    "atc_code": "R03DA04",
+    "aliases": [
+      {"alias": "Theophylline", "language": "en"},
+      {"alias": "Theo-Dur", "language": "en"},
+      {"alias": "Teofillina", "language": "it"},
+      {"alias": "Theo-Dur", "language": "it"},
+      {"alias": "Theophyllin", "language": "de"},
+      {"alias": "Euphylong", "language": "de"},
+      {"alias": "Theophylline", "language": "fr"},
+      {"alias": "Euphylline", "language": "fr"},
+      {"alias": "Teofilina", "language": "es"},
+      {"alias": "Theo-Dur", "language": "es"},
+      {"alias": "Unifyl", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "cetirizine",
+    "canonical_display": "Cetirizine",
+    "atc_code": "R06AE07",
+    "aliases": [
+      {"alias": "Cetirizine", "language": "en"},
+      {"alias": "Zyrtec", "language": "en"},
+      {"alias": "Cetirizina", "language": "it"},
+      {"alias": "Zirtec", "language": "it"},
+      {"alias": "Cetirizin", "language": "de"},
+      {"alias": "Zyrtec", "language": "de"},
+      {"alias": "Cetirizine", "language": "fr"},
+      {"alias": "Zyrtec", "language": "fr"},
+      {"alias": "Virlix", "language": "fr"},
+      {"alias": "Cetirizina", "language": "es"},
+      {"alias": "Zyrtec", "language": "es"},
+      {"alias": "Zyrtec", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "loratadine",
+    "canonical_display": "Loratadine",
+    "atc_code": "R06AX13",
+    "aliases": [
+      {"alias": "Loratadine", "language": "en"},
+      {"alias": "Claritin", "language": "en"},
+      {"alias": "Loratadina", "language": "it"},
+      {"alias": "Clarityn", "language": "it"},
+      {"alias": "Fristamin", "language": "it"},
+      {"alias": "Loratadin", "language": "de"},
+      {"alias": "Lorano", "language": "de"},
+      {"alias": "Loratadine", "language": "fr"},
+      {"alias": "Clarityne", "language": "fr"},
+      {"alias": "Loratadina", "language": "es"},
+      {"alias": "Clarityn", "language": "es"},
+      {"alias": "Claritine", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "desloratadine",
+    "canonical_display": "Desloratadine",
+    "atc_code": "R06AX27",
+    "aliases": [
+      {"alias": "Desloratadine", "language": "en"},
+      {"alias": "Clarinex", "language": "en"},
+      {"alias": "Aerius", "language": "en"},
+      {"alias": "Desloratadina", "language": "it"},
+      {"alias": "Aerius", "language": "it"},
+      {"alias": "Desloratadin", "language": "de"},
+      {"alias": "Aerius", "language": "de"},
+      {"alias": "Desloratadine", "language": "fr"},
+      {"alias": "Aerius", "language": "fr"},
+      {"alias": "Desloratadina", "language": "es"},
+      {"alias": "Aerius", "language": "es"},
+      {"alias": "Aerius", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "fexofenadine",
+    "canonical_display": "Fexofenadine",
+    "atc_code": "R06AX26",
+    "aliases": [
+      {"alias": "Fexofenadine", "language": "en"},
+      {"alias": "Allegra", "language": "en"},
+      {"alias": "Fexofenadina", "language": "it"},
+      {"alias": "Telfast", "language": "it"},
+      {"alias": "Fexofenadin", "language": "de"},
+      {"alias": "Telfast", "language": "de"},
+      {"alias": "Fexofenadine", "language": "fr"},
+      {"alias": "Telfast", "language": "fr"},
+      {"alias": "Fexofenadina", "language": "es"},
+      {"alias": "Telfast", "language": "es"},
+      {"alias": "Telfast", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "levocetirizine",
+    "canonical_display": "Levocetirizine",
+    "atc_code": "R06AE09",
+    "aliases": [
+      {"alias": "Levocetirizine", "language": "en"},
+      {"alias": "Xyzal", "language": "en"},
+      {"alias": "Levocetirizina", "language": "it"},
+      {"alias": "Xyzal", "language": "it"},
+      {"alias": "Levocetirizin", "language": "de"},
+      {"alias": "Xyzal", "language": "de"},
+      {"alias": "Levocetirizine", "language": "fr"},
+      {"alias": "Xyzall", "language": "fr"},
+      {"alias": "Levocetirizina", "language": "es"},
+      {"alias": "Xyzal", "language": "es"},
+      {"alias": "Xyzal", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "prednisone",
+    "canonical_display": "Prednisone",
+    "atc_code": "H02AB07",
+    "aliases": [
+      {"alias": "Prednisone", "language": "en"},
+      {"alias": "Deltasone", "language": "en"},
+      {"alias": "Prednisone", "language": "it"},
+      {"alias": "Deltacortene", "language": "it"},
+      {"alias": "Prednison", "language": "de"},
+      {"alias": "Decortin", "language": "de"},
+      {"alias": "Prednisone", "language": "fr"},
+      {"alias": "Cortancyl", "language": "fr"},
+      {"alias": "Prednisona", "language": "es"},
+      {"alias": "Dacortin", "language": "es"},
+      {"alias": "Prednison", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "prednisolone",
+    "canonical_display": "Prednisolone",
+    "atc_code": "H02AB06",
+    "aliases": [
+      {"alias": "Prednisolone", "language": "en"},
+      {"alias": "Prelone", "language": "en"},
+      {"alias": "Prednisolone", "language": "it"},
+      {"alias": "Deltacortenesol", "language": "it"},
+      {"alias": "Prednisolon", "language": "de"},
+      {"alias": "Decortin H", "language": "de"},
+      {"alias": "Prednisolone", "language": "fr"},
+      {"alias": "Solupred", "language": "fr"},
+      {"alias": "Prednisolona", "language": "es"},
+      {"alias": "Estilsona", "language": "es"},
+      {"alias": "Spiricort", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "methylprednisolone",
+    "canonical_display": "Methylprednisolone",
+    "atc_code": "H02AB04",
+    "aliases": [
+      {"alias": "Methylprednisolone", "language": "en"},
+      {"alias": "Medrol", "language": "en"},
+      {"alias": "Solu-Medrol", "language": "en"},
+      {"alias": "Metilprednisolone", "language": "it"},
+      {"alias": "Medrol", "language": "it"},
+      {"alias": "Urbason", "language": "it"},
+      {"alias": "Methylprednisolon", "language": "de"},
+      {"alias": "Urbason", "language": "de"},
+      {"alias": "Medrol", "language": "de"},
+      {"alias": "Methylprednisolone", "language": "fr"},
+      {"alias": "Medrol", "language": "fr"},
+      {"alias": "Solumedrol", "language": "fr"},
+      {"alias": "Metilprednisolona", "language": "es"},
+      {"alias": "Urbason", "language": "es"},
+      {"alias": "Medrol", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "dexamethasone",
+    "canonical_display": "Dexamethasone",
+    "atc_code": "H02AB02",
+    "aliases": [
+      {"alias": "Dexamethasone", "language": "en"},
+      {"alias": "Decadron", "language": "en"},
+      {"alias": "Desametasone", "language": "it"},
+      {"alias": "Decadron", "language": "it"},
+      {"alias": "Soldesam", "language": "it"},
+      {"alias": "Dexamethason", "language": "de"},
+      {"alias": "Fortecortin", "language": "de"},
+      {"alias": "Dexamethasone", "language": "fr"},
+      {"alias": "Dectancyl", "language": "fr"},
+      {"alias": "Dexametasona", "language": "es"},
+      {"alias": "Fortecortin", "language": "es"},
+      {"alias": "Fortecortin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "hydrocortisone",
+    "canonical_display": "Hydrocortisone",
+    "atc_code": "H02AB09",
+    "aliases": [
+      {"alias": "Hydrocortisone", "language": "en"},
+      {"alias": "Cortef", "language": "en"},
+      {"alias": "Solu-Cortef", "language": "en"},
+      {"alias": "Idrocortisone", "language": "it"},
+      {"alias": "Flebocortid", "language": "it"},
+      {"alias": "Hydrocortison", "language": "de"},
+      {"alias": "Hydrocortone", "language": "de"},
+      {"alias": "Hydrocortisone", "language": "fr"},
+      {"alias": "Hydrocortisone", "language": "fr"},
+      {"alias": "Hidrocortisona", "language": "es"},
+      {"alias": "Actocortina", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "alendronate",
+    "canonical_display": "Alendronate",
+    "atc_code": "M05BA04",
+    "aliases": [
+      {"alias": "Alendronate", "language": "en"},
+      {"alias": "Fosamax", "language": "en"},
+      {"alias": "Alendronic Acid", "language": "en"},
+      {"alias": "Alendronato", "language": "it"},
+      {"alias": "Fosamax", "language": "it"},
+      {"alias": "Adronat", "language": "it"},
+      {"alias": "Alendronat", "language": "de"},
+      {"alias": "Fosamax", "language": "de"},
+      {"alias": "Alendronate", "language": "fr"},
+      {"alias": "Fosamax", "language": "fr"},
+      {"alias": "Alendronato", "language": "es"},
+      {"alias": "Fosamax", "language": "es"},
+      {"alias": "Fosamax", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "risedronate",
+    "canonical_display": "Risedronate",
+    "atc_code": "M05BA07",
+    "aliases": [
+      {"alias": "Risedronate", "language": "en"},
+      {"alias": "Actonel", "language": "en"},
+      {"alias": "Risedronato", "language": "it"},
+      {"alias": "Actonel", "language": "it"},
+      {"alias": "Risedronat", "language": "de"},
+      {"alias": "Actonel", "language": "de"},
+      {"alias": "Risedronate", "language": "fr"},
+      {"alias": "Actonel", "language": "fr"},
+      {"alias": "Risedronato", "language": "es"},
+      {"alias": "Actonel", "language": "es"},
+      {"alias": "Actonel", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "denosumab",
+    "canonical_display": "Denosumab",
+    "atc_code": "M05BX04",
+    "aliases": [
+      {"alias": "Denosumab", "language": "en"},
+      {"alias": "Prolia", "language": "en"},
+      {"alias": "Xgeva", "language": "en"},
+      {"alias": "Denosumab", "language": "it"},
+      {"alias": "Prolia", "language": "it"},
+      {"alias": "Denosumab", "language": "de"},
+      {"alias": "Prolia", "language": "de"},
+      {"alias": "Denosumab", "language": "fr"},
+      {"alias": "Prolia", "language": "fr"},
+      {"alias": "Denosumab", "language": "es"},
+      {"alias": "Prolia", "language": "es"},
+      {"alias": "Prolia", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "levetiracetam",
+    "canonical_display": "Levetiracetam",
+    "atc_code": "N03AX14",
+    "aliases": [
+      {"alias": "Levetiracetam", "language": "en"},
+      {"alias": "Keppra", "language": "en"},
+      {"alias": "Levetiracetam", "language": "it"},
+      {"alias": "Keppra", "language": "it"},
+      {"alias": "Levetiracetam", "language": "de"},
+      {"alias": "Keppra", "language": "de"},
+      {"alias": "Levetiracetam", "language": "fr"},
+      {"alias": "Keppra", "language": "fr"},
+      {"alias": "Levetiracetam", "language": "es"},
+      {"alias": "Keppra", "language": "es"},
+      {"alias": "Keppra", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "valproate",
+    "canonical_display": "Valproate",
+    "atc_code": "N03AG01",
+    "aliases": [
+      {"alias": "Valproate", "language": "en"},
+      {"alias": "Valproic Acid", "language": "en"},
+      {"alias": "Depakote", "language": "en"},
+      {"alias": "Depakene", "language": "en"},
+      {"alias": "VPA", "language": "en"},
+      {"alias": "Acido Valproico", "language": "it"},
+      {"alias": "Depakin", "language": "it"},
+      {"alias": "Valproat", "language": "de"},
+      {"alias": "Ergenyl", "language": "de"},
+      {"alias": "Orfiril", "language": "de"},
+      {"alias": "Valproate", "language": "fr"},
+      {"alias": "Depakine", "language": "fr"},
+      {"alias": "Valproato", "language": "es"},
+      {"alias": "Depakine", "language": "es"},
+      {"alias": "Depakine", "language": "ch"},
+      {"alias": "Orfiril", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "carbamazepine",
+    "canonical_display": "Carbamazepine",
+    "atc_code": "N03AF01",
+    "aliases": [
+      {"alias": "Carbamazepine", "language": "en"},
+      {"alias": "Tegretol", "language": "en"},
+      {"alias": "Carbamazepina", "language": "it"},
+      {"alias": "Tegretol", "language": "it"},
+      {"alias": "Carbamazepin", "language": "de"},
+      {"alias": "Tegretol", "language": "de"},
+      {"alias": "Tegretal", "language": "de"},
+      {"alias": "Carbamazepine", "language": "fr"},
+      {"alias": "Tegretol", "language": "fr"},
+      {"alias": "Carbamazepina", "language": "es"},
+      {"alias": "Tegretol", "language": "es"},
+      {"alias": "Tegretol", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "lamotrigine",
+    "canonical_display": "Lamotrigine",
+    "atc_code": "N03AX09",
+    "aliases": [
+      {"alias": "Lamotrigine", "language": "en"},
+      {"alias": "Lamictal", "language": "en"},
+      {"alias": "Lamotrigina", "language": "it"},
+      {"alias": "Lamictal", "language": "it"},
+      {"alias": "Lamotrigin", "language": "de"},
+      {"alias": "Lamictal", "language": "de"},
+      {"alias": "Lamotrigine", "language": "fr"},
+      {"alias": "Lamictal", "language": "fr"},
+      {"alias": "Lamotrigina", "language": "es"},
+      {"alias": "Lamictal", "language": "es"},
+      {"alias": "Lamictal", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "gabapentin",
+    "canonical_display": "Gabapentin",
+    "atc_code": "N03AX12",
+    "aliases": [
+      {"alias": "Gabapentin", "language": "en"},
+      {"alias": "Neurontin", "language": "en"},
+      {"alias": "Gabapentin", "language": "it"},
+      {"alias": "Neurontin", "language": "it"},
+      {"alias": "Gabapentin", "language": "de"},
+      {"alias": "Neurontin", "language": "de"},
+      {"alias": "Gabapentine", "language": "fr"},
+      {"alias": "Neurontin", "language": "fr"},
+      {"alias": "Gabapentina", "language": "es"},
+      {"alias": "Neurontin", "language": "es"},
+      {"alias": "Neurontin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "tamsulosin",
+    "canonical_display": "Tamsulosin",
+    "atc_code": "G04CA02",
+    "aliases": [
+      {"alias": "Tamsulosin", "language": "en"},
+      {"alias": "Flomax", "language": "en"},
+      {"alias": "Tamsulosina", "language": "it"},
+      {"alias": "Omnic", "language": "it"},
+      {"alias": "Pradif", "language": "it"},
+      {"alias": "Tamsulosin", "language": "de"},
+      {"alias": "Omnic", "language": "de"},
+      {"alias": "Tamsulosine", "language": "fr"},
+      {"alias": "Omix", "language": "fr"},
+      {"alias": "Josir", "language": "fr"},
+      {"alias": "Tamsulosina", "language": "es"},
+      {"alias": "Omnic", "language": "es"},
+      {"alias": "Omnic", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "finasteride",
+    "canonical_display": "Finasteride",
+    "atc_code": "G04CB01",
+    "aliases": [
+      {"alias": "Finasteride", "language": "en"},
+      {"alias": "Proscar", "language": "en"},
+      {"alias": "Propecia", "language": "en"},
+      {"alias": "Finasteride", "language": "it"},
+      {"alias": "Proscar", "language": "it"},
+      {"alias": "Finasterid", "language": "de"},
+      {"alias": "Proscar", "language": "de"},
+      {"alias": "Finasteride", "language": "fr"},
+      {"alias": "Chibro-Proscar", "language": "fr"},
+      {"alias": "Finasterida", "language": "es"},
+      {"alias": "Proscar", "language": "es"},
+      {"alias": "Proscar", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "dutasteride",
+    "canonical_display": "Dutasteride",
+    "atc_code": "G04CB02",
+    "aliases": [
+      {"alias": "Dutasteride", "language": "en"},
+      {"alias": "Avodart", "language": "en"},
+      {"alias": "Dutasteride", "language": "it"},
+      {"alias": "Avodart", "language": "it"},
+      {"alias": "Dutasterid", "language": "de"},
+      {"alias": "Avodart", "language": "de"},
+      {"alias": "Dutasteride", "language": "fr"},
+      {"alias": "Avodart", "language": "fr"},
+      {"alias": "Dutasterida", "language": "es"},
+      {"alias": "Avodart", "language": "es"},
+      {"alias": "Avodart", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ethinylestradiol_levonorgestrel",
+    "canonical_display": "Ethinylestradiol/Levonorgestrel",
+    "atc_code": "G03AA07",
+    "aliases": [
+      {"alias": "Ethinylestradiol/Levonorgestrel", "language": "en"},
+      {"alias": "Alesse", "language": "en"},
+      {"alias": "Seasonique", "language": "en"},
+      {"alias": "Etinilestradiolo/Levonorgestrel", "language": "it"},
+      {"alias": "Loette", "language": "it"},
+      {"alias": "Ethinylestradiol/Levonorgestrel", "language": "de"},
+      {"alias": "Microgynon", "language": "de"},
+      {"alias": "Ethinylestradiol/Levonorgestrel", "language": "fr"},
+      {"alias": "Minidril", "language": "fr"},
+      {"alias": "Etinilestradiol/Levonorgestrel", "language": "es"},
+      {"alias": "Microgynon", "language": "es"},
+      {"alias": "Microgynon", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ethinylestradiol_drospirenone",
+    "canonical_display": "Ethinylestradiol/Drospirenone",
+    "atc_code": "G03AA12",
+    "aliases": [
+      {"alias": "Ethinylestradiol/Drospirenone", "language": "en"},
+      {"alias": "Yasmin", "language": "en"},
+      {"alias": "Yaz", "language": "en"},
+      {"alias": "Etinilestradiolo/Drospirenone", "language": "it"},
+      {"alias": "Yasmin", "language": "it"},
+      {"alias": "Yasminelle", "language": "it"},
+      {"alias": "Ethinylestradiol/Drospirenon", "language": "de"},
+      {"alias": "Yasmin", "language": "de"},
+      {"alias": "Yasminelle", "language": "de"},
+      {"alias": "Ethinylestradiol/Drospirenone", "language": "fr"},
+      {"alias": "Jasmine", "language": "fr"},
+      {"alias": "Jasminelle", "language": "fr"},
+      {"alias": "Etinilestradiol/Drospirenona", "language": "es"},
+      {"alias": "Yasmin", "language": "es"},
+      {"alias": "Yasmin", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "levonorgestrel",
+    "canonical_display": "Levonorgestrel",
+    "atc_code": "G03AC03",
+    "aliases": [
+      {"alias": "Levonorgestrel", "language": "en"},
+      {"alias": "Plan B", "language": "en"},
+      {"alias": "Mirena", "language": "en"},
+      {"alias": "Levonorgestrel", "language": "it"},
+      {"alias": "Norlevo", "language": "it"},
+      {"alias": "Mirena", "language": "it"},
+      {"alias": "Levonorgestrel", "language": "de"},
+      {"alias": "Mirena", "language": "de"},
+      {"alias": "Levogynon", "language": "de"},
+      {"alias": "Levonorgestrel", "language": "fr"},
+      {"alias": "Norlevo", "language": "fr"},
+      {"alias": "Mirena", "language": "fr"},
+      {"alias": "Levonorgestrel", "language": "es"},
+      {"alias": "Norlevo", "language": "es"},
+      {"alias": "Postinor", "language": "es"},
+      {"alias": "Mirena", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "allopurinol",
+    "canonical_display": "Allopurinol",
+    "atc_code": "M04AA01",
+    "aliases": [
+      {"alias": "Allopurinol", "language": "en"},
+      {"alias": "Zyloprim", "language": "en"},
+      {"alias": "Allopurinolo", "language": "it"},
+      {"alias": "Zyloric", "language": "it"},
+      {"alias": "Allopurinol", "language": "de"},
+      {"alias": "Zyloric", "language": "de"},
+      {"alias": "Allopurinol", "language": "fr"},
+      {"alias": "Zyloric", "language": "fr"},
+      {"alias": "Alopurinol", "language": "es"},
+      {"alias": "Zyloric", "language": "es"},
+      {"alias": "Zyloric", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "colchicine",
+    "canonical_display": "Colchicine",
+    "atc_code": "M04AC01",
+    "aliases": [
+      {"alias": "Colchicine", "language": "en"},
+      {"alias": "Colcrys", "language": "en"},
+      {"alias": "Colchicina", "language": "it"},
+      {"alias": "Colchicina Lirca", "language": "it"},
+      {"alias": "Colchicin", "language": "de"},
+      {"alias": "Colchicum-Dispert", "language": "de"},
+      {"alias": "Colchicine", "language": "fr"},
+      {"alias": "Colchimax", "language": "fr"},
+      {"alias": "Colchicina", "language": "es"},
+      {"alias": "Colchicine", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "methotrexate",
+    "canonical_display": "Methotrexate",
+    "atc_code": "L01BA01",
+    "aliases": [
+      {"alias": "Methotrexate", "language": "en"},
+      {"alias": "MTX", "language": "en"},
+      {"alias": "Trexall", "language": "en"},
+      {"alias": "Metotrexato", "language": "it"},
+      {"alias": "Methotrexat", "language": "de"},
+      {"alias": "Methotrexate", "language": "fr"},
+      {"alias": "Metotrexato", "language": "es"},
+      {"alias": "Methotrexat", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "azathioprine",
+    "canonical_display": "Azathioprine",
+    "atc_code": "L04AX01",
+    "aliases": [
+      {"alias": "Azathioprine", "language": "en"},
+      {"alias": "Imuran", "language": "en"},
+      {"alias": "Azatioprina", "language": "it"},
+      {"alias": "Imuran", "language": "it"},
+      {"alias": "Azafalk", "language": "it"},
+      {"alias": "Azathioprin", "language": "de"},
+      {"alias": "Imurek", "language": "de"},
+      {"alias": "Azathioprine", "language": "fr"},
+      {"alias": "Imurel", "language": "fr"},
+      {"alias": "Azatioprina", "language": "es"},
+      {"alias": "Imurel", "language": "es"},
+      {"alias": "Imurek", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "tacrolimus",
+    "canonical_display": "Tacrolimus",
+    "atc_code": "L04AD02",
+    "aliases": [
+      {"alias": "Tacrolimus", "language": "en"},
+      {"alias": "Prograf", "language": "en"},
+      {"alias": "Tacrolimus", "language": "it"},
+      {"alias": "Prograf", "language": "it"},
+      {"alias": "Advagraf", "language": "it"},
+      {"alias": "Tacrolimus", "language": "de"},
+      {"alias": "Prograf", "language": "de"},
+      {"alias": "Advagraf", "language": "de"},
+      {"alias": "Tacrolimus", "language": "fr"},
+      {"alias": "Prograf", "language": "fr"},
+      {"alias": "Advagraf", "language": "fr"},
+      {"alias": "Tacrolimus", "language": "es"},
+      {"alias": "Prograf", "language": "es"},
+      {"alias": "Prograf", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "sildenafil",
+    "canonical_display": "Sildenafil",
+    "atc_code": "G04BE03",
+    "aliases": [
+      {"alias": "Sildenafil", "language": "en"},
+      {"alias": "Viagra", "language": "en"},
+      {"alias": "Revatio", "language": "en"},
+      {"alias": "Sildenafil", "language": "it"},
+      {"alias": "Viagra", "language": "it"},
+      {"alias": "Revatio", "language": "it"},
+      {"alias": "Sildenafil", "language": "de"},
+      {"alias": "Viagra", "language": "de"},
+      {"alias": "Revatio", "language": "de"},
+      {"alias": "Sildenafil", "language": "fr"},
+      {"alias": "Viagra", "language": "fr"},
+      {"alias": "Revatio", "language": "fr"},
+      {"alias": "Sildenafilo", "language": "es"},
+      {"alias": "Viagra", "language": "es"},
+      {"alias": "Viagra", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "ferrous_sulfate",
+    "canonical_display": "Ferrous Sulfate",
+    "atc_code": "B03AA07",
+    "aliases": [
+      {"alias": "Ferrous Sulfate", "language": "en"},
+      {"alias": "Iron Sulfate", "language": "en"},
+      {"alias": "Ferro Solfato", "language": "it"},
+      {"alias": "Ferrograd", "language": "it"},
+      {"alias": "Eisensulfat", "language": "de"},
+      {"alias": "Ferro sanol", "language": "de"},
+      {"alias": "Sulfate Ferreux", "language": "fr"},
+      {"alias": "Tardyferon", "language": "fr"},
+      {"alias": "Sulfato Ferroso", "language": "es"},
+      {"alias": "Tardyferon", "language": "es"},
+      {"alias": "Tardyferon", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "folic_acid",
+    "canonical_display": "Folic Acid",
+    "atc_code": "B03BB01",
+    "aliases": [
+      {"alias": "Folic Acid", "language": "en"},
+      {"alias": "Folate", "language": "en"},
+      {"alias": "Acido Folico", "language": "it"},
+      {"alias": "Folina", "language": "it"},
+      {"alias": "Folsaeure", "language": "de"},
+      {"alias": "Acide Folique", "language": "fr"},
+      {"alias": "Speciafoldine", "language": "fr"},
+      {"alias": "Acido Folico", "language": "es"}
+    ]
+  },
+  {
+    "canonical_code": "cholecalciferol",
+    "canonical_display": "Cholecalciferol",
+    "atc_code": "A11CC05",
+    "aliases": [
+      {"alias": "Cholecalciferol", "language": "en"},
+      {"alias": "Vitamin D3", "language": "en"},
+      {"alias": "Vit D3", "language": "en"},
+      {"alias": "Colecalciferolo", "language": "it"},
+      {"alias": "Dibase", "language": "it"},
+      {"alias": "Vitamina D3", "language": "it"},
+      {"alias": "Colecalciferol", "language": "de"},
+      {"alias": "Vitamin D3", "language": "de"},
+      {"alias": "Dekristol", "language": "de"},
+      {"alias": "Cholecalciferol", "language": "fr"},
+      {"alias": "Vitamine D3", "language": "fr"},
+      {"alias": "Uvedose", "language": "fr"},
+      {"alias": "Colecalciferol", "language": "es"},
+      {"alias": "Vitamina D3", "language": "es"},
+      {"alias": "Vi-De 3", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "calcium_carbonate",
+    "canonical_display": "Calcium Carbonate",
+    "atc_code": "A12AA04",
+    "aliases": [
+      {"alias": "Calcium Carbonate", "language": "en"},
+      {"alias": "Tums", "language": "en"},
+      {"alias": "Os-Cal", "language": "en"},
+      {"alias": "Carbonato di Calcio", "language": "it"},
+      {"alias": "Cacit", "language": "it"},
+      {"alias": "Calciumcarbonat", "language": "de"},
+      {"alias": "Calcium Sandoz", "language": "de"},
+      {"alias": "Carbonate de Calcium", "language": "fr"},
+      {"alias": "Cacit", "language": "fr"},
+      {"alias": "Orocal", "language": "fr"},
+      {"alias": "Carbonato de Calcio", "language": "es"},
+      {"alias": "Calcium Sandoz", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "potassium_chloride",
+    "canonical_display": "Potassium Chloride",
+    "atc_code": "A12BA01",
+    "aliases": [
+      {"alias": "Potassium Chloride", "language": "en"},
+      {"alias": "KCl", "language": "en"},
+      {"alias": "K-Dur", "language": "en"},
+      {"alias": "Slow-K", "language": "en"},
+      {"alias": "Cloruro di Potassio", "language": "it"},
+      {"alias": "KCl", "language": "it"},
+      {"alias": "Kaliumchlorid", "language": "de"},
+      {"alias": "Kalinor", "language": "de"},
+      {"alias": "Chlorure de Potassium", "language": "fr"},
+      {"alias": "Diffu-K", "language": "fr"},
+      {"alias": "Cloruro de Potasio", "language": "es"},
+      {"alias": "Slow-K", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "magnesium",
+    "canonical_display": "Magnesium",
+    "atc_code": "A12CC",
+    "aliases": [
+      {"alias": "Magnesium", "language": "en"},
+      {"alias": "Mag-Ox", "language": "en"},
+      {"alias": "Magnesio", "language": "it"},
+      {"alias": "Mag 2", "language": "it"},
+      {"alias": "Magnesium", "language": "de"},
+      {"alias": "Magnesium Verla", "language": "de"},
+      {"alias": "Magnesium", "language": "fr"},
+      {"alias": "Mag 2", "language": "fr"},
+      {"alias": "Magnesio", "language": "es"},
+      {"alias": "Magnesiocard", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "lactulose",
+    "canonical_display": "Lactulose",
+    "atc_code": "A06AD11",
+    "aliases": [
+      {"alias": "Lactulose", "language": "en"},
+      {"alias": "Duphalac", "language": "en"},
+      {"alias": "Lattulosio", "language": "it"},
+      {"alias": "Duphalac", "language": "it"},
+      {"alias": "Laevolac", "language": "it"},
+      {"alias": "Laktulose", "language": "de"},
+      {"alias": "Duphalac", "language": "de"},
+      {"alias": "Lactulose", "language": "fr"},
+      {"alias": "Duphalac", "language": "fr"},
+      {"alias": "Lactulosa", "language": "es"},
+      {"alias": "Duphalac", "language": "es"},
+      {"alias": "Duphalac", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "loperamide",
+    "canonical_display": "Loperamide",
+    "atc_code": "A07DA03",
+    "aliases": [
+      {"alias": "Loperamide", "language": "en"},
+      {"alias": "Imodium", "language": "en"},
+      {"alias": "Loperamide", "language": "it"},
+      {"alias": "Imodium", "language": "it"},
+      {"alias": "Dissenten", "language": "it"},
+      {"alias": "Loperamid", "language": "de"},
+      {"alias": "Imodium", "language": "de"},
+      {"alias": "Loperamide", "language": "fr"},
+      {"alias": "Imodium", "language": "fr"},
+      {"alias": "Loperamida", "language": "es"},
+      {"alias": "Imodium", "language": "es"},
+      {"alias": "Imodium", "language": "ch"}
+    ]
+  },
+  {
+    "canonical_code": "mebeverine",
+    "canonical_display": "Mebeverine",
+    "atc_code": "A03AA04",
+    "aliases": [
+      {"alias": "Mebeverine", "language": "en"},
+      {"alias": "Colofac", "language": "en"},
+      {"alias": "Mebeverina", "language": "it"},
+      {"alias": "Duspatal", "language": "it"},
+      {"alias": "Mebeverin", "language": "de"},
+      {"alias": "Duspatal", "language": "de"},
+      {"alias": "Mebeverine", "language": "fr"},
+      {"alias": "Duspatalin", "language": "fr"},
+      {"alias": "Mebeverina", "language": "es"},
+      {"alias": "Duspatalin", "language": "es"},
+      {"alias": "Duspatalin", "language": "ch"}
+    ]
+  }
+]

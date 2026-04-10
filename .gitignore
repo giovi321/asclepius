@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Config (real settings, not example)
+config/settings.yaml
+
+# Vault data (never commit patient data)
+vault/
+
+# SQLite databases
+*.sqlite
+*.db
+
+# Docker
+ollama_data/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MkDocs build
+site/

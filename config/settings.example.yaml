@@ -1,0 +1,37 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+database:
+  path: "/vault/asclepius.sqlite"
+
+vault:
+  root_path: "/vault"
+  inbox_path: "/vault/inbox"
+  patients_path: "/vault/patients"
+  unclassified_path: "/vault/unclassified"
+
+auth:
+  secret_key: "change-me-in-production"
+  session_ttl_hours: 720  # 30 days
+
+ocr:
+  engine: "tesseract"  # tesseract
+  language: "eng+ita+deu"  # Tesseract language codes
+  confidence_threshold: 0.7
+  cloud_ocr_enabled: false
+  google_vision_key: ""
+
+llm:
+  provider: "ollama"  # ollama or claude
+  ollama_base_url: "http://ollama:11434"
+  ollama_model: "llama3.1"
+  claude_api_key: ""
+  claude_model: "claude-sonnet-4-20250514"
+  extraction_timeout: 120  # seconds
+
+pipeline:
+  watch_enabled: true
+  poll_interval_seconds: 5
+  retry_interval_seconds: 300  # retry failed LLM extractions
+  max_retries: 3

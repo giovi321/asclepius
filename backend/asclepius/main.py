@@ -1,0 +1,104 @@
+"""FastAPI application entry point."""
+
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from asclepius.config import get_config
+from asclepius.db.init import initialize_database
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: startup and shutdown."""
+    config = get_config()
+
+    # Ensure vault directories exist
+    for dir_path in [
+        config.vault.root_path,
+        config.vault.inbox_path,
+        config.vault.patients_path,
+        config.vault.unclassified_path,
+    ]:
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+
+    # Initialize database
+    await initialize_database(config.database.path)
+
+    # Create default admin user if needed
+    import aiosqlite
+    async with aiosqlite.connect(config.database.path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        from asclepius.auth.session import ensure_admin_exists
+        await ensure_admin_exists(db)
+
+    # Start pipeline watcher (imported here to avoid circular imports)
+    pipeline_task = None
+    if config.pipeline.watch_enabled:
+        import asyncio
+        from asclepius.pipeline.watcher import start_watcher
+        pipeline_task = asyncio.create_task(start_watcher(config))
+
+    yield
+
+    # Shutdown
+    if pipeline_task:
+        pipeline_task.cancel()
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title="Asclepius",
+        description="Self-hosted medical records manager",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://localhost:8070"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Health check
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
+    # Register routers (will be added as they're implemented)
+    from asclepius.auth.routes import router as auth_router
+    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+
+    from asclepius.patients.routes import router as patients_router
+    app.include_router(patients_router, prefix="/api/patients", tags=["patients"])
+
+    from asclepius.documents.routes import router as documents_router
+    app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
+
+    from asclepius.lab_results.routes import router as lab_results_router
+    app.include_router(lab_results_router, prefix="/api/lab-results", tags=["lab-results"])
+
+    from asclepius.imaging.routes import router as imaging_router
+    app.include_router(imaging_router, prefix="/api/imaging", tags=["imaging"])
+
+    from asclepius.chat.routes import router as chat_router
+    app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+
+    from asclepius.normalization.routes import router as normalization_router
+    app.include_router(normalization_router, prefix="/api/normalization", tags=["normalization"])
+
+    from asclepius.pipeline.routes import router as pipeline_router
+    app.include_router(pipeline_router, prefix="/api/pipeline", tags=["pipeline"])
+
+    from asclepius.settings.routes import router as settings_router
+    app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
+
+    return app
+
+
+app = create_app()

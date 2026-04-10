@@ -1,0 +1,83 @@
+site_name: Asclepius
+site_description: Self-hosted medical records manager — documentation
+site_url: https://giovi321.github.io/asclepius/
+repo_url: https://github.com/giovi321/asclepius
+repo_name: giovi321/asclepius
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: grey
+      accent: red
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: grey
+      accent: red
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - toc.follow
+    - search.suggest
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Configuration: getting-started/configuration.md
+    - First Steps: getting-started/first-steps.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Database Schema: architecture/database.md
+    - Processing Pipeline: architecture/pipeline.md
+    - Vault Structure: architecture/vault-structure.md
+  - User Guide:
+    - Documents: user-guide/documents.md
+    - Lab Results: user-guide/lab-results.md
+    - Imaging: user-guide/imaging.md
+    - Chat: user-guide/chat.md
+    - Search: user-guide/search.md
+    - Normalization: user-guide/normalization.md
+  - Admin Guide:
+    - User Management: admin-guide/user-management.md
+    - LLM Configuration: admin-guide/llm-configuration.md
+    - Backup & Restore: admin-guide/backup-restore.md
+  - API Reference:
+    - Authentication: api-reference/authentication.md
+    - Endpoints: api-reference/endpoints.md
+  - Development:
+    - Setup: development/setup.md
+    - Contributing: development/contributing.md

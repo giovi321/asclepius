@@ -1,0 +1,33 @@
+services:
+  asclepius:
+    build: ./backend
+    ports:
+      - "8070:8000"
+    volumes:
+      - ./vault:/vault
+      - ./config:/config
+    environment:
+      - ASCLEPIUS_VAULT_PATH=/vault
+      - ASCLEPIUS_CONFIG_PATH=/config/settings.yaml
+      - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ASCLEPIUS_OLLAMA_URL=http://ollama:11434
+      - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # GPU passthrough if available:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+volumes:
+  ollama_data:

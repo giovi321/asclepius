@@ -194,3 +194,89 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pass
 
     pipeline_status["processing"] = None
+
+
+async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
+    """Re-run LLM extraction on an existing document. Does NOT re-OCR or move files."""
+    async with aiosqlite.connect(config.database.path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA foreign_keys=ON")
+
+        cursor = await db.execute(
+            "SELECT id, ocr_text, file_path, original_filename, patient_id FROM documents WHERE id = ?",
+            (doc_id,),
+        )
+        doc = await cursor.fetchone()
+        if not doc:
+            return {"error": "Document not found"}
+
+        ocr_text = doc["ocr_text"]
+        if not ocr_text or not ocr_text.strip():
+            # Need to re-OCR — find the file
+            file_path = Path(config.vault.root_path) / doc["file_path"]
+            if not file_path.exists():
+                await db.execute(
+                    "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (doc_id,),
+                )
+                await db.commit()
+                return {"error": f"File not found: {doc['file_path']}"}
+
+            logger.info("Re-running OCR on doc %d", doc_id)
+            ocr_text, confidence, engine = await extract_text(str(file_path), config)
+            await db.execute(
+                """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (ocr_text, confidence, engine, doc_id),
+            )
+            await db.commit()
+
+        if not ocr_text or not ocr_text.strip():
+            await db.execute(
+                "UPDATE documents SET status = 'needs_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+            return {"error": "No text could be extracted"}
+
+        # Clear old extracted data
+        for table in ["lab_results", "encounters", "medications", "vaccinations"]:
+            await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
+
+        await db.execute(
+            "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (doc_id,),
+        )
+        await db.commit()
+
+        # Run LLM extraction
+        logger.info("Re-running LLM extraction on doc %d", doc_id)
+        try:
+            llm = get_llm_provider(config)
+            extraction = await extract_and_store(db, llm, doc_id, ocr_text, config)
+
+            if "error" in extraction:
+                await db.execute(
+                    "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (doc_id,),
+                )
+                await db.commit()
+                return extraction
+
+            await db.execute(
+                "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+            logger.info("Reprocessing complete for doc %d", doc_id)
+            return {"status": "done", "document_id": doc_id}
+
+        except Exception as e:
+            logger.exception("Reprocessing failed for doc %d", doc_id)
+            await db.execute(
+                "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+            return {"error": str(e)}

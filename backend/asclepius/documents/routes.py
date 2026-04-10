@@ -184,13 +184,13 @@ async def reprocess_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Reset status to pending
-    await db.execute(
-        "UPDATE documents SET status = 'pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (doc_id,),
-    )
-    await db.commit()
-    return {"status": "queued", "document_id": doc_id}
+    # Run reprocessing in background
+    import asyncio
+    from asclepius.pipeline.processor import reprocess_document
+
+    config = get_config()
+    asyncio.create_task(reprocess_document(doc_id, config))
+    return {"status": "reprocessing", "document_id": doc_id}
 
 
 async def _get_related(db: aiosqlite.Connection, table: str, doc_id: int) -> list[dict]:

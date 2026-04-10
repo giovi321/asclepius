@@ -2,16 +2,32 @@
 
 EXTRACTION_PROMPT = """You are a medical document parser. Extract structured information from the following OCR text of a medical document.
 
-CRITICAL: Document classification rules (doc_type). Read the document carefully before classifying:
-- "specialist_report" = any visit report, consultation, checkup, follow-up, "visita di controllo", "referto", "Befund". This is the MOST COMMON type.
-- "bloodtest" = ONLY if the document contains a table/list of lab test values with numbers and units
-- "prescription" = ONLY if the document is a prescription/recipe for medications ("ricetta", "Rezept")
-- "invoice" = ONLY if the document contains prices, amounts, payment details, or billing codes
-- "discharge" = hospital discharge letter ("lettera di dimissione", "Austrittsbrief")
-- "radiology_report" = radiology/imaging report with findings from X-ray, CT, MRI, ultrasound
-- "referral" = a letter referring the patient to another doctor/specialist
-- Look for the document TITLE or HEADING first — it usually tells you the type directly.
-- When in doubt, use "specialist_report" rather than "prescription" or "other".
+CRITICAL RULES:
+
+1. PATIENT IDENTIFICATION:
+   - The PATIENT is the person RECEIVING medical care, NOT the doctor/provider/sender.
+   - On invoices/bills: the patient is the person being BILLED (often labeled "Patient", "Paziente", "Assicurato", "Versicherter"). The sender/header is the FACILITY, not the patient.
+   - On reports: the patient name is usually near "Patient:", "Paziente:", "Name:", etc.
+   - If known patients are listed below, MATCH against them. Use the known patient name if it appears anywhere in the document.
+   - NEVER confuse the doctor's name, clinic name, or letterhead with the patient name.
+
+2. DOCUMENT CLASSIFICATION (doc_type):
+   - "specialist_report" = any visit report, consultation, checkup, follow-up, "visita di controllo", "referto", "Befund". This is the MOST COMMON type.
+   - "bloodtest" = ONLY if the document contains a table/list of lab test values with numbers and units
+   - "prescription" = ONLY if the document is a prescription/recipe for medications ("ricetta", "Rezept")
+   - "invoice" = ONLY if the document contains prices, amounts, payment details, billing codes, TARMED, tariff points
+   - "receipt" = payment confirmation, "Quittung", "ricevuta"
+   - "discharge" = hospital discharge letter ("lettera di dimissione", "Austrittsbrief")
+   - "radiology_report" = radiology/imaging report with findings from X-ray, CT, MRI, ultrasound
+   - "referral" = a letter referring the patient to another doctor/specialist
+   - Look for the document TITLE or HEADING first — it usually tells you the type directly.
+   - When in doubt, use "specialist_report" rather than "prescription" or "other".
+
+3. INVOICES/BILLS:
+   - The "doctor" field should be the treating doctor if mentioned, or null if not applicable.
+   - The "facility" field should be the billing entity (clinic, hospital, practice).
+   - Extract ALL line items with amounts, tariff codes, and categories.
+   - The letterhead/sender is the FACILITY, not the patient and not the doctor.
 
 Known patients: {patient_list}
 Known facilities: {facility_list}

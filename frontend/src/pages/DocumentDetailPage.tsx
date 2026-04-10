@@ -27,7 +27,8 @@ export default function DocumentDetailPage() {
     const res = await api.get(`/documents/${id}`);
     setDoc(res.data);
     setNotes(res.data.user_notes || "");
-    setTags(res.data.tags || []);
+    const rawTags = res.data.tags || "";
+    setTags(typeof rawTags === "string" ? (rawTags ? rawTags.split(",").map((t: string) => t.trim()) : []) : rawTags);
     setLinkedDocs(res.data.linked_documents || []);
     setLoading(false);
   };
@@ -100,7 +101,7 @@ export default function DocumentDetailPage() {
     if (!newTag.trim()) return;
     const updated = [...tags, newTag.trim()];
     try {
-      await api.patch(`/documents/${id}`, { tags: updated });
+      await api.patch(`/documents/${id}`, { tags: updated.join(",") });
       setTags(updated);
       setNewTag("");
     } catch {
@@ -111,7 +112,7 @@ export default function DocumentDetailPage() {
   const handleRemoveTag = async (tag: string) => {
     const updated = tags.filter((t) => t !== tag);
     try {
-      await api.patch(`/documents/${id}`, { tags: updated });
+      await api.patch(`/documents/${id}`, { tags: updated.join(",") });
       setTags(updated);
     } catch {
       alert("Failed to remove tag");

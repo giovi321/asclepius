@@ -4,24 +4,32 @@
 # Phase 1: Classification prompt (same for ALL document types)
 # ---------------------------------------------------------------------------
 
-CLASSIFICATION_PROMPT = """You are a medical document classifier. Analyze the OCR text and extract basic metadata.
+CLASSIFICATION_PROMPT = """You are a medical document classifier.
 
-NOTE: The OCR text may be in Markdown format (with headers like #, tables with |, etc.) from an AI-based OCR engine. Parse it as structured text.
+STEP 1: Look at the document for these keywords to determine doc_type:
+- "FATTURA", "Fattura", "Rechnung", "Invoice", "Bill", "TARMED", "importo", "Betrag", "CHF", "EUR", "totale" with prices → doc_type = "invoice"
+- "RICEVUTA", "Quittung", "Receipt", "pagamento", "Zahlung" → doc_type = "receipt"
+- "RICETTA", "Rezept", "Prescription", "prescrizione" → doc_type = "prescription"
+- "REFERTO", "Befund", "Report", "visita", "controllo", "Untersuchung", "esame" → doc_type = "specialist_report"
+- "DIMISSIONE", "Austritt", "Discharge", "dimissioni" → doc_type = "discharge"
+- "ANALISI", "Blutbild", "lab", "emocromo", "esami del sangue" with numeric values → doc_type = "bloodtest"
+- "RADIOLOGIA", "Röntgen", "X-ray", "CT", "MRI", "RMN", "ecografia" → doc_type = "radiology_report"
+- "VACCINAZIONE", "Impfung", "Vaccination" → doc_type = "vaccination"
 
-CRITICAL: Patient identification rules:
-- The PATIENT is the person RECEIVING care, NOT the doctor/provider/sender.
-- On invoices: the patient is the person being BILLED. The letterhead is the FACILITY.
-- Match against known patients if possible.
+STEP 2: Identify the PATIENT (person receiving care, NOT the doctor or sender).
+Match against known patients: {patient_list}
 
-Known patients: {patient_list}
+STEP 3: Identify doctor and facility.
 Known facilities: {facility_list}
 Known doctors: {doctor_list}
 
-Respond in JSON only. No markdown.
+NOTE: OCR text may be in Markdown format (headers, tables with |). Parse it as structured text.
+
+Respond in JSON only. No markdown, no explanation.
 
 {{
   "patient_name": "string or null",
-  "doc_type": "one of: bloodtest, labtest_other, prescription, invoice, receipt, insurance_claim, insurance_doc, referral, discharge, specialist_report, radiology_report, pathology_report, surgical_report, er_report, vaccination, allergy, sick_leave, medical_cert, physio_report, dental, ophthalmology, mental_health, consent, advance_directive, imaging_dicom, imaging_other, correspondence, other",
+  "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",
   "doc_date": "YYYY-MM-DD or null",
   "date_issued": "YYYY-MM-DD or null",
   "date_visit": "YYYY-MM-DD or null",
@@ -33,15 +41,6 @@ Respond in JSON only. No markdown.
   "summary_en": "1-3 sentence English summary",
   "summary_original": "1-3 sentence summary in source language"
 }}
-
-Document classification hints:
-- "specialist_report" = visit report, consultation, checkup, referto, Befund — MOST COMMON
-- "bloodtest" = table of lab values with numbers and units
-- "prescription" = ONLY medication prescription (ricetta, Rezept)
-- "invoice" = prices, amounts, billing codes, TARMED
-- "discharge" = hospital discharge letter
-- "radiology_report" = imaging findings
-- Look at the document TITLE/HEADING first
 
 OCR text:
 ---

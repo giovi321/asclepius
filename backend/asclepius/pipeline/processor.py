@@ -103,37 +103,38 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             file_size = os.path.getsize(file_path)
             page_count = _count_pages(file_path)
 
-            # Check for existing records (by hash or filename)
+            # Check for existing record by file_hash ONLY
             cursor = await db.execute(
-                "SELECT id, status FROM documents WHERE file_hash = ? OR (original_filename = ? AND file_hash IS NULL) ORDER BY id",
-                (file_hash, path.name),
+                "SELECT id, status FROM documents WHERE file_hash = ? ORDER BY id",
+                (file_hash,),
             )
-            existing_rows = await cursor.fetchall()
+            existing = await cursor.fetchone()
 
-            if existing_rows:
-                # Check if any are already done
-                done_row = next((r for r in existing_rows if r["status"] == "done"), None)
-                if done_row:
-                    logger.info("Already processed (doc %d), skipping: %s", done_row["id"], path.name)
-                    path.unlink()
-                    return
+            if existing and existing["status"] == "done":
+                logger.info("Already processed (doc %d), skipping: %s", existing["id"], path.name)
+                path.unlink()
+                return
 
-                # Reuse the first pending/failed record, delete any duplicates
-                doc_id = existing_rows[0]["id"]
-                for dup in existing_rows[1:]:
-                    logger.info("Removing duplicate record %d for: %s", dup["id"], path.name)
-                    await db.execute("DELETE FROM documents WHERE id = ?", (dup["id"],))
+            ext = path.suffix.lower()
 
+            if existing:
+                # Reuse the existing record (created by upload endpoint)
+                doc_id = existing["id"]
                 await db.execute(
-                    """UPDATE documents SET status = 'processing', file_hash = ?, file_size = ?, page_count = ?,
+                    """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (file_hash, file_size, page_count, doc_id),
+                    (file_size, page_count, doc_id),
                 )
                 await db.commit()
-                logger.info("Reusing existing record %d for: %s", doc_id, path.name)
-            else:
-                ext = path.suffix.lower()
+                logger.info("Reusing upload record %d for: %s", doc_id, path.name)
 
+                # Delete any other duplicates with the same hash
+                await db.execute(
+                    "DELETE FROM documents WHERE file_hash = ? AND id != ?",
+                    (file_hash, doc_id),
+                )
+                await db.commit()
+            else:
                 # DICOM path
                 if ext in {".dcm", ".dicom"}:
                     from asclepius.pipeline.dicom_ingest import process_dicom
@@ -143,23 +144,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         pipeline_status["last_processed"] = path.name
                     return
 
-                # Check for patient_id hint from upload
-                hint_patient_id = None
-                hint_path = Path(str(path) + ".patient_hint")
-                if hint_path.exists():
-                    try:
-                        hint_patient_id = int(hint_path.read_text().strip())
-                    except (ValueError, OSError):
-                        pass
-                    hint_path.unlink(missing_ok=True)
-
-                # Create new document record
+                # Create new document record (file dropped directly into inbox)
                 cursor = await db.execute(
                     """INSERT INTO documents
                        (file_path, original_filename, file_hash, file_size, page_count,
-                        patient_id, date_received, status)
-                       VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'processing')""",
-                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id),
+                        date_received, status)
+                       VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
+                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
                 )
                 doc_id = cursor.lastrowid
                 await db.commit()

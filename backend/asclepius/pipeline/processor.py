@@ -147,8 +147,6 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             )
             await db.commit()
             logger.info("Processing doc %d: %s", doc_id, path.name)
-                doc_id = cursor.lastrowid
-                await db.commit()
 
             ext = path.suffix.lower()
             if ext in {".dcm", ".dicom"}:

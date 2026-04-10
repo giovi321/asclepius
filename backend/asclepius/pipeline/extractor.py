@@ -226,6 +226,14 @@ async def extract_and_store(
     else:
         extraction = await llm.extract(ocr_text, context)
 
+    # Sanitize extraction — LLMs sometimes return strings instead of dicts/lists
+    for key in ("doctor", "facility", "specialty", "insurance", "encounter", "cost"):
+        if key in extraction and not isinstance(extraction[key], dict):
+            extraction[key] = {}
+    for key in ("lab_results", "diagnoses", "medications", "vaccinations"):
+        if key in extraction and not isinstance(extraction[key], list):
+            extraction[key] = []
+
     if "error" in extraction:
         logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))
         await db.execute(
@@ -341,6 +349,8 @@ async def extract_and_store(
 
         # Insert encounters/diagnoses
         encounter = extraction.get("encounter", {})
+        if not isinstance(encounter, dict):
+            encounter = {}
         for diag in extraction.get("diagnoses", []):
             norm_diag_id = await _resolve_diagnosis(db, diag)
             norm_spec_id = None

@@ -245,9 +245,19 @@ function OcrTab() {
       )}
 
       {f.ocr_engine === "llm_vision" && (
-        <TextField label="Vision Model (Ollama)" value={f.llm_vision_model}
-          onChange={(v) => setF({ ...f, llm_vision_model: v })}
-          placeholder="e.g. llava:13b or llama3.2-vision (empty = use main LLM model)" />
+        <>
+          <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+            LLM Vision uses the provider configured in the <strong>LLM tab</strong>.
+            {s.llm.provider === "claude"
+              ? " Claude has built-in vision — no extra model needed."
+              : " For Ollama, specify a vision-capable model below (e.g. llava, llama3.2-vision)."}
+          </div>
+          {s.llm.provider !== "claude" && (
+            <TextField label="Vision Model (Ollama)" value={f.llm_vision_model}
+              onChange={(v) => setF({ ...f, llm_vision_model: v })}
+              placeholder="e.g. llava:13b or llama3.2-vision" />
+          )}
+        </>
       )}
 
       {f.ocr_engine === "google_vision" && (

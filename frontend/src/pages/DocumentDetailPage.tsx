@@ -170,8 +170,6 @@ export default function DocumentDetailPage() {
             </Section>
           )}
         </div>
-
-        </div>
       </div>
 
       {/* OCR Text — collapsible below */}

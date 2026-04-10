@@ -5,7 +5,6 @@ import { usePatient } from "@/contexts/PatientContext";
 import {
   FileText,
   AlertCircle,
-  TestTube,
   Activity,
   Clock,
 } from "lucide-react";
@@ -38,9 +37,9 @@ export default function DashboardPage() {
     });
 
     api
-      .get("/documents", { params: { status: "done", limit: 1 } })
-      .then((res) => {
-        // Count unclassified by checking patient_id=null
+      .get("/documents", { params: { limit: 1 } })
+      .then((_res) => {
+        // TODO: count unclassified documents
       });
 
     api.get("/pipeline/status").then((res) => setPipeline(res.data));

@@ -13,12 +13,12 @@ interface DicomViewerProps {
  */
 export default function DicomViewer({ studyId, seriesId }: DicomViewerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [frames, setFrames] = useState<string[]>([]);
+  const [, setFrames] = useState<string[]>([]);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cornerstoneReady, setCornerstoneReady] = useState(false);
+  const [, setCornerstoneReady] = useState(false);
 
   // Load frame list
   useEffect(() => {

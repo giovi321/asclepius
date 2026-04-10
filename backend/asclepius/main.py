@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import logging
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -10,6 +12,22 @@ from fastapi.staticfiles import StaticFiles
 
 from asclepius.config import get_config
 from asclepius.db.init import initialize_database
+
+# Configure logging — show all asclepius modules at INFO level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+    force=True,
+)
+# Set asclepius loggers to DEBUG for detailed output
+logging.getLogger("asclepius").setLevel(logging.DEBUG)
+# Keep noisy libraries at WARNING
+logging.getLogger("watchdog").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("anthropic").setLevel(logging.WARNING)
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 

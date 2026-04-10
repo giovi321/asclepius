@@ -19,6 +19,7 @@ class OllamaProvider(LLMProvider):
         self.timeout = timeout
 
     async def classify(self, ocr_text: str, context: dict) -> dict:
+        logger.info("Ollama classify: model=%s, text_len=%d", self.model, len(ocr_text))
         prompt = CLASSIFICATION_PROMPT.format(
             patient_list=json.dumps(context.get("patient_list", []), indent=2),
             facility_list=json.dumps(context.get("facility_list", []), indent=2),
@@ -27,7 +28,9 @@ class OllamaProvider(LLMProvider):
         )
 
         response_text = await self._generate(prompt)
-        return self._parse_json(response_text)
+        result = self._parse_json(response_text)
+        logger.info("Ollama classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
+        return result
 
     async def extract(self, ocr_text: str, context: dict) -> dict:
         prompt = EXTRACTION_PROMPT.format(
@@ -74,6 +77,7 @@ class OllamaProvider(LLMProvider):
         return response_text.strip()
 
     async def _generate(self, prompt: str) -> str:
+        logger.debug("Ollama _generate: model=%s, prompt_len=%d, url=%s", self.model, len(prompt), self.base_url)
         # Separate timeouts: short connect, long read (LLM can take minutes)
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         async with httpx.AsyncClient(timeout=timeout) as client:
@@ -83,7 +87,9 @@ class OllamaProvider(LLMProvider):
             )
             resp.raise_for_status()
             data = resp.json()
-            return data.get("response", "")
+            response = data.get("response", "")
+            logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
+            return response
 
     @staticmethod
     def _parse_json(text: str) -> dict:

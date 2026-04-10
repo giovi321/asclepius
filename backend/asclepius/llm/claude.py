@@ -19,6 +19,7 @@ class ClaudeProvider(LLMProvider):
         self.timeout = timeout
 
     async def classify(self, ocr_text: str, context: dict) -> dict:
+        logger.info("Claude classify: model=%s, text_len=%d", self.model, len(ocr_text))
         prompt = CLASSIFICATION_PROMPT.format(
             patient_list=json.dumps(context.get("patient_list", []), indent=2),
             facility_list=json.dumps(context.get("facility_list", []), indent=2),
@@ -32,7 +33,9 @@ class ClaudeProvider(LLMProvider):
             messages=[{"role": "user", "content": prompt}],
         )
         response_text = response.content[0].text
-        return self._parse_json(response_text)
+        result = self._parse_json(response_text)
+        logger.info("Claude classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
+        return result
 
     async def extract(self, ocr_text: str, context: dict) -> dict:
         prompt = EXTRACTION_PROMPT.format(

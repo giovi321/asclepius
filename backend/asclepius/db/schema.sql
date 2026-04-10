@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS documents (
     tags TEXT,  -- comma-separated user tags
     page_count INTEGER,
     file_size INTEGER,  -- bytes
-    file_hash TEXT,  -- SHA-256 for dedup
+    file_hash TEXT UNIQUE,  -- SHA-256 for dedup
     language_source TEXT,
     ocr_text TEXT,
     ocr_confidence REAL,

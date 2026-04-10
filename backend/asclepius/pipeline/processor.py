@@ -103,55 +103,50 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             file_size = os.path.getsize(file_path)
             page_count = _count_pages(file_path)
 
-            # Check for existing record by file_hash ONLY
+            ext = path.suffix.lower()
+
+            # DICOM path (handle before dedup since DICOM has its own logic)
+            if ext in {".dcm", ".dicom"}:
+                from asclepius.pipeline.dicom_ingest import process_dicom
+                doc_id = await process_dicom(file_path, config, db)
+                if doc_id:
+                    pipeline_status["total_processed"] += 1
+                    pipeline_status["last_processed"] = path.name
+                return
+
+            # Try to INSERT — if file_hash already exists (from upload), it'll be ignored
+            # thanks to UNIQUE constraint on file_hash
+            await db.execute(
+                """INSERT OR IGNORE INTO documents
+                   (file_path, original_filename, file_hash, file_size, page_count,
+                    date_received, status)
+                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
+            )
+            await db.commit()
+
+            # Now SELECT the record (whether just inserted or pre-existing from upload)
             cursor = await db.execute(
-                "SELECT id, status FROM documents WHERE file_hash = ? ORDER BY id",
-                (file_hash,),
+                "SELECT id, status FROM documents WHERE file_hash = ?", (file_hash,),
             )
             existing = await cursor.fetchone()
+            if not existing:
+                logger.error("Failed to find/create document record for: %s", path.name)
+                return
 
-            if existing and existing["status"] == "done":
+            if existing["status"] == "done":
                 logger.info("Already processed (doc %d), skipping: %s", existing["id"], path.name)
                 path.unlink()
                 return
 
-            ext = path.suffix.lower()
-
-            if existing:
-                # Reuse the existing record (created by upload endpoint)
-                doc_id = existing["id"]
-                await db.execute(
-                    """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
-                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (file_size, page_count, doc_id),
-                )
-                await db.commit()
-                logger.info("Reusing upload record %d for: %s", doc_id, path.name)
-
-                # Delete any other duplicates with the same hash
-                await db.execute(
-                    "DELETE FROM documents WHERE file_hash = ? AND id != ?",
-                    (file_hash, doc_id),
-                )
-                await db.commit()
-            else:
-                # DICOM path
-                if ext in {".dcm", ".dicom"}:
-                    from asclepius.pipeline.dicom_ingest import process_dicom
-                    doc_id = await process_dicom(file_path, config, db)
-                    if doc_id:
-                        pipeline_status["total_processed"] += 1
-                        pipeline_status["last_processed"] = path.name
-                    return
-
-                # Create new document record (file dropped directly into inbox)
-                cursor = await db.execute(
-                    """INSERT INTO documents
-                       (file_path, original_filename, file_hash, file_size, page_count,
-                        date_received, status)
-                       VALUES (?, ?, ?, ?, ?, DATE('now'), 'processing')""",
-                    (f"inbox/{path.name}", path.name, file_hash, file_size, page_count),
-                )
+            doc_id = existing["id"]
+            await db.execute(
+                """UPDATE documents SET status = 'processing', file_size = ?, page_count = ?,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (file_size, page_count, doc_id),
+            )
+            await db.commit()
+            logger.info("Processing doc %d: %s", doc_id, path.name)
                 doc_id = cursor.lastrowid
                 await db.commit()
 

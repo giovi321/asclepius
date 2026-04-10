@@ -37,7 +37,8 @@ class OllamaProvider(LLMProvider):
         ollama_messages = [{"role": "system", "content": system_prompt}]
         ollama_messages.extend(messages)
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/api/chat",
                 json={"model": self.model, "messages": ollama_messages, "stream": False},
@@ -62,7 +63,9 @@ class OllamaProvider(LLMProvider):
         return response_text.strip()
 
     async def _generate(self, prompt: str) -> str:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        # Separate timeouts: short connect, long read (LLM can take minutes)
+        timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/api/generate",
                 json={"model": self.model, "prompt": prompt, "stream": False},

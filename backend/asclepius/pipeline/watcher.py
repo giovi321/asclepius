@@ -75,11 +75,20 @@ async def start_watcher(config: AppConfig) -> None:
     try:
         while True:
             file_path = await file_queue.get()
+            # Process in a way that doesn't block the event loop
+            # Use asyncio.shield + timeout to prevent server hangs
             try:
-                await process_file(file_path, config)
+                await asyncio.wait_for(
+                    process_file(file_path, config),
+                    timeout=600,  # 10 min max per document
+                )
+            except asyncio.TimeoutError:
+                logger.error("Processing timed out for: %s", file_path)
             except Exception:
                 logger.exception("Error processing file: %s", file_path)
             file_queue.task_done()
+            # Small yield to let the event loop handle HTTP requests
+            await asyncio.sleep(0.1)
     except asyncio.CancelledError:
         observer.stop()
         observer.join()

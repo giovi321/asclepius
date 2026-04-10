@@ -102,17 +102,6 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 path.unlink()
                 return
 
-            # Also check by filename as fallback
-            cursor = await db.execute(
-                "SELECT id FROM documents WHERE file_path LIKE ? OR original_filename = ?",
-                (f"%{path.name}", path.name),
-            )
-            existing = await cursor.fetchone()
-            if existing:
-                logger.info("Duplicate detected by name, skipping: %s", path.name)
-                path.unlink()
-                return
-
             ext = path.suffix.lower()
 
             # DICOM path

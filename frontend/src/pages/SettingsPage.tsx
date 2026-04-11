@@ -18,18 +18,18 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Settings</h1>
-      <div className="flex flex-wrap gap-1 rounded-lg border p-1">
+      <div className="flex flex-wrap gap-1 rounded-lg border p-1 overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap transition-colors ${
                 activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-accent"
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {tab.label}
             </button>
           );

@@ -25,6 +25,9 @@ async def initialize_database(db_path: str) -> None:
         await db.executescript(schema_sql)
         await db.commit()
 
+        # Migrations for existing databases
+        await _run_migrations(db)
+
         # Check if we need to seed
         cursor = await db.execute("SELECT COUNT(*) FROM norm_lab_tests")
         row = await cursor.fetchone()
@@ -33,6 +36,17 @@ async def initialize_database(db_path: str) -> None:
             await db.commit()
 
         logger.info("Database initialized at %s", db_path)
+
+
+async def _run_migrations(db: aiosqlite.Connection) -> None:
+    """Run schema migrations for existing databases."""
+    # Check if process_at column exists on documents table
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    columns = [row[1] for row in await cursor.fetchall()]
+    if "process_at" not in columns:
+        await db.execute("ALTER TABLE documents ADD COLUMN process_at DATETIME")
+        await db.commit()
+        logger.info("Migration: added process_at column to documents")
 
 
 async def _seed_normalization_tables(db: aiosqlite.Connection) -> None:

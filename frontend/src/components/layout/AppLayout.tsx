@@ -21,6 +21,7 @@ import {
   Heart,
   Sun,
   Moon,
+  FolderTree,
 } from "lucide-react";
 
 const navItems = [
@@ -35,6 +36,7 @@ const navItems = [
   { path: "/chat", label: "Chat", icon: MessageCircle },
   { path: "/search", label: "Search", icon: Search },
   { path: "/settings", label: "Settings", icon: Settings },
+  { path: "/files", label: "Files", icon: FolderTree },
 ];
 
 export default function AppLayout() {

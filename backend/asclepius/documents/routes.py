@@ -78,7 +78,65 @@ async def upload_document(
         import logging
         logging.getLogger(__name__).warning("Upload DB record failed (pipeline will create): %s", e)
 
-    return {"filename": dest.name, "status": "pending", "message": "File uploaded and queued for processing"}
+    # Check if we should suggest batch scheduling
+    suggestion = None
+    suggestion_message = None
+    queue_size = 0
+    try:
+        async with aiosqlite.connect(config.database.path) as db2:
+            cursor = await db2.execute(
+                "SELECT COUNT(*) FROM documents WHERE status IN ('pending', 'processing')"
+            )
+            row = await cursor.fetchone()
+            queue_size = row[0] if row else 0
+        if file_size > 10 * 1024 * 1024 or queue_size > 5:
+            suggestion = "batch_schedule"
+            suggestion_message = "Large upload detected. Consider scheduling for later processing."
+    except Exception:
+        pass
+
+    result = {"filename": dest.name, "status": "pending", "message": "File uploaded and queued for processing"}
+    if suggestion:
+        result["suggestion"] = suggestion
+        result["message"] = suggestion_message
+        result["queue_size"] = queue_size
+    return result
+
+
+class BatchScheduleRequest(BaseModel):
+    document_ids: list[int]  # list of document IDs to schedule
+    process_at: str | None = None  # ISO datetime, null = process now
+
+
+@router.post("/schedule-batch")
+async def schedule_batch(
+    body: BatchScheduleRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Schedule a batch of documents for later processing."""
+    if not body.document_ids:
+        raise HTTPException(status_code=400, detail="No document IDs provided")
+
+    count = 0
+    for doc_id in body.document_ids:
+        doc = await get_document(db, doc_id)
+        if not doc:
+            continue
+        if body.process_at:
+            await db.execute(
+                "UPDATE documents SET status = 'scheduled', process_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (body.process_at, doc_id),
+            )
+        else:
+            await db.execute(
+                "UPDATE documents SET status = 'pending', process_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+        count += 1
+
+    await db.commit()
+    return {"scheduled": count, "process_at": body.process_at}
 
 
 class DocumentUpdate(BaseModel):

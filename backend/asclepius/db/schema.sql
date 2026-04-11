@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS documents (
     cost_amount REAL,
     cost_currency TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
+    process_at DATETIME,  -- null = process immediately, set = process after this time
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

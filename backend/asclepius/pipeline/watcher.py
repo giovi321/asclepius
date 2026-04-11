@@ -140,10 +140,51 @@ async def start_watcher(config: AppConfig) -> None:
                 file_size = 0
             queue.put((file_size, str(f)))
 
-    # Keep the coroutine alive (so the task isn't garbage collected)
+    # Keep the coroutine alive and periodically check for scheduled documents
     try:
         while True:
             await asyncio.sleep(60)
+            # Check for scheduled documents whose process_at time has passed
+            try:
+                import aiosqlite
+                async with aiosqlite.connect(config.database.path) as db:
+                    await db.execute("PRAGMA journal_mode=WAL")
+                    cursor = await db.execute(
+                        "SELECT id, file_path FROM documents WHERE status = 'scheduled' AND process_at <= DATETIME('now')"
+                    )
+                    rows = await cursor.fetchall()
+                    for row in rows:
+                        doc_id, file_path = row
+                        logger.info("Scheduled document %d is due, re-queuing", doc_id)
+                        await db.execute(
+                            "UPDATE documents SET status = 'pending', process_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (doc_id,),
+                        )
+                        # Try to re-queue the file for processing
+                        vault_root = Path(config.vault.root_path)
+                        full_path = vault_root / file_path
+                        if full_path.exists():
+                            try:
+                                file_size = full_path.stat().st_size
+                            except OSError:
+                                file_size = 0
+                            queue.put((file_size, str(full_path)))
+                        else:
+                            # Try inbox path
+                            inbox_path = Path(config.vault.inbox_path) / Path(file_path).name
+                            if inbox_path.exists():
+                                try:
+                                    file_size = inbox_path.stat().st_size
+                                except OSError:
+                                    file_size = 0
+                                queue.put((file_size, str(inbox_path)))
+                            else:
+                                logger.warning("Scheduled document %d file not found: %s", doc_id, file_path)
+                    if rows:
+                        await db.commit()
+                        logger.info("Re-queued %d scheduled document(s)", len(rows))
+            except Exception:
+                logger.exception("Error checking scheduled documents")
     except asyncio.CancelledError:
         observer.stop()
         observer.join()

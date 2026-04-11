@@ -154,6 +154,9 @@ def create_app() -> FastAPI:
     from asclepius.settings.routes import router as settings_router
     app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
 
+    from asclepius.vault.routes import router as vault_router
+    app.include_router(vault_router, prefix="/api/vault", tags=["vault"])
+
     # Serve frontend static files (production build)
     if STATIC_DIR.exists():
         app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")

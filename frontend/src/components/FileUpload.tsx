@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { Upload, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, X, Calendar } from "lucide-react";
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
+}
+
+interface UploadResult {
+  filename: string;
+  status: string;
+  suggestion?: string;
+  message?: string;
+  queue_size?: number;
 }
 
 export default function FileUpload({ onUploadComplete }: FileUploadProps) {
@@ -16,6 +24,9 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [showPatientPrompt, setShowPatientPrompt] = useState(false);
   const [patients, setPatients] = useState<any[]>([]);
   const [chosenPatientId, setChosenPatientId] = useState<string>("");
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [uploadedDocIds, setUploadedDocIds] = useState<number[]>([]);
+  const [uploadedCount, setUploadedCount] = useState(0);
 
   useEffect(() => {
     api.get("/patients").then((res) => {
@@ -34,6 +45,29 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
     }
   }, [selectedPatient]);
 
+  const scheduleBatch = useCallback(
+    async (processAt: string | null) => {
+      if (uploadedDocIds.length === 0) return;
+      try {
+        await api.post("/documents/schedule-batch", {
+          document_ids: uploadedDocIds,
+          process_at: processAt,
+        });
+        setResult({
+          ok: true,
+          message: processAt
+            ? `${uploadedDocIds.length} file(s) scheduled for later processing`
+            : `${uploadedDocIds.length} file(s) queued for immediate processing`,
+        });
+      } catch {
+        setResult({ ok: false, message: "Failed to schedule batch" });
+      }
+      setShowScheduleDialog(false);
+      setUploadedDocIds([]);
+    },
+    [uploadedDocIds]
+  );
+
   const doUpload = useCallback(
     async (files: File[], patientId: number | null, eventId: number | null = null) => {
       setUploading(true);
@@ -43,6 +77,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
 
       let successCount = 0;
       let errorCount = 0;
+      let hasSuggestion = false;
+      const docIds: number[] = [];
 
       for (const file of files) {
         try {
@@ -52,21 +88,43 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           if (patientId) qp.set("patient_id", String(patientId));
           if (eventId) qp.set("event_id", String(eventId));
           const params = qp.toString() ? `?${qp.toString()}` : "";
-          await api.post(`/documents/upload${params}`, form, {
+          const res = await api.post(`/documents/upload${params}`, form, {
             headers: { "Content-Type": "multipart/form-data" },
           });
           successCount++;
+          const data = res.data as UploadResult;
+          if (data.suggestion === "batch_schedule") {
+            hasSuggestion = true;
+          }
+          // Try to get the doc ID from the response filename by looking it up
+          // We'll collect IDs after all uploads complete
         } catch {
           errorCount++;
         }
       }
 
       setUploading(false);
+      setUploadedCount(successCount);
 
       if (errorCount === 0) {
         setResult({ ok: true, message: `${successCount} file(s) uploaded` });
       } else {
         setResult({ ok: false, message: `${successCount} uploaded, ${errorCount} failed` });
+      }
+
+      // If batch scheduling was suggested, fetch pending doc IDs and show dialog
+      if (hasSuggestion && successCount > 0) {
+        try {
+          const docsRes = await api.get("/documents", { params: { status: "pending", limit: 100 } });
+          const docs = Array.isArray(docsRes.data) ? docsRes.data : [];
+          const ids = docs.map((d: any) => d.id);
+          if (ids.length > 0) {
+            setUploadedDocIds(ids);
+            setShowScheduleDialog(true);
+          }
+        } catch {
+          // Ignore — just don't show the dialog
+        }
       }
 
       onUploadComplete?.();
@@ -139,6 +197,57 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               className="rounded-md border px-4 py-2 text-sm"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Batch schedule dialog */}
+      {showScheduleDialog && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            <p className="text-sm font-medium">
+              You uploaded {uploadedCount} file(s). Process now or schedule for later?
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Scheduling allows processing during off-peak hours to avoid slowdowns.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => scheduleBatch(null)}
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+            >
+              Process Now
+            </button>
+            <button
+              onClick={() => {
+                const tonight = new Date();
+                tonight.setHours(22, 0, 0, 0);
+                if (tonight <= new Date()) tonight.setDate(tonight.getDate() + 1);
+                scheduleBatch(tonight.toISOString());
+              }}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+            >
+              Schedule for Tonight (22:00)
+            </button>
+            <button
+              onClick={() => {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(6, 0, 0, 0);
+                scheduleBatch(tomorrow.toISOString());
+              }}
+              className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
+            >
+              Schedule for Tomorrow (06:00)
+            </button>
+            <button
+              onClick={() => { setShowScheduleDialog(false); setUploadedDocIds([]); }}
+              className="rounded-md border px-4 py-2 text-sm text-muted-foreground hover:bg-accent"
+            >
+              Dismiss
             </button>
           </div>
         </div>

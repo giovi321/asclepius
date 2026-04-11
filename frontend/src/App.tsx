@@ -14,6 +14,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import PatientsPage from "@/pages/PatientsPage";
 import TimelinePage from "@/pages/TimelinePage";
 import EventsPage from "@/pages/EventsPage";
+import FileBrowserPage from "@/pages/FileBrowserPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="chat" element={<ChatPage />} />
         <Route path="search" element={<SearchPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="files" element={<FileBrowserPage />} />
       </Route>
     </Routes>
   );

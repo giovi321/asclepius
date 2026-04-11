@@ -15,6 +15,43 @@ from asclepius.db.connection import get_db
 router = APIRouter()
 
 
+# --- Backup ---
+
+@router.get("/backup")
+async def download_backup(
+    current_user: dict = Depends(get_current_user),
+):
+    """Download a SQLite backup of the database."""
+    import shutil
+    import tempfile
+    import sqlite3
+    from datetime import datetime
+    from fastapi.responses import FileResponse
+
+    config = get_config()
+    db_path = config.database.path
+
+    # Create a safe backup using SQLite's backup API
+    backup_name = f"asclepius_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
+    backup_path = os.path.join(tempfile.gettempdir(), backup_name)
+
+    try:
+        source = sqlite3.connect(db_path)
+        dest = sqlite3.connect(backup_path)
+        source.backup(dest)
+        source.close()
+        dest.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+
+    return FileResponse(
+        path=backup_path,
+        filename=backup_name,
+        media_type="application/x-sqlite3",
+        background=None,
+    )
+
+
 # --- Prompts ---
 
 @router.get("/prompts")

@@ -445,9 +445,19 @@ async def move_doc(
 
         provider_slug = facility_slug or doctor_slug
 
+        # Get event slug if assigned
+        event_slug = None
+        if doc.get("event_id"):
+            cursor = await db.execute("SELECT title FROM medical_events WHERE id = ?", (doc["event_id"],))
+            ev_row = await cursor.fetchone()
+            if ev_row:
+                from asclepius.pipeline.organizer import slugify_event
+                event_slug = slugify_event(ev_row[0])
+
         new_relative = build_organized_path(
             config, target_slug, doc.get("doc_date"), provider_slug,
             doc.get("doc_type"), doc["original_filename"],
+            event_slug=event_slug,
         )
         new_dest = vault_root / new_relative
         new_dest.parent.mkdir(parents=True, exist_ok=True)

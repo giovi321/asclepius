@@ -329,13 +329,16 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # Get document metadata for file organization
             cursor = await db.execute(
                 """SELECT d.patient_id, d.doc_type, d.doc_date, d.doctor_id, d.facility_id,
+                          d.event_id,
                           p.slug as patient_slug,
                           doc.slug as doctor_slug,
-                          f.slug as facility_slug
+                          f.slug as facility_slug,
+                          me.title as event_title
                    FROM documents d
                    LEFT JOIN patients p ON d.patient_id = p.id
                    LEFT JOIN doctors doc ON d.doctor_id = doc.id
                    LEFT JOIN facilities f ON d.facility_id = f.id
+                   LEFT JOIN medical_events me ON d.event_id = me.id
                    WHERE d.id = ?""",
                 (doc_id,),
             )
@@ -343,8 +346,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Use facility slug for path organization, fall back to doctor slug
             provider_slug = None
+            event_slug = None
             if doc:
                 provider_slug = doc["facility_slug"] or doc["doctor_slug"]
+                if doc["event_title"]:
+                    from asclepius.pipeline.organizer import slugify_event
+                    event_slug = slugify_event(doc["event_title"])
 
             # Organize file
             dest_path = build_organized_path(
@@ -354,6 +361,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 provider_slug,
                 doc["doc_type"] if doc else None,
                 path.name,
+                event_slug=event_slug,
             )
             final_path = move_file(config, file_path, dest_path)
 

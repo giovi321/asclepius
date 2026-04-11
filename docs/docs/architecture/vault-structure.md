@@ -9,9 +9,16 @@ vault/
 ├── inbox/                              # Drop files here for processing
 ├── patients/
 │   ├── giovanni-crapelli/
+│   │   ├── 2023/
+│   │   │   ├── sleep-apnea-treatment/              # Medical event folder
+│   │   │   │   ├── 2023-10-17_humanitas_surgical-report.pdf
+│   │   │   │   ├── 2023-10-31_humanitas_specialist-report.pdf
+│   │   │   │   └── 2023-11-15_humanitas_invoice.pdf
+│   │   │   └── 2023-03-15_ospedale-civico_bloodtest.pdf  # No event
 │   │   ├── 2024/
-│   │   │   ├── 2024-03-15_ospedale-civico_bloodtest.pdf
-│   │   │   ├── 2024-07-22_clinica-luganese_xray.pdf
+│   │   │   ├── knee-injury/
+│   │   │   │   ├── 2024-07-22_clinica-luganese_radiology-report.pdf
+│   │   │   │   └── 2024-08-01_clinica-luganese_specialist-report.pdf
 │   │   │   └── imaging/
 │   │   │       └── 2024-07-22_clinica-luganese_ct-abdomen/
 │   │   │           ├── series-001/
@@ -25,6 +32,8 @@ vault/
 ├── unclassified/                       # Docs that couldn't be assigned to a patient
 └── asclepius.sqlite                    # SQLite database
 ```
+
+Documents assigned to a medical event are organized into an event subfolder within the year. Documents without an event remain directly in the year folder.
 
 ## File Naming Convention
 

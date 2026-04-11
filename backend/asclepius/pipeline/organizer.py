@@ -17,12 +17,13 @@ def build_organized_path(
     provider_slug: str | None,
     doc_type: str | None,
     original_filename: str,
+    event_slug: str | None = None,
 ) -> str:
     """Build the organized file path.
 
-    Format: patients/{slug}/{YYYY}/{YYYY-MM-DD}_{facility-or-doctor-slug}_{doctype}.{ext}
+    Format: patients/{slug}/{YYYY}/{event-slug}/{YYYY-MM-DD}_{provider}_{doctype}.{ext}
+    If no event, the event-slug folder is omitted.
     If no patient, goes to unclassified/
-    The provider_slug parameter accepts either a facility slug or doctor slug.
     """
     ext = Path(original_filename).suffix.lower()
     year = doc_date[:4] if doc_date else "unknown"
@@ -36,9 +37,21 @@ def build_organized_path(
     filename = re.sub(r"-+", "-", filename)
 
     if patient_slug:
-        return f"patients/{patient_slug}/{year}/{filename}"
+        if event_slug:
+            return f"patients/{patient_slug}/{year}/{event_slug}/{filename}"
+        else:
+            return f"patients/{patient_slug}/{year}/{filename}"
     else:
         return f"unclassified/{filename}"
+
+
+def slugify_event(title: str) -> str:
+    """Convert an event title to a folder-safe slug."""
+    slug = title.lower().strip()
+    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
+    slug = re.sub(r"[\s]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug)
+    return slug.strip("-")[:60]  # limit length
 
 
 def move_file(

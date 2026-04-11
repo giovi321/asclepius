@@ -47,6 +47,24 @@ def test_build_organized_path_missing_fields():
     assert path.endswith(".jpg")
 
 
+def test_build_organized_path_with_event():
+    from asclepius.config import AppConfig
+    config = AppConfig()
+
+    path = build_organized_path(
+        config, "giovanni-crapelli", "2024-03-15", "drhouse", "bloodtest", "report.pdf",
+        event_slug="sleep-apnea-treatment",
+    )
+    assert path == "patients/giovanni-crapelli/2024/sleep-apnea-treatment/2024-03-15_drhouse_bloodtest.pdf"
+
+
+def test_slugify_event():
+    from asclepius.pipeline.organizer import slugify_event
+    assert slugify_event("Sleep Apnea Treatment") == "sleep-apnea-treatment"
+    assert slugify_event("Knee Injury 2024") == "knee-injury-2024"
+    assert slugify_event("  Spaces  Everywhere  ") == "spaces-everywhere"
+
+
 def test_compute_file_hash(tmp_path):
     test_file = tmp_path / "test.txt"
     test_file.write_text("hello world")

@@ -114,29 +114,35 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["last_processed"] = path.name
                 return
 
-            # Read patient_id hint from upload (if present)
+            # Read hint files from upload (if present)
             hint_patient_id = None
-            hint_path = Path(str(path) + ".patient_hint")
-            if hint_path.exists():
-                try:
-                    hint_patient_id = int(hint_path.read_text().strip())
-                except (ValueError, OSError):
-                    pass
-                hint_path.unlink(missing_ok=True)
+            hint_event_id = None
+            for hint_name, hint_var in [(".patient_hint", "patient"), (".event_hint", "event")]:
+                hint_path = Path(str(path) + hint_name)
+                if hint_path.exists():
+                    try:
+                        val = int(hint_path.read_text().strip())
+                        if hint_var == "patient":
+                            hint_patient_id = val
+                        else:
+                            hint_event_id = val
+                    except (ValueError, OSError):
+                        pass
+                    hint_path.unlink(missing_ok=True)
 
             # Try to INSERT — if file_hash already exists (from upload), it'll be ignored
             await db.execute(
                 """INSERT OR IGNORE INTO documents
                    (file_path, original_filename, file_hash, file_size, page_count,
-                    patient_id, date_received, status)
-                   VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id),
+                    patient_id, event_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id, hint_event_id),
             )
             await db.commit()
 
             # Now SELECT the record (whether just inserted or pre-existing from upload)
             cursor = await db.execute(
-                "SELECT id, status, patient_id FROM documents WHERE file_hash = ?", (file_hash,),
+                "SELECT id, status, patient_id, event_id FROM documents WHERE file_hash = ?", (file_hash,),
             )
             existing = await cursor.fetchone()
             if not existing:
@@ -150,22 +156,26 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             doc_id = existing["id"]
 
-            # Ensure patient_id is set even if pipeline created the record first
-            patient_update = ""
+            # Ensure patient_id and event_id are set even if pipeline created the record first
+            extra_updates = ""
             params = [file_size, page_count]
             if hint_patient_id and not existing["patient_id"]:
-                patient_update = ", patient_id = ?"
+                extra_updates += ", patient_id = ?"
                 params.append(hint_patient_id)
+            if hint_event_id and not existing["event_id"]:
+                extra_updates += ", event_id = ?"
+                params.append(hint_event_id)
             params.append(doc_id)
 
             await db.execute(
-                f"""UPDATE documents SET status = 'processing', file_size = ?, page_count = ?{patient_update},
+                f"""UPDATE documents SET status = 'processing', file_size = ?, page_count = ?{extra_updates},
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
                 params,
             )
             await db.commit()
-            logger.info("Processing doc %d (patient=%s): %s",
-                        doc_id, existing["patient_id"] or hint_patient_id, path.name)
+            logger.info("Processing doc %d (patient=%s, event=%s): %s",
+                        doc_id, existing["patient_id"] or hint_patient_id,
+                        existing["event_id"] or hint_event_id, path.name)
 
             ext = path.suffix.lower()
             if ext in {".dcm", ".dicom"}:
@@ -356,6 +366,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             )
             await db.commit()
 
+            # Auto-assign to medical event if not already assigned
+            try:
+                await _auto_assign_event(db, llm, doc_id, config)
+            except Exception:
+                logger.warning("Auto-event assignment failed for doc %d (non-fatal)", doc_id)
+
             pipeline_status["total_processed"] += 1
             pipeline_status["last_processed"] = path.name
             logger.info("Completed processing doc %d: %s -> %s", doc_id, path.name, final_path)
@@ -385,6 +401,88 @@ async def process_file(file_path: str, config: AppConfig) -> None:
     pipeline_status["processing_doc_id"] = None
     pipeline_status["processing_pages"] = None
     pipeline_status["processing_page_current"] = None
+
+
+async def _auto_assign_event(
+    db: aiosqlite.Connection, llm, doc_id: int, config: AppConfig
+) -> None:
+    """Auto-assign a document to a medical event after extraction.
+
+    Skips if the document already has an event_id assigned.
+    Uses LLM to match against existing events or suggest a new one.
+    """
+    # Check if already assigned
+    cursor = await db.execute(
+        "SELECT event_id, patient_id, doc_type, summary_en, doctor_name, facility_name, "
+        "COALESCE(date_visit, date_issued, doc_date) as best_date "
+        "FROM documents WHERE id = ?",
+        (doc_id,),
+    )
+    doc = await cursor.fetchone()
+    if not doc or doc["event_id"] or not doc["patient_id"]:
+        return  # Already assigned, no patient, or doc not found
+
+    doc = dict(doc)
+
+    # Get existing events for this patient
+    cursor = await db.execute(
+        """SELECT id, title, event_type, date_start, date_end, is_ongoing, diagnosis_text
+           FROM medical_events WHERE patient_id = ? ORDER BY date_start DESC""",
+        (doc["patient_id"],),
+    )
+    events = [dict(r) for r in await cursor.fetchall()]
+
+    events_text = "\n".join(
+        f"- ID {e['id']}: \"{e['title']}\" ({e['event_type']}, {e.get('date_start', '?')})"
+        + (f" — {e.get('diagnosis_text', '')}" if e.get("diagnosis_text") else "")
+        for e in events
+    ) or "No events exist yet."
+
+    prompt = f"""Match this document to a medical event, or suggest creating a new one.
+
+Document: type={doc.get('doc_type','?')}, date={doc.get('best_date','?')}, doctor={doc.get('doctor_name','?')}, facility={doc.get('facility_name','?')}
+Summary: {(doc.get('summary_en') or 'N/A')[:300]}
+
+Existing events:
+{events_text}
+
+JSON response:
+{{"existing_event_id": number or null, "new_event": {{"title": "string", "event_type": "string", "date_start": "YYYY-MM-DD or null"}} or null}}"""
+
+    try:
+        response = await llm._generate(prompt)
+        result = llm._parse_json(response)
+    except Exception:
+        return
+
+    if result.get("existing_event_id"):
+        # Verify event exists
+        eid = result["existing_event_id"]
+        cursor = await db.execute("SELECT id FROM medical_events WHERE id = ?", (eid,))
+        if await cursor.fetchone():
+            await db.execute("UPDATE documents SET event_id = ? WHERE id = ?", (eid, doc_id))
+            await db.execute(
+                "INSERT OR IGNORE INTO document_event_links (document_id, event_id, auto_linked) VALUES (?, ?, 1)",
+                (doc_id, eid),
+            )
+            await db.commit()
+            logger.info("Auto-assigned doc %d to event %d", doc_id, eid)
+    elif result.get("new_event"):
+        ne = result["new_event"]
+        if ne.get("title"):
+            cursor = await db.execute(
+                """INSERT INTO medical_events (patient_id, title, event_type, date_start)
+                   VALUES (?, ?, ?, ?)""",
+                (doc["patient_id"], ne["title"], ne.get("event_type", "other"), ne.get("date_start")),
+            )
+            new_eid = cursor.lastrowid
+            await db.execute("UPDATE documents SET event_id = ? WHERE id = ?", (new_eid, doc_id))
+            await db.execute(
+                "INSERT OR IGNORE INTO document_event_links (document_id, event_id, auto_linked) VALUES (?, ?, 1)",
+                (doc_id, new_eid),
+            )
+            await db.commit()
+            logger.info("Auto-created event '%s' (id=%d) and assigned doc %d", ne["title"], new_eid, doc_id)
 
 
 async def _chunked_extract_and_store(

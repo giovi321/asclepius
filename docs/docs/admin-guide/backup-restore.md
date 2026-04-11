@@ -4,61 +4,87 @@
 
 Two things make up the entire Asclepius state:
 
-1. **`vault/`** — all document files and the SQLite database
-2. **`config/settings.yaml`** — your configuration
+1. **`vault/` directory** -- all documents, organized files, imaging studies, and the SQLite database
+2. **`config/settings.yaml`** -- your configuration file
 
-That's it. Back up these two and you can restore everything.
+Back up both regularly to protect against data loss.
 
-## Backup Strategy
+## Backup Methods
 
-### Simple: Copy the vault
+### Web UI Backup (Database Only)
+
+Download a SQLite backup directly from the web UI:
+
+1. Go to **Settings**
+2. Click **Download Backup**
+3. A timestamped `.sqlite` file is downloaded (e.g., `asclepius_backup_20250115_143022.sqlite`)
+
+This uses SQLite's online backup API, which creates a consistent snapshot even while the application is running. The backup includes all structured data (documents, patients, lab results, etc.) but **not** the actual document files on disk.
+
+### Full Backup (Recommended)
+
+For a complete backup, copy the entire `vault/` directory and `config/settings.yaml`:
 
 ```bash
-# Stop the application (ensures clean SQLite state)
-docker compose down
+# Stop the container for a consistent backup
+docker compose stop
 
-# Copy the vault
-cp -r vault/ /backup/vault-$(date +%Y%m%d)/
+# Copy the vault and config
+cp -r vault/ /backup/asclepius/vault/
+cp config/settings.yaml /backup/asclepius/settings.yaml
 
 # Restart
 docker compose up -d
 ```
 
-### SQLite-Safe: Use `.backup`
+### Live Backup (No Downtime)
 
-For a backup without stopping the server:
+SQLite with WAL mode supports live backups. You can copy the database while the application is running:
 
 ```bash
-sqlite3 vault/asclepius.sqlite ".backup /backup/asclepius-$(date +%Y%m%d).sqlite"
+# Use sqlite3 backup command for a consistent copy
+sqlite3 vault/asclepius.sqlite ".backup /backup/asclepius.sqlite"
+
+# Copy document files (rsync for incremental)
+rsync -av vault/patients/ /backup/patients/
+rsync -av vault/unclassified/ /backup/unclassified/
 ```
 
-This creates a consistent snapshot even while the server is running (SQLite WAL mode handles this safely).
-
-### Automated
-
-Set up a cron job or use your existing backup solution (rsync, Syncthing, Nextcloud, etc.) to sync the vault directory.
+!!! warning "Do not simply copy the SQLite file"
+    Do not use `cp` to copy the SQLite database while the application is running. WAL mode uses additional files (`-wal` and `-shm`) that must be consistent. Use the `sqlite3 .backup` command or the web UI backup instead.
 
 ## Restore
 
+### From Web UI Backup
+
+1. Stop the application: `docker compose stop`
+2. Replace the database file: `cp backup.sqlite vault/asclepius.sqlite`
+3. Start the application: `docker compose up -d`
+
+!!! note
+    A database-only restore will restore all metadata but the actual document files must be present in the `vault/` directory for file serving to work.
+
+### From Full Backup
+
+1. Stop the application: `docker compose stop`
+2. Restore the vault: `cp -r /backup/asclepius/vault/ vault/`
+3. Restore the config: `cp /backup/asclepius/settings.yaml config/settings.yaml`
+4. Start the application: `docker compose up -d`
+
+## Automated Backups
+
+Set up a cron job for automated backups:
+
 ```bash
-docker compose down
-
-# Replace vault with backup
-rm -rf vault/
-cp -r /backup/vault-20240315/ vault/
-
-# Replace config
-cp /backup/settings.yaml config/settings.yaml
-
-docker compose up -d
+# Daily backup at 2 AM
+0 2 * * * sqlite3 /path/to/vault/asclepius.sqlite ".backup /backup/asclepius_$(date +\%Y\%m\%d).sqlite" && rsync -av /path/to/vault/patients/ /backup/patients/
 ```
 
 ## Migration
 
 To move Asclepius to a new server:
 
-1. Back up `vault/` and `config/settings.yaml`
+1. Create a full backup on the old server
 2. Install Asclepius on the new server
-3. Copy the vault and config to the new location
-4. Update paths in `config/settings.yaml` if needed
-5. Start with `docker compose up -d`
+3. Copy the `vault/` directory and `config/settings.yaml` to the new server
+4. Start the application

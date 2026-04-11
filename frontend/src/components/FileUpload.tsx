@@ -23,8 +23,19 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
     }).catch(() => {});
   }, []);
 
+  const [events, setEvents] = useState<any[]>([]);
+  const [chosenEventId, setChosenEventId] = useState<string>("");
+
+  useEffect(() => {
+    if (selectedPatient) {
+      api.get("/events", { params: { patient_id: selectedPatient.id } })
+        .then((res) => setEvents(res.data || []))
+        .catch(() => {});
+    }
+  }, [selectedPatient]);
+
   const doUpload = useCallback(
-    async (files: File[], patientId: number | null) => {
+    async (files: File[], patientId: number | null, eventId: number | null = null) => {
       setUploading(true);
       setResult(null);
       setShowPatientPrompt(false);
@@ -37,7 +48,10 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
         try {
           const form = new FormData();
           form.append("file", file);
-          const params = patientId ? `?patient_id=${patientId}` : "";
+          const qp = new URLSearchParams();
+          if (patientId) qp.set("patient_id", String(patientId));
+          if (eventId) qp.set("event_id", String(eventId));
+          const params = qp.toString() ? `?${qp.toString()}` : "";
           await api.post(`/documents/upload${params}`, form, {
             headers: { "Content-Type": "multipart/form-data" },
           });
@@ -64,7 +78,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
     (files: FileList | File[]) => {
       const fileArray = Array.from(files);
       if (selectedPatient) {
-        doUpload(fileArray, selectedPatient.id);
+        const eid = chosenEventId ? Number(chosenEventId) : null;
+        doUpload(fileArray, selectedPatient.id, eid);
       } else {
         setPendingFiles(fileArray);
         setShowPatientPrompt(true);
@@ -102,9 +117,19 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               <option key={p.id} value={p.id}>{p.display_name}</option>
             ))}
           </select>
+          <select
+            value={chosenEventId}
+            onChange={(e) => setChosenEventId(e.target.value)}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">No medical event (auto-assign later)</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.title} ({ev.event_type?.replace(/_/g, " ")})</option>
+            ))}
+          </select>
           <div className="flex gap-2">
             <button
-              onClick={() => doUpload(pendingFiles, chosenPatientId ? Number(chosenPatientId) : null)}
+              onClick={() => doUpload(pendingFiles, chosenPatientId ? Number(chosenPatientId) : null, chosenEventId ? Number(chosenEventId) : null)}
               className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
             >
               Upload
@@ -157,6 +182,18 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                 </span>
               )}
             </p>
+            {selectedPatient && events.length > 0 && (
+              <select
+                value={chosenEventId}
+                onChange={(e) => setChosenEventId(e.target.value)}
+                className="mt-2 rounded-md border bg-background px-2 py-1 text-xs"
+              >
+                <option value="">Medical event: auto-assign</option>
+                {events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>{ev.title}</option>
+                ))}
+              </select>
+            )}
           </>
         )}
 

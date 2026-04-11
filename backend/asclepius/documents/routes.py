@@ -23,6 +23,7 @@ router = APIRouter()
 async def upload_document(
     file: UploadFile = File(...),
     patient_id: int | None = Query(default=None),
+    event_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
 ):
     """Upload a document file to the inbox for processing."""
@@ -47,9 +48,11 @@ async def upload_document(
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    # Write patient_id hint so the pipeline can pick it up even if it wins the race
+    # Write hint files so the pipeline can pick them up even if it wins the race
     if patient_id:
         Path(str(dest) + ".patient_hint").write_text(str(patient_id))
+    if event_id:
+        Path(str(dest) + ".event_hint").write_text(str(event_id))
 
     # Create DB record immediately so the document is visible in the list.
     # The pipeline will find this record by file_hash and reuse it (not duplicate).
@@ -66,9 +69,9 @@ async def upload_document(
             # so the pipeline can match by hash
             await db.execute(
                 """INSERT INTO documents
-                   (file_path, original_filename, file_hash, file_size, patient_id, date_received, status)
-                   VALUES (?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{dest.name}", dest.name, file_hash, file_size, patient_id),
+                   (file_path, original_filename, file_hash, file_size, patient_id, event_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/{dest.name}", dest.name, file_hash, file_size, patient_id, event_id),
             )
             await db.commit()
     except Exception as e:

@@ -1,8 +1,10 @@
 # Authentication
 
-Asclepius uses session-based authentication with signed cookies.
+Asclepius uses session-based authentication with signed cookies. All API endpoints (except login and health check) require a valid session.
 
-## Login
+## Session Authentication
+
+### Login
 
 ```
 POST /api/auth/login
@@ -14,57 +16,113 @@ Content-Type: application/json
 }
 ```
 
-**Response:** `200 OK` with user info and a `asclepius_session` cookie.
+**Response:**
 
 ```json
 {
   "id": 1,
   "username": "admin",
-  "display_name": "Administrator"
+  "display_name": "Admin"
 }
 ```
 
-## Current User
+On success, a signed session cookie (`asclepius_session`) is set with:
+
+- `httponly: true` -- not accessible from JavaScript
+- `samesite: lax` -- CSRF protection
+- `path: /`
+
+The cookie contains a signed token (via itsdangerous `URLSafeTimedSerializer`) with the user ID. The session is valid for `auth.session_ttl_hours` (default: 720 hours / 30 days).
+
+### Logout
+
+```
+POST /api/auth/logout
+```
+
+Deletes the session cookie.
+
+### Get Current User
 
 ```
 GET /api/auth/me
-Cookie: asclepius_session=...
 ```
 
-**Response:** `200 OK` with user info and accessible patients.
+**Response:**
 
 ```json
 {
   "id": 1,
   "username": "admin",
-  "display_name": "Administrator",
+  "display_name": "Admin",
   "patients": [
-    {"id": 1, "slug": "giovanni-crapelli", "display_name": "Giovanni Crapelli", "role": "owner"}
+    {
+      "id": 1,
+      "slug": "giovanni-crapelli",
+      "display_name": "Giovanni Crapelli",
+      "role": "owner"
+    }
   ]
 }
 ```
 
-## Logout
+Returns the current user with their accessible patients and roles.
+
+## OIDC Authentication
+
+When OIDC is enabled, an additional authentication flow is available:
+
+### Check OIDC Status
 
 ```
-POST /api/auth/logout
-Cookie: asclepius_session=...
+GET /api/auth/oidc/enabled
 ```
 
-**Response:** `200 OK`, clears the session cookie.
+**Response:**
 
-## Session Details
+```json
+{
+  "enabled": true,
+  "provider_url": "https://auth.example.com/application/o/asclepius/"
+}
+```
 
-- Cookie name: `asclepius_session`
-- HttpOnly: yes
-- SameSite: Lax
-- Signed with: `itsdangerous.URLSafeTimedSerializer`
-- TTL: configurable (default 30 days)
-- Hashing: bcrypt
+### Initiate OIDC Login
+
+```
+GET /api/auth/oidc/login
+```
+
+Redirects the browser to the OIDC provider's authorization endpoint. A signed state cookie is set for CSRF protection.
+
+### OIDC Callback
+
+```
+GET /api/auth/oidc/callback?code=...&state=...
+```
+
+Handles the OIDC provider's callback:
+
+1. Verifies the state parameter against the signed cookie
+2. Exchanges the authorization code for tokens
+3. Retrieves user info from the provider
+4. Creates or updates the local user
+5. Sets a session cookie
+6. Redirects to the application root (`/`)
+
+## Authorization
+
+After authentication, access to patient data is controlled by the `user_patient_access` table:
+
+- Each user must be explicitly granted access to each patient
+- Roles: `owner` (full access) or `viewer` (read-only)
+- All document and patient endpoints check access before returning data
+- Users without access to a patient receive a `403 Forbidden` response
 
 ## Error Responses
 
 | Status | Meaning |
 |--------|---------|
-| `401` | Not authenticated or session expired |
-| `403` | Authenticated but no access to the requested resource |
+| `401 Unauthorized` | No valid session cookie, or session expired |
+| `403 Forbidden` | Authenticated but no access to the requested patient |
+| `409 Conflict` | Username already exists (when creating users) |

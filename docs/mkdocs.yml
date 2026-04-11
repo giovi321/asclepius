@@ -66,6 +66,8 @@ nav:
     - Vault Structure: architecture/vault-structure.md
   - User Guide:
     - Documents: user-guide/documents.md
+    - Medical Events: user-guide/medical-events.md
+    - Timeline: user-guide/timeline.md
     - Lab Results: user-guide/lab-results.md
     - Imaging: user-guide/imaging.md
     - Chat: user-guide/chat.md

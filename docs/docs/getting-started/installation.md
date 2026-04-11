@@ -2,8 +2,11 @@
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- (Optional) An Ollama instance for local LLM, or a Claude API key
+- **Docker and Docker Compose** (v2+)
+- **An LLM provider** -- either an [Ollama](https://ollama.ai/) instance running on your network, or a [Claude API](https://console.anthropic.com/) key
+
+!!! note "No bundled LLM"
+    Asclepius does **not** bundle an LLM server. You must provide your own Ollama instance or a Claude API key. This keeps the container lightweight and gives you full control over your LLM setup.
 
 ## Docker Compose (Recommended)
 
@@ -15,65 +18,72 @@ cd asclepius
 cp config/settings.example.yaml config/settings.yaml
 ```
 
-Edit `config/settings.yaml` to configure your LLM provider, OCR languages, and other settings.
+Edit `config/settings.yaml` to configure your LLM provider, OCR settings, and other options. See [Configuration](configuration.md) for a full reference.
 
 ```bash
 # Start the application
 docker compose up -d
 ```
 
-This starts two services:
+This starts a single service:
 
-- **asclepius** — the main application on port `8070`
-- **ollama** — local LLM server on port `11434`
+- **asclepius** -- the main application on port `8070` (mapped from container port `8000`)
+
+The container includes:
+
+- Python 3.12 + FastAPI backend
+- Pre-built React frontend (served as static files)
+- Tesseract OCR with English, Italian, German, French, and Spanish language packs
 
 ### Environment Variables
 
-You can override settings via environment variables in `docker-compose.yml` or a `.env` file:
+You can set environment variables in a `.env` file alongside `docker-compose.yml`, or directly in the compose file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Session signing key | `change-me-in-production` |
-| `ANTHROPIC_API_KEY` | Claude API key (optional) | — |
-| `GOOGLE_VISION_KEY` | Google Cloud Vision key (optional) | — |
+| `SECRET_KEY` | Session signing key (change in production!) | `change-me-in-production` |
+| `ANTHROPIC_API_KEY` | Claude API key (optional, for Claude LLM provider) | -- |
+| `GOOGLE_VISION_KEY` | Google Cloud Vision API key (optional) | -- |
 
-### GPU Support for Ollama
+Example `.env` file:
 
-To enable GPU acceleration for the local LLM, uncomment the GPU section in `docker-compose.yml`:
+```env
+SECRET_KEY=your-random-secret-key-at-least-32-chars
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+### Connecting to Ollama
+
+If you run Ollama on the same machine as Asclepius, point `llm.ollama_base_url` to it:
 
 ```yaml
-ollama:
-  deploy:
-    resources:
-      reservations:
-        devices:
-          - capabilities: [gpu]
+llm:
+  provider: "ollama"
+  ollama_base_url: "http://host.docker.internal:11434"  # Docker Desktop
+  # ollama_base_url: "http://192.168.1.100:11434"       # Or use the host IP
+  ollama_model: "llama3.1"
 ```
+
+If Ollama runs on a different machine, use that machine's IP or hostname.
+
+### Volume Mounts
+
+The default `docker-compose.yml` mounts two directories:
+
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| `./vault` | `/vault` | All documents, organized files, and the SQLite database |
+| `./config` | `/config` | `settings.yaml` configuration file |
+
+!!! tip "Back up the vault"
+    The `vault/` directory contains all your documents and the SQLite database. Make sure to include it in your backup strategy. You can also download a database backup from the Settings page in the web UI.
+
+### First Login
+
+1. Open [http://localhost:8070](http://localhost:8070)
+2. Log in with username `admin` and password `admin`
+3. **Change the admin password immediately** from Settings > Users
 
 ## Manual Installation (Development)
 
-### Backend
-
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
-
-# Install Tesseract OCR
-# Ubuntu/Debian: sudo apt install tesseract-ocr tesseract-ocr-ita tesseract-ocr-deu
-# macOS: brew install tesseract
-# Windows: download from https://github.com/UB-Mannheim/tesseract/wiki
-
-uvicorn asclepius.main:app --reload --port 8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend dev server runs on port `5173` and proxies API calls to `localhost:8000`.
+For development, you can run the backend and frontend separately. See [Development Setup](../development/setup.md) for details.

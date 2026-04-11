@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
-import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check, FileCode, RotateCcw, Download } from "lucide-react";
+import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check, FileCode, RotateCcw, Download, ScrollText } from "lucide-react";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("llm");
@@ -14,6 +14,7 @@ export default function SettingsPage() {
     { key: "prompts", label: "Prompts", icon: FileCode },
     { key: "normalization", label: "Normalization", icon: Database },
     { key: "backup", label: "Backup", icon: Download },
+    { key: "logs", label: "Logs", icon: ScrollText },
   ];
 
   return (
@@ -44,6 +45,7 @@ export default function SettingsPage() {
       {activeTab === "users" && <UsersTab />}
       {activeTab === "prompts" && <PromptsTab />}
       {activeTab === "normalization" && <NormalizationTab />}
+      {activeTab === "logs" && <LogsTab />}
       {activeTab === "backup" && <BackupTab />}
     </div>
   );
@@ -561,6 +563,83 @@ function PromptsTab() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function LogsTab() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [levelFilter, setLevelFilter] = useState("");
+  const [moduleFilter, setModuleFilter] = useState("");
+  const [total, setTotal] = useState(0);
+
+  const fetchLogs = () => {
+    const params: Record<string, any> = { limit: 500 };
+    if (levelFilter) params.level = levelFilter;
+    if (moduleFilter) params.module = moduleFilter;
+    api.get("/settings/logs", { params })
+      .then((res) => { setLogs(res.data.logs || []); setTotal(res.data.total || 0); })
+      .catch(() => {});
+  };
+
+  useEffect(() => { fetchLogs(); }, [levelFilter, moduleFilter]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(fetchLogs, 3000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, levelFilter, moduleFilter]);
+
+  const levelColor = (level: string) => {
+    switch (level) {
+      case "ERROR": return "text-red-500";
+      case "WARNING": return "text-yellow-500";
+      case "DEBUG": return "text-muted-foreground/60";
+      default: return "text-foreground";
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <select value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)}
+          className="rounded-md border bg-background px-2 py-1.5 text-xs">
+          <option value="">All levels</option>
+          <option value="ERROR">Errors only</option>
+          <option value="WARNING,ERROR">Warnings + Errors</option>
+          <option value="INFO">Info only</option>
+          <option value="DEBUG">Debug</option>
+        </select>
+        <input type="text" placeholder="Filter by module..." value={moduleFilter}
+          onChange={(e) => setModuleFilter(e.target.value)}
+          className="rounded-md border bg-background px-2 py-1.5 text-xs w-48" />
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+          Auto-refresh (3s)
+        </label>
+        <button onClick={fetchLogs} className="rounded-md border px-2 py-1.5 text-xs hover:bg-accent">
+          Refresh
+        </button>
+        <span className="text-xs text-muted-foreground ml-auto">{total} total log entries</span>
+      </div>
+
+      <div className="rounded-lg border overflow-hidden">
+        <div className="max-h-[600px] overflow-y-auto font-mono text-[11px] leading-5 bg-black/5 dark:bg-white/5">
+          {logs.length === 0 ? (
+            <p className="p-4 text-muted-foreground text-center">No logs found</p>
+          ) : (
+            logs.map((log, i) => (
+              <div key={i} className={`flex gap-2 px-3 py-0.5 border-b border-border/30 hover:bg-accent/30 ${levelColor(log.level)}`}>
+                <span className="text-muted-foreground/70 flex-shrink-0 w-[140px]">{log.ts}</span>
+                <span className={`flex-shrink-0 w-[55px] font-bold ${levelColor(log.level)}`}>{log.level}</span>
+                <span className="text-muted-foreground/70 flex-shrink-0 w-[200px] truncate">{log.module}</span>
+                <span className="flex-1 break-all">{log.message}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

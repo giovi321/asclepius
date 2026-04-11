@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 import aiosqlite
@@ -13,6 +13,36 @@ from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
 router = APIRouter()
+
+
+# --- Logs ---
+
+@router.get("/logs")
+async def get_logs(
+    level: str | None = Query(default=None),
+    module: str | None = Query(default=None),
+    limit: int = Query(default=200),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get recent application logs from the in-memory buffer."""
+    from asclepius.main import LOG_BUFFER
+
+    logs = list(LOG_BUFFER)
+
+    # Filter by level
+    if level:
+        levels = level.upper().split(",")
+        logs = [l for l in logs if l["level"] in levels]
+
+    # Filter by module
+    if module:
+        logs = [l for l in logs if module in l["module"]]
+
+    # Return most recent first, limited
+    logs = logs[-limit:]
+    logs.reverse()
+
+    return {"logs": logs, "total": len(LOG_BUFFER)}
 
 
 # --- Backup ---

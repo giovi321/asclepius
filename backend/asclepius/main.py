@@ -13,6 +13,27 @@ from fastapi.staticfiles import StaticFiles
 from asclepius.config import get_config
 from asclepius.db.init import initialize_database
 
+# In-memory log buffer for the web UI
+from collections import deque
+
+LOG_BUFFER: deque[dict] = deque(maxlen=1000)
+
+
+class BufferHandler(logging.Handler):
+    """Captures log records into an in-memory ring buffer."""
+    def emit(self, record):
+        try:
+            LOG_BUFFER.append({
+                "ts": self.format(record).split(" [")[0] if " [" in self.format(record) else "",
+                "time": record.created,
+                "level": record.levelname,
+                "module": record.name,
+                "message": record.getMessage(),
+            })
+        except Exception:
+            pass
+
+
 # Configure logging — show all asclepius modules at INFO level
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +42,13 @@ logging.basicConfig(
     stream=sys.stdout,
     force=True,
 )
+
+# Add buffer handler to capture logs for web UI
+buffer_handler = BufferHandler()
+buffer_handler.setLevel(logging.DEBUG)
+buffer_handler.setFormatter(logging.Formatter("%(asctime)s", datefmt="%Y-%m-%d %H:%M:%S"))
+logging.getLogger("asclepius").addHandler(buffer_handler)
+
 # Set asclepius loggers to DEBUG for detailed output
 logging.getLogger("asclepius").setLevel(logging.DEBUG)
 # Keep noisy libraries at WARNING

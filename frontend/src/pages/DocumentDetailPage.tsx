@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag, Save,
+  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
@@ -39,7 +39,6 @@ export default function DocumentDetailPage() {
 
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiEditing, setAiEditing] = useState(false);
-  const [showAiEdit, setShowAiEdit] = useState(false);
 
   const handleReprocess = async () => {
     await api.post(`/documents/${id}/reprocess`);

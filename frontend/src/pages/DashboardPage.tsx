@@ -151,7 +151,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium">{doc.original_filename}</p>
                   <p className="text-xs text-muted-foreground">
-                    {doc.doc_type || "—"} | {doc.doc_date || "—"} | {doc.patient_name || "Unclassified"}
+                    {doc.doc_type || "—"} | {doc.date_visit || doc.date_issued || doc.doc_date || "—"} | {doc.patient_name || "Unclassified"}
                   </p>
                 </div>
                 <span

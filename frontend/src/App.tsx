@@ -12,6 +12,7 @@ import ChatPage from "@/pages/ChatPage";
 import SearchPage from "@/pages/SearchPage";
 import SettingsPage from "@/pages/SettingsPage";
 import PatientsPage from "@/pages/PatientsPage";
+import TimelinePage from "@/pages/TimelinePage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="patients" element={<PatientsPage />} />
         <Route path="documents" element={<DocumentsPage />} />
+        <Route path="timeline" element={<TimelinePage />} />
         <Route path="documents/:id" element={<DocumentDetailPage />} />
         <Route path="unclassified" element={<UnclassifiedPage />} />
         <Route path="lab-results" element={<LabResultsPage />} />

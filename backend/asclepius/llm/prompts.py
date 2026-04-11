@@ -6,6 +6,18 @@
 
 CLASSIFICATION_PROMPT = """You are a medical document classifier.
 
+The OCR text may be in one of these formats:
+- Plain text (from Tesseract)
+- Markdown with headers (#) and tables (|)
+- HTML with data-bbox and data-label attributes (from Chandra OCR). In this format:
+  - data-label="Page-Header" = letterhead, header info (facility name, NOT the patient)
+  - data-label="Page-Footer" = footer info (ignore for classification)
+  - data-label="Section-Header" = section titles within the document
+  - data-label="Text" = regular content
+  - The PATIENT name is usually in the top-right header area
+  - The SIGNING DOCTOR is usually near the bottom, before the footer, with "Dott." or "Dr."
+  - "Responsabile" in the header = department head, NOT the treating doctor
+
 STEP 1: Look at the document for these keywords to determine doc_type:
 - "FATTURA", "Fattura", "Rechnung", "Invoice", "Bill", "TARMED", "importo", "Betrag", "CHF", "EUR", "totale" with prices → doc_type = "invoice"
 - "RICEVUTA", "Quittung", "Receipt", "pagamento", "Zahlung" → doc_type = "receipt"
@@ -18,6 +30,13 @@ STEP 1: Look at the document for these keywords to determine doc_type:
 
 STEP 2: Identify the PATIENT (person receiving care, NOT the doctor or sender).
 Match against known patients: {patient_list}
+
+STEP 2b: Identify the DOCTOR who treated/examined the patient.
+- The doctor is the person who SIGNED the document or performed the examination.
+- Look for: "Dr.", "Dott.", "Prof.", signature at the bottom, "Arzt", "Medico"
+- Do NOT use: department heads listed in letterheads/headers/footers, hospital directors, administrative contacts
+- The doctor who signs at the BOTTOM of the document is usually the correct one.
+- If multiple doctors are mentioned, prefer the one who signed or performed the exam.
 
 STEP 3: Identify doctor and facility.
 Known facilities: {facility_list}

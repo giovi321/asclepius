@@ -178,7 +178,7 @@ export default function DocumentDetailPage() {
         <div>
           <h1 className="text-xl font-semibold">{doc.original_filename}</h1>
           <p className="text-sm text-muted-foreground">
-            {doc.doc_type?.replace(/_/g, " ")} | {doc.doc_date || "No date"} | {doc.patient_name || "Unclassified"}
+            {doc.doc_type?.replace(/_/g, " ")} | {doc.date_visit || doc.date_issued || doc.doc_date || "No date"} | {doc.patient_name || "Unclassified"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -207,56 +207,10 @@ export default function DocumentDetailPage() {
             </button>
           )}
           <button
-            onClick={() => setShowAiEdit(!showAiEdit)}
-            className="flex items-center gap-1 rounded-md border border-primary/50 px-3 py-1.5 text-sm text-primary hover:bg-primary/10"
-          >
-            <Stethoscope className="h-4 w-4" /> Edit with AI
-          </button>
-          <button
             onClick={handleDelete}
             className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
           >
             <Trash2 className="h-4 w-4" /> Delete
-          </button>
-        </div>
-      </div>
-
-      {/* AI Edit Panel */}
-      {showAiEdit && (
-        <div className="rounded-lg border bg-card p-4 space-y-3">
-          <p className="text-sm font-medium">Edit with AI</p>
-          <p className="text-xs text-muted-foreground">
-            Describe what to change in natural language. The AI will update the document metadata accordingly.
-          </p>
-          <textarea
-            value={aiInstruction}
-            onChange={(e) => setAiInstruction(e.target.value)}
-            placeholder='e.g. "This is a discharge letter for patient Giovanni Crapelli, dated 15/03/2024, diagnosis was hypertension, doctor was Dr. Müller from Ospedale Civico"'
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[80px]"
-            disabled={aiEditing}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleAiEdit}
-              disabled={aiEditing || !aiInstruction.trim()}
-              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              {aiEditing ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4" /> Apply
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => { setShowAiEdit(false); setAiInstruction(""); }}
-              className="rounded-md border px-4 py-2 text-sm"
-            >
-              Cancel
             </button>
           </div>
         </div>
@@ -449,6 +403,33 @@ export default function DocumentDetailPage() {
                 {notes || "Click to add notes..."}
               </div>
             )}
+          </Section>
+
+          {/* AI Edit */}
+          <Section title="AI Edit" icon={Stethoscope}>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={aiInstruction}
+                  onChange={(e) => setAiInstruction(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAiEdit()}
+                  placeholder='e.g. "doctor is Dr. Bianchi", "type is invoice", "date 15/03/2024"'
+                  className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm"
+                  disabled={aiEditing}
+                />
+                <button
+                  onClick={handleAiEdit}
+                  disabled={aiEditing || !aiInstruction.trim()}
+                  className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+                >
+                  {aiEditing ? "..." : "Apply"}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Tell the AI what to change. Press Enter or click Apply.
+              </p>
+            </div>
           </Section>
 
           {/* Tags */}
@@ -715,22 +696,37 @@ function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => vo
             <p className="text-xs text-muted-foreground">No related documents found</p>
           ) : (
             suggestions.map((sg: any) => (
-              <div key={sg.document_id} className="flex items-start gap-2 rounded-md border p-2 text-xs">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{sg.filename || `Document #${sg.document_id}`}</p>
-                  <p className="text-muted-foreground">{sg.reason}</p>
-                  <span className="inline-block mt-1 rounded bg-muted px-1.5 py-0.5 text-[10px]">{sg.link_type?.replace(/_/g, " ")}</span>
+              <div key={sg.document_id} className="rounded-md border p-3 text-xs space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <a href={`/documents/${sg.document_id}`} className="font-medium text-primary hover:underline block truncate">
+                      {sg.filename || `Document #${sg.document_id}`}
+                    </a>
+                    <div className="flex flex-wrap gap-2 mt-1 text-muted-foreground">
+                      {sg.doc_type && <span className="rounded bg-muted px-1.5 py-0.5">{sg.doc_type.replace(/_/g, " ")}</span>}
+                      {sg.doc_date && <span>{sg.doc_date}</span>}
+                      {sg.doctor_name && <span>{sg.doctor_name}</span>}
+                      {sg.facility_name && <span>{sg.facility_name}</span>}
+                    </div>
+                    {sg.summary_en && (
+                      <p className="mt-1 text-muted-foreground line-clamp-2">{sg.summary_en}</p>
+                    )}
+                  </div>
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] whitespace-nowrap">
+                    {sg.link_type?.replace(/_/g, " ")}
+                  </span>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <p className="flex-1 text-muted-foreground italic">{sg.reason}</p>
                   <button
                     onClick={() => handleAccept(sg.document_id, sg.link_type)}
-                    className="rounded bg-primary px-2 py-1 text-primary-foreground hover:bg-primary/90"
+                    className="rounded bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90"
                   >
                     Link
                   </button>
                   <button
                     onClick={() => setSuggestions((s) => s?.filter((x) => x.document_id !== sg.document_id) || null)}
-                    className="rounded border px-2 py-1 hover:bg-accent"
+                    className="rounded border px-3 py-1 hover:bg-accent"
                   >
                     Skip
                   </button>

@@ -210,7 +210,7 @@ export default function DocumentsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "\u2014"}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_date || "\u2014"}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{doc.date_visit || doc.date_issued || doc.doc_date || "\u2014"}</td>
                   <td className="px-4 py-2">{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
                   <td className="px-4 py-2 text-muted-foreground">{doc.doctor_name || doc.facility_name || "\u2014"}</td>
                   <td className="px-4 py-2">

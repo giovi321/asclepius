@@ -576,6 +576,17 @@ async def suggest_document_links(
         if s.get("document_id") in valid_ids and s.get("link_type") in valid_link_types
     ]
 
+    # Enrich each suggestion with document info
+    docs_by_id = {d["id"]: d for d in other_docs}
+    for s in validated:
+        info = docs_by_id.get(s["document_id"], {})
+        s["filename"] = info.get("original_filename")
+        s["doc_type"] = info.get("doc_type")
+        s["doc_date"] = info.get("doc_date")
+        s["summary_en"] = info.get("summary_en")
+        s["doctor_name"] = info.get("doctor_name")
+        s["facility_name"] = info.get("facility_name")
+
     return {"suggestions": validated}
 
 

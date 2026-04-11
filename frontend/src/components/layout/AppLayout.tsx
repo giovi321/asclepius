@@ -17,6 +17,7 @@ import {
   Menu,
   Activity,
   Users,
+  Clock,
   Sun,
   Moon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/patients", label: "Patients", icon: Users },
   { path: "/documents", label: "Documents", icon: FileText },
+  { path: "/timeline", label: "Timeline", icon: Clock },
   { path: "/unclassified", label: "Unclassified", icon: AlertCircle },
   { path: "/lab-results", label: "Lab Results", icon: TestTube },
   { path: "/imaging", label: "Imaging", icon: Image },

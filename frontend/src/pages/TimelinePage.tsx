@@ -60,7 +60,7 @@ export default function TimelinePage() {
   const { selectedPatient } = usePatient();
   const navigate = useNavigate();
   const [documents, setDocuments] = useState<TimelineDoc[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -69,20 +69,25 @@ export default function TimelinePage() {
     api
       .get("/documents", { params })
       .then((res) => {
-        const items: TimelineDoc[] = res.data.items || [];
+        console.log("Timeline API response:", res.data);
+        const items: TimelineDoc[] = res.data.items || res.data || [];
         // Sort by best date descending (newest first)
         const bestDate = (d: TimelineDoc) => d.date_visit || d.date_issued || d.doc_date || "";
         items.sort((a, b) => {
           const da = bestDate(a);
-          const db = bestDate(b);
-          if (!da && !db) return 0;
+          const db2 = bestDate(b);
+          if (!da && !db2) return 0;
           if (!da) return 1;
-          if (!db) return -1;
-          return db.localeCompare(da);
+          if (!db2) return -1;
+          return db2.localeCompare(da);
         });
+        console.log("Timeline documents:", items.length);
         setDocuments(items);
       })
-      .catch(() => setDocuments([]))
+      .catch((err) => {
+        console.error("Timeline API error:", err);
+        setDocuments([]);
+      })
       .finally(() => setLoading(false));
   }, [selectedPatient]);
 

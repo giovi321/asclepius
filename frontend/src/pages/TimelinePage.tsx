@@ -64,7 +64,7 @@ export default function TimelinePage() {
 
   useEffect(() => {
     setLoading(true);
-    const params: Record<string, any> = { limit: 500, status: "done" };
+    const params: Record<string, any> = { limit: 500 };
     if (selectedPatient) params.patient_id = selectedPatient.id;
     api
       .get("/documents", { params })

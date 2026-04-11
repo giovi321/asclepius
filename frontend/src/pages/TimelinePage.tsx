@@ -63,15 +63,11 @@ export default function TimelinePage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!selectedPatient) {
-      setDocuments([]);
-      return;
-    }
     setLoading(true);
+    const params: Record<string, any> = { limit: 500, status: "done" };
+    if (selectedPatient) params.patient_id = selectedPatient.id;
     api
-      .get("/documents", {
-        params: { patient_id: selectedPatient.id, limit: 500 },
-      })
+      .get("/documents", { params })
       .then((res) => {
         const items: TimelineDoc[] = res.data.items || [];
         // Sort by best date descending (newest first)
@@ -90,13 +86,7 @@ export default function TimelinePage() {
       .finally(() => setLoading(false));
   }, [selectedPatient]);
 
-  if (!selectedPatient) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <p className="text-muted-foreground">Select a patient to view timeline</p>
-      </div>
-    );
-  }
+  // No longer requires patient selection — shows all documents or filtered by patient
 
   if (loading) {
     return (

@@ -15,6 +15,48 @@ from asclepius.db.connection import get_db
 router = APIRouter()
 
 
+# --- Prompts ---
+
+@router.get("/prompts")
+async def list_prompts(
+    current_user: dict = Depends(get_current_user),
+):
+    config = get_config()
+    from asclepius.llm.prompt_manager import get_all_prompts
+    return await get_all_prompts(config.database.path)
+
+
+class PromptUpdate(BaseModel):
+    text: str
+
+
+@router.put("/prompts/{key}")
+async def update_prompt(
+    key: str,
+    body: PromptUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    config = get_config()
+    from asclepius.llm.prompt_manager import set_prompt, PROMPT_REGISTRY
+    if key not in PROMPT_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown prompt key: {key}")
+    await set_prompt(config.database.path, key, body.text)
+    return {"ok": True, "key": key}
+
+
+@router.delete("/prompts/{key}")
+async def reset_prompt(
+    key: str,
+    current_user: dict = Depends(get_current_user),
+):
+    config = get_config()
+    from asclepius.llm.prompt_manager import reset_prompt as _reset, PROMPT_REGISTRY
+    if key not in PROMPT_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown prompt key: {key}")
+    await _reset(config.database.path, key)
+    return {"ok": True, "key": key}
+
+
 # --- Settings ---
 
 @router.get("")

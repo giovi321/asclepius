@@ -295,6 +295,15 @@ CREATE TABLE IF NOT EXISTS norm_medication_aliases (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Custom prompts (user-editable LLM prompts)
+CREATE TABLE IF NOT EXISTS custom_prompts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prompt_key TEXT UNIQUE NOT NULL,  -- e.g. 'classification', 'extraction_bloodtest', 'chat_system'
+    prompt_text TEXT NOT NULL,
+    description TEXT,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Full-text search index
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     ocr_text,

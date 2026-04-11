@@ -68,13 +68,29 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     }
 
 
-async def _extract_type_specific(llm: LLMProvider, ocr_text: str, doc_type: str, context: dict) -> dict:
+async def _extract_type_specific(
+    llm: LLMProvider, ocr_text: str, doc_type: str, context: dict,
+    db_path: str | None = None,
+) -> dict:
     """Call the type-specific extraction prompt for phase 2."""
     from asclepius.llm.prompts import TYPE_EXTRACTION_PROMPTS
 
-    prompt_template = TYPE_EXTRACTION_PROMPTS.get(doc_type)
+    # Try custom prompt first
+    prompt_template = None
+    if db_path:
+        from asclepius.llm.prompt_manager import get_prompt
+        import asyncio
+        custom_key = f"extraction_{doc_type}"
+        try:
+            custom = await get_prompt(db_path, custom_key)
+            if custom:
+                prompt_template = custom
+        except Exception:
+            pass
+
     if not prompt_template:
-        # No type-specific prompt for this doc_type — return empty
+        prompt_template = TYPE_EXTRACTION_PROMPTS.get(doc_type)
+    if not prompt_template:
         return {}
 
     # Build format kwargs with only the placeholders that exist in this template
@@ -180,9 +196,25 @@ async def classify_and_extract(
     if extraction_override:
         extraction = extraction_override
     else:
-        # Phase 1: Classify
+        # Phase 1: Classify (use custom prompt if configured)
         logger.info("Phase 1 — classifying doc %d", doc_id)
-        classification = await llm.classify(ocr_text, context)
+        from asclepius.llm.prompt_manager import get_prompt
+        custom_classification = await get_prompt(config.database.path, "classification")
+        if custom_classification and hasattr(llm, '_generate'):
+            try:
+                formatted = custom_classification.format(
+                    patient_list=json.dumps(context.get("patient_list", []), indent=2),
+                    facility_list=json.dumps(context.get("facility_list", []), indent=2),
+                    doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
+                    ocr_text=ocr_text,
+                )
+                response_text = await llm._generate(formatted)
+                classification = llm._parse_json(response_text)
+            except Exception:
+                logger.warning("Custom classification prompt failed, using default")
+                classification = await llm.classify(ocr_text, context)
+        else:
+            classification = await llm.classify(ocr_text, context)
 
         if "error" in classification:
             logger.error("Classification failed for doc %d: %s", doc_id, classification.get("error"))
@@ -199,7 +231,7 @@ async def classify_and_extract(
 
         # Phase 2: Type-specific extraction
         logger.info("Phase 2 — extracting type-specific data for doc %d (type=%s)", doc_id, doc_type)
-        type_extraction = await _extract_type_specific(llm, ocr_text, doc_type, context)
+        type_extraction = await _extract_type_specific(llm, ocr_text, doc_type, context, db_path=config.database.path)
 
         # Merge: classification provides the base, type-specific adds structured arrays
         extraction = {**classification, **type_extraction}

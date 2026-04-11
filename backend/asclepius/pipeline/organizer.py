@@ -21,13 +21,14 @@ def build_organized_path(
 ) -> str:
     """Build the organized file path.
 
-    Format: patients/{slug}/{YYYY}/{event-slug}/{YYYY-MM-DD}_{provider}_{doctype}.{ext}
-    If no event, the event-slug folder is omitted.
+    Format: patients/{slug}/{YYYY}/{event-slug}/{YYYYMMDD}_{provider}_{doctype}.{ext}
+    Date is compact format (20251231). If no event, the event-slug folder is omitted.
     If no patient, goes to unclassified/
     """
     ext = Path(original_filename).suffix.lower()
     year = doc_date[:4] if doc_date else "unknown"
-    date_prefix = doc_date or "unknown-date"
+    # Compact date: 2025-12-31 → 20251231
+    date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
     provider = provider_slug or "unknown"
     dtype = doc_type or "other"
 

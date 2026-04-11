@@ -11,22 +11,22 @@ vault/
 │   ├── giovanni-crapelli/
 │   │   ├── 2023/
 │   │   │   ├── sleep-apnea-treatment/              # Medical event folder
-│   │   │   │   ├── 2023-10-17_humanitas_surgical-report.pdf
-│   │   │   │   ├── 2023-10-31_humanitas_specialist-report.pdf
-│   │   │   │   └── 2023-11-15_humanitas_invoice.pdf
-│   │   │   └── 2023-03-15_ospedale-civico_bloodtest.pdf  # No event
+│   │   │   │   ├── 20231017_humanitas_surgical-report.pdf
+│   │   │   │   ├── 20231031_humanitas_specialist-report.pdf
+│   │   │   │   └── 20231115_humanitas_invoice.pdf
+│   │   │   └── 20230315_ospedale-civico_bloodtest.pdf  # No event
 │   │   ├── 2024/
 │   │   │   ├── knee-injury/
-│   │   │   │   ├── 2024-07-22_clinica-luganese_radiology-report.pdf
-│   │   │   │   └── 2024-08-01_clinica-luganese_specialist-report.pdf
+│   │   │   │   ├── 20240722_clinica-luganese_radiology-report.pdf
+│   │   │   │   └── 20240801_clinica-luganese_specialist-report.pdf
 │   │   │   └── imaging/
-│   │   │       └── 2024-07-22_clinica-luganese_ct-abdomen/
+│   │   │       └── 20240722_clinica-luganese_ct-abdomen/
 │   │   │           ├── series-001/
 │   │   │           │   ├── 00001.dcm
 │   │   │           │   └── ...
 │   │   │           └── series-002/
 │   │   └── 2025/
-│   │       └── 2025-01-10_dr-mueller_prescription.pdf
+│   │       └── 20250110_dr-mueller_prescription.pdf
 │   └── other-patient/
 │       └── ...
 ├── unclassified/                       # Docs that couldn't be assigned to a patient
@@ -40,18 +40,18 @@ Documents assigned to a medical event are organized into an event subfolder with
 Files are renamed during organization to:
 
 ```
-{YYYY-MM-DD}_{provider-slug}_{doctype}.{ext}
+{YYYYMMDD}_{provider-slug}_{doctype}.{ext}
 ```
 
-- **Date** -- Document date as extracted by the LLM (`doc_date`)
+- **Date** -- Compact date format (e.g., `20251231`) as extracted by the LLM
 - **Provider slug** -- Facility slug (preferred) or doctor slug, lowercase with hyphens
 - **Doc type** -- One of the document type codes (e.g., `bloodtest`, `prescription`, `specialist_report`)
 
 Examples:
 
-- `2024-03-15_ospedale-civico_bloodtest.pdf`
-- `2025-01-10_dr-mueller_prescription.pdf`
-- `2024-11-20_university-hospital_discharge.pdf`
+- `20240315_ospedale-civico_bloodtest.pdf`
+- `20250110_dr-mueller_prescription.pdf`
+- `20241120_university-hospital_discharge.pdf`
 
 ## Key Rules
 

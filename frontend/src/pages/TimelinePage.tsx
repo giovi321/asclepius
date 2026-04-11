@@ -116,7 +116,10 @@ export default function TimelinePage() {
       <h1 className="text-2xl font-semibold">Timeline</h1>
 
       {documents.length === 0 ? (
-        <p className="text-muted-foreground">No documents found for this patient.</p>
+        <p className="text-muted-foreground">
+          No documents found.
+          {selectedPatient && " Try selecting \"All patients\" in the sidebar."}
+        </p>
       ) : (
         <div className="relative ml-4">
           {/* Vertical timeline line */}

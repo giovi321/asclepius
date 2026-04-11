@@ -55,6 +55,32 @@ export default function TimelinePage() {
   const [currentYear, setCurrentYear] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const yearRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  // Restore scroll position when returning from document detail
+  useEffect(() => {
+    if (!loading && documents.length > 0 && mainRef.current) {
+      const saved = sessionStorage.getItem("timeline_scroll");
+      if (saved) {
+        const parent = mainRef.current.closest("main");
+        if (parent) parent.scrollTop = parseInt(saved, 10);
+        sessionStorage.removeItem("timeline_scroll");
+      }
+    }
+  }, [loading, documents.length]);
+
+  const openDocument = (docId: number, e: React.MouseEvent) => {
+    // Save scroll position before navigating
+    const parent = mainRef.current?.closest("main");
+    if (parent) sessionStorage.setItem("timeline_scroll", String(parent.scrollTop));
+
+    // Middle-click or ctrl/cmd+click → new tab
+    if (e.button === 1 || e.ctrlKey || e.metaKey) {
+      window.open(`/documents/${docId}`, "_blank");
+    } else {
+      navigate(`/documents/${docId}`);
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -127,7 +153,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div ref={mainRef} className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Timeline</h1>
         {/* Jump to date */}
@@ -217,7 +243,8 @@ export default function TimelinePage() {
 
                       {/* Card */}
                       <button
-                        onClick={() => navigate(`/documents/${doc.id}`)}
+                        onClick={(e) => openDocument(doc.id, e)}
+                        onAuxClick={(e) => { if (e.button === 1) openDocument(doc.id, e); }}
                         className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50"
                       >
                         <div className="flex flex-wrap items-center gap-2 mb-1">

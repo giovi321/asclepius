@@ -58,6 +58,10 @@ PROMPT_REGISTRY = {
         "description": "Suggest related documents for linking",
         "default_attr": "LINK_SUGGESTION_PROMPT",
     },
+    "page_classification": {
+        "description": "Classify pages of multi-page documents into content types",
+        "default_attr": "PAGE_CLASSIFICATION_PROMPT",
+    },
 }
 
 

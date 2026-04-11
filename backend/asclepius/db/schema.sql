@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS documents (
     specialty_original TEXT,
     insurance_company TEXT,
     insurance_policy TEXT,
+    event_id INTEGER REFERENCES medical_events(id),  -- primary medical event
     notes TEXT,
     tags TEXT,  -- comma-separated user tags
     page_count INTEGER,
@@ -303,6 +304,62 @@ CREATE TABLE IF NOT EXISTS custom_prompts (
     description TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Medical events (central concept linking documents to medical stories)
+CREATE TABLE IF NOT EXISTS medical_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,  -- e.g. "Sleep Apnea Diagnosis & Treatment"
+    event_type TEXT NOT NULL,  -- 'symptom', 'diagnosis', 'hospitalization', 'surgery', 'treatment', 'follow_up', 'emergency', 'pregnancy', 'chronic_condition', 'injury', 'screening', 'other'
+    description TEXT,  -- detailed description
+    date_start DATE,  -- when the event started
+    date_end DATE,  -- when the event ended (null if ongoing)
+    is_ongoing BOOLEAN DEFAULT 0,
+    severity TEXT,  -- 'mild', 'moderate', 'severe', 'critical'
+    norm_diagnosis_id INTEGER REFERENCES norm_diagnoses(id),
+    diagnosis_text TEXT,  -- free text diagnosis
+    icd10_code TEXT,
+    norm_specialty_id INTEGER REFERENCES norm_specialties(id),
+    specialty_text TEXT,
+    notes TEXT,  -- user notes
+    color TEXT,  -- UI color for timeline (#hex)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_medical_events_patient ON medical_events(patient_id);
+CREATE INDEX IF NOT EXISTS idx_medical_events_type ON medical_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_medical_events_date ON medical_events(date_start);
+
+-- Link documents to medical events (many-to-many)
+CREATE TABLE IF NOT EXISTS document_event_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    event_id INTEGER NOT NULL REFERENCES medical_events(id) ON DELETE CASCADE,
+    relevance TEXT DEFAULT 'primary',  -- 'primary', 'secondary', 'background'
+    auto_linked BOOLEAN DEFAULT 0,  -- true if linked by LLM, false if by user
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(document_id, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_doc_event_links_document ON document_event_links(document_id);
+CREATE INDEX IF NOT EXISTS idx_doc_event_links_event ON document_event_links(event_id);
+
+-- Document sections (page-level sectioning for multi-page documents)
+CREATE TABLE IF NOT EXISTS document_sections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    section_index INTEGER NOT NULL,  -- order within the document
+    page_start INTEGER NOT NULL,  -- first page (1-indexed)
+    page_end INTEGER NOT NULL,  -- last page (inclusive)
+    section_type TEXT,  -- 'lab_results_page', 'clinical_notes', 'nursing_notes', 'vital_signs', 'consent_form', 'cover_page', 'medication_chart', 'operative_notes', 'discharge_summary', 'imaging_report', 'correspondence', 'invoice_page', 'other'
+    ocr_text TEXT,
+    raw_extraction JSON,
+    summary_en TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_sections_document ON document_sections(document_id);
 
 -- Full-text search index
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(

@@ -675,6 +675,44 @@ OCR text:
 EXTRACTION_PROMPT = EXTRACTION_PROMPT_LEGACY
 
 
+# ---------------------------------------------------------------------------
+# Page classification prompt (for multi-page document sectioning)
+# ---------------------------------------------------------------------------
+
+PAGE_CLASSIFICATION_PROMPT = """Classify each page of this multi-page medical document.
+For each page, determine what type of content it contains.
+
+Page types:
+- lab_results_page: tables of lab test values with numbers and units
+- clinical_notes: doctor's narrative notes, observations, assessments
+- nursing_notes: nursing diary, care records
+- vital_signs: vital signs charts, temperature, blood pressure tables
+- consent_form: consent forms, privacy documents, signatures
+- cover_page: front page with patient info, admission details
+- medication_chart: medication administration records
+- operative_notes: surgical/procedure descriptions
+- discharge_summary: discharge letter/summary
+- imaging_report: radiology findings, imaging descriptions
+- correspondence: letters, referrals
+- invoice_page: billing, costs, prices
+- other: anything that doesn't fit above
+
+I will give you the OCR text for multiple pages separated by "--- PAGE X ---" markers.
+
+Respond in JSON only:
+{{
+  "pages": [
+    {{"page": 1, "type": "cover_page", "brief": "Patient admission form with demographics"}},
+    {{"page": 2, "type": "clinical_notes", "brief": "Initial assessment by Dr. Smith"}}
+  ]
+}}
+
+OCR text:
+---
+{pages_text}
+---"""
+
+
 DOCUMENT_EDIT_PROMPT = """You are a medical document metadata editor. The user is correcting or adding information about a medical document.
 
 Current document data:

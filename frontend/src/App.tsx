@@ -13,6 +13,7 @@ import SearchPage from "@/pages/SearchPage";
 import SettingsPage from "@/pages/SettingsPage";
 import PatientsPage from "@/pages/PatientsPage";
 import TimelinePage from "@/pages/TimelinePage";
+import EventsPage from "@/pages/EventsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="patients" element={<PatientsPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="timeline" element={<TimelinePage />} />
+        <Route path="events" element={<EventsPage />} />
         <Route path="documents/:id" element={<DocumentDetailPage />} />
         <Route path="unclassified" element={<UnclassifiedPage />} />
         <Route path="lab-results" element={<LabResultsPage />} />

@@ -45,6 +45,60 @@ async def extract_text(file_path: str, config: AppConfig) -> tuple[str, float, s
         return "", 0.0, "none"
 
 
+async def extract_text_per_page(file_path: str, config: AppConfig) -> list[str]:
+    """Extract OCR text for each page separately. Returns list of strings, one per page."""
+    path = Path(file_path)
+    ext = path.suffix.lower()
+
+    if ext != ".pdf":
+        # For non-PDF, return the whole text as a single-page list
+        text, _, _ = await extract_text(file_path, config)
+        return [text] if text.strip() else []
+
+    # For LLM vision, each page is already processed individually
+    if config.ocr.engine == "llm_vision":
+        doc = fitz.open(str(path))
+        pages = []
+        for page_idx, page in enumerate(doc):
+            b64_image = _render_page_for_vision(page)
+            page_text = await _llm_vision_page_with_retry(
+                b64_image, config,
+                config.ocr.llm_vision_model,
+            )
+            pages.append(page_text)
+        doc.close()
+        return pages
+
+    # Try embedded text first, per page
+    doc = fitz.open(str(path))
+    pages = []
+    has_embedded = False
+
+    for page in doc:
+        text = page.get_text()
+        pages.append(text)
+        if text.strip():
+            has_embedded = True
+
+    doc.close()
+
+    if has_embedded and any(len(p.strip()) > 20 for p in pages):
+        return pages
+
+    # Fall back to Tesseract OCR per page
+    doc = fitz.open(str(path))
+    ocr_pages = []
+
+    for page in doc:
+        pix = page.get_pixmap(dpi=300)
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        page_text = pytesseract.image_to_string(img, lang=config.ocr.language)
+        ocr_pages.append(page_text)
+
+    doc.close()
+    return ocr_pages
+
+
 async def _extract_from_pdf(path: Path, config: AppConfig) -> tuple[str, float, str]:
     """Extract text from PDF — try embedded text first, fall back to OCR."""
     doc = fitz.open(str(path))

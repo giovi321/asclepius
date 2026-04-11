@@ -236,8 +236,47 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             logger.info("Running LLM extraction on doc %d", doc_id)
             llm = get_llm_provider(config)
 
+            # Check if document needs page-level sectioning
+            from asclepius.pipeline.section_processor import should_section, process_with_sections
+
+            if await should_section(file_path):
+                logger.info("Large document (%s pages) — using page-level sectioning for doc %d", page_count, doc_id)
+
+                # Get per-page OCR text
+                from asclepius.pipeline.ocr import extract_text_per_page
+                ocr_pages = await extract_text_per_page(file_path, config)
+
+                # If per-page extraction returned nothing useful, split full OCR text
+                if all(not p.strip() for p in ocr_pages):
+                    total_pages = max(page_count or 1, 1)
+                    chunk_size = max(1, len(ocr_text) // total_pages)
+                    ocr_pages = [ocr_text[i:i + chunk_size] for i in range(0, len(ocr_text), chunk_size)]
+
+                # Run section-level extraction (classify pages, extract per-section)
+                section_extraction = await process_with_sections(db, llm, doc_id, file_path, ocr_pages, config)
+
+                # Run normal classification on a truncated version of the text
+                # to get document-level metadata (patient, doctor, facility, dates)
+                # then merge with section extraction data
+                from asclepius.pipeline.extractor import (
+                    build_extraction_context, extract_and_store,
+                )
+                context = await build_extraction_context(db)
+
+                # Classify using first ~5000 chars (cover page + start)
+                classification_text = ocr_text[:5000]
+                classification = await llm.classify(classification_text, context)
+                if "error" not in classification:
+                    # Merge: classification provides metadata, sections provide structured data
+                    merged = {**classification, **section_extraction}
+                    extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
+                                                        extraction_override=merged)
+                else:
+                    # Classification failed — use section data alone
+                    extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
+                                                        extraction_override=section_extraction)
             # Chunked LLM extraction for very long texts
-            if len(ocr_text) > 15000:
+            elif len(ocr_text) > 15000:
                 logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
                 extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
             else:
@@ -482,7 +521,7 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
             return {"error": "No text could be extracted"}
 
         # Clear old extracted data
-        for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items"]:
+        for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.commit()
 

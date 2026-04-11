@@ -105,6 +105,9 @@ def create_app() -> FastAPI:
     from asclepius.documents.routes import router as documents_router
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 
+    from asclepius.events.routes import router as events_router
+    app.include_router(events_router, prefix="/api/events", tags=["events"])
+
     from asclepius.lab_results.routes import router as lab_results_router
     app.include_router(lab_results_router, prefix="/api/lab-results", tags=["lab-results"])
 

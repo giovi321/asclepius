@@ -221,6 +221,27 @@ export default function DocumentDetailPage() {
         </div>
       )}
 
+      {doc.sections?.length > 0 && (
+        <div className="rounded-lg border p-4">
+          <h3 className="mb-3 font-medium">Document Sections ({doc.sections.length})</h3>
+          <div className="space-y-2">
+            {doc.sections.map((section: any) => (
+              <div key={section.id} className="flex items-center gap-3 text-sm rounded-md border p-2">
+                <span className="text-xs text-muted-foreground w-16">
+                  pp. {section.page_start}{"\u2013"}{section.page_end}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getSectionTypeStyle(section.section_type)}`}>
+                  {section.section_type?.replace(/_/g, " ")}
+                </span>
+                {section.summary_en && (
+                  <span className="flex-1 text-xs text-muted-foreground truncate">{section.summary_en}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Document viewer */}
         <div className="space-y-4">
@@ -267,6 +288,9 @@ export default function DocumentDetailPage() {
             <InfoRow label="OCR Engine" value={doc.ocr_engine} />
             <InfoRow label="OCR Confidence" value={doc.ocr_confidence?.toFixed(2)} />
           </Section>
+
+          {/* Medical Event */}
+          <EventSelector docId={doc.id} patientId={doc.patient_id} currentEventId={doc.event_id} onUpdate={loadDoc} />
 
           {/* Lab Results */}
           {doc.lab_results?.length > 0 && (
@@ -574,6 +598,24 @@ export default function DocumentDetailPage() {
   );
 }
 
+function getSectionTypeStyle(type: string): string {
+  const styles: Record<string, string> = {
+    lab_results_page: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    clinical_notes: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    nursing_notes: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+    vital_signs: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+    consent_form: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    cover_page: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+    medication_chart: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+    operative_notes: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+    discharge_summary: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+    imaging_report: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
+    correspondence: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+    invoice_page: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+  };
+  return styles[type] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+}
+
 function MedFormBadge({ form }: { form?: string }) {
   if (!form) return <span className="text-muted-foreground">{"\u2014"}</span>;
   const lower = form.toLowerCase();
@@ -732,6 +774,114 @@ function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => vo
         </div>
       )}
     </div>
+  );
+}
+
+function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
+  docId: number; patientId: number | null; currentEventId: number | null; onUpdate: () => void;
+}) {
+  const [events, setEvents] = useState<any[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestion, setSuggestion] = useState<any>(null);
+
+  useEffect(() => {
+    if (!patientId) return;
+    api.get("/events", { params: { patient_id: patientId } })
+      .then((res) => setEvents(res.data || []))
+      .catch(() => {});
+  }, [patientId]);
+
+  const handleAssign = async (eventId: number) => {
+    await api.post(`/events/${eventId}/link`, { document_id: docId });
+    onUpdate();
+  };
+
+  const handleSuggest = async () => {
+    setSuggesting(true);
+    setSuggestion(null);
+    try {
+      const res = await api.post(`/events/suggest-for-document/${docId}`);
+      setSuggestion(res.data);
+    } catch { alert("Failed to get suggestion"); }
+    setSuggesting(false);
+  };
+
+  const handleCreateAndLink = async (s: any) => {
+    if (!patientId || !s) return;
+    const res = await api.post("/events", {
+      patient_id: patientId,
+      title: s.title,
+      event_type: s.event_type || "other",
+      description: s.description,
+      date_start: s.date_start,
+    });
+    await api.post(`/events/${res.data.id}/link`, { document_id: docId });
+    setSuggestion(null);
+    onUpdate();
+    // Reload events list
+    api.get("/events", { params: { patient_id: patientId } })
+      .then((r) => setEvents(r.data || []));
+  };
+
+  if (!patientId) return null;
+
+  const currentEvent = events.find((e) => e.id === currentEventId);
+
+  return (
+    <Section title="Medical Event" icon={Stethoscope}>
+      {currentEvent ? (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-medium">{currentEvent.title}</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{currentEvent.event_type?.replace(/_/g, " ")}</span>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground mb-2">No medical event assigned.</p>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-2">
+        <select
+          value={currentEventId || ""}
+          onChange={(e) => { if (e.target.value) handleAssign(Number(e.target.value)); }}
+          className="rounded-md border bg-background px-2 py-1.5 text-xs"
+        >
+          <option value="">Assign to event...</option>
+          {events.map((ev) => (
+            <option key={ev.id} value={ev.id}>{ev.title} ({ev.event_type?.replace(/_/g, " ")})</option>
+          ))}
+        </select>
+
+        <button onClick={handleSuggest} disabled={suggesting}
+          className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50">
+          {suggesting ? "Analyzing..." : "Suggest (AI)"}
+        </button>
+      </div>
+
+      {suggestion && (
+        <div className="mt-2 rounded-md border p-3 text-xs space-y-2">
+          {suggestion.existing_event_id && suggestion.matched_event ? (
+            <div>
+              <p className="font-medium">Matches: {suggestion.matched_event.title}</p>
+              <p className="text-muted-foreground">{suggestion.reason}</p>
+              <button onClick={() => handleAssign(suggestion.existing_event_id)}
+                className="mt-1 rounded bg-primary px-3 py-1 text-primary-foreground">
+                Link to this event
+              </button>
+            </div>
+          ) : suggestion.new_event_suggestion ? (
+            <div>
+              <p className="font-medium">Suggest new event: {suggestion.new_event_suggestion.title}</p>
+              <p className="text-muted-foreground">{suggestion.new_event_suggestion.description}</p>
+              <button onClick={() => handleCreateAndLink(suggestion.new_event_suggestion)}
+                className="mt-1 rounded bg-primary px-3 py-1 text-primary-foreground">
+                Create & Link
+              </button>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No matching event found.</p>
+          )}
+        </div>
+      )}
+    </Section>
   );
 }
 

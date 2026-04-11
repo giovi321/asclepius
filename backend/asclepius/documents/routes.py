@@ -90,6 +90,7 @@ class DocumentUpdate(BaseModel):
     facility_name: str | None = None
     specialty_original: str | None = None
     summary_en: str | None = None
+    event_id: int | None = None
     notes: str | None = None
     tags: str | None = None
 
@@ -156,6 +157,14 @@ async def get_doc(
     # Get linked documents
     links = await _get_document_links(db, doc_id)
 
+    # Get document sections (page-level sectioning)
+    sections_cursor = await db.execute(
+        """SELECT id, section_index, page_start, page_end, section_type, summary_en
+           FROM document_sections WHERE document_id = ? ORDER BY section_index""",
+        (doc_id,),
+    )
+    sections = [dict(r) for r in await sections_cursor.fetchall()]
+
     return {
         **doc,
         "lab_results": lab_results,
@@ -163,6 +172,7 @@ async def get_doc(
         "medications": medications,
         "vaccinations": vaccinations,
         "links": links,
+        "sections": sections,
     }
 
 

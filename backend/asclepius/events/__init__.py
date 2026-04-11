@@ -1,0 +1,1 @@
+"""Medical events module."""

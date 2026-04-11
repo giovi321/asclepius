@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { Plus, Trash2, FileText, ChevronDown, ChevronUp, Calendar, Activity } from "lucide-react";
+import { Plus, Trash2, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
 const EVENT_TYPES = [
   "symptom", "diagnosis", "hospitalization", "surgery", "treatment",

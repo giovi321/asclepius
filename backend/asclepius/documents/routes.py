@@ -114,7 +114,7 @@ async def list_docs(
     specialty: str | None = None,
     doctor_id: int | None = None,
     facility_id: int | None = None,
-    limit: int = Query(default=50, le=200),
+    limit: int = Query(default=50, le=1000),
     offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),

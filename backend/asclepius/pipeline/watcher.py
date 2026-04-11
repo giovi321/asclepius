@@ -43,6 +43,15 @@ class InboxHandler(FileSystemEventHandler):
             return
 
         logger.info("New file detected: %s", path.name)
+        # Delay to let file finish writing (especially for large uploads)
+        import time
+        time.sleep(2)
+
+        # Verify file still exists and is not being written
+        if not path.exists():
+            logger.warning("File disappeared before processing: %s", path.name)
+            return
+
         # Use file size as priority — smaller files processed first
         try:
             file_size = os.path.getsize(event.src_path)

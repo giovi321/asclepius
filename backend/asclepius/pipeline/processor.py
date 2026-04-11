@@ -253,28 +253,38 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     ocr_pages = [ocr_text[i:i + chunk_size] for i in range(0, len(ocr_text), chunk_size)]
 
                 # Run section-level extraction (classify pages, extract per-section)
-                section_extraction = await process_with_sections(db, llm, doc_id, file_path, ocr_pages, config)
+                try:
+                    section_extraction = await process_with_sections(db, llm, doc_id, file_path, ocr_pages, config)
+                except Exception as sect_err:
+                    logger.exception("Sectioning failed for doc %d, falling back to normal extraction", doc_id)
+                    section_extraction = None
 
-                # Run normal classification on a truncated version of the text
-                # to get document-level metadata (patient, doctor, facility, dates)
-                # then merge with section extraction data
-                from asclepius.pipeline.extractor import (
-                    build_extraction_context, extract_and_store,
-                )
-                context = await build_extraction_context(db)
+                if section_extraction is not None:
+                    # Run normal classification on a truncated version of the text
+                    # to get document-level metadata (patient, doctor, facility, dates)
+                    from asclepius.pipeline.extractor import (
+                        build_extraction_context, extract_and_store,
+                    )
+                    context = await build_extraction_context(db)
 
-                # Classify using first ~5000 chars (cover page + start)
-                classification_text = ocr_text[:5000]
-                classification = await llm.classify(classification_text, context)
-                if "error" not in classification:
-                    # Merge: classification provides metadata, sections provide structured data
-                    merged = {**classification, **section_extraction}
-                    extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
-                                                        extraction_override=merged)
+                    # Classify using first ~5000 chars (cover page + start)
+                    classification_text = ocr_text[:5000]
+                    try:
+                        classification = await llm.classify(classification_text, context)
+                    except Exception:
+                        classification = {"error": "classification failed"}
+
+                    if "error" not in classification:
+                        merged = {**classification, **section_extraction}
+                        extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
+                                                            extraction_override=merged)
+                    else:
+                        extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
+                                                            extraction_override=section_extraction)
                 else:
-                    # Classification failed — use section data alone
-                    extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
-                                                        extraction_override=section_extraction)
+                    # Sectioning failed — fall through to normal extraction
+                    logger.info("Falling back to chunked extraction for doc %d", doc_id)
+                    extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
             # Chunked LLM extraction for very long texts
             elif len(ocr_text) > 15000:
                 logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
@@ -352,10 +362,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
         except Exception as e:
             logger.exception("Pipeline error for %s", path.name)
+            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else f"{type(e).__name__} (no message)"
             pipeline_status["total_errors"] += 1
             pipeline_status["recent_errors"].append({
                 "file": path.name,
-                "error": str(e),
+                "error": error_msg,
             })
             pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
 

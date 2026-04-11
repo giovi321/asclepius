@@ -51,7 +51,6 @@ export default function DocumentDetailPage() {
     try {
       await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
       setAiInstruction("");
-      setShowAiEdit(false);
       await loadDoc();
     } catch (e: any) {
       alert("AI edit failed: " + (e.response?.data?.detail || e.message));

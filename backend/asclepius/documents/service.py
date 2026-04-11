@@ -45,9 +45,6 @@ async def list_documents(
     conditions = []
     params: list = []
 
-    # No blanket access filter — all authenticated users can see all documents.
-    # Per-patient access control is enforced when viewing individual documents.
-
     if patient_id is not None:
         conditions.append("d.patient_id = ?")
         params.append(patient_id)
@@ -55,10 +52,11 @@ async def list_documents(
         conditions.append("d.doc_type = ?")
         params.append(doc_type)
     if date_from:
-        conditions.append("d.doc_date >= ?")
+        # Use the best available date
+        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) >= ?")
         params.append(date_from)
     if date_to:
-        conditions.append("d.doc_date <= ?")
+        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) <= ?")
         params.append(date_to)
     if status:
         conditions.append("d.status = ?")
@@ -79,6 +77,22 @@ async def list_documents(
         except ValueError:
             params.extend([-1, f"%{specialty}%"])
 
+    # Fuzzy search across multiple columns using LIKE
+    if q:
+        search_term = f"%{q}%"
+        conditions.append(
+            """(d.original_filename LIKE ? COLLATE NOCASE
+                OR d.doc_type LIKE ? COLLATE NOCASE
+                OR d.doctor_name LIKE ? COLLATE NOCASE
+                OR d.facility_name LIKE ? COLLATE NOCASE
+                OR d.summary_en LIKE ? COLLATE NOCASE
+                OR d.summary_original LIKE ? COLLATE NOCASE
+                OR d.specialty_original LIKE ? COLLATE NOCASE
+                OR d.ocr_text LIKE ? COLLATE NOCASE
+                OR p.display_name LIKE ? COLLATE NOCASE)"""
+        )
+        params.extend([search_term] * 9)
+
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     select_cols = """d.*,
@@ -89,38 +103,20 @@ async def list_documents(
                LEFT JOIN doctors doc ON d.doctor_id = doc.id
                LEFT JOIN facilities f ON d.facility_id = f.id"""
 
-    # Full-text search
-    if q:
-        fts_query = (
-            f"""SELECT {select_cols}
+    query = f"""SELECT {select_cols}
                 FROM documents d {joins}
-                JOIN documents_fts ON documents_fts.rowid = d.id
-                {where} AND documents_fts MATCH ?
-                ORDER BY rank
+                {where}
+                ORDER BY COALESCE(d.date_visit, d.date_issued, d.doc_date, d.created_at) DESC
                 LIMIT ? OFFSET ?"""
-        )
-        params.extend([q, limit, offset])
-        cursor = await db.execute(fts_query, params)
-    else:
-        query = f"""SELECT {select_cols}
-                    FROM documents d {joins}
-                    {where}
-                    ORDER BY d.created_at DESC
-                    LIMIT ? OFFSET ?"""
-        params.extend([limit, offset])
-        cursor = await db.execute(query, params)
+    params.extend([limit, offset])
+    cursor = await db.execute(query, params)
 
     rows = await cursor.fetchall()
     items = [dict(r) for r in rows]
 
     # Get total count
     count_params = params[:-2]  # remove limit/offset
-    if q:
-        count_query = f"""SELECT COUNT(*) FROM documents d
-                         JOIN documents_fts ON documents_fts.rowid = d.id
-                         {where} AND documents_fts MATCH ?"""
-    else:
-        count_query = f"SELECT COUNT(*) FROM documents d {where}"
+    count_query = f"SELECT COUNT(*) FROM documents d {joins} {where}"
     cursor = await db.execute(count_query, count_params)
     total = (await cursor.fetchone())[0]
 

@@ -149,10 +149,10 @@ export default function DocumentsPage() {
           ))}
         </select>
       </div>
-      {/* Date range */}
+      {/* Date range (filters by visit/exam date) */}
       <div className="flex flex-wrap gap-3 items-center">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">From:</span>
+          <span className="text-muted-foreground">Visit date from:</span>
           <input
             type="date"
             value={dateFrom}
@@ -161,7 +161,7 @@ export default function DocumentsPage() {
           />
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">To:</span>
+          <span className="text-muted-foreground">to:</span>
           <input
             type="date"
             value={dateTo}

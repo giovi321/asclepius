@@ -8,6 +8,8 @@ interface TimelineDoc {
   id: number;
   doc_type: string;
   doc_date: string | null;
+  date_visit: string | null;
+  date_issued: string | null;
   original_filename: string;
   doctor_name: string | null;
   facility_name: string | null;
@@ -72,12 +74,15 @@ export default function TimelinePage() {
       })
       .then((res) => {
         const items: TimelineDoc[] = res.data.items || [];
-        // Sort by doc_date descending (newest first)
+        // Sort by best date descending (newest first)
+        const bestDate = (d: TimelineDoc) => d.date_visit || d.date_issued || d.doc_date || "";
         items.sort((a, b) => {
-          if (!a.doc_date && !b.doc_date) return 0;
-          if (!a.doc_date) return 1;
-          if (!b.doc_date) return -1;
-          return b.doc_date.localeCompare(a.doc_date);
+          const da = bestDate(a);
+          const db = bestDate(b);
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return db.localeCompare(da);
         });
         setDocuments(items);
       })
@@ -104,7 +109,7 @@ export default function TimelinePage() {
   // Group documents by year
   const grouped: Record<string, TimelineDoc[]> = {};
   for (const doc of documents) {
-    const year = getYear(doc.doc_date);
+    const year = getYear(doc.date_visit || doc.date_issued || doc.doc_date);
     if (!grouped[year]) grouped[year] = [];
     grouped[year].push(doc);
   }
@@ -152,7 +157,7 @@ export default function TimelinePage() {
                     >
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="text-sm font-medium">
-                          {formatDate(doc.doc_date)}
+                          {formatDate(doc.date_visit || doc.date_issued || doc.doc_date)}
                         </span>
                         <span
                           className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${style.bg} ${style.text}`}

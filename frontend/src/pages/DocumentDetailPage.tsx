@@ -29,7 +29,7 @@ export default function DocumentDetailPage() {
     setNotes(res.data.user_notes || "");
     const rawTags = res.data.tags || "";
     setTags(typeof rawTags === "string" ? (rawTags ? rawTags.split(",").map((t: string) => t.trim()) : []) : rawTags);
-    setLinkedDocs(res.data.linked_documents || []);
+    setLinkedDocs(res.data.links || []);
     setLoading(false);
   };
 
@@ -256,18 +256,16 @@ export default function DocumentDetailPage() {
         <div className="space-y-4">
           <Section title="Document Info">
             <InfoRow label="Status" value={doc.status} />
-            <InfoRow label="Type" value={doc.doc_type} />
-            <InfoRow label="Document Date" value={doc.doc_date} />
-            <InfoRow label="Date Issued" value={doc.date_issued} />
-            <InfoRow label="Date of Visit" value={doc.date_visit} />
-            <InfoRow label="Date Received" value={doc.date_received} />
-            <InfoRow label="Doctor" value={doc.doctor_name || doc.doctor} />
-            <InfoRow label="Facility" value={doc.facility_name || doc.facility} />
-            <InfoRow label="Specialty" value={doc.specialty} />
+            <EditableField label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={loadDoc} />
+            <EditableField label="Summary" value={doc.summary_en} field="summary_en" docId={doc.id} onSave={loadDoc} multiline />
             <InfoRow label="Language" value={doc.language_source} />
             <InfoRow label="OCR Engine" value={doc.ocr_engine} />
             <InfoRow label="OCR Confidence" value={doc.ocr_confidence?.toFixed(2)} />
-            <InfoRow label="Cost" value={doc.cost_amount ? `${doc.cost_amount} ${doc.cost_currency}` : null} />
           </Section>
 
           {/* Lab Results */}
@@ -733,6 +731,65 @@ function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => vo
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false }: {
+  label: string; value: any; field: string; docId: number; onSave: () => void;
+  type?: string; multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/documents/${docId}`, { [field]: val || null });
+      setEditing(false);
+      onSave();
+    } catch { alert("Failed to save"); }
+    setSaving(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !multiline) handleSave();
+    if (e.key === "Escape") { setEditing(false); setVal(value || ""); }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-start gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">{label}</span>
+        <div className="flex-1 flex gap-1">
+          {multiline ? (
+            <textarea value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
+              className="flex-1 rounded border bg-background px-2 py-1 text-sm" rows={2} autoFocus disabled={saving} />
+          ) : (
+            <input type={type} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
+              className="flex-1 rounded border bg-background px-2 py-1 text-sm" autoFocus disabled={saving} />
+          )}
+          <button onClick={handleSave} disabled={saving}
+            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
+            {saving ? "..." : "OK"}
+          </button>
+          <button onClick={() => { setEditing(false); setVal(value || ""); }}
+            className="rounded border px-2 py-1 text-xs">
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => { setVal(value || ""); setEditing(true); }}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">
+        {value || <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+      </span>
     </div>
   );
 }

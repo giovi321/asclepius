@@ -82,8 +82,14 @@ class DocumentUpdate(BaseModel):
     patient_id: int | None = None
     doc_type: str | None = None
     doc_date: str | None = None
+    date_issued: str | None = None
+    date_visit: str | None = None
     doctor_id: int | None = None
+    doctor_name: str | None = None
     facility_id: int | None = None
+    facility_name: str | None = None
+    specialty_original: str | None = None
+    summary_en: str | None = None
     notes: str | None = None
     tags: str | None = None
 
@@ -216,24 +222,16 @@ async def update_doc(
         raise HTTPException(status_code=404, detail="Document not found")
 
     updates = {}
-    if body.patient_id is not None:
-        # Verify access to target patient
-        role = await check_patient_access(db, current_user["id"], body.patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access to target patient")
-        updates["patient_id"] = body.patient_id
-    if body.doc_type is not None:
-        updates["doc_type"] = body.doc_type
-    if body.doc_date is not None:
-        updates["doc_date"] = body.doc_date
-    if body.doctor_id is not None:
-        updates["doctor_id"] = body.doctor_id
-    if body.facility_id is not None:
-        updates["facility_id"] = body.facility_id
-    if body.notes is not None:
-        updates["notes"] = body.notes
-    if body.tags is not None:
-        updates["tags"] = body.tags
+    # Iterate over all fields in the model
+    for field_name in body.model_fields_set:
+        value = getattr(body, field_name)
+        if value is None:
+            continue
+        if field_name == "patient_id":
+            role = await check_patient_access(db, current_user["id"], value)
+            if not role:
+                raise HTTPException(status_code=403, detail="No access to target patient")
+        updates[field_name] = value
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -639,8 +637,9 @@ User instruction: "{body.instruction}"
 
 Return ONLY a JSON object with the fields that should change. Use these field names:
 - patient_name, doc_type, doc_date (YYYY-MM-DD), date_issued, date_visit
-- doctor (object: name, title, specialty_original)
-- facility (object: name, type, city)
+- doctor_name (string, e.g. "Dr. Bianchi")
+- facility_name (string, e.g. "Ospedale Civico")
+- specialty_original
 - summary_en, summary_original
 
 Only include fields the user mentioned. JSON only, no explanation."""
@@ -690,19 +689,39 @@ Only include fields the user mentioned. JSON only, no explanation."""
         if patient_id:
             updates["patient_id"] = patient_id
 
-    # Handle doctor change
+    # Handle doctor change — accept both {"doctor": {"name": "X"}} and {"doctor_name": "X"}
     doctor_data = changes.get("doctor")
+    doctor_name_str = changes.get("doctor_name")
+    if isinstance(doctor_data, str):
+        doctor_name_str = doctor_data
+        doctor_data = None
     if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_doctor
         doctor_id = await _upsert_doctor(db, doctor_data)
         updates["doctor_id"] = doctor_id
+        updates["doctor_name"] = doctor_data["name"]
+    elif doctor_name_str:
+        from asclepius.pipeline.extractor import _upsert_doctor
+        doctor_id = await _upsert_doctor(db, {"name": doctor_name_str})
+        updates["doctor_id"] = doctor_id
+        updates["doctor_name"] = doctor_name_str
 
-    # Handle facility change
+    # Handle facility change — accept both {"facility": {"name": "X"}} and {"facility_name": "X"}
     facility_data = changes.get("facility")
+    facility_name_str = changes.get("facility_name")
+    if isinstance(facility_data, str):
+        facility_name_str = facility_data
+        facility_data = None
     if facility_data and isinstance(facility_data, dict) and facility_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_facility
         facility_id = await _upsert_facility(db, facility_data)
         updates["facility_id"] = facility_id
+        updates["facility_name"] = facility_data["name"]
+    elif facility_name_str:
+        from asclepius.pipeline.extractor import _upsert_facility
+        facility_id = await _upsert_facility(db, {"name": facility_name_str})
+        updates["facility_id"] = facility_id
+        updates["facility_name"] = facility_name_str
 
     if updates:
         set_clause = ", ".join(f"{k} = ?" for k in updates)

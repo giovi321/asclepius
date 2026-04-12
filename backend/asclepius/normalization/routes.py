@@ -92,12 +92,16 @@ async def list_facilities(
 async def list_norms(
     norm_type: str,
     filter: str | None = Query(default=None),
+    search: str | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     tables = _validate_type(norm_type)
     svc = NormService(db, tables)
-    return await svc.list_all(filter_unreviewed=(filter == "unreviewed"))
+    return await svc.list_all(
+        filter_unreviewed=(filter == "unreviewed"),
+        search=search,
+    )
 
 
 @router.get("/{norm_type}/{norm_id}")

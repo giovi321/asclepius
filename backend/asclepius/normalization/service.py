@@ -14,12 +14,24 @@ class NormService:
         self.ref_table = tables["ref_table"]
         self.ref_col = tables["ref_col"]
 
-    async def list_all(self, filter_unreviewed: bool = False) -> list[dict]:
-        cursor = await self.db.execute(f"SELECT * FROM {self.main_table} ORDER BY canonical_display")
+    async def list_all(self, filter_unreviewed: bool = False, search: str | None = None) -> list[dict]:
+        if search:
+            # Search in canonical_display, canonical_code, and aliases
+            like = f"%{search}%"
+            cursor = await self.db.execute(
+                f"""SELECT DISTINCT m.* FROM {self.main_table} m
+                    LEFT JOIN {self.alias_table} a ON a.{self.fk_col} = m.id
+                    WHERE m.canonical_display LIKE ? OR m.canonical_code LIKE ? OR a.alias LIKE ?
+                    ORDER BY m.canonical_display""",
+                (like, like, like),
+            )
+        else:
+            cursor = await self.db.execute(f"SELECT * FROM {self.main_table} ORDER BY canonical_display")
+
         items = []
         for row in await cursor.fetchall():
             item = dict(row)
-            # Get alias count
+            # Get alias counts
             alias_cursor = await self.db.execute(
                 f"SELECT COUNT(*) FROM {self.alias_table} WHERE {self.fk_col} = ?",
                 (item["id"],),
@@ -27,16 +39,16 @@ class NormService:
             alias_count = (await alias_cursor.fetchone())[0]
             item["alias_count"] = alias_count
 
-            if filter_unreviewed:
-                # Check if has unreviewed aliases
-                alias_cursor = await self.db.execute(
-                    f"SELECT COUNT(*) FROM {self.alias_table} WHERE {self.fk_col} = ? AND auto_mapped = 1",
-                    (item["id"],),
-                )
-                unreviewed = (await alias_cursor.fetchone())[0]
-                if unreviewed == 0:
-                    continue
-                item["unreviewed_count"] = unreviewed
+            # Get unreviewed count
+            alias_cursor = await self.db.execute(
+                f"SELECT COUNT(*) FROM {self.alias_table} WHERE {self.fk_col} = ? AND auto_mapped = 1",
+                (item["id"],),
+            )
+            unreviewed = (await alias_cursor.fetchone())[0]
+            item["unreviewed_count"] = unreviewed
+
+            if filter_unreviewed and unreviewed == 0:
+                continue
 
             items.append(item)
         return items

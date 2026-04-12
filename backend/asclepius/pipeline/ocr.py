@@ -282,23 +282,40 @@ async def _llm_vision_page_with_retry(
     b64_image: str, config: AppConfig, vision_model: str,
     max_retries: int = 3,
 ) -> str:
-    """Call _llm_vision_page with retry + backoff for rate limits."""
+    """Call _llm_vision_page with retry + backoff for rate limits and timeouts."""
     import asyncio as _asyncio
 
     for attempt in range(max_retries):
         try:
             return await _llm_vision_page(b64_image, config, vision_model)
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
+            wait = 30 * (attempt + 1)  # 30s, 60s, 90s
+            logger.warning(
+                "Vision OCR %s (attempt %d/%d), retrying in %ds...",
+                type(e).__name__, attempt + 1, max_retries, wait,
+            )
+            if attempt < max_retries - 1:
+                await _asyncio.sleep(wait)
+            else:
+                logger.error("Vision OCR failed after %d attempts: %s", max_retries, e)
+                return ""  # Return empty text for this page rather than crash
         except Exception as e:
             error_str = str(e)
             if "rate_limit" in error_str or "429" in error_str:
-                wait = 30 * (attempt + 1)  # 30s, 60s, 90s
+                wait = 30 * (attempt + 1)
                 logger.warning("Rate limited, waiting %ds before retry (attempt %d/%d)", wait, attempt + 1, max_retries)
                 await _asyncio.sleep(wait)
             elif "exceeds" in error_str and "MB" in error_str:
                 logger.error("Image still too large after compression: %s", error_str)
-                return "[Image too large for vision OCR — falling back to empty text]"
+                return ""
             else:
-                raise
+                if attempt < max_retries - 1:
+                    wait = 30 * (attempt + 1)
+                    logger.warning("Vision OCR error (attempt %d/%d): %s, retrying in %ds...",
+                                   attempt + 1, max_retries, e, wait)
+                    await _asyncio.sleep(wait)
+                else:
+                    raise
     # Final attempt without catching
     return await _llm_vision_page(b64_image, config, vision_model)
 
@@ -351,7 +368,9 @@ async def _llm_vision_page(
         # Ollama with vision model — can use a different URL than the extraction LLM
         model = vision_model or config.llm.ollama_model
         ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
-        timeout = httpx.Timeout(connect=10.0, read=float(config.llm.extraction_timeout), write=10.0, pool=10.0)
+        # Vision OCR needs a generous timeout — processing a single page image can be slow
+        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
+        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         logger.info("Vision OCR: model=%s, url=%s", model, ollama_url)
 
         async with httpx.AsyncClient(timeout=timeout) as client:

@@ -239,8 +239,8 @@ export default function DocumentsPage() {
                       "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
                     }`}>
                       {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
-                        && pipeline.processing_pages && pipeline.processing_page_current != null
-                        ? `${pipeline.processing_step || "processing"} (${pipeline.processing_page_current}/${pipeline.processing_pages})`
+                        && pipeline?.processing_pages && pipeline?.processing_page_current != null
+                        ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`
                         : doc.status}
                     </span>
                   </td>

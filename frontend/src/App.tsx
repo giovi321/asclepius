@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/LoginPage";
+import SetupWizardPage from "@/pages/SetupWizardPage";
 import DashboardPage from "@/pages/DashboardPage";
 import DocumentsPage from "@/pages/DocumentsPage";
 import DocumentDetailPage from "@/pages/DocumentDetailPage";
@@ -17,7 +18,7 @@ import EventsPage from "@/pages/EventsPage";
 import FileBrowserPage from "@/pages/FileBrowserPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, needsSetup } = useAuth();
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -25,6 +26,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  if (needsSetup) return <Navigate to="/setup" />;
   if (!user) return <Navigate to="/login" />;
   return <>{children}</>;
 }
@@ -32,6 +34,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
+      <Route path="/setup" element={<SetupWizardPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"

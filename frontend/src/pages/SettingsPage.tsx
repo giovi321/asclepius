@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check, FileCode, RotateCcw, Download, ScrollText } from "lucide-react";
 
@@ -570,9 +570,11 @@ function PromptsTab() {
 function LogsTab() {
   const [logs, setLogs] = useState<any[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoScroll, setAutoScroll] = useState(true);
   const [levelFilter, setLevelFilter] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [total, setTotal] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchLogs = () => {
     const params: Record<string, any> = { limit: 500 };
@@ -590,6 +592,12 @@ function LogsTab() {
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
   }, [autoRefresh, levelFilter, moduleFilter]);
+
+  useEffect(() => {
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs, autoScroll]);
 
   const levelColor = (level: string) => {
     switch (level) {
@@ -618,6 +626,10 @@ function LogsTab() {
           <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
           Auto-refresh (3s)
         </label>
+        <label className="flex items-center gap-1.5 text-xs">
+          <input type="checkbox" checked={autoScroll} onChange={(e) => setAutoScroll(e.target.checked)} />
+          Auto-scroll
+        </label>
         <button onClick={fetchLogs} className="rounded-md border px-2 py-1.5 text-xs hover:bg-accent">
           Refresh
         </button>
@@ -625,7 +637,7 @@ function LogsTab() {
       </div>
 
       <div className="rounded-lg border overflow-hidden">
-        <div className="max-h-[600px] overflow-y-auto font-mono text-[11px] leading-5 bg-black/5 dark:bg-white/5">
+        <div ref={scrollRef} className="max-h-[600px] overflow-y-auto font-mono text-[11px] leading-5 bg-black/5 dark:bg-white/5">
           {logs.length === 0 ? (
             <p className="p-4 text-muted-foreground text-center">No logs found</p>
           ) : (

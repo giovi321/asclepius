@@ -77,12 +77,7 @@ async def lifespan(app: FastAPI):
     # Initialize database
     await initialize_database(config.database.path)
 
-    # Create default admin user if needed
-    import aiosqlite
-    async with aiosqlite.connect(config.database.path) as db:
-        await db.execute("PRAGMA foreign_keys=ON")
-        from asclepius.auth.session import ensure_admin_exists
-        await ensure_admin_exists(db)
+    # Note: no default admin user is created — the setup wizard handles first-user creation
 
     # Start pipeline watcher (imported here to avoid circular imports)
     pipeline_task = None
@@ -156,6 +151,9 @@ def create_app() -> FastAPI:
 
     from asclepius.vault.routes import router as vault_router
     app.include_router(vault_router, prefix="/api/vault", tags=["vault"])
+
+    from asclepius.setup.routes import router as setup_router
+    app.include_router(setup_router, prefix="/api/setup", tags=["setup"])
 
     # Serve frontend static files (production build)
     if STATIC_DIR.exists():

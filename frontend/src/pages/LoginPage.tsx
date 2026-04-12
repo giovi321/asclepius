@@ -10,7 +10,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [oidcEnabled, setOidcEnabled] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, needsSetup } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,8 +20,9 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (user) navigate("/");
-  }, [user, navigate]);
+    if (needsSetup) navigate("/setup");
+    else if (user) navigate("/");
+  }, [user, needsSetup, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

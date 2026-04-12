@@ -197,12 +197,29 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # OCR
+            # OCR (with retry for transient failures like timeouts)
             pipeline_status["processing_step"] = "ocr"
             pipeline_status["processing_doc_id"] = doc_id
             pipeline_status["processing_pages"] = page_count
             logger.info("Running OCR on doc %d: %s", doc_id, path.name)
-            ocr_text, confidence, engine = await extract_text(file_path, config)
+
+            import asyncio as _asyncio
+            ocr_text, confidence, engine = "", 0.0, "none"
+            for ocr_attempt in range(3):
+                try:
+                    ocr_text, confidence, engine = await extract_text(file_path, config)
+                    break
+                except Exception as ocr_err:
+                    if ocr_attempt < 2:
+                        wait = 60 * (ocr_attempt + 1)
+                        logger.warning(
+                            "OCR failed for doc %d (%s, attempt %d/3): %s — retrying in %ds",
+                            doc_id, path.name, ocr_attempt + 1, ocr_err, wait,
+                        )
+                        await _asyncio.sleep(wait)
+                    else:
+                        logger.error("OCR failed after 3 attempts for doc %d: %s", doc_id, ocr_err)
+                        raise
 
             await db.execute(
                 """UPDATE documents SET

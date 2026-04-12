@@ -22,18 +22,15 @@ LOG_BUFFER: deque[dict] = deque(maxlen=1000)
 class BufferHandler(logging.Handler):
     """Captures log records into an in-memory ring buffer."""
     def emit(self, record):
-        try:
-            from datetime import datetime, timezone
-            ts = datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S")
-            LOG_BUFFER.append({
-                "ts": ts,
-                "time": record.created,
-                "level": record.levelname,
-                "module": record.name,
-                "message": record.getMessage(),
-            })
-        except Exception:
-            pass
+        import time
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created))
+        LOG_BUFFER.append({
+            "ts": ts,
+            "time": record.created,
+            "level": record.levelname,
+            "module": record.name,
+            "message": record.getMessage(),
+        })
 
 
 # Configure logging — show all asclepius modules at INFO level

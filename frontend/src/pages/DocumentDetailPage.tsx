@@ -207,7 +207,7 @@ export default function DocumentDetailPage() {
           >
             <FileText className="h-4 w-4" /> View file
           </a>
-          {doc.file_path?.endsWith(".pdf") && (
+          {(doc.file_path?.toLowerCase().endsWith(".pdf") || doc.original_filename?.toLowerCase().endsWith(".pdf")) && (
             <button
               onClick={() => setShowRotateDialog(true)}
               className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"

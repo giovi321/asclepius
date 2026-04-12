@@ -112,6 +112,18 @@ export default function AppLayout() {
               <LogOut className="h-4 w-4" />
             </button>
           </div>
+          {sidebarOpen && (
+            <div className="mt-2 text-center">
+              <a
+                href="https://github.com/giovi321/asclepius"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                Asclepius v0.2
+              </a>
+            </div>
+          )}
         </div>
       </aside>
 

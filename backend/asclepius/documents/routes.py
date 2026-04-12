@@ -823,6 +823,85 @@ async def _get_related(db: aiosqlite.Connection, table: str, doc_id: int) -> lis
     return [dict(r) for r in rows]
 
 
+class RotateRequest(BaseModel):
+    degrees: int = 90  # 90, 180, 270
+    pages: list[int] | None = None  # None = all pages, or list of 1-based page numbers
+
+
+@router.post("/{doc_id}/rotate")
+async def rotate_document(
+    doc_id: int,
+    body: RotateRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Permanently rotate pages of a PDF document.
+
+    - degrees: rotation angle (90, 180, 270)
+    - pages: list of 1-based page numbers to rotate, or null/empty for all pages
+    """
+    if body.degrees not in (90, 180, 270):
+        raise HTTPException(status_code=400, detail="Degrees must be 90, 180, or 270")
+
+    config = get_config()
+    cursor = await db.execute(
+        "SELECT file_path, patient_id FROM documents WHERE id = ?", (doc_id,)
+    )
+    doc = await cursor.fetchone()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = Path(config.vault.root_path) / doc[0]
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    if file_path.suffix.lower() != ".pdf":
+        raise HTTPException(status_code=400, detail="Rotation is only supported for PDF files")
+
+    import fitz
+    try:
+        pdf = fitz.open(str(file_path))
+        total_pages = len(pdf)
+
+        if body.pages:
+            # Validate page numbers
+            for p in body.pages:
+                if p < 1 or p > total_pages:
+                    pdf.close()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Page {p} is out of range (document has {total_pages} pages)"
+                    )
+            target_pages = [p - 1 for p in body.pages]  # Convert to 0-based
+        else:
+            target_pages = list(range(total_pages))
+
+        for page_idx in target_pages:
+            page = pdf[page_idx]
+            page.set_rotation((page.rotation + body.degrees) % 360)
+
+        pdf.save(str(file_path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+        pdf.close()
+
+        rotated_desc = (
+            f"pages {body.pages}" if body.pages
+            else f"all {total_pages} pages"
+        )
+        return {
+            "status": "rotated",
+            "document_id": doc_id,
+            "degrees": body.degrees,
+            "pages_rotated": len(target_pages),
+            "total_pages": total_pages,
+            "description": f"Rotated {rotated_desc} by {body.degrees} degrees",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to rotate PDF: {str(e)}")
+
+
 async def _get_document_links(db: aiosqlite.Connection, doc_id: int) -> list[dict]:
     """Get all document links (both directions) for a document."""
     cursor = await db.execute(

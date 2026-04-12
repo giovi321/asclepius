@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag,
+  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag, RotateCw,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
@@ -39,6 +39,11 @@ export default function DocumentDetailPage() {
 
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiEditing, setAiEditing] = useState(false);
+  const [showRotateDialog, setShowRotateDialog] = useState(false);
+  const [rotateDegrees, setRotateDegrees] = useState(90);
+  const [rotateMode, setRotateMode] = useState<"all" | "single">("all");
+  const [rotatePageNum, setRotatePageNum] = useState("1");
+  const [rotating, setRotating] = useState(false);
 
   const handleReprocess = async () => {
     await api.post(`/documents/${id}/reprocess`);
@@ -65,6 +70,20 @@ export default function DocumentDetailPage() {
       await loadDoc();
     } catch {
       alert("Failed to cancel processing");
+    }
+  };
+
+  const handleRotate = async () => {
+    setRotating(true);
+    try {
+      const pages = rotateMode === "single" ? [Number(rotatePageNum)] : null;
+      await api.post(`/documents/${id}/rotate`, { degrees: rotateDegrees, pages });
+      setShowRotateDialog(false);
+      await loadDoc();
+    } catch (e: any) {
+      alert("Rotation failed: " + (e.response?.data?.detail || e.message));
+    } finally {
+      setRotating(false);
     }
   };
 
@@ -188,6 +207,14 @@ export default function DocumentDetailPage() {
           >
             <FileText className="h-4 w-4" /> View file
           </a>
+          {doc.file_path?.endsWith(".pdf") && (
+            <button
+              onClick={() => setShowRotateDialog(true)}
+              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              <RotateCw className="h-4 w-4" /> Rotate
+            </button>
+          )}
           {(doc.status === "processing" || doc.status === "pending") && (
             <button
               onClick={handleCancel}
@@ -212,6 +239,68 @@ export default function DocumentDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Rotate dialog */}
+      {showRotateDialog && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <h3 className="font-medium flex items-center gap-2">
+            <RotateCw className="h-4 w-4 text-primary" /> Rotate PDF Pages
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">What to rotate</label>
+              <div className="flex gap-3">
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input type="radio" name="rotateMode" checked={rotateMode === "all"}
+                    onChange={() => setRotateMode("all")} />
+                  All pages {doc.page_count ? `(${doc.page_count})` : ""}
+                </label>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input type="radio" name="rotateMode" checked={rotateMode === "single"}
+                    onChange={() => setRotateMode("single")} />
+                  Single page
+                </label>
+              </div>
+            </div>
+            {rotateMode === "single" && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Page number</label>
+                <input type="number" min={1} max={doc.page_count || 999}
+                  value={rotatePageNum} onChange={(e) => setRotatePageNum(e.target.value)}
+                  className="w-24 rounded-md border bg-background px-3 py-1.5 text-sm" />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium mb-1 block">Rotation</label>
+              <div className="flex gap-2">
+                {[90, 180, 270].map((deg) => (
+                  <button key={deg}
+                    onClick={() => setRotateDegrees(deg)}
+                    className={`rounded-md border px-3 py-1.5 text-sm ${
+                      rotateDegrees === deg ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+                    }`}
+                  >
+                    {deg === 90 ? "90\u00b0 CW" : deg === 180 ? "180\u00b0" : "90\u00b0 CCW"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleRotate} disabled={rotating}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {rotating ? "Rotating..." : "Apply Rotation"}
+              </button>
+              <button onClick={() => setShowRotateDialog(false)}
+                className="rounded-md border px-4 py-2 text-sm hover:bg-accent">
+                Cancel
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              This permanently modifies the stored PDF file.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {doc.summary_en && (

@@ -2,37 +2,32 @@
 
 This guide walks you through the basic workflow after installation.
 
-## 1. Change the Default Password
+## 1. Setup Wizard (First Launch Only)
 
-1. Log in with `admin` / `admin`
-2. Go to **Settings** (gear icon in the sidebar)
-3. Under **Users**, find the admin user and change the password
+On the very first launch — when no users exist in the database — Asclepius shows a **setup wizard** that walks you through:
 
-## 2. Create a Patient
+1. **Create your admin account** — choose a username, password, and display name
+2. **Create your first patient** — the patient name is pre-filled from your display name, but you can change it and fill in all details (date of birth, sex, blood type, allergies, contact info, insurance)
+3. **Done** — you are automatically logged in and redirected to the dashboard
 
-1. Go to **Patients** in the sidebar
-2. Click **Add Patient**
-3. Fill in the patient details:
-    - **Display name** (required) -- how the patient appears throughout the UI
-    - **Date of birth**, **sex**, **blood type** -- basic demographics
-    - **Allergies** -- free text field
-    - **Contact info** -- phone, email, address
-    - **Insurance** -- company name and policy number
-4. Click **Save**
+!!! info "The wizard only appears once"
+    After setup, the login page is shown instead. You can create additional users and patients from the Settings and Patients pages.
 
-The patient gets a URL-safe slug automatically (e.g., "Giovanni Crapelli" becomes `giovanni-crapelli`), which is used for file organization.
+## 2. Configure LLM & OCR
 
-## 3. Grant Yourself Access
+Before processing any documents, configure your LLM and OCR settings:
 
-After creating a patient, grant your user access:
+1. Go to **Settings** (gear icon in the sidebar)
+2. Under **LLM**, configure your provider:
+    - **Ollama**: set the base URL and model name (e.g., `llama3.1`)
+    - **Claude**: paste your API key and choose a model
+3. Under **OCR**, choose your OCR engine:
+    - **Tesseract** (built-in) — good for clear, printed documents
+    - **LLM Vision** — uses a vision model for OCR (better for handwriting, forms)
+    - **Google Cloud Vision** — high accuracy, requires API key
+    - **Tesseract Remote** — external Tesseract server
 
-1. Go to **Settings** > **Users**
-2. Click your user, then **Grant Access**
-3. Select the patient and choose a role:
-    - **Owner** -- full access, can delete documents and reassign patients
-    - **Viewer** -- read-only access to the patient's records
-
-## 4. Upload Your First Document
+## 3. Upload Your First Document
 
 There are two ways to add documents:
 
@@ -49,7 +44,7 @@ There are two ways to add documents:
 2. The file watcher detects them within a few seconds (configurable via `pipeline.poll_interval_seconds`)
 3. Processing begins automatically
 
-## 5. Monitor Processing
+## 4. Monitor Processing
 
 The **Dashboard** shows:
 
@@ -68,7 +63,9 @@ For large documents (>5 pages), you will also see:
 - **Page classification** -- each page is classified by content type
 - **Section extraction** -- data is extracted from each section individually
 
-## 6. Review the Document
+You can also monitor detailed processing logs from **Settings** > **Logs**. The log viewer auto-refreshes every 3 seconds and auto-scrolls to the latest entries.
+
+## 5. Review the Document
 
 1. Go to **Documents** and click on your processed document
 2. The detail page shows:
@@ -81,7 +78,7 @@ For large documents (>5 pages), you will also see:
 3. All metadata fields are **inline-editable** -- click any field to edit it
 4. Use the **AI Edit** button to modify metadata using natural language (e.g., "change the doctor to Dr. Smith")
 
-## 7. Create a Medical Event
+## 6. Create a Medical Event
 
 Medical events are the central organizing concept -- they represent a medical story like a diagnosis, treatment, or surgery.
 
@@ -98,7 +95,7 @@ Medical events are the central organizing concept -- they represent a medical st
 !!! tip "AI Event Suggestions"
     On any document's detail page, click **Suggest Event** to have the LLM recommend which existing event the document belongs to, or suggest creating a new one.
 
-## 8. Explore the Timeline
+## 7. Explore the Timeline
 
 Go to **Timeline** in the sidebar to see all documents for the selected patient arranged chronologically:
 
@@ -106,6 +103,12 @@ Go to **Timeline** in the sidebar to see all documents for the selected patient 
 - Mini-map on the right for quick navigation across years
 - Jump-to-date control for fast access to specific periods
 - Click any entry to view the document detail
+
+## 8. Create Additional Patients & Users
+
+- Go to **Patients** in the sidebar to create more patient profiles
+- Go to **Settings** > **Users** to create more user accounts
+- Grant users access to specific patients with `owner` or `viewer` roles
 
 ## 9. Next Steps
 

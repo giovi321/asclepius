@@ -1,14 +1,13 @@
 # User Management
 
-## Default Admin
+## First-Time Setup
 
-On first startup, Asclepius creates a default admin user:
+On the very first launch — when no users exist in the database — Asclepius shows a **setup wizard** that creates:
 
-- **Username:** `admin`
-- **Password:** `admin`
+1. Your **admin account** (username, password, display name)
+2. Your **first patient profile** (pre-filled from your display name, fully editable)
 
-!!! warning "Change the default password immediately"
-    Go to **Settings** > **Users** and change the admin password after first login.
+The wizard automatically logs you in after completion. It only appears once.
 
 ## Local Authentication
 
@@ -57,6 +56,9 @@ Each user must be explicitly granted access to each patient:
 2. Select a user
 3. Click **Grant Access**
 4. Select the patient and role
+
+!!! note "Setup wizard grants owner access"
+    The setup wizard automatically grants the first user `owner` access to the first patient.
 
 ### Revoking Access
 

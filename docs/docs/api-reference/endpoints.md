@@ -8,6 +8,35 @@ All endpoints require authentication unless noted. Base prefix: `/api`
 |--------|------|------|-------------|
 | `GET` | `/health` | No | Returns `{"status": "ok"}` |
 
+## Setup (First Launch)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/setup/status` | No | Returns `{"needs_setup": true/false}` — true when no users exist |
+| `POST` | `/api/setup/complete` | No | Create first admin user + first patient (only works when no users exist) |
+
+### Setup Request
+
+```json
+{
+  "username": "giovanni",
+  "password": "your-password",
+  "display_name": "Giovanni Crapelli",
+  "patient_name": "Giovanni Crapelli",
+  "patient_date_of_birth": "1990-01-15",
+  "patient_sex": "M",
+  "patient_blood_type": "A+",
+  "patient_allergies": "Penicillin",
+  "patient_phone": "+41 79 123 4567",
+  "patient_email": "giovanni@example.com",
+  "patient_address": "Via Roma 1, Lugano",
+  "patient_insurance_company": "CSS",
+  "patient_insurance_number": "1234567"
+}
+```
+
+Only `username`, `password`, and `patient_name` are required. All other fields are optional. On success, a session cookie is set so the user is automatically logged in.
+
 ## Authentication
 
 | Method | Path | Auth | Description |

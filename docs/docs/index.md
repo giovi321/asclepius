@@ -33,10 +33,10 @@ cp config/settings.example.yaml config/settings.yaml
 docker compose up -d
 ```
 
-Then open [http://localhost:8070](http://localhost:8070) and log in with `admin` / `admin`.
+Then open [http://localhost:8070](http://localhost:8070). On first launch, a **setup wizard** will guide you through creating your admin account and first patient profile.
 
-!!! warning "Change default credentials"
-    Change the default admin password and the `auth.secret_key` immediately after first login.
+!!! tip "Setup Wizard"
+    The wizard only appears once — when no users exist in the database. It creates your admin account and a first patient profile pre-filled with your name.
 
 ## Tech Stack
 

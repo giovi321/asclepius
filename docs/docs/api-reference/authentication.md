@@ -1,6 +1,10 @@
 # Authentication
 
-Asclepius uses session-based authentication with signed cookies. All API endpoints (except login and health check) require a valid session.
+Asclepius uses session-based authentication with signed cookies. All API endpoints (except login, setup, and health check) require a valid session.
+
+## First-Time Setup
+
+On a fresh installation (no users in the database), the `/api/setup/status` endpoint returns `{"needs_setup": true}`. The frontend detects this and redirects to the setup wizard, which calls `/api/setup/complete` to create the first admin user and patient. This endpoint only works when no users exist — it returns `400` once setup is complete.
 
 ## Session Authentication
 

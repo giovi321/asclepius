@@ -314,9 +314,21 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             if await should_section(file_path):
                 logger.info("Large document (%s pages) — using page-level sectioning for doc %d", page_count, doc_id)
 
-                # Get per-page OCR text
-                from asclepius.pipeline.ocr import extract_text_per_page
-                ocr_pages = await extract_text_per_page(file_path, config)
+                # Re-use already-extracted OCR text split by page separator
+                # instead of re-running OCR (which would redo all pages with LLM vision)
+                if engine in ("llm_vision",) and "\n\n" in ocr_text:
+                    # LLM vision joins pages with "\n\n", split them back
+                    ocr_pages = ocr_text.split("\n\n")
+                    logger.info("Re-using %d already-extracted OCR pages for doc %d", len(ocr_pages), doc_id)
+                elif engine == "tesseract" and page_count and page_count > 1:
+                    # For Tesseract, we can split per page cheaply (no LLM calls)
+                    from asclepius.pipeline.ocr import extract_text_per_page
+                    ocr_pages = await extract_text_per_page(file_path, config)
+                else:
+                    # Fallback: split full text into equal chunks
+                    total_pages = max(page_count or 1, 1)
+                    chunk_size = max(1, len(ocr_text) // total_pages)
+                    ocr_pages = [ocr_text[i:i + chunk_size] for i in range(0, len(ocr_text), chunk_size)]
 
                 # If per-page extraction returned nothing useful, split full OCR text
                 if all(not p.strip() for p in ocr_pages):

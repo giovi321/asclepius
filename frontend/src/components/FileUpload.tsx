@@ -78,8 +78,6 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       let successCount = 0;
       let errorCount = 0;
       let hasSuggestion = false;
-      const docIds: number[] = [];
-
       for (const file of files) {
         try {
           const form = new FormData();

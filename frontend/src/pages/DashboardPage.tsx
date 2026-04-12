@@ -92,17 +92,32 @@ export default function DashboardPage() {
         <div className="rounded-lg border p-4">
           <h2 className="mb-2 font-medium">Pipeline Status</h2>
           {pipeline.processing ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-sm">
                 Processing: <span className="font-medium">{pipeline.processing}</span>
               </p>
               {pipeline.processing_step && (
                 <p className="text-xs text-muted-foreground">
                   Step: <span className="font-medium">{pipeline.processing_step}</span>
-                  {pipeline.processing_pages && pipeline.processing_page_current != null && (
-                    <span> — page {pipeline.processing_page_current}/{pipeline.processing_pages}</span>
-                  )}
                 </p>
+              )}
+              {pipeline.processing_pages && pipeline.processing_page_current != null && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      Page {pipeline.processing_page_current} of {pipeline.processing_pages}
+                    </span>
+                    <span className="font-medium">
+                      {Math.round((pipeline.processing_page_current / pipeline.processing_pages) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500"
+                      style={{ width: `${(pipeline.processing_page_current / pipeline.processing_pages) * 100}%` }}
+                    />
+                  </div>
+                </div>
               )}
               {pipeline.queued_files?.length > 0 && (
                 <p className="text-xs text-muted-foreground">

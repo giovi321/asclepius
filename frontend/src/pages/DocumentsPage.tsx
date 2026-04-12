@@ -11,6 +11,14 @@ const DOC_TYPES = [
   "radiology_report", "surgical_report", "vaccination", "other",
 ];
 
+interface PipelineStatus {
+  processing: string | null;
+  processing_step: string | null;
+  processing_doc_id: number | null;
+  processing_pages: number | null;
+  processing_page_current: number | null;
+}
+
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
   const [documents, setDocuments] = useState<any[]>([]);
@@ -25,6 +33,7 @@ export default function DocumentsPage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const limit = 20;
 
   // Load filter options
@@ -61,7 +70,16 @@ export default function DocumentsPage() {
       setTotal(res.data.total || 0);
       setLoading(false);
     });
+    api.get("/pipeline/status").then((res) => setPipeline(res.data)).catch(() => {});
   }, [selectedPatient, search, typeFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
+
+  // Poll pipeline status for live page progress
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.get("/pipeline/status").then((res) => setPipeline(res.data)).catch(() => {});
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -219,7 +237,12 @@ export default function DocumentsPage() {
                       doc.status === "failed" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" :
                       doc.status === "needs_review" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" :
                       "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                    }`}>{doc.status}</span>
+                    }`}>
+                      {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
+                        && pipeline.processing_pages && pipeline.processing_page_current != null
+                        ? `${pipeline.processing_step || "processing"} (${pipeline.processing_page_current}/${pipeline.processing_pages})`
+                        : doc.status}
+                    </span>
                   </td>
                 </tr>
               ))

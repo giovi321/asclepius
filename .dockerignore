@@ -5,7 +5,7 @@ frontend/dist
 __pycache__
 *.pyc
 .venv
-vault
+/vault
 *.sqlite
 *.db
 site

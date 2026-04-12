@@ -5,7 +5,8 @@ frontend/dist
 __pycache__
 *.pyc
 .venv
-/vault
+vault/
+!backend/asclepius/vault/
 *.sqlite
 *.db
 site

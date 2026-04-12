@@ -10,30 +10,30 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig
+from asclepius.config import AppConfig, OcrProviderEntry, get_active_ocr_provider_config
 
 logger = logging.getLogger(__name__)
 
 
-async def extract_text(file_path: str, config: AppConfig) -> tuple[str, float, str]:
+async def extract_text(file_path: str, config: AppConfig, ocr_priority: int = 1) -> tuple[str, float, str]:
     """Extract text from a file using OCR.
 
-    Routes to the appropriate engine based on config.ocr.engine:
-    - 'tesseract': local Tesseract OCR (default)
-    - 'tesseract_remote': remote Tesseract server
-    - 'llm_vision': send page images to LLM for OCR (combined OCR+extraction)
-    - 'google_vision': Google Cloud Vision API
+    Uses the OCR provider at the given priority rank from the provider list.
+    Falls back to legacy config.ocr.engine if no provider list is configured.
 
     Returns: (text, confidence, engine_used)
     """
     path = Path(file_path)
     ext = path.suffix.lower()
 
-    # LLM Vision OCR — send page images directly to LLM
+    # Try the new provider list first
+    provider_entry = get_active_ocr_provider_config(config, ocr_priority)
+    if provider_entry:
+        return await _extract_with_provider(file_path, config, provider_entry)
+
+    # Legacy fallback
     if config.ocr.engine == "llm_vision":
         return await _extract_llm_vision(file_path, config)
-
-    # Remote OCR — send the file directly
     if config.ocr.engine == "tesseract_remote" and config.ocr.remote_url:
         return await _extract_remote_ocr(file_path, config)
 
@@ -42,6 +42,37 @@ async def extract_text(file_path: str, config: AppConfig) -> tuple[str, float, s
     elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
         return await _extract_from_image(path, config)
     else:
+        return "", 0.0, "none"
+
+
+async def _extract_with_provider(
+    file_path: str, config: AppConfig, provider: OcrProviderEntry
+) -> tuple[str, float, str]:
+    """Route extraction to the correct engine based on provider entry type."""
+    path = Path(file_path)
+    ext = path.suffix.lower()
+
+    if provider.type == "llm_vision":
+        return await _extract_llm_vision(
+            file_path, config, provider_entry=provider,
+        )
+    elif provider.type == "tesseract_remote" and provider.remote_url:
+        return await _extract_remote_ocr(
+            file_path, config, provider_entry=provider,
+        )
+    elif provider.type == "google_vision":
+        # Google Vision — placeholder, uses the existing cloud fallback path
+        logger.warning("Google Vision OCR not yet fully implemented, falling back to Tesseract")
+        if ext == ".pdf":
+            return await _extract_from_pdf(path, config, provider_entry=provider)
+        elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+            return await _extract_from_image(path, config, provider_entry=provider)
+        return "", 0.0, "none"
+    else:  # tesseract (local)
+        if ext == ".pdf":
+            return await _extract_from_pdf(path, config, provider_entry=provider)
+        elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+            return await _extract_from_image(path, config, provider_entry=provider)
         return "", 0.0, "none"
 
 
@@ -99,8 +130,10 @@ async def extract_text_per_page(file_path: str, config: AppConfig) -> list[str]:
     return ocr_pages
 
 
-async def _extract_from_pdf(path: Path, config: AppConfig) -> tuple[str, float, str]:
+async def _extract_from_pdf(path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
     """Extract text from PDF — try embedded text first, fall back to OCR."""
+    ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
+    confidence_threshold = (provider_entry.confidence_threshold if provider_entry else None) or config.ocr.confidence_threshold
     doc = fitz.open(str(path))
     text_parts = []
     has_text = False
@@ -141,10 +174,10 @@ async def _extract_from_pdf(path: Path, config: AppConfig) -> tuple[str, float, 
 
         # Get OCR data with confidence
         ocr_data = pytesseract.image_to_data(
-            img, lang=config.ocr.language, output_type=pytesseract.Output.DICT
+            img, lang=ocr_language, output_type=pytesseract.Output.DICT
         )
 
-        page_text = pytesseract.image_to_string(img, lang=config.ocr.language)
+        page_text = pytesseract.image_to_string(img, lang=ocr_language)
         ocr_parts.append(page_text)
 
         # Calculate average confidence
@@ -161,22 +194,22 @@ async def _extract_from_pdf(path: Path, config: AppConfig) -> tuple[str, float, 
     avg_confidence = (total_confidence / page_count / 100.0) if page_count > 0 else 0.0
 
     # Check if we should use cloud OCR
-    if avg_confidence < config.ocr.confidence_threshold and config.ocr.cloud_ocr_enabled:
+    if avg_confidence < confidence_threshold and config.ocr.cloud_ocr_enabled:
         logger.info("Low OCR confidence (%.2f), attempting cloud OCR", avg_confidence)
-        # Cloud OCR would go here — for now, return Tesseract result
         return full_text, avg_confidence, "tesseract"
 
     return full_text, avg_confidence, "tesseract"
 
 
-async def _extract_from_image(path: Path, config: AppConfig) -> tuple[str, float, str]:
+async def _extract_from_image(path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
     """Extract text from an image file."""
+    ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
     img = Image.open(str(path))
 
     ocr_data = pytesseract.image_to_data(
-        img, lang=config.ocr.language, output_type=pytesseract.Output.DICT
+        img, lang=ocr_language, output_type=pytesseract.Output.DICT
     )
-    text = pytesseract.image_to_string(img, lang=config.ocr.language)
+    text = pytesseract.image_to_string(img, lang=ocr_language)
 
     confidences = [
         int(c) for c in ocr_data["conf"] if str(c).isdigit() and int(c) > 0
@@ -186,11 +219,11 @@ async def _extract_from_image(path: Path, config: AppConfig) -> tuple[str, float
     return text, avg_confidence, "tesseract"
 
 
-async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, float, str]:
+async def _extract_llm_vision(file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
     """Use LLM with vision capability to OCR document pages.
 
     Renders each page as an image and sends it to the LLM.
-    Works with Claude (native vision) or Ollama vision models (llava, llama3.2-vision).
+    Works with Claude (native vision), OpenAI, or Ollama vision models.
     """
     import base64
     import io
@@ -200,8 +233,11 @@ async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, f
 
     from asclepius.pipeline.processor import pipeline_status
 
-    # Determine which model/provider to use
-    vision_model = config.ocr.llm_vision_model
+    # Determine which model/provider to use — prefer provider_entry if given
+    if provider_entry:
+        vision_model = provider_entry.llm_model
+    else:
+        vision_model = config.ocr.llm_vision_model
 
     if ext == ".pdf":
         doc = fitz.open(str(path))
@@ -214,7 +250,7 @@ async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, f
             logger.info("LLM vision OCR: page %d/%d of %s", page_idx + 1, total_pages, path.name)
 
             b64_image = _render_page_for_vision(page)
-            page_text = await _llm_vision_page_with_retry(b64_image, config, vision_model)
+            page_text = await _llm_vision_page_with_retry(b64_image, config, vision_model, provider_entry=provider_entry)
             text_parts.append(page_text)
 
         doc.close()
@@ -225,7 +261,7 @@ async def _extract_llm_vision(file_path: str, config: AppConfig) -> tuple[str, f
         img = Image.open(str(path))
         b64_image = _compress_image_for_vision(img)
 
-        text = await _llm_vision_page_with_retry(b64_image, config, vision_model)
+        text = await _llm_vision_page_with_retry(b64_image, config, vision_model, provider_entry=provider_entry)
         return text, 0.95, "llm_vision"
 
     return "", 0.0, "none"
@@ -280,14 +316,14 @@ def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
 
 async def _llm_vision_page_with_retry(
     b64_image: str, config: AppConfig, vision_model: str,
-    max_retries: int = 3,
+    max_retries: int = 3, provider_entry: OcrProviderEntry | None = None,
 ) -> str:
     """Call _llm_vision_page with retry + backoff for rate limits and timeouts."""
     import asyncio as _asyncio
 
     for attempt in range(max_retries):
         try:
-            return await _llm_vision_page(b64_image, config, vision_model)
+            return await _llm_vision_page(b64_image, config, vision_model, provider_entry=provider_entry)
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
             wait = 30 * (attempt + 1)  # 30s, 60s, 90s
             logger.warning(
@@ -317,11 +353,12 @@ async def _llm_vision_page_with_retry(
                 else:
                     raise
     # Final attempt without catching
-    return await _llm_vision_page(b64_image, config, vision_model)
+    return await _llm_vision_page(b64_image, config, vision_model, provider_entry=provider_entry)
 
 
 async def _llm_vision_page(
-    b64_image: str, config: AppConfig, vision_model: str
+    b64_image: str, config: AppConfig, vision_model: str,
+    provider_entry: OcrProviderEntry | None = None,
 ) -> str:
     """Send a single page image to the LLM for text extraction.
 
@@ -337,11 +374,17 @@ async def _llm_vision_page(
     )
 
     # Determine which provider to use for vision
-    vision_provider = config.ocr.llm_vision_provider or config.llm.provider
+    if provider_entry:
+        vision_provider = provider_entry.llm_provider
+    else:
+        vision_provider = config.ocr.llm_vision_provider or config.llm.provider
 
-    if vision_provider == "claude" and config.llm.claude_api_key:
+    # Get API key from provider entry or fall back to config
+    vision_api_key = (provider_entry.llm_api_key if provider_entry else None) or config.llm.claude_api_key
+
+    if vision_provider == "claude" and vision_api_key:
         from anthropic import AsyncAnthropic
-        client = AsyncAnthropic(api_key=config.llm.claude_api_key)
+        client = AsyncAnthropic(api_key=vision_api_key)
         model = vision_model or config.llm.claude_model
 
         response = await client.messages.create(
@@ -364,10 +407,40 @@ async def _llm_vision_page(
         )
         return response.content[0].text
 
+    elif vision_provider == "openai" and vision_api_key:
+        # OpenAI vision (GPT-4o etc.)
+        model = vision_model or "gpt-4o"
+        base_url = (provider_entry.llm_base_url if provider_entry and provider_entry.llm_base_url else "https://api.openai.com/v1").rstrip("/")
+        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
+        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
+        headers = {"Authorization": f"Bearer {vision_api_key}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json={
+                    "model": model,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+                            {"type": "text", "text": prompt},
+                        ],
+                    }],
+                    "max_tokens": 4096,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+
     else:
         # Ollama with vision model — can use a different URL than the extraction LLM
         model = vision_model or config.llm.ollama_model
-        ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
+        if provider_entry and provider_entry.llm_base_url:
+            ollama_url = provider_entry.llm_base_url.rstrip("/")
+        else:
+            ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
         # Vision OCR needs a generous timeout — processing a single page image can be slow
         read_timeout = max(float(config.llm.extraction_timeout), 300.0)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
@@ -388,26 +461,29 @@ async def _llm_vision_page(
             return data.get("response", "")
 
 
-async def _extract_remote_ocr(file_path: str, config: AppConfig) -> tuple[str, float, str]:
+async def _extract_remote_ocr(file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
     """Send file to a remote Tesseract OCR server.
 
     The remote server is expected to accept POST with a file upload
     and return JSON: {"text": "...", "confidence": 0.95}
     """
     path = Path(file_path)
-    logger.info("Sending %s to remote OCR server: %s", path.name, config.ocr.remote_url)
+    remote_url = (provider_entry.remote_url if provider_entry else None) or config.ocr.remote_url
+    remote_api_key = (provider_entry.remote_api_key if provider_entry else None) or config.ocr.remote_api_key
+    ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
+    logger.info("Sending %s to remote OCR server: %s", path.name, remote_url)
 
     headers = {}
-    if config.ocr.remote_api_key:
-        headers["Authorization"] = f"Bearer {config.ocr.remote_api_key}"
+    if remote_api_key:
+        headers["Authorization"] = f"Bearer {remote_api_key}"
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             with open(file_path, "rb") as f:
                 files = {"file": (path.name, f, "application/octet-stream")}
-                params = {"language": config.ocr.language}
+                params = {"language": ocr_language}
                 response = await client.post(
-                    config.ocr.remote_url,
+                    remote_url,
                     files=files,
                     params=params,
                     headers=headers,

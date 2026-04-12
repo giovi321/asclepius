@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user, hash_password
-from asclepius.config import get_config
+from asclepius.config import get_config, LlmProviderEntry, OcrProviderEntry
 from asclepius.db.connection import get_db
 
 router = APIRouter()
@@ -136,6 +136,7 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "claude_model": config.llm.claude_model,
             "has_claude_key": bool(config.llm.claude_api_key),
             "extraction_timeout": config.llm.extraction_timeout,
+            "provider_count": len([p for p in config.llm.providers if p.enabled]),
         },
         "ocr": {
             "engine": config.ocr.engine,
@@ -148,6 +149,7 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "llm_vision_model": config.ocr.llm_vision_model,
             "llm_vision_ollama_url": config.ocr.llm_vision_ollama_url,
             "has_google_vision_key": bool(config.ocr.google_vision_key),
+            "provider_count": len([p for p in config.ocr.providers if p.enabled]),
         },
         "pipeline": {
             "watch_enabled": config.pipeline.watch_enabled,
@@ -287,6 +289,122 @@ async def update_settings(
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
 
     return {"status": "saved", "changes": changes}
+
+
+# --- LLM Providers ---
+
+@router.get("/llm-providers")
+async def get_llm_providers(current_user: dict = Depends(get_current_user)):
+    """Get the ordered list of LLM providers."""
+    config = get_config()
+    providers = []
+    for p in config.llm.providers:
+        entry = p.model_dump()
+        # Mask API keys
+        if entry.get("api_key"):
+            entry["has_api_key"] = True
+            entry["api_key"] = ""
+        else:
+            entry["has_api_key"] = False
+        providers.append(entry)
+    return providers
+
+
+@router.put("/llm-providers")
+async def update_llm_providers(
+    providers: list[dict],
+    current_user: dict = Depends(get_current_user),
+):
+    """Replace the full list of LLM providers. API keys sent as empty string are preserved."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config = get_config()
+
+    # Build a lookup of existing providers by id (to preserve API keys)
+    existing_by_id = {p.id: p for p in config.llm.providers}
+
+    new_providers: list[LlmProviderEntry] = []
+    for i, raw in enumerate(providers):
+        # Preserve existing API key if not provided
+        pid = raw.get("id", f"llm-{i}")
+        if not raw.get("api_key") and pid in existing_by_id:
+            raw["api_key"] = existing_by_id[pid].api_key
+        raw["id"] = pid
+        new_providers.append(LlmProviderEntry(**raw))
+
+    # Update in-memory config
+    config.llm.providers = new_providers
+
+    # Persist to YAML
+    data["llm"] = data.get("llm", {})
+    data["llm"]["providers"] = [p.model_dump() for p in new_providers]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved", "count": len(new_providers)}
+
+
+# --- OCR Providers ---
+
+@router.get("/ocr-providers")
+async def get_ocr_providers(current_user: dict = Depends(get_current_user)):
+    """Get the ordered list of OCR providers."""
+    config = get_config()
+    providers = []
+    for p in config.ocr.providers:
+        entry = p.model_dump()
+        # Mask API keys
+        for key_field in ("remote_api_key", "llm_api_key", "google_vision_key"):
+            if entry.get(key_field):
+                entry[f"has_{key_field}"] = True
+                entry[key_field] = ""
+            else:
+                entry[f"has_{key_field}"] = False
+        providers.append(entry)
+    return providers
+
+
+@router.put("/ocr-providers")
+async def update_ocr_providers(
+    providers: list[dict],
+    current_user: dict = Depends(get_current_user),
+):
+    """Replace the full list of OCR providers."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config = get_config()
+    existing_by_id = {p.id: p for p in config.ocr.providers}
+
+    new_providers: list[OcrProviderEntry] = []
+    for i, raw in enumerate(providers):
+        pid = raw.get("id", f"ocr-{i}")
+        # Preserve existing keys if not provided
+        if pid in existing_by_id:
+            existing = existing_by_id[pid]
+            for key_field in ("remote_api_key", "llm_api_key", "google_vision_key"):
+                if not raw.get(key_field):
+                    raw[key_field] = getattr(existing, key_field, "")
+        raw["id"] = pid
+        new_providers.append(OcrProviderEntry(**raw))
+
+    config.ocr.providers = new_providers
+
+    data["ocr"] = data.get("ocr", {})
+    data["ocr"]["providers"] = [p.model_dump() for p in new_providers]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved", "count": len(new_providers)}
 
 
 # --- User management ---

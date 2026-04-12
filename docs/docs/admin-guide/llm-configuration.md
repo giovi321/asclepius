@@ -1,126 +1,169 @@
-# LLM Configuration
+# LLM & OCR Configuration
+
+## Overview
+
+Asclepius uses a **multi-provider priority system** for both LLM and OCR. You can configure multiple providers, enable/disable them, and set their priority order. The pipeline always uses the highest-priority enabled provider. If you're not satisfied with a result, you can re-process a document using the next provider in the priority list from the document detail page.
+
+All provider configuration is done from **Settings** > **Document Analysis** in the web UI.
 
 ## LLM Providers
 
-Asclepius supports two LLM providers for document extraction, chat, and AI editing:
+LLM providers handle document classification, data extraction, chat, and search.
 
-### Ollama
+### Supported Providers
 
-Self-hosted LLM server. You must run your own Ollama instance.
+| Provider | Type | Description |
+|----------|------|-------------|
+| **Ollama** | `ollama` | Self-hosted LLM via Ollama. Free, runs locally. |
+| **vLLM** | `vllm` | High-performance inference server (OpenAI-compatible API). |
+| **Claude** | `claude` | Anthropic Claude API. Best extraction quality. |
+| **OpenAI** | `openai` | OpenAI API (GPT-4o, etc.). |
+
+### Adding a Provider
+
+1. Go to **Settings** > **Document Analysis** > **LLM Providers**
+2. Click **Add Provider** and select the type
+3. Configure the provider settings (model, URL, API key, timeout)
+4. Use the arrow buttons to set priority order (top = highest priority)
+5. Click **Save Changes**
+
+### Provider Priority & Escalation
+
+Providers are ordered by priority. The pipeline uses **priority 1** (topmost enabled provider) by default. If you're not satisfied with extraction results for a document, you can re-analyze it with the next provider from the document detail page.
+
+Example setup:
+1. **Ollama** (llama3.1) -- fast, free, good for most documents
+2. **Claude** (claude-sonnet) -- higher quality, used for complex or failed documents
+
+### YAML Configuration
+
+Providers can also be configured in `settings.yaml`:
 
 ```yaml
 llm:
-  provider: "ollama"
-  ollama_base_url: "http://your-ollama-host:11434"
-  ollama_model: "llama3.1"
-  extraction_timeout: 120
+  providers:
+    - id: "ollama-1"
+      type: "ollama"
+      name: "Ollama (Local)"
+      enabled: true
+      priority: 1
+      base_url: "http://ollama:11434"
+      model: "llama3.1"
+      timeout: 120
+    - id: "claude-1"
+      type: "claude"
+      name: "Claude API"
+      enabled: true
+      priority: 2
+      api_key: "sk-ant-..."
+      model: "claude-sonnet-4-20250514"
+      timeout: 120
+    - id: "openai-1"
+      type: "openai"
+      name: "OpenAI"
+      enabled: false
+      priority: 3
+      api_key: "sk-..."
+      model: "gpt-4o"
+      timeout: 120
+    - id: "vllm-1"
+      type: "vllm"
+      name: "vLLM Server"
+      enabled: false
+      priority: 4
+      base_url: "http://vllm:8000/v1"
+      model: "meta-llama/Llama-3.1-8B-Instruct"
+      timeout: 120
 ```
 
-**Recommended models:**
+### Recommended Models
 
+**Ollama:**
 - `llama3.1` -- good balance of speed and quality
-- `llama3.1:70b` -- better extraction quality, requires more VRAM
-- `qwen2.5` -- alternative with strong multilingual support
+- `llama3.1:70b` -- better quality, requires more VRAM
+- `qwen2.5` -- strong multilingual support
 
-Make sure to pull the model before use:
+**Claude:**
+- `claude-sonnet-4-20250514` -- best balance of cost and quality
 
-```bash
-ollama pull llama3.1
-```
+**OpenAI:**
+- `gpt-4o` -- strong general-purpose model
+- `gpt-4o-mini` -- faster, cheaper, good for simple documents
 
-### Claude API
+**vLLM:**
+- Any HuggingFace model served by vLLM (e.g. `meta-llama/Llama-3.1-8B-Instruct`)
 
-Anthropic's Claude API. Requires an API key.
+## OCR Providers
 
-```yaml
-llm:
-  provider: "claude"
-  claude_api_key: "sk-ant-..."
-  claude_model: "claude-sonnet-4-20250514"
-  extraction_timeout: 120
-```
+OCR providers extract text from scanned documents and images.
 
-**Recommended models:**
+### Supported Providers
 
-- `claude-sonnet-4-20250514` -- best balance of cost and quality (default)
+| Provider | Type | Description |
+|----------|------|-------------|
+| **Tesseract (Local)** | `tesseract` | Local Tesseract OCR. Free, no network needed. |
+| **Tesseract (Remote)** | `tesseract_remote` | Remote Tesseract server via HTTP API. |
+| **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR. Best quality. |
+| **Google Cloud Vision** | `google_vision` | Google Cloud Vision API. |
 
-The API key can also be set via the `ANTHROPIC_API_KEY` environment variable.
+### LLM Vision OCR
 
-### Switching Providers
+The LLM Vision OCR engine sends page images directly to an LLM for text extraction. This produces the best results for handwritten documents, poorly scanned pages, complex layouts with tables, and mixed text/images.
 
-You can switch between providers at any time from **Settings** > **LLM** in the web UI, or by editing `settings.yaml`. Changes take effect immediately without restarting.
+Vision OCR can use a **different** LLM provider and model than the extraction LLM. For example: Chandra for OCR + llama3.1 for extraction.
 
-## OCR with LLM Vision
+#### Supported Vision Backends
 
-The LLM Vision OCR engine sends page images directly to an LLM for text extraction. This produces the best results for:
+- **Ollama** -- use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
+- **Claude** -- uses Claude's native vision capability
+- **OpenAI** -- uses GPT-4o vision
 
-- Handwritten documents
-- Poorly scanned documents
-- Complex layouts with tables and forms
-- Documents with mixed text and images
-
-### Separate Vision Model
-
-You can use a **different** LLM model (and even a different Ollama server) for OCR than for data extraction. This is configured under the `ocr` section:
-
-```yaml
-ocr:
-  engine: "llm_vision"
-  llm_vision_provider: "ollama"            # or "claude"
-  llm_vision_model: "llava:13b"            # vision-capable model
-  llm_vision_ollama_url: "http://gpu-server:11434"  # optional separate server
-
-llm:
-  provider: "ollama"
-  ollama_model: "llama3.1"                  # extraction model (can be different)
-```
-
-### Chandra OCR
+#### Chandra OCR
 
 For the highest OCR quality, use **Chandra OCR** as the vision model:
 
-```yaml
-ocr:
-  engine: "llm_vision"
-  llm_vision_provider: "ollama"
-  llm_vision_model: "fredrezones55/chandra-ocr-2"
-```
+1. Pull the model: `ollama pull fredrezones55/chandra-ocr-2`
+2. Add an LLM Vision OCR provider
+3. Set Vision LLM Provider to **Ollama**
+4. Set Vision Model to `fredrezones55/chandra-ocr-2`
 
-Chandra produces structured HTML output with semantic labels (`Page-Header`, `Section-Header`, `Text`, etc.), which significantly improves the downstream extraction accuracy. The classification prompt is designed to understand Chandra's HTML format.
+Chandra produces structured HTML output that significantly improves downstream extraction accuracy.
 
-Pull the model:
-
-```bash
-ollama pull fredrezones55/chandra-ocr-2
-```
-
-### Vision with Claude
-
-When using Claude as the vision provider, Claude's native vision capability is used. No special model is needed:
+### YAML Configuration
 
 ```yaml
 ocr:
-  engine: "llm_vision"
-  llm_vision_provider: "claude"
-  # Uses the main claude_model by default
+  providers:
+    - id: "tesseract-1"
+      type: "tesseract"
+      name: "Tesseract (Local)"
+      enabled: true
+      priority: 1
+      language: "eng+ita+deu"
+      confidence_threshold: 0.7
+    - id: "llm-vision-1"
+      type: "llm_vision"
+      name: "Chandra Vision OCR"
+      enabled: true
+      priority: 2
+      llm_provider: "ollama"
+      llm_model: "fredrezones55/chandra-ocr-2"
+      llm_base_url: "http://ollama:11434"
 ```
 
 ## Extraction Timeout
 
-The `extraction_timeout` setting (default: 120 seconds) controls how long the system waits for an LLM response before timing out. Increase this for:
+Each provider has its own timeout setting (default: 120 seconds). Increase this for:
 
-- Very large documents
-- Slow Ollama instances
-- Large models with slow inference
+- Very large documents (70+ pages)
+- Slow inference servers
+- Large models
 
-```yaml
-llm:
-  extraction_timeout: 300  # 5 minutes
-```
+Vision OCR automatically uses a minimum timeout of 300 seconds regardless of the configured value.
 
 ## Custom Prompts
 
-All LLM prompts used by Asclepius are editable from the web UI under **Settings** > **Prompts**.
+All LLM prompts are editable from **Settings** > **Document Analysis** > **Prompts**.
 
 ### Available Prompts
 
@@ -128,7 +171,7 @@ All LLM prompts used by Asclepius are editable from the web UI under **Settings*
 |-----|-------------|
 | `classification` | Phase 1: Document classification and basic metadata extraction |
 | `extraction_bloodtest` | Phase 2: Extract lab results from blood test documents |
-| `extraction_specialist_report` | Phase 2: Extract diagnoses, encounters, medications from specialist reports |
+| `extraction_specialist_report` | Phase 2: Extract diagnoses, encounters, medications |
 | `extraction_prescription` | Phase 2: Extract medications from prescriptions |
 | `extraction_invoice` | Phase 2: Extract cost and line items from invoices |
 | `extraction_discharge` | Phase 2: Extract data from discharge letters |
@@ -138,21 +181,25 @@ All LLM prompts used by Asclepius are editable from the web UI under **Settings*
 | `sql_generation` | Chat: Generate SQL queries from natural language |
 | `chat_system` | Chat: System prompt for the medical records assistant |
 | `link_suggestion` | Suggest related documents for linking |
-| `page_classification` | Classify pages of multi-page documents into content types |
+| `page_classification` | Classify pages of multi-page documents |
 
-### Editing Prompts
+### Editing & Resetting Prompts
 
-1. Go to **Settings** > **Prompts**
-2. Select a prompt to edit
-3. Modify the prompt text
-4. Click **Save**
+1. Go to **Settings** > **Document Analysis** > **Prompts**
+2. Click a prompt to edit it
+3. Modify and click **Save**
+4. Click **Reset to Default** to revert to the hardcoded default
 
-### Resetting Prompts
-
-Click **Reset to Default** to revert a prompt to its hardcoded default. This deletes the custom entry from the database.
-
-### Tips for Custom Prompts
-
-- Keep the JSON output format instructions intact -- the extraction pipeline depends on specific field names
+**Tips:**
+- Keep JSON output format instructions intact -- the pipeline depends on specific field names
 - Test changes with a single document before bulk reprocessing
-- The classification prompt supports Chandra OCR's HTML format -- do not remove the HTML parsing instructions if you use LLM Vision with Chandra
+
+## Normalization
+
+The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms. When the LLM extracts terms like lab test names, diagnoses, medications, and specialties, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed.
+
+See [Normalization](../user-guide/normalization.md) for details.
+
+## Backward Compatibility
+
+If you have an existing `settings.yaml` with the old flat `llm:` / `ocr:` config format (without `providers:` lists), Asclepius automatically migrates it to the new multi-provider format on startup. Your existing settings are preserved as provider entries.

@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/api/client";
-import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check, FileCode, RotateCcw, Download, ScrollText } from "lucide-react";
+import {
+  Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check,
+  FileCode, RotateCcw, Download, ScrollText, Power, ChevronUp,
+  ChevronDown, FileSearch,
+} from "lucide-react";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("llm");
+  const [activeTab, setActiveTab] = useState("analysis");
 
   const tabs = [
-    { key: "llm", label: "LLM", icon: Brain },
-    { key: "ocr", label: "OCR", icon: Eye },
+    { key: "analysis", label: "Document Analysis", icon: FileSearch },
     { key: "pipeline", label: "Pipeline", icon: Workflow },
     { key: "oidc", label: "OIDC / SSO", icon: Shield },
     { key: "users", label: "Users", icon: Users },
-    { key: "prompts", label: "Prompts", icon: FileCode },
-    { key: "normalization", label: "Normalization", icon: Database },
     { key: "backup", label: "Backup", icon: Download },
     { key: "logs", label: "Logs", icon: ScrollText },
   ];
@@ -20,38 +21,81 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Settings</h1>
-      <div className="flex flex-wrap gap-1 rounded-lg border p-1 overflow-x-auto">
+      <div className="flex flex-wrap gap-1.5 rounded-lg border p-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           return (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap transition-colors ${
-                activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-accent"
+              className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className="h-4 w-4" />
               {tab.label}
             </button>
           );
         })}
       </div>
 
-      {activeTab === "llm" && <LlmTab />}
-      {activeTab === "ocr" && <OcrTab />}
+      {activeTab === "analysis" && <DocumentAnalysisTab />}
       {activeTab === "pipeline" && <PipelineTab />}
       {activeTab === "oidc" && <OidcTab />}
       {activeTab === "users" && <UsersTab />}
-      {activeTab === "prompts" && <PromptsTab />}
-      {activeTab === "normalization" && <NormalizationTab />}
       {activeTab === "logs" && <LogsTab />}
       {activeTab === "backup" && <BackupTab />}
     </div>
   );
 }
 
-// --- Generic settings form helpers ---
+// ==========================
+// Document Analysis — parent tab with sub-tabs
+// ==========================
+
+function DocumentAnalysisTab() {
+  const [subTab, setSubTab] = useState("llm");
+
+  const subTabs = [
+    { key: "llm", label: "LLM Providers", icon: Brain },
+    { key: "ocr", label: "OCR Providers", icon: Eye },
+    { key: "prompts", label: "Prompts", icon: FileCode },
+    { key: "normalization", label: "Normalization", icon: Database },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-1 rounded-md border p-1 bg-muted/30">
+        {subTabs.map((st) => {
+          const Icon = st.icon;
+          return (
+            <button
+              key={st.key}
+              onClick={() => setSubTab(st.key)}
+              className={`flex items-center gap-2 rounded-md px-3.5 py-2 text-sm whitespace-nowrap transition-colors ${
+                subTab === st.key
+                  ? "bg-background text-foreground font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {st.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {subTab === "llm" && <LlmProvidersTab />}
+      {subTab === "ocr" && <OcrProvidersTab />}
+      {subTab === "prompts" && <PromptsTab />}
+      {subTab === "normalization" && <NormalizationTab />}
+    </div>
+  );
+}
+
+// ==========================
+// Generic form helpers
+// ==========================
 
 function SettingsForm({ title, children, onSave, saving, saved }: {
   title: string; children: React.ReactNode;
@@ -73,12 +117,13 @@ function SettingsForm({ title, children, onSave, saving, saved }: {
   );
 }
 
-function TextField({ label, value, onChange, placeholder, type = "text" }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+function TextField({ label, value, onChange, placeholder, type = "text", description }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; description?: string;
 }) {
   return (
     <label className="space-y-1">
       <span className="text-sm font-medium">{label}</span>
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
     </label>
@@ -128,8 +173,6 @@ function ToggleField({ label, value, onChange, description }: {
   );
 }
 
-// --- Tabs ---
-
 function useSettingsSave() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -148,149 +191,474 @@ function useSettingsSave() {
   return { saving, saved, save };
 }
 
-function LlmTab() {
-  const [s, setS] = useState<any>(null);
-  const [f, setF] = useState<any>({});
-  const { saving, saved, save } = useSettingsSave();
+// ==========================
+// Provider type definitions
+// ==========================
 
-  useEffect(() => {
-    api.get("/settings").then((res) => {
-      setS(res.data);
-      setF({
-        llm_provider: res.data.llm.provider,
-        ollama_base_url: res.data.llm.ollama_base_url,
-        ollama_model: res.data.llm.ollama_model,
-        claude_model: res.data.llm.claude_model,
-        claude_api_key: "",
-        extraction_timeout: res.data.llm.extraction_timeout,
-      });
-    });
-  }, []);
+const LLM_TYPES = [
+  { value: "ollama", label: "Ollama", description: "Local LLM via Ollama" },
+  { value: "vllm", label: "vLLM", description: "vLLM (OpenAI-compatible API)" },
+  { value: "claude", label: "Claude", description: "Anthropic Claude API" },
+  { value: "openai", label: "OpenAI", description: "OpenAI API (GPT-4, etc.)" },
+];
 
-  if (!s) return <div className="text-muted-foreground">Loading...</div>;
+const OCR_TYPES = [
+  { value: "tesseract", label: "Tesseract (Local)", description: "Local Tesseract OCR engine" },
+  { value: "tesseract_remote", label: "Tesseract (Remote)", description: "Remote Tesseract OCR server" },
+  { value: "llm_vision", label: "LLM Vision", description: "Send page images to an LLM for OCR" },
+  { value: "google_vision", label: "Google Cloud Vision", description: "Google Cloud Vision API" },
+];
 
-  return (
-    <SettingsForm title="LLM Configuration" saving={saving} saved={saved}
-      onSave={() => save({
-        llm_provider: f.llm_provider !== s.llm.provider ? f.llm_provider : undefined,
-        ollama_base_url: f.ollama_base_url !== s.llm.ollama_base_url ? f.ollama_base_url : undefined,
-        ollama_model: f.ollama_model !== s.llm.ollama_model ? f.ollama_model : undefined,
-        claude_model: f.claude_model !== s.llm.claude_model ? f.claude_model : undefined,
-        claude_api_key: f.claude_api_key || undefined,
-        extraction_timeout: f.extraction_timeout !== s.llm.extraction_timeout ? f.extraction_timeout : undefined,
-      })}>
-      <SelectField label="Provider" value={f.llm_provider} onChange={(v) => setF({ ...f, llm_provider: v })}
-        options={[{ value: "ollama", label: "Ollama (Local)" }, { value: "claude", label: "Claude API" }]} />
-      <TextField label="Ollama URL" value={f.ollama_base_url} onChange={(v) => setF({ ...f, ollama_base_url: v })} />
-      <TextField label="Ollama Model" value={f.ollama_model} onChange={(v) => setF({ ...f, ollama_model: v })}
-        placeholder="e.g. llama3.1" />
-      <TextField label="Claude Model" value={f.claude_model} onChange={(v) => setF({ ...f, claude_model: v })} />
-      <TextField label="Claude API Key" value={f.claude_api_key} onChange={(v) => setF({ ...f, claude_api_key: v })}
-        type="password" placeholder={s.llm.has_claude_key ? "configured" : "Not set"} />
-      <NumberField label="Extraction Timeout (seconds)" value={f.extraction_timeout}
-        onChange={(v) => setF({ ...f, extraction_timeout: v })} min={30} max={600} step={10} />
-    </SettingsForm>
-  );
+const LLM_VISION_PROVIDERS = [
+  { value: "ollama", label: "Ollama" },
+  { value: "claude", label: "Claude" },
+  { value: "openai", label: "OpenAI" },
+];
+
+// ==========================
+// LLM Providers Tab
+// ==========================
+
+interface LlmProvider {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  base_url: string;
+  model: string;
+  api_key: string;
+  timeout: number;
+  has_api_key?: boolean;
 }
 
-function OcrTab() {
-  const [s, setS] = useState<any>(null);
-  const [f, setF] = useState<any>({});
-  const { saving, saved, save } = useSettingsSave();
+function LlmProvidersTab() {
+  const [providers, setProviders] = useState<LlmProvider[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    api.get("/settings").then((res) => {
-      setS(res.data);
-      setF({
-        ocr_engine: res.data.ocr.engine,
-        ocr_language: res.data.ocr.language,
-        ocr_confidence_threshold: res.data.ocr.confidence_threshold,
-        cloud_ocr_enabled: res.data.ocr.cloud_ocr_enabled,
-        ocr_remote_url: res.data.ocr.remote_url || "",
-        ocr_remote_api_key: "",
-        llm_vision_provider: res.data.ocr.llm_vision_provider || "",
-        llm_vision_model: res.data.ocr.llm_vision_model || "",
-        llm_vision_ollama_url: res.data.ocr.llm_vision_ollama_url || "",
-        google_vision_key: "",
-      });
+    api.get("/settings/llm-providers").then((res) => {
+      const data = Array.isArray(res.data) ? res.data : [];
+      setProviders(data);
+      if (data.length > 0) setExpandedId(data[0].id);
     });
   }, []);
 
-  if (!s) return <div className="text-muted-foreground">Loading...</div>;
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put("/settings/llm-providers", providers);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { alert("Failed to save LLM providers"); }
+    setSaving(false);
+  };
+
+  const addProvider = (type: string) => {
+    const typeInfo = LLM_TYPES.find((t) => t.value === type);
+    const newId = `${type}-${Date.now()}`;
+    const entry: LlmProvider = {
+      id: newId,
+      type,
+      name: typeInfo?.label || type,
+      enabled: true,
+      priority: providers.length + 1,
+      base_url: type === "ollama" ? "http://ollama:11434" : type === "vllm" ? "http://vllm:8000/v1" : "",
+      model: type === "ollama" ? "llama3.1" : type === "claude" ? "claude-sonnet-4-20250514" : type === "openai" ? "gpt-4o" : "",
+      api_key: "",
+      timeout: 120,
+    };
+    setProviders([...providers, entry]);
+    setExpandedId(newId);
+  };
+
+  const removeProvider = (id: string) => {
+    setProviders(providers.filter((p) => p.id !== id).map((p, i) => ({ ...p, priority: i + 1 })));
+  };
+
+  const updateProvider = (id: string, updates: Partial<LlmProvider>) => {
+    setProviders(providers.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  };
+
+  const moveProvider = (id: string, direction: "up" | "down") => {
+    const idx = providers.findIndex((p) => p.id === id);
+    if (direction === "up" && idx > 0) {
+      const copy = [...providers];
+      [copy[idx - 1], copy[idx]] = [copy[idx], copy[idx - 1]];
+      setProviders(copy.map((p, i) => ({ ...p, priority: i + 1 })));
+    } else if (direction === "down" && idx < providers.length - 1) {
+      const copy = [...providers];
+      [copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]];
+      setProviders(copy.map((p, i) => ({ ...p, priority: i + 1 })));
+    }
+  };
 
   return (
-    <SettingsForm title="OCR Configuration" saving={saving} saved={saved}
-      onSave={() => save({
-        ocr_engine: f.ocr_engine !== s.ocr.engine ? f.ocr_engine : undefined,
-        ocr_language: f.ocr_language !== s.ocr.language ? f.ocr_language : undefined,
-        ocr_confidence_threshold: f.ocr_confidence_threshold !== s.ocr.confidence_threshold ? f.ocr_confidence_threshold : undefined,
-        cloud_ocr_enabled: f.cloud_ocr_enabled !== s.ocr.cloud_ocr_enabled ? f.cloud_ocr_enabled : undefined,
-        ocr_remote_url: f.ocr_remote_url !== (s.ocr.remote_url || "") ? f.ocr_remote_url : undefined,
-        ocr_remote_api_key: f.ocr_remote_api_key || undefined,
-        llm_vision_provider: f.llm_vision_provider !== (s.ocr.llm_vision_provider || "") ? f.llm_vision_provider : undefined,
-        llm_vision_model: f.llm_vision_model !== (s.ocr.llm_vision_model || "") ? f.llm_vision_model : undefined,
-        llm_vision_ollama_url: f.llm_vision_ollama_url !== (s.ocr.llm_vision_ollama_url || "") ? f.llm_vision_ollama_url : undefined,
-        google_vision_key: f.google_vision_key || undefined,
-      })}>
-      <SelectField label="OCR Engine" value={f.ocr_engine} onChange={(v) => setF({ ...f, ocr_engine: v })}
-        options={[
-          { value: "tesseract", label: "Tesseract (Local)" },
-          { value: "tesseract_remote", label: "Tesseract (Remote Server)" },
-          { value: "llm_vision", label: "LLM Vision (AI reads images)" },
-          { value: "google_vision", label: "Google Cloud Vision" },
-        ]} />
-      <TextField label="OCR Languages" value={f.ocr_language} onChange={(v) => setF({ ...f, ocr_language: v })}
-        placeholder="e.g. eng+ita+deu" />
-      <NumberField label="Confidence Threshold" value={f.ocr_confidence_threshold}
-        onChange={(v) => setF({ ...f, ocr_confidence_threshold: v })} min={0} max={1} step={0.05} />
+    <div className="space-y-4">
+      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+        Configure LLM providers for document classification, data extraction, chat, and search.
+        Providers are tried in priority order (top = highest priority). If you're not satisfied with a result,
+        you can re-process a document with the next provider from the document detail page.
+      </div>
 
-      {f.ocr_engine === "tesseract_remote" && (
-        <>
-          <TextField label="Remote OCR URL" value={f.ocr_remote_url}
-            onChange={(v) => setF({ ...f, ocr_remote_url: v })} placeholder="http://ocr-server:8080/ocr" />
-          <TextField label="Remote OCR API Key" value={f.ocr_remote_api_key}
-            onChange={(v) => setF({ ...f, ocr_remote_api_key: v })} type="password"
-            placeholder={s.ocr.has_remote_api_key ? "configured" : "Not set"} />
-        </>
+      {providers.length === 0 && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="font-medium">No LLM providers configured</p>
+          <p className="text-sm mt-1">Add a provider below to get started.</p>
+        </div>
       )}
 
-      {f.ocr_engine === "llm_vision" && (
-        <>
-          <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-            Vision OCR can use a <strong>different provider and model</strong> than the extraction LLM.
-            For example: Chandra for OCR + llama3.1 for extraction.
-            Leave fields empty to use the same provider/model as the LLM tab.
+      <div className="space-y-2">
+        {providers.map((p, idx) => {
+          const typeInfo = LLM_TYPES.find((t) => t.value === p.type);
+          const isExpanded = expandedId === p.id;
+          return (
+            <div key={p.id} className={`rounded-lg border transition-colors ${p.enabled ? "bg-card" : "bg-muted/30 opacity-75"}`}>
+              {/* Header row */}
+              <div className="flex items-center gap-2 px-4 py-3">
+                <div className="flex flex-col gap-0.5">
+                  <button onClick={() => moveProvider(p.id, "up")} disabled={idx === 0}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => moveProvider(p.id, "down")} disabled={idx === providers.length - 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                  {idx + 1}
+                </span>
+
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : p.id)}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{p.name}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      {typeInfo?.label || p.type}
+                    </span>
+                    {p.model && <span className="text-xs text-muted-foreground truncate">{p.model}</span>}
+                  </div>
+                </div>
+
+                <button onClick={() => updateProvider(p.id, { enabled: !p.enabled })}
+                  className={`rounded-md p-1.5 transition-colors ${p.enabled ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : "text-muted-foreground hover:bg-accent"}`}
+                  title={p.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}>
+                  <Power className="h-4 w-4" />
+                </button>
+
+                <button onClick={() => removeProvider(p.id)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Expanded settings */}
+              {isExpanded && (
+                <div className="border-t px-4 py-3 grid gap-3 max-w-lg">
+                  <TextField label="Display Name" value={p.name} onChange={(v) => updateProvider(p.id, { name: v })} />
+                  <SelectField label="Provider Type" value={p.type}
+                    onChange={(v) => updateProvider(p.id, { type: v })}
+                    options={LLM_TYPES.map((t) => ({ value: t.value, label: t.label }))} />
+                  <TextField label="Model" value={p.model} onChange={(v) => updateProvider(p.id, { model: v })}
+                    placeholder={p.type === "ollama" ? "e.g. llama3.1" : p.type === "claude" ? "e.g. claude-sonnet-4-20250514" : "e.g. gpt-4o"} />
+                  {(p.type === "ollama" || p.type === "vllm") && (
+                    <TextField label="Base URL" value={p.base_url} onChange={(v) => updateProvider(p.id, { base_url: v })}
+                      placeholder={p.type === "ollama" ? "http://ollama:11434" : "http://vllm:8000/v1"} />
+                  )}
+                  {(p.type === "openai" && p.base_url) && (
+                    <TextField label="Base URL (optional)" value={p.base_url}
+                      onChange={(v) => updateProvider(p.id, { base_url: v })}
+                      placeholder="https://api.openai.com/v1" description="Leave empty for default OpenAI endpoint" />
+                  )}
+                  {(p.type === "claude" || p.type === "openai" || p.type === "vllm") && (
+                    <TextField label="API Key" value={p.api_key} onChange={(v) => updateProvider(p.id, { api_key: v })}
+                      type="password" placeholder={p.has_api_key ? "configured (leave blank to keep)" : "Enter API key"} />
+                  )}
+                  <NumberField label="Timeout (seconds)" value={p.timeout}
+                    onChange={(v) => updateProvider(p.id, { timeout: v })} min={30} max={600} step={10} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add provider dropdown */}
+      <div className="flex items-center gap-3">
+        <div className="relative group">
+          <button className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+            <Plus className="h-4 w-4" /> Add Provider
+          </button>
+          <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 rounded-lg border bg-popover p-1.5 shadow-lg min-w-[200px]">
+            {LLM_TYPES.map((t) => (
+              <button key={t.value} onClick={() => addProvider(t.value)}
+                className="flex flex-col w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors">
+                <span className="text-sm font-medium">{t.label}</span>
+                <span className="text-xs text-muted-foreground">{t.description}</span>
+              </button>
+            ))}
           </div>
-          <SelectField label="Vision Provider" value={f.llm_vision_provider}
-            onChange={(v) => setF({ ...f, llm_vision_provider: v })}
-            options={[
-              { value: "", label: "Same as LLM tab" },
-              { value: "ollama", label: "Ollama" },
-              { value: "claude", label: "Claude" },
-            ]} />
-          <TextField label="Vision Model" value={f.llm_vision_model}
-            onChange={(v) => setF({ ...f, llm_vision_model: v })}
-            placeholder="e.g. fredrezones55/chandra-ocr-2, llama3.2-vision" />
-          {(f.llm_vision_provider === "ollama" || (!f.llm_vision_provider && s.llm.provider === "ollama")) && (
-            <TextField label="Vision Ollama URL" value={f.llm_vision_ollama_url}
-              onChange={(v) => setF({ ...f, llm_vision_ollama_url: v })}
-              placeholder="Same as LLM Ollama URL if empty" />
-          )}
-        </>
-      )}
+        </div>
 
-      {f.ocr_engine === "google_vision" && (
-        <TextField label="Google Vision API Key" value={f.google_vision_key}
-          onChange={(v) => setF({ ...f, google_vision_key: v })} type="password"
-          placeholder={s.ocr.has_google_vision_key ? "configured" : "Not set"} />
-      )}
-
-      <ToggleField label="Cloud OCR Fallback" value={f.cloud_ocr_enabled}
-        onChange={(v) => setF({ ...f, cloud_ocr_enabled: v })}
-        description="Use cloud OCR when local confidence is below threshold" />
-    </SettingsForm>
+        <button onClick={save} disabled={saving}
+          className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 ml-auto">
+          {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+          {saved ? "Saved" : saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </div>
   );
 }
+
+// ==========================
+// OCR Providers Tab
+// ==========================
+
+interface OcrProvider {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  language: string;
+  remote_url: string;
+  remote_api_key: string;
+  llm_provider: string;
+  llm_model: string;
+  llm_base_url: string;
+  llm_api_key: string;
+  google_vision_key: string;
+  confidence_threshold: number;
+  has_remote_api_key?: boolean;
+  has_llm_api_key?: boolean;
+  has_google_vision_key?: boolean;
+}
+
+function OcrProvidersTab() {
+  const [providers, setProviders] = useState<OcrProvider[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get("/settings/ocr-providers").then((res) => {
+      const data = Array.isArray(res.data) ? res.data : [];
+      setProviders(data);
+      if (data.length > 0) setExpandedId(data[0].id);
+    });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put("/settings/ocr-providers", providers);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { alert("Failed to save OCR providers"); }
+    setSaving(false);
+  };
+
+  const addProvider = (type: string) => {
+    const typeInfo = OCR_TYPES.find((t) => t.value === type);
+    const newId = `${type}-${Date.now()}`;
+    const entry: OcrProvider = {
+      id: newId,
+      type,
+      name: typeInfo?.label || type,
+      enabled: true,
+      priority: providers.length + 1,
+      language: "eng+ita+deu",
+      remote_url: "",
+      remote_api_key: "",
+      llm_provider: "ollama",
+      llm_model: "",
+      llm_base_url: "",
+      llm_api_key: "",
+      google_vision_key: "",
+      confidence_threshold: 0.7,
+    };
+    setProviders([...providers, entry]);
+    setExpandedId(newId);
+  };
+
+  const removeProvider = (id: string) => {
+    setProviders(providers.filter((p) => p.id !== id).map((p, i) => ({ ...p, priority: i + 1 })));
+  };
+
+  const updateProvider = (id: string, updates: Partial<OcrProvider>) => {
+    setProviders(providers.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  };
+
+  const moveProvider = (id: string, direction: "up" | "down") => {
+    const idx = providers.findIndex((p) => p.id === id);
+    if (direction === "up" && idx > 0) {
+      const copy = [...providers];
+      [copy[idx - 1], copy[idx]] = [copy[idx], copy[idx - 1]];
+      setProviders(copy.map((p, i) => ({ ...p, priority: i + 1 })));
+    } else if (direction === "down" && idx < providers.length - 1) {
+      const copy = [...providers];
+      [copy[idx], copy[idx + 1]] = [copy[idx + 1], copy[idx]];
+      setProviders(copy.map((p, i) => ({ ...p, priority: i + 1 })));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+        Configure OCR engines for extracting text from scanned documents and images.
+        Providers are tried in priority order. The pipeline uses the highest-priority enabled provider.
+        You can re-process a document with a different provider from the document detail page.
+      </div>
+
+      {providers.length === 0 && (
+        <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
+          <Eye className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="font-medium">No OCR providers configured</p>
+          <p className="text-sm mt-1">Add a provider below to get started.</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {providers.map((p, idx) => {
+          const typeInfo = OCR_TYPES.find((t) => t.value === p.type);
+          const isExpanded = expandedId === p.id;
+          return (
+            <div key={p.id} className={`rounded-lg border transition-colors ${p.enabled ? "bg-card" : "bg-muted/30 opacity-75"}`}>
+              <div className="flex items-center gap-2 px-4 py-3">
+                <div className="flex flex-col gap-0.5">
+                  <button onClick={() => moveProvider(p.id, "up")} disabled={idx === 0}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => moveProvider(p.id, "down")} disabled={idx === providers.length - 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <span className="flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                  {idx + 1}
+                </span>
+
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : p.id)}>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{p.name}</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                      {typeInfo?.label || p.type}
+                    </span>
+                  </div>
+                </div>
+
+                <button onClick={() => updateProvider(p.id, { enabled: !p.enabled })}
+                  className={`rounded-md p-1.5 transition-colors ${p.enabled ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : "text-muted-foreground hover:bg-accent"}`}
+                  title={p.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}>
+                  <Power className="h-4 w-4" />
+                </button>
+
+                <button onClick={() => removeProvider(p.id)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+
+              {isExpanded && (
+                <div className="border-t px-4 py-3 grid gap-3 max-w-lg">
+                  <TextField label="Display Name" value={p.name} onChange={(v) => updateProvider(p.id, { name: v })} />
+
+                  {/* Common: language for Tesseract-type engines */}
+                  {(p.type === "tesseract" || p.type === "tesseract_remote") && (
+                    <>
+                      <TextField label="OCR Languages" value={p.language}
+                        onChange={(v) => updateProvider(p.id, { language: v })}
+                        placeholder="e.g. eng+ita+deu" description="Tesseract language codes separated by +" />
+                      <NumberField label="Confidence Threshold" value={p.confidence_threshold}
+                        onChange={(v) => updateProvider(p.id, { confidence_threshold: v })} min={0} max={1} step={0.05} />
+                    </>
+                  )}
+
+                  {/* Remote Tesseract */}
+                  {p.type === "tesseract_remote" && (
+                    <>
+                      <TextField label="Remote Server URL" value={p.remote_url}
+                        onChange={(v) => updateProvider(p.id, { remote_url: v })} placeholder="http://ocr-server:8080/ocr" />
+                      <TextField label="API Key" value={p.remote_api_key}
+                        onChange={(v) => updateProvider(p.id, { remote_api_key: v })} type="password"
+                        placeholder={p.has_remote_api_key ? "configured" : "Not set"} />
+                    </>
+                  )}
+
+                  {/* LLM Vision */}
+                  {p.type === "llm_vision" && (
+                    <>
+                      <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-700 dark:text-blue-300">
+                        Vision OCR sends page images to an LLM for text extraction. This can use a
+                        different provider/model than your extraction LLM (e.g. Chandra for OCR + llama3.1 for extraction).
+                      </div>
+                      <SelectField label="Vision LLM Provider" value={p.llm_provider}
+                        onChange={(v) => updateProvider(p.id, { llm_provider: v })}
+                        options={LLM_VISION_PROVIDERS} />
+                      <TextField label="Vision Model" value={p.llm_model}
+                        onChange={(v) => updateProvider(p.id, { llm_model: v })}
+                        placeholder={p.llm_provider === "ollama" ? "e.g. chandra-ocr-2" : p.llm_provider === "claude" ? "e.g. claude-sonnet-4-20250514" : "e.g. gpt-4o"} />
+                      {(p.llm_provider === "ollama") && (
+                        <TextField label="Ollama URL" value={p.llm_base_url}
+                          onChange={(v) => updateProvider(p.id, { llm_base_url: v })}
+                          placeholder="http://ollama:11434" description="Leave empty to use the same URL as the extraction LLM" />
+                      )}
+                      {(p.llm_provider === "claude" || p.llm_provider === "openai") && (
+                        <TextField label="API Key" value={p.llm_api_key}
+                          onChange={(v) => updateProvider(p.id, { llm_api_key: v })} type="password"
+                          placeholder={p.has_llm_api_key ? "configured" : "Enter API key"} />
+                      )}
+                    </>
+                  )}
+
+                  {/* Google Vision */}
+                  {p.type === "google_vision" && (
+                    <TextField label="Google Vision API Key" value={p.google_vision_key}
+                      onChange={(v) => updateProvider(p.id, { google_vision_key: v })} type="password"
+                      placeholder={p.has_google_vision_key ? "configured" : "Enter API key"} />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative group">
+          <button className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+            <Plus className="h-4 w-4" /> Add Provider
+          </button>
+          <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 rounded-lg border bg-popover p-1.5 shadow-lg min-w-[220px]">
+            {OCR_TYPES.map((t) => (
+              <button key={t.value} onClick={() => addProvider(t.value)}
+                className="flex flex-col w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors">
+                <span className="text-sm font-medium">{t.label}</span>
+                <span className="text-xs text-muted-foreground">{t.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving}
+          className="flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 ml-auto">
+          {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+          {saved ? "Saved" : saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==========================
+// Pipeline Tab
+// ==========================
 
 function PipelineTab() {
   const [s, setS] = useState<any>(null);
@@ -335,6 +703,10 @@ function PipelineTab() {
     </SettingsForm>
   );
 }
+
+// ==========================
+// OIDC Tab
+// ==========================
 
 function OidcTab() {
   const [s, setS] = useState<any>(null);
@@ -389,6 +761,10 @@ function OidcTab() {
     </SettingsForm>
   );
 }
+
+// ==========================
+// Users Tab
+// ==========================
 
 function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
@@ -482,6 +858,10 @@ function UsersTab() {
   );
 }
 
+// ==========================
+// Prompts Tab
+// ==========================
+
 function PromptsTab() {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -515,7 +895,7 @@ function PromptsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
         Customize the LLM prompts used for document classification, extraction, chat, and more.
         Prompts use Python format strings with placeholders like {"{ocr_text}"}, {"{patient_list}"}, etc.
         Click a prompt to edit it. Reset to revert to the default.
@@ -566,6 +946,10 @@ function PromptsTab() {
     </div>
   );
 }
+
+// ==========================
+// Logs Tab
+// ==========================
 
 function LogsTab() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -656,6 +1040,10 @@ function LogsTab() {
   );
 }
 
+// ==========================
+// Backup Tab
+// ==========================
+
 function BackupTab() {
   const [downloading, setDownloading] = useState(false);
 
@@ -704,6 +1092,10 @@ function BackupTab() {
   );
 }
 
+// ==========================
+// Normalization Tab
+// ==========================
+
 function NormalizationTab() {
   const [normType, setNormType] = useState("lab_tests");
   const [normItems, setNormItems] = useState<any[]>([]);
@@ -719,16 +1111,21 @@ function NormalizationTab() {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+        Normalization maps different names for the same medical concept (e.g. "CBC", "Complete Blood Count", "Emocromo")
+        to a single canonical entry. When documents are processed, the LLM auto-maps extracted terms. Use "Confirm all"
+        to mark auto-mapped aliases as reviewed.
+      </div>
       <div className="flex gap-3">
         <select value={normType} onChange={(e) => setNormType(e.target.value)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm">
+          className="rounded-md border bg-background px-3 py-2 text-sm">
           <option value="lab_tests">Lab Tests</option>
           <option value="specialties">Specialties</option>
           <option value="diagnoses">Diagnoses</option>
           <option value="medications">Medications</option>
         </select>
         <select value={normFilter || ""} onChange={(e) => setNormFilter(e.target.value || null)}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm">
+          className="rounded-md border bg-background px-3 py-2 text-sm">
           <option value="">All</option>
           <option value="unreviewed">Unreviewed only</option>
         </select>

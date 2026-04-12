@@ -17,13 +17,13 @@ docker compose up -d
 
 The application will be available at `http://localhost:8070`.
 
-Default credentials: `admin` / `admin` (change on first login).
+On first launch, a setup wizard guides you through creating your account and first patient.
 
 ## Features
 
 - **Document ingestion**: Drop PDFs, images, or DICOM files into the inbox
-- **OCR**: Tesseract (primary) with optional cloud OCR fallback
-- **LLM extraction**: Configurable Ollama (local) or Claude API for structured data extraction
+- **OCR**: Multi-provider with priority (Tesseract, LLM Vision, Google Vision, remote Tesseract)
+- **LLM extraction**: Multi-provider with priority and escalation (Ollama, vLLM, Claude, OpenAI)
 - **Multi-patient**: Organize records by patient with access control
 - **Lab results**: Extracted and normalized, with trend tracking
 - **Medical imaging**: DICOM viewer (Cornerstone.js) with windowing, zoom, scroll
@@ -39,8 +39,8 @@ Default credentials: `admin` / `admin` (change on first login).
 | Backend | Python + FastAPI |
 | Frontend | React + TypeScript + Vite + shadcn/ui |
 | Database | SQLite (via aiosqlite) |
-| OCR | Tesseract 5 |
-| LLM | Ollama (local) or Claude API |
+| OCR | Tesseract 5, LLM Vision, Google Vision |
+| LLM | Ollama, vLLM, Claude API, OpenAI API |
 | DICOM | pydicom + Cornerstone.js |
 | Deployment | Docker Compose |
 

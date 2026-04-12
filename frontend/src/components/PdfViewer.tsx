@@ -125,7 +125,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
                 >
                   All
                 </button>
-                <div className="absolute right-0 top-full mt-1 hidden group-hover:flex z-10 rounded-lg border bg-popover p-1 shadow-lg gap-1">
+                <div className="absolute right-0 top-full mt-1 hidden group-hover:flex z-10 rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl gap-1">
                   <button
                     onClick={() => handleRotate(270, "all")}
                     disabled={rotating}

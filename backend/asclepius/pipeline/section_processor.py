@@ -169,18 +169,21 @@ async def process_with_sections(
                     idx, section_type, doc_id,
                 )
 
-        # Generate a brief summary for the section
+        # Generate a brief summary for the section (skip for large docs to save time)
         summary = ""
-        if section["text"].strip() and hasattr(llm, '_generate'):
+        if len(sections) <= 10 and section["text"].strip() and hasattr(llm, '_generate'):
             try:
                 sum_prompt = (
                     "Summarize this medical document section in 1-2 sentences "
                     "in English:\n\n" + section["text"][:3000]
                 )
-                summary = await llm._generate(sum_prompt)
+                summary = await llm._generate(sum_prompt, force_json=False)
                 summary = summary.strip()[:500]
             except Exception:
                 pass
+        elif section["text"].strip():
+            # For large docs, just use first ~200 chars as a crude summary
+            summary = section["text"][:200].replace("\n", " ").strip()
 
         # Save section to DB
         await db.execute(

@@ -1,5 +1,6 @@
 """Ollama LLM provider implementation."""
 
+import asyncio
 import json
 import logging
 import re
@@ -10,6 +11,10 @@ from asclepius.llm.base import LLMProvider
 from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT
 
 logger = logging.getLogger(__name__)
+
+# Retry settings for transient failures (ReadTimeout, connection errors)
+MAX_RETRIES = 3
+RETRY_BACKOFF = [30, 60, 120]  # seconds
 
 
 class OllamaProvider(LLMProvider):
@@ -76,23 +81,43 @@ class OllamaProvider(LLMProvider):
             return select_match.group(1).strip()
         return response_text.strip()
 
-    async def _generate(self, prompt: str, force_json: bool = True) -> str:
-        logger.debug("Ollama _generate: model=%s, prompt_len=%d, url=%s", self.model, len(prompt), self.base_url)
-        # Separate timeouts: short connect, long read (LLM can take minutes)
-        timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
+    async def _generate(self, prompt: str, force_json: bool = True, timeout_override: float | None = None) -> str:
+        read_timeout = timeout_override or float(self.timeout)
+        logger.debug("Ollama _generate: model=%s, prompt_len=%d, url=%s, timeout=%.0fs",
+                      self.model, len(prompt), self.base_url, read_timeout)
+        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         payload = {"model": self.model, "prompt": prompt, "stream": False}
         if force_json:
             payload["format"] = "json"
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{self.base_url}/api/generate",
-                json=payload,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            response = data.get("response", "")
-            logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
-            return response
+
+        last_err = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    resp = await client.post(
+                        f"{self.base_url}/api/generate",
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    response = data.get("response", "")
+                    logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
+                    return response
+            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
+                last_err = e
+                if attempt < MAX_RETRIES - 1:
+                    wait = RETRY_BACKOFF[attempt]
+                    logger.warning(
+                        "Ollama %s (attempt %d/%d, prompt_len=%d), retrying in %ds...",
+                        type(e).__name__, attempt + 1, MAX_RETRIES, len(prompt), wait,
+                    )
+                    await asyncio.sleep(wait)
+                else:
+                    logger.error(
+                        "Ollama %s after %d attempts (prompt_len=%d)",
+                        type(e).__name__, MAX_RETRIES, len(prompt),
+                    )
+        raise last_err  # type: ignore[misc]
 
     @staticmethod
     def _parse_json(text: str) -> dict:

@@ -85,7 +85,7 @@ class ClaudeProvider(LLMProvider):
             return select_match.group(1).strip()
         return response_text.strip()
 
-    async def _generate(self, prompt: str) -> str:
+    async def _generate(self, prompt: str, force_json: bool = True, timeout_override: float | None = None) -> str:
         """Generate raw text response from a prompt."""
         response = await self.client.messages.create(
             model=self.model,

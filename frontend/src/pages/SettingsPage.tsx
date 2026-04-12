@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import { Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check, FileCode, RotateCcw, Download, ScrollText } from "lucide-react";
 
@@ -576,22 +576,22 @@ function LogsTab() {
   const [total, setTotal] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const fetchLogs = () => {
+  const fetchLogs = useCallback(() => {
     const params: Record<string, any> = { limit: 500 };
     if (levelFilter) params.level = levelFilter;
     if (moduleFilter) params.module = moduleFilter;
     api.get("/settings/logs", { params })
       .then((res) => { setLogs(res.data.logs || []); setTotal(res.data.total || 0); })
       .catch(() => {});
-  };
+  }, [levelFilter, moduleFilter]);
 
-  useEffect(() => { fetchLogs(); }, [levelFilter, moduleFilter]);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   useEffect(() => {
     if (!autoRefresh) return;
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [autoRefresh, levelFilter, moduleFilter]);
+  }, [autoRefresh, fetchLogs]);
 
   useEffect(() => {
     if (autoScroll && scrollRef.current) {

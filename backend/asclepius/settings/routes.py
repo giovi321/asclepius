@@ -38,9 +38,8 @@ async def get_logs(
     if module:
         logs = [l for l in logs if module in l["module"]]
 
-    # Return most recent first, limited
+    # Return in chronological order (oldest first), limited to most recent entries
     logs = logs[-limit:]
-    logs.reverse()
 
     return {"logs": logs, "total": len(LOG_BUFFER)}
 

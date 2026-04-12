@@ -38,7 +38,7 @@ Thumbs.db
 config/settings.yaml
 
 # Vault data (never commit patient data)
-vault/
+/vault/
 
 # SQLite databases
 *.sqlite

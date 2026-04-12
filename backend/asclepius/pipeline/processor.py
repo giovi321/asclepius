@@ -385,8 +385,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             logger.info("Completed processing doc %d: %s -> %s", doc_id, path.name, final_path)
 
         except Exception as e:
-            logger.exception("Pipeline error for %s", path.name)
             error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else f"{type(e).__name__} (no message)"
+            logger.exception("Pipeline error for %s — %s", path.name, error_msg)
             pipeline_status["total_errors"] += 1
             pipeline_status["recent_errors"].append({
                 "file": path.name,

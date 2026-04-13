@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search, Tag,
+  Eye, EyeOff, Trash2, Plus, X, Link2, Search,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
@@ -14,8 +14,8 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
-  const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
+  const [relevantDocs, setRelevantDocs] = useState<any[]>([]);
+  const [loadingRelevant, setLoadingRelevant] = useState(false);
   const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
   const [showLinkSearch, setShowLinkSearch] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
@@ -23,14 +23,14 @@ export default function DocumentDetailPage() {
   const [linkType, setLinkType] = useState("related");
 
   const loadDoc = async (showLoading = true) => {
+    const scrollY = window.scrollY;
     if (showLoading && !doc) setLoading(true);
     const res = await api.get(`/documents/${id}`);
     setDoc(res.data);
     setNotes(res.data.user_notes || "");
-    const rawTags = res.data.tags || "";
-    setTags(typeof rawTags === "string" ? (rawTags ? rawTags.split(",").map((t: string) => t.trim()) : []) : rawTags);
     setLinkedDocs(res.data.links || []);
     setLoading(false);
+    if (!showLoading) requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
   useEffect(() => {
@@ -92,6 +92,16 @@ export default function DocumentDetailPage() {
     }
   }, [doc?.status]);
 
+  // Load relevant document suggestions
+  useEffect(() => {
+    if (!doc?.patient_id || !doc?.id) return;
+    setLoadingRelevant(true);
+    api.get(`/documents/${doc.id}/relevant`)
+      .then((res) => setRelevantDocs(res.data.suggestions || []))
+      .catch(() => {})
+      .finally(() => setLoadingRelevant(false));
+  }, [doc?.id, doc?.patient_id]);
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) return;
     try {
@@ -108,28 +118,6 @@ export default function DocumentDetailPage() {
       setEditingNotes(false);
     } catch {
       alert("Failed to save notes");
-    }
-  };
-
-  const handleAddTag = async () => {
-    if (!newTag.trim()) return;
-    const updated = [...tags, newTag.trim()];
-    try {
-      await api.patch(`/documents/${id}`, { tags: updated.join(",") });
-      setTags(updated);
-      setNewTag("");
-    } catch {
-      alert("Failed to add tag");
-    }
-  };
-
-  const handleRemoveTag = async (tag: string) => {
-    const updated = tags.filter((t) => t !== tag);
-    try {
-      await api.patch(`/documents/${id}`, { tags: updated.join(",") });
-      setTags(updated);
-    } catch {
-      alert("Failed to remove tag");
     }
   };
 
@@ -175,27 +163,26 @@ export default function DocumentDetailPage() {
   };
 
   const handleLinkDocument = async (targetId: number) => {
+    const scrollY = window.scrollY;
     try {
       const res = await api.post(`/documents/${id}/link`, { target_document_id: targetId, link_type: linkType });
-      // Update linked docs locally — no full page reload
       const linked = linkResults.find((d: any) => d.id === targetId);
       setLinkedDocs((prev) => [...prev, {
         ...res.data,
         target_filename: linked?.original_filename,
         target_doc_type: linked?.doc_type,
       }]);
-      // Remove from search results so it can't be linked again
       setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 409) {
         alert(detail || "These documents are already linked");
-        // Remove from search results since it's already linked
         setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
       } else {
         alert(detail || "Failed to link document");
       }
     }
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
   if (loading) return <div className="text-muted-foreground">Loading...</div>;
@@ -206,7 +193,7 @@ export default function DocumentDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">{doc.original_filename}</h1>
+          <EditableFilename value={doc.original_filename} docId={doc.id} onSave={updateDocFields} />
           <p className="text-sm text-muted-foreground">
             {doc.doc_type?.replace(/_/g, " ")} | {doc.date_visit || doc.date_issued || doc.doc_date || "No date"} | {doc.patient_name || "Unclassified"}
           </p>
@@ -246,12 +233,7 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* Summary */}
-      {doc.summary_en && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <h3 className="mb-1 text-sm font-medium text-primary">Summary</h3>
-          <p className="text-sm">{doc.summary_en}</p>
-        </div>
-      )}
+      <EditableSummary value={doc.summary_en} docId={doc.id} onSave={updateDocFields} />
 
       {doc.sections?.length > 0 && (
         <div className="rounded-lg border p-4">
@@ -315,7 +297,6 @@ export default function DocumentDetailPage() {
             <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} />
-            <EditableField label="Summary" value={doc.summary_en} field="summary_en" docId={doc.id} onSave={updateDocFields} multiline />
             <InfoRow label="Language" value={doc.language_source} />
             <InfoRow label="OCR Engine" value={doc.ocr_engine} />
             <InfoRow label="OCR Confidence" value={doc.ocr_confidence?.toFixed(2)} />
@@ -485,43 +466,6 @@ export default function DocumentDetailPage() {
             </div>
           </Section>
 
-          {/* Tags */}
-          <Section title="Tags" icon={Tag}>
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
-                >
-                  {tag}
-                  <button
-                    onClick={() => handleRemoveTag(tag)}
-                    className="rounded-full p-0.5 hover:bg-primary/20"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-              <div className="flex items-center gap-1">
-                <input
-                  type="text"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
-                  placeholder="Add tag..."
-                  className="w-24 rounded-md border bg-background px-2 py-1 text-xs"
-                />
-                <button
-                  onClick={handleAddTag}
-                  disabled={!newTag.trim()}
-                  className="rounded-md p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                >
-                  <Plus className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          </Section>
-
           {/* Linked Documents */}
           <Section title="Linked Documents" icon={Link2}>
             {linkedDocs.length > 0 ? (
@@ -560,6 +504,57 @@ export default function DocumentDetailPage() {
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No linked documents</p>
+            )}
+            {/* Relevant Documents (AI suggested) */}
+            {(relevantDocs.length > 0 || loadingRelevant) && (
+              <div className="mt-3 pt-3 border-t">
+                <h4 className="text-xs font-medium text-muted-foreground mb-2">Suggested by AI</h4>
+                {loadingRelevant ? (
+                  <p className="text-xs text-muted-foreground">Analyzing document relationships...</p>
+                ) : (
+                  <div className="space-y-2">
+                    {relevantDocs.map((sg: any) => (
+                      <div key={sg.document_id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <a href={`/documents/${sg.document_id}`} className="text-primary hover:underline block truncate font-medium">
+                            {sg.filename || `Document #${sg.document_id}`}
+                          </a>
+                          <span className="text-muted-foreground">
+                            {sg.doc_type?.replace(/_/g, " ")} | {sg.doc_date || "no date"}
+                          </span>
+                          {sg.reason && <p className="text-muted-foreground italic mt-0.5">{sg.reason}</p>}
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const scrollY = window.scrollY;
+                            try {
+                              const res = await api.post(`/documents/${doc.id}/link`, { target_document_id: sg.document_id, link_type: sg.link_type || "related" });
+                              setLinkedDocs((prev) => [...prev, { ...res.data, target_filename: sg.filename, target_doc_type: sg.doc_type }]);
+                              setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id));
+                            } catch (e: any) {
+                              if (e?.response?.status === 409) {
+                                setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id));
+                              } else {
+                                alert("Failed to link: " + (e.response?.data?.detail || e.message));
+                              }
+                            }
+                            requestAnimationFrame(() => window.scrollTo(0, scrollY));
+                          }}
+                          className="rounded bg-primary/10 px-2 py-1 text-primary hover:bg-primary/20 whitespace-nowrap"
+                        >
+                          Link
+                        </button>
+                        <button
+                          onClick={() => setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id))}
+                          className="rounded p-1 text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {!showLinkSearch ? (
               <div className="mt-2 flex gap-2">
@@ -1011,5 +1006,99 @@ function InfoRow({ label, value }: { label: string; value: any }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">{value}</span>
     </div>
+  );
+}
+
+function EditableSummary({ value, docId, onSave }: { value: string | null; docId: number; onSave: (updated?: any) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setVal(value || ""); }, [value]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await api.patch(`/documents/${docId}`, { summary_en: val || null });
+      setEditing(false);
+      onSave(res.data);
+    } catch { alert("Failed to save"); }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <h3 className="mb-2 text-sm font-medium text-primary">Summary</h3>
+        <textarea value={val} onChange={(e) => setVal(e.target.value)}
+          className="w-full rounded border bg-background px-3 py-2 text-sm" rows={3} autoFocus disabled={saving} />
+        <div className="flex gap-2 mt-2">
+          <button onClick={handleSave} disabled={saving}
+            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button onClick={() => { setEditing(false); setVal(value || ""); }}
+            className="rounded border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 cursor-pointer hover:bg-primary/10 transition-colors group"
+      onClick={() => setEditing(true)}>
+      <h3 className="mb-1 text-sm font-medium text-primary flex items-center justify-between">
+        Summary
+        <span className="text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">click to edit</span>
+      </h3>
+      <p className="text-sm">{value || <span className="text-muted-foreground italic">No summary — click to add</span>}</p>
+    </div>
+  );
+}
+
+function EditableFilename({ value, docId, onSave }: { value: string; docId: number; onSave: (updated?: any) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { setVal(value || ""); }, [value]);
+
+  const handleSave = async () => {
+    if (!val.trim() || val === value) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      const res = await api.post(`/documents/${docId}/rename`, { filename: val });
+      setEditing(false);
+      onSave(res.data);
+    } catch (e: any) {
+      alert("Rename failed: " + (e.response?.data?.detail || e.message));
+    }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input value={val} onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
+          className="text-xl font-semibold bg-background border rounded px-2 py-1 flex-1"
+          autoFocus disabled={saving} />
+        <button onClick={handleSave} disabled={saving}
+          className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
+          {saving ? "..." : "Save"}
+        </button>
+        <button onClick={() => { setEditing(false); setVal(value); }}
+          className="rounded border px-2 py-1.5 text-xs hover:bg-accent">
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2" onClick={() => setEditing(true)}>
+      {value}
+      <span className="opacity-0 group-hover:opacity-100 text-muted-foreground text-xs font-normal">&#x270E;</span>
+    </h1>
   );
 }

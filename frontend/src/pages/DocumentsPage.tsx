@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { FileText, Search, Upload } from "lucide-react";
+import { FileText, Search, Upload, Pencil, Check, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 
 const DOC_TYPES = [
@@ -222,10 +222,9 @@ export default function DocumentsPage() {
               documents.map((doc) => (
                 <tr key={doc.id} className="hover:bg-accent/50">
                   <td className="px-4 py-2">
-                    <Link to={`/documents/${doc.id}`} className="flex items-center gap-2 text-primary hover:underline">
-                      <FileText className="h-4 w-4" />
-                      <span className="max-w-[200px] truncate">{doc.original_filename}</span>
-                    </Link>
+                    <InlineRenameCell doc={doc} onRenamed={(updated) => {
+                      setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, ...updated } : d));
+                    }} />
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "\u2014"}</td>
                   <td className="px-4 py-2 text-muted-foreground">{doc.date_visit || doc.date_issued || doc.doc_date || "\u2014"}</td>
@@ -271,6 +270,62 @@ export default function DocumentsPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: any) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(doc.original_filename || "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!val.trim() || val === doc.original_filename) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      const res = await api.post(`/documents/${doc.id}/rename`, { filename: val });
+      setEditing(false);
+      onRenamed(res.data);
+    } catch (e: any) {
+      alert("Rename failed: " + (e.response?.data?.detail || e.message));
+    }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input value={val} onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(doc.original_filename); } }}
+          className="flex-1 rounded border bg-background px-2 py-0.5 text-sm min-w-0"
+          autoFocus disabled={saving}
+          onClick={(e) => e.stopPropagation()}
+        />
+        <button onClick={handleSave} disabled={saving}
+          className="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-50">
+          <Check className="h-3.5 w-3.5" />
+        </button>
+        <button onClick={() => { setEditing(false); setVal(doc.original_filename); }}
+          className="rounded p-1 text-muted-foreground hover:bg-accent">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 group">
+      <Link to={`/documents/${doc.id}`} className="flex items-center gap-2 text-primary hover:underline flex-1 min-w-0">
+        <FileText className="h-4 w-4 flex-shrink-0" />
+        <span className="max-w-[200px] truncate">{doc.original_filename}</span>
+      </Link>
+      <button
+        onClick={(e) => { e.stopPropagation(); setVal(doc.original_filename); setEditing(true); }}
+        className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
+        title="Rename"
+      >
+        <Pencil className="h-3 w-3" />
+      </button>
     </div>
   );
 }

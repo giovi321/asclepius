@@ -186,8 +186,15 @@ export default function DocumentDetailPage() {
       }]);
       // Remove from search results so it can't be linked again
       setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
-    } catch {
-      alert("Failed to link document");
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 409) {
+        alert(detail || "These documents are already linked");
+        // Remove from search results since it's already linked
+        setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
+      } else {
+        alert(detail || "Failed to link document");
+      }
     }
   };
 

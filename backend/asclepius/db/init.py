@@ -96,6 +96,20 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         )
     """)
     await db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id)")
+
+    # Add unique constraint on document_links to prevent exact duplicates
+    # First deduplicate any existing rows, keeping the oldest
+    await db.execute("""
+        DELETE FROM document_links WHERE id NOT IN (
+            SELECT MIN(id) FROM document_links
+            GROUP BY source_document_id, target_document_id
+        )
+    """)
+    await db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_document_links_unique
+        ON document_links(source_document_id, target_document_id)
+    """)
+
     await db.commit()
 
 

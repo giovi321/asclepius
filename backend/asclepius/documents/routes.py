@@ -548,6 +548,9 @@ async def link_documents(
     if body.link_type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Invalid link_type. Must be one of: {valid_types}")
 
+    if doc_id == body.target_document_id:
+        raise HTTPException(status_code=400, detail="Cannot link a document to itself")
+
     # Verify both documents exist
     source = await get_document(db, doc_id)
     if not source:
@@ -555,6 +558,16 @@ async def link_documents(
     target = await get_document(db, body.target_document_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target document not found")
+
+    # Check for existing link in either direction
+    existing = await db.execute(
+        """SELECT id FROM document_links
+           WHERE (source_document_id = ? AND target_document_id = ?)
+              OR (source_document_id = ? AND target_document_id = ?)""",
+        (doc_id, body.target_document_id, body.target_document_id, doc_id),
+    )
+    if await existing.fetchone():
+        raise HTTPException(status_code=409, detail="These documents are already linked")
 
     try:
         cursor = await db.execute(

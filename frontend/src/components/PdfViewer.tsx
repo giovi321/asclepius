@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
@@ -20,8 +20,31 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [scale, setScale] = useState(1.0);
   const [error, setError] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
-  const [pdfKey, setPdfKey] = useState(0); // force re-render after rotation
   const [showAllMenu, setShowAllMenu] = useState(false);
+
+  // Store PDF binary data directly — bypasses all URL/browser/pdfjs caching
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+  const [loadingPdf, setLoadingPdf] = useState(true);
+
+  const fetchPdf = useCallback(async () => {
+    setLoadingPdf(true);
+    setError(null);
+    try {
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf = await resp.arrayBuffer();
+      setPdfData(buf.slice(0)); // copy to detach from response
+    } catch (e) {
+      console.error("Failed to fetch PDF:", e);
+      setError("Failed to load PDF");
+    }
+    setLoadingPdf(false);
+  }, [url]);
+
+  // Initial load
+  useEffect(() => {
+    fetchPdf();
+  }, [fetchPdf]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -40,8 +63,8 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     try {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
-      // Force PDF reload after rotation
-      setPdfKey(Date.now());
+      // Re-fetch the PDF binary to get the rotated version
+      await fetchPdf();
     } catch (e) {
       console.error("Rotation failed:", e);
     }
@@ -161,10 +184,11 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       <div className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
         {error ? (
           <div className="text-destructive text-sm py-8">{error}</div>
-        ) : (
+        ) : loadingPdf ? (
+          <div className="text-muted-foreground text-sm py-8">Loading PDF...</div>
+        ) : pdfData ? (
           <Document
-            key={pdfKey}
-            file={pdfKey > 0 ? `${url}${url.includes("?") ? "&" : "?"}t=${pdfKey}` : url}
+            file={{ data: pdfData }}
             onLoadSuccess={onDocumentLoadSuccess}
             onLoadError={onDocumentLoadError}
             loading={
@@ -178,7 +202,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
               renderAnnotationLayer={true}
             />
           </Document>
-        )}
+        ) : null}
       </div>
     </div>
   );

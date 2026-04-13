@@ -5,12 +5,13 @@ import os
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
+from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.documents.service import get_document, list_documents
@@ -163,6 +164,48 @@ class DocumentMoveRequest(BaseModel):
 class DocumentLinkRequest(BaseModel):
     target_document_id: int
     link_type: str  # 'invoice_for', 'report_for', 'imaging_for', 'follow_up', 'related'
+
+
+@router.get("/failed")
+async def list_failed_docs(
+    limit: int = Query(default=50),
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """List failed documents with error messages for the review queue."""
+    cursor = await db.execute(
+        """SELECT d.id, d.original_filename, d.file_path, d.status, d.error_message,
+                  d.retry_count, d.created_at, d.updated_at,
+                  p.display_name as patient_name
+           FROM documents d
+           LEFT JOIN patients p ON d.patient_id = p.id
+           WHERE d.status IN ('failed', 'needs_review')
+           ORDER BY d.updated_at DESC
+           LIMIT ?""",
+        (limit,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+@router.post("/retry-all-failed")
+async def retry_all_failed(
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Retry all failed documents."""
+    import asyncio
+    from asclepius.pipeline.processor import reprocess_document
+
+    config = get_config()
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE status = 'failed'"
+    )
+    doc_ids = [row[0] for row in await cursor.fetchall()]
+
+    for doc_id in doc_ids:
+        asyncio.create_task(reprocess_document(doc_id, config))
+
+    return {"status": "retrying", "count": len(doc_ids)}
 
 
 @router.get("")
@@ -346,6 +389,7 @@ async def cancel_processing(
 @router.delete("/{doc_id}")
 async def delete_doc(
     doc_id: int,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -386,6 +430,9 @@ async def delete_doc(
     # Delete from DB (CASCADE will handle child tables)
     await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     await db.commit()
+
+    await audit_log(db, current_user["id"], "document.delete", "document", doc_id,
+                    {"filename": doc["original_filename"]}, get_client_ip(request))
 
     return {"status": "deleted", "document_id": doc_id}
 
@@ -816,8 +863,12 @@ Only include fields the user mentioned. JSON only, no explanation."""
     return {"status": "updated", "document_id": doc_id, "changes": changes}
 
 
+_VALID_RELATED_TABLES = {"lab_results", "encounters", "medications", "vaccinations"}
+
 async def _get_related(db: aiosqlite.Connection, table: str, doc_id: int) -> list[dict]:
     """Get related records from a child table."""
+    if table not in _VALID_RELATED_TABLES:
+        raise ValueError(f"Invalid related table: {table}")
     cursor = await db.execute(f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,))
     rows = await cursor.fetchall()
     return [dict(r) for r in rows]

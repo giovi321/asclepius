@@ -10,11 +10,126 @@ from asclepius.llm.prompts import CHAT_SYSTEM_PROMPT, DB_SCHEMA_FOR_CHAT
 
 logger = logging.getLogger(__name__)
 
-# Dangerous SQL patterns
+# Dangerous SQL patterns — block all write operations
 FORBIDDEN_PATTERNS = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|ATTACH|DETACH)\b",
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|ATTACH|DETACH|REPLACE|PRAGMA)\b",
     re.IGNORECASE,
 )
+
+# Whitelist of tables the LLM is allowed to query
+ALLOWED_TABLES = {
+    "documents", "patients", "facilities", "doctors",
+    "document_links", "lab_results", "encounters",
+    "medications", "vaccinations", "imaging_studies",
+    "norm_lab_tests", "norm_lab_test_aliases",
+    "norm_diagnoses", "norm_diagnosis_aliases",
+    "norm_medications", "norm_medication_aliases",
+    "norm_specialties", "norm_specialty_aliases",
+    "medical_events", "document_event_links",
+    "document_sections", "invoice_items",
+}
+
+# Maximum rows the LLM query can return
+MAX_RESULT_ROWS = 100
+
+
+def _sanitize_sql(sql: str, patient_id: int | None) -> str | None:
+    """Validate and sanitize an LLM-generated SQL query.
+
+    Returns the sanitized SQL string, or None if the query is rejected.
+    """
+    if not sql or not sql.strip():
+        return None
+
+    sql = sql.strip().rstrip(";")
+
+    # Block forbidden patterns (write operations)
+    if FORBIDDEN_PATTERNS.search(sql):
+        logger.warning("SQL blocked: contains forbidden pattern")
+        return None
+
+    # Must start with SELECT
+    if not sql.upper().lstrip().startswith("SELECT"):
+        logger.warning("SQL blocked: does not start with SELECT")
+        return None
+
+    # Block semicolons (prevent multi-statement injection)
+    if ";" in sql:
+        logger.warning("SQL blocked: contains semicolon (multi-statement)")
+        return None
+
+    # Check that all referenced tables are in the whitelist
+    # Extract table names from FROM and JOIN clauses
+    table_pattern = re.compile(
+        r'\b(?:FROM|JOIN)\s+(\w+)', re.IGNORECASE
+    )
+    referenced_tables = set(table_pattern.findall(sql))
+    disallowed = referenced_tables - ALLOWED_TABLES
+    if disallowed:
+        logger.warning("SQL blocked: references disallowed tables: %s", disallowed)
+        return None
+
+    # Enforce patient_id filter via parameterized injection
+    # The LLM may write `patient_id = 5` but we replace it with a parameter
+    if patient_id is not None:
+        # Check that patient_id is referenced somewhere
+        if "patient_id" not in sql.lower():
+            logger.warning("SQL blocked: missing patient_id filter for patient-scoped query")
+            return None
+
+    # Enforce LIMIT
+    if "LIMIT" not in sql.upper():
+        sql += f" LIMIT {MAX_RESULT_ROWS}"
+    else:
+        # Parse existing LIMIT and cap it
+        limit_match = re.search(r'LIMIT\s+(\d+)', sql, re.IGNORECASE)
+        if limit_match:
+            existing_limit = int(limit_match.group(1))
+            if existing_limit > MAX_RESULT_ROWS:
+                sql = sql[:limit_match.start(1)] + str(MAX_RESULT_ROWS) + sql[limit_match.end(1):]
+
+    return sql
+
+
+async def _execute_safe_sql(
+    db: aiosqlite.Connection, sql: str, patient_id: int | None
+) -> list[dict] | None:
+    """Execute a sanitized SQL query within a read-only savepoint.
+
+    Uses parameterized patient_id injection — replaces any literal patient_id
+    value in the query with a parameter placeholder.
+    """
+    params = []
+
+    if patient_id is not None:
+        # Replace literal patient_id values with parameterized placeholder
+        # Handles: patient_id = 5, patient_id=5, patient_id = '5'
+        sql_replaced = re.sub(
+            r"patient_id\s*=\s*(?:'?\d+'?|\?)",
+            "patient_id = ?",
+            sql,
+            flags=re.IGNORECASE,
+        )
+        # Count how many patient_id placeholders we created
+        param_count = sql_replaced.lower().count("patient_id = ?")
+        params = [patient_id] * param_count
+        sql = sql_replaced
+
+    try:
+        # Use a savepoint so we can rollback if anything goes wrong
+        await db.execute("SAVEPOINT chat_query")
+        cursor = await db.execute(sql, params)
+        rows = await cursor.fetchall()
+        await db.execute("RELEASE SAVEPOINT chat_query")
+        return [dict(r) for r in rows[:MAX_RESULT_ROWS]]
+    except Exception as e:
+        logger.warning("Chat SQL execution failed: %s — Query: %s", e, sql[:200])
+        try:
+            await db.execute("ROLLBACK TO SAVEPOINT chat_query")
+            await db.execute("RELEASE SAVEPOINT chat_query")
+        except Exception:
+            pass
+        return None
 
 
 async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> str:
@@ -135,17 +250,15 @@ async def chat_with_rag(
     try:
         sql_query = await llm.generate_sql(message, DB_SCHEMA_FOR_CHAT, patient_context)
 
-        if sql_query and not FORBIDDEN_PATTERNS.search(sql_query):
-            # Add patient filter if not present
-            if patient_id and "patient_id" not in sql_query.lower():
-                logger.warning("SQL query missing patient_id filter, skipping")
+        if sql_query:
+            # Sanitize and validate the LLM-generated SQL
+            safe_sql = _sanitize_sql(sql_query, patient_id)
+            if safe_sql:
+                sql_result = await _execute_safe_sql(db, safe_sql, patient_id)
             else:
-                cursor = await db.execute(sql_query)
-                sql_rows = await cursor.fetchall()
-                if sql_rows:
-                    sql_result = [dict(r) for r in sql_rows[:50]]
+                logger.warning("LLM-generated SQL was rejected by sanitizer")
         else:
-            logger.warning("SQL query contains forbidden patterns or is empty")
+            logger.debug("LLM returned empty SQL query")
     except Exception:
         logger.warning("SQL generation/execution failed, falling back to context-based chat")
 

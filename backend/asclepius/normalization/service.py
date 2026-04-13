@@ -2,54 +2,86 @@
 
 import aiosqlite
 
+# Whitelist of valid table and column names for normalization queries.
+# All f-string SQL uses ONLY these validated names — never user input.
+VALID_TABLES = {
+    "norm_lab_tests", "norm_lab_test_aliases",
+    "norm_specialties", "norm_specialty_aliases",
+    "norm_diagnoses", "norm_diagnosis_aliases",
+    "norm_medications", "norm_medication_aliases",
+    "lab_results", "encounters", "medications",
+}
+
+VALID_COLUMNS = {
+    "norm_lab_test_id", "norm_specialty_id",
+    "norm_diagnosis_id", "norm_medication_id",
+}
+
+
+def _validate_table(name: str) -> str:
+    """Validate a table name against the whitelist. Raises ValueError if invalid."""
+    if name not in VALID_TABLES:
+        raise ValueError(f"Invalid table name: {name}")
+    return name
+
+
+def _validate_column(name: str) -> str:
+    """Validate a column name against the whitelist. Raises ValueError if invalid."""
+    if name not in VALID_COLUMNS:
+        raise ValueError(f"Invalid column name: {name}")
+    return name
+
 
 class NormService:
     """Generic normalization table service."""
 
     def __init__(self, db: aiosqlite.Connection, tables: dict):
         self.db = db
-        self.main_table = tables["main"]
-        self.alias_table = tables["aliases"]
-        self.fk_col = tables["fk"]
-        self.ref_table = tables["ref_table"]
-        self.ref_col = tables["ref_col"]
+        # Validate all table/column names at construction time
+        self.main_table = _validate_table(tables["main"])
+        self.alias_table = _validate_table(tables["aliases"])
+        self.fk_col = _validate_column(tables["fk"])
+        self.ref_table = _validate_table(tables["ref_table"])
+        self.ref_col = _validate_column(tables["ref_col"])
 
     async def list_all(self, filter_unreviewed: bool = False, search: str | None = None) -> list[dict]:
+        """List all normalization entries with alias/unreviewed counts.
+
+        Uses a single query with JOINs instead of N+1 per-row queries.
+        """
         if search:
-            # Search in canonical_display, canonical_code, and aliases
             like = f"%{search}%"
-            cursor = await self.db.execute(
-                f"""SELECT DISTINCT m.* FROM {self.main_table} m
-                    LEFT JOIN {self.alias_table} a ON a.{self.fk_col} = m.id
-                    WHERE m.canonical_display LIKE ? OR m.canonical_code LIKE ? OR a.alias LIKE ?
-                    ORDER BY m.canonical_display""",
-                (like, like, like),
-            )
+            query = f"""
+                SELECT m.*,
+                       COUNT(DISTINCT a_all.id) AS alias_count,
+                       COUNT(DISTINCT a_unrev.id) AS unreviewed_count
+                FROM {self.main_table} m
+                LEFT JOIN {self.alias_table} a_all ON a_all.{self.fk_col} = m.id
+                LEFT JOIN {self.alias_table} a_unrev ON a_unrev.{self.fk_col} = m.id AND a_unrev.auto_mapped = 1
+                LEFT JOIN {self.alias_table} a_search ON a_search.{self.fk_col} = m.id
+                WHERE m.canonical_display LIKE ? OR m.canonical_code LIKE ? OR a_search.alias LIKE ?
+                GROUP BY m.id
+                ORDER BY m.canonical_display
+            """
+            cursor = await self.db.execute(query, (like, like, like))
         else:
-            cursor = await self.db.execute(f"SELECT * FROM {self.main_table} ORDER BY canonical_display")
+            query = f"""
+                SELECT m.*,
+                       COUNT(DISTINCT a_all.id) AS alias_count,
+                       COUNT(DISTINCT a_unrev.id) AS unreviewed_count
+                FROM {self.main_table} m
+                LEFT JOIN {self.alias_table} a_all ON a_all.{self.fk_col} = m.id
+                LEFT JOIN {self.alias_table} a_unrev ON a_unrev.{self.fk_col} = m.id AND a_unrev.auto_mapped = 1
+                GROUP BY m.id
+                ORDER BY m.canonical_display
+            """
+            cursor = await self.db.execute(query)
 
         items = []
         for row in await cursor.fetchall():
             item = dict(row)
-            # Get alias counts
-            alias_cursor = await self.db.execute(
-                f"SELECT COUNT(*) FROM {self.alias_table} WHERE {self.fk_col} = ?",
-                (item["id"],),
-            )
-            alias_count = (await alias_cursor.fetchone())[0]
-            item["alias_count"] = alias_count
-
-            # Get unreviewed count
-            alias_cursor = await self.db.execute(
-                f"SELECT COUNT(*) FROM {self.alias_table} WHERE {self.fk_col} = ? AND auto_mapped = 1",
-                (item["id"],),
-            )
-            unreviewed = (await alias_cursor.fetchone())[0]
-            item["unreviewed_count"] = unreviewed
-
-            if filter_unreviewed and unreviewed == 0:
+            if filter_unreviewed and item.get("unreviewed_count", 0) == 0:
                 continue
-
             items.append(item)
         return items
 

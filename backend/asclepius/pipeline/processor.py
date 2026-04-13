@@ -275,6 +275,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             )
             await db.commit()
 
+            # Cache per-page OCR text
+            try:
+                await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
+            except Exception:
+                logger.warning("Failed to cache OCR pages for doc %d (non-fatal)", doc_id)
+
             if not ocr_text.strip():
                 logger.warning("No text extracted from %s", path.name)
                 await db.execute(
@@ -314,9 +320,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             if await should_section(file_path):
                 logger.info("Large document (%s pages) — using page-level sectioning for doc %d", page_count, doc_id)
 
-                # Re-use already-extracted OCR text split by page separator
-                # instead of re-running OCR (which would redo all pages with LLM vision)
-                if engine in ("llm_vision",) and "\n\n" in ocr_text:
+                # Try loading from OCR page cache first
+                ocr_pages = await _load_cached_ocr_pages(db, doc_id)
+                if ocr_pages:
+                    logger.info("Loaded %d cached OCR pages for doc %d", len(ocr_pages), doc_id)
+                elif engine in ("llm_vision",) and "\n\n" in ocr_text:
                     # LLM vision joins pages with "\n\n", split them back
                     ocr_pages = ocr_text.split("\n\n")
                     logger.info("Re-using %d already-extracted OCR pages for doc %d", len(ocr_pages), doc_id)
@@ -468,11 +476,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             })
             pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
 
-            # Mark as failed if doc_id exists
+            # Mark as failed with error message
             try:
                 await db.execute(
-                    "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (doc_id,),
+                    """UPDATE documents SET status = 'failed', error_message = ?,
+                       retry_count = COALESCE(retry_count, 0) + 1,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (error_msg[:2000], doc_id),
                 )
                 await db.commit()
             except Exception:
@@ -483,6 +493,46 @@ async def process_file(file_path: str, config: AppConfig) -> None:
     pipeline_status["processing_doc_id"] = None
     pipeline_status["processing_pages"] = None
     pipeline_status["processing_page_current"] = None
+
+
+async def _cache_ocr_pages(
+    db: aiosqlite.Connection, doc_id: int, ocr_text: str, engine: str, confidence: float
+) -> None:
+    """Cache per-page OCR text for a document."""
+    if not ocr_text or not ocr_text.strip():
+        return
+
+    # Split by page separator (LLM vision uses \n\n)
+    if "\n\n" in ocr_text:
+        pages = ocr_text.split("\n\n")
+    else:
+        pages = [ocr_text]
+
+    # Clear old cache
+    await db.execute("DELETE FROM ocr_page_cache WHERE document_id = ?", (doc_id,))
+
+    for i, page_text in enumerate(pages, start=1):
+        if page_text.strip():
+            await db.execute(
+                """INSERT OR REPLACE INTO ocr_page_cache
+                   (document_id, page_number, ocr_text, ocr_engine, confidence)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (doc_id, i, page_text.strip(), engine, confidence),
+            )
+    await db.commit()
+    logger.debug("Cached %d OCR pages for doc %d", len(pages), doc_id)
+
+
+async def _load_cached_ocr_pages(db: aiosqlite.Connection, doc_id: int) -> list[str] | None:
+    """Load cached per-page OCR text. Returns None if no cache exists."""
+    cursor = await db.execute(
+        "SELECT ocr_text FROM ocr_page_cache WHERE document_id = ? ORDER BY page_number",
+        (doc_id,),
+    )
+    rows = await cursor.fetchall()
+    if not rows:
+        return None
+    return [row[0] for row in rows]
 
 
 async def _auto_assign_event(
@@ -683,7 +733,8 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
-                    "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    """UPDATE documents SET status = 'failed', error_message = 'File not found on disk',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
                     (doc_id,),
                 )
                 await db.commit()
@@ -691,7 +742,8 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
 
             logger.info("Re-running OCR on doc %d", doc_id)
             await db.execute(
-                "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                """UPDATE documents SET status = 'processing', error_message = NULL,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
                 (doc_id,),
             )
             await db.commit()
@@ -702,6 +754,11 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
                 (ocr_text, confidence, engine, doc_id),
             )
             await db.commit()
+            # Cache pages
+            try:
+                await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
+            except Exception:
+                pass
 
         if not ocr_text or not ocr_text.strip():
             await db.execute(
@@ -720,7 +777,8 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
         logger.info("Re-running LLM extraction on doc %d", doc_id)
         try:
             await db.execute(
-                "UPDATE documents SET status = 'processing', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                """UPDATE documents SET status = 'processing', error_message = NULL,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
                 (doc_id,),
             )
             await db.commit()
@@ -746,9 +804,12 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
 
         except Exception as e:
             logger.exception("Reprocessing failed for doc %d", doc_id)
+            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
             await db.execute(
-                "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (doc_id,),
+                """UPDATE documents SET status = 'failed', error_message = ?,
+                   retry_count = COALESCE(retry_count, 0) + 1,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (error_msg[:2000], doc_id),
             )
             await db.commit()
             return {"error": str(e)}

@@ -52,14 +52,27 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Session expired")
 
     cursor = await db.execute(
-        "SELECT id, username, display_name FROM users WHERE id = ?",
+        "SELECT id, username, display_name, role FROM users WHERE id = ?",
         (session_data["user_id"],),
     )
     user = await cursor.fetchone()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return {"id": user[0], "username": user[1], "display_name": user[2]}
+    return {"id": user[0], "username": user[1], "display_name": user[2], "role": user[3] or "editor"}
+
+
+def require_role(*allowed_roles: str):
+    """FastAPI dependency factory: require user to have one of the specified roles."""
+    async def _check(current_user: dict = Depends(get_current_user)):
+        user_role = current_user.get("role", "viewer")
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Requires role: {', '.join(allowed_roles)}. Your role: {user_role}",
+            )
+        return current_user
+    return _check
 
 
 async def ensure_admin_exists(db: aiosqlite.Connection) -> None:
@@ -68,7 +81,7 @@ async def ensure_admin_exists(db: aiosqlite.Connection) -> None:
     row = await cursor.fetchone()
     if row[0] == 0:
         await db.execute(
-            "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
-            ("admin", hash_password("admin"), "Administrator"),
+            "INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)",
+            ("admin", hash_password("admin"), "Administrator", "admin"),
         )
         await db.commit()

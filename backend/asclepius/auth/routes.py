@@ -1,6 +1,6 @@
 """Authentication API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 import aiosqlite
@@ -10,6 +10,7 @@ from asclepius.auth.session import (
     get_current_user,
     verify_password,
 )
+from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.db.connection import get_db
 
 router = APIRouter()
@@ -24,16 +25,18 @@ class UserResponse(BaseModel):
     id: int
     username: str
     display_name: str | None
+    role: str
 
 
 @router.post("/login")
 async def login(
     body: LoginRequest,
+    request: Request,
     response: Response,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     cursor = await db.execute(
-        "SELECT id, username, password_hash, display_name FROM users WHERE username = ?",
+        "SELECT id, username, password_hash, display_name, role FROM users WHERE username = ?",
         (body.username,),
     )
     user = await cursor.fetchone()
@@ -48,11 +51,30 @@ async def login(
         samesite="lax",
         path="/",
     )
-    return UserResponse(id=user[0], username=user[1], display_name=user[3])
+
+    # Audit log
+    await audit_log(db, user[0], "login", ip_address=get_client_ip(request))
+
+    return UserResponse(id=user[0], username=user[1], display_name=user[3], role=user[4] or "editor")
 
 
 @router.post("/logout")
-async def logout(response: Response):
+async def logout(
+    request: Request,
+    response: Response,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    # Try to get the current user for audit logging
+    try:
+        from asclepius.auth.session import validate_session_token
+        token = request.cookies.get(COOKIE_NAME)
+        if token:
+            session_data = validate_session_token(token)
+            if session_data:
+                await audit_log(db, session_data["user_id"], "logout", ip_address=get_client_ip(request))
+    except Exception:
+        pass
+
     response.delete_cookie(key=COOKIE_NAME, path="/")
     return {"ok": True}
 
@@ -74,4 +96,21 @@ async def me(
         {"id": row[0], "slug": row[1], "display_name": row[2], "role": row[3]}
         for row in await cursor.fetchall()
     ]
+
+    # Admins can see all patients
+    if current_user.get("role") == "admin":
+        cursor = await db.execute(
+            """SELECT p.id, p.slug, p.display_name, 'admin' as role
+               FROM patients p
+               WHERE p.id NOT IN (
+                   SELECT patient_id FROM user_patient_access WHERE user_id = ?
+               )""",
+            (current_user["id"],),
+        )
+        extra = [
+            {"id": row[0], "slug": row[1], "display_name": row[2], "role": row[3]}
+            for row in await cursor.fetchall()
+        ]
+        patients.extend(extra)
+
     return {**current_user, "patients": patients}

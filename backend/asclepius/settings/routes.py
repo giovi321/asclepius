@@ -4,11 +4,12 @@ import os
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 import aiosqlite
-from asclepius.auth.session import get_current_user, hash_password
+from asclepius.auth.session import get_current_user, hash_password, require_role
+from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.config import get_config, LlmProviderEntry, OcrProviderEntry
 from asclepius.db.connection import get_db
 
@@ -45,6 +46,46 @@ async def get_logs(
 
 
 # --- Backup ---
+
+@router.get("/audit-log")
+async def get_audit_log(
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    action: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    current_user: dict = Depends(require_role("admin")),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Get audit log entries (admin only)."""
+    conditions = []
+    params: list = []
+    if action:
+        conditions.append("a.action LIKE ?")
+        params.append(f"%{action}%")
+    if user_id is not None:
+        conditions.append("a.user_id = ?")
+        params.append(user_id)
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    cursor = await db.execute(
+        f"""SELECT a.*, u.username
+            FROM audit_log a
+            LEFT JOIN users u ON a.user_id = u.id
+            {where}
+            ORDER BY a.created_at DESC
+            LIMIT ? OFFSET ?""",
+        params + [limit, offset],
+    )
+    items = [dict(r) for r in await cursor.fetchall()]
+
+    count_cursor = await db.execute(
+        f"SELECT COUNT(*) FROM audit_log a {where}", params
+    )
+    total = (await count_cursor.fetchone())[0]
+
+    return {"items": items, "total": total}
+
 
 @router.get("/backup")
 async def download_backup(
@@ -251,7 +292,9 @@ _SETTINGS_MAP = {
 @router.patch("")
 async def update_settings(
     body: SettingsUpdate,
-    current_user: dict = Depends(get_current_user),
+    request: Request = None,
+    current_user: dict = Depends(require_role("admin")),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Update settings: persists to YAML and updates in-memory config."""
     config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
@@ -288,6 +331,10 @@ async def update_settings(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
 
+    # Audit log
+    ip = get_client_ip(request) if request else None
+    await audit_log(db, current_user["id"], "settings.update", "settings", details={"changed_keys": list(changes.keys())}, ip_address=ip)
+
     return {"status": "saved", "changes": changes}
 
 
@@ -313,7 +360,7 @@ async def get_llm_providers(current_user: dict = Depends(get_current_user)):
 @router.put("/llm-providers")
 async def update_llm_providers(
     providers: list[dict],
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
     """Replace the full list of LLM providers. API keys sent as empty string are preserved."""
     config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
@@ -372,7 +419,7 @@ async def get_ocr_providers(current_user: dict = Depends(get_current_user)):
 @router.put("/ocr-providers")
 async def update_ocr_providers(
     providers: list[dict],
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
     """Replace the full list of OCR providers."""
     config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
@@ -413,11 +460,13 @@ class UserCreate(BaseModel):
     username: str
     password: str
     display_name: str | None = None
+    role: str = "editor"  # 'admin', 'editor', 'viewer'
 
 
 class UserUpdate(BaseModel):
     display_name: str | None = None
     password: str | None = None
+    role: str | None = None  # 'admin', 'editor', 'viewer'
 
 
 class PatientAccessGrant(BaseModel):
@@ -427,11 +476,11 @@ class PatientAccessGrant(BaseModel):
 
 @router.get("/users")
 async def list_users(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     cursor = await db.execute(
-        "SELECT id, username, display_name, created_at FROM users ORDER BY username"
+        "SELECT id, username, display_name, role, created_at FROM users ORDER BY username"
     )
     return [dict(r) for r in await cursor.fetchall()]
 
@@ -439,16 +488,20 @@ async def list_users(
 @router.post("/users", status_code=201)
 async def create_user(
     body: UserCreate,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     try:
+        role = getattr(body, "role", "editor") or "editor"
         cursor = await db.execute(
-            "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
-            (body.username, hash_password(body.password), body.display_name or body.username),
+            "INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)",
+            (body.username, hash_password(body.password), body.display_name or body.username, role),
         )
         await db.commit()
-        return {"id": cursor.lastrowid, "username": body.username}
+        await audit_log(db, current_user["id"], "user.create", "user", cursor.lastrowid,
+                        {"username": body.username, "role": role}, get_client_ip(request))
+        return {"id": cursor.lastrowid, "username": body.username, "role": role}
     except aiosqlite.IntegrityError:
         raise HTTPException(status_code=409, detail="Username already exists")
 
@@ -457,7 +510,8 @@ async def create_user(
 async def update_user(
     user_id: int,
     body: UserUpdate,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     updates = {}
@@ -465,6 +519,10 @@ async def update_user(
         updates["display_name"] = body.display_name
     if body.password is not None:
         updates["password_hash"] = hash_password(body.password)
+    if body.role is not None:
+        if body.role not in ("admin", "editor", "viewer"):
+            raise HTTPException(status_code=400, detail="Role must be admin, editor, or viewer")
+        updates["role"] = body.role
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -473,21 +531,31 @@ async def update_user(
     values = list(updates.values()) + [user_id]
     await db.execute(f"UPDATE users SET {set_clause} WHERE id = ?", values)
     await db.commit()
+    await audit_log(db, current_user["id"], "user.update", "user", user_id,
+                    {"changed": list(updates.keys())}, get_client_ip(request))
     return {"ok": True}
 
 
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     if user_id == current_user["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
+    # Get username for audit log
+    cursor = await db.execute("SELECT username FROM users WHERE id = ?", (user_id,))
+    user_row = await cursor.fetchone()
+    username = user_row[0] if user_row else "unknown"
+
     await db.execute("DELETE FROM user_patient_access WHERE user_id = ?", (user_id,))
     await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
     await db.commit()
+    await audit_log(db, current_user["id"], "user.delete", "user", user_id,
+                    {"username": username}, get_client_ip(request))
     return {"ok": True}
 
 
@@ -511,7 +579,8 @@ async def get_user_access(
 async def grant_access(
     user_id: int,
     body: PatientAccessGrant,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     try:
@@ -520,6 +589,8 @@ async def grant_access(
             (user_id, body.patient_id, body.role),
         )
         await db.commit()
+        await audit_log(db, current_user["id"], "access.grant", "user", user_id,
+                        {"patient_id": body.patient_id, "role": body.role}, get_client_ip(request))
         return {"ok": True}
     except aiosqlite.IntegrityError:
         raise HTTPException(status_code=400, detail="Invalid user or patient ID")
@@ -529,7 +600,8 @@ async def grant_access(
 async def revoke_access(
     user_id: int,
     patient_id: int,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     await db.execute(
@@ -537,4 +609,6 @@ async def revoke_access(
         (user_id, patient_id),
     )
     await db.commit()
+    await audit_log(db, current_user["id"], "access.revoke", "user", user_id,
+                    {"patient_id": patient_id}, get_client_ip(request))
     return {"ok": True}

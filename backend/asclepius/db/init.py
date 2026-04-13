@@ -48,6 +48,56 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.commit()
         logger.info("Migration: added process_at column to documents")
 
+    # Add error_message and retry_count to documents
+    if "error_message" not in columns:
+        await db.execute("ALTER TABLE documents ADD COLUMN error_message TEXT")
+        await db.execute("ALTER TABLE documents ADD COLUMN retry_count INTEGER DEFAULT 0")
+        await db.commit()
+        logger.info("Migration: added error_message/retry_count to documents")
+
+    # Add role column to users
+    cursor = await db.execute("PRAGMA table_info(users)")
+    user_columns = [row[1] for row in await cursor.fetchall()]
+    if "role" not in user_columns:
+        await db.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'editor'")
+        # Make the first user (id=1) an admin
+        await db.execute("UPDATE users SET role = 'admin' WHERE id = 1")
+        await db.commit()
+        logger.info("Migration: added role column to users, first user set to admin")
+
+    # Create audit_log table
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id INTEGER,
+            details TEXT,
+            ip_address TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at)")
+
+    # Create ocr_page_cache table
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS ocr_page_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            page_number INTEGER NOT NULL,
+            ocr_text TEXT NOT NULL,
+            ocr_engine TEXT,
+            confidence REAL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(document_id, page_number)
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id)")
+    await db.commit()
+
 
 async def _seed_normalization_tables(db: aiosqlite.Connection) -> None:
     """Load seed data from JSON files into normalization tables."""

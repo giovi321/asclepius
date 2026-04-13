@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     display_name TEXT,
+    role TEXT NOT NULL DEFAULT 'editor',  -- 'admin', 'editor', 'viewer'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -95,6 +96,8 @@ CREATE TABLE IF NOT EXISTS documents (
     cost_amount REAL,
     cost_currency TEXT,
     status TEXT NOT NULL DEFAULT 'pending',
+    error_message TEXT,  -- stores failure reason when status='failed'
+    retry_count INTEGER DEFAULT 0,
     process_at DATETIME,  -- null = process immediately, set = process after this time
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -387,6 +390,36 @@ CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
     INSERT INTO documents_fts(rowid, ocr_text, raw_extraction)
     VALUES (new.id, new.ocr_text, new.raw_extraction);
 END;
+
+-- Audit log (tracks user actions for compliance and debugging)
+CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id),
+    action TEXT NOT NULL,  -- 'login', 'logout', 'document.create', 'document.update', 'document.delete', 'document.reprocess', 'document.download', 'patient.create', 'patient.update', 'patient.delete', 'settings.update', 'user.create', 'user.update', 'user.delete', 'access.grant', 'access.revoke'
+    resource_type TEXT,  -- 'document', 'patient', 'user', 'settings', etc.
+    resource_id INTEGER,
+    details TEXT,  -- JSON string with additional context
+    ip_address TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
+-- Per-page OCR text cache (avoids re-processing on reprocess/sectioning)
+CREATE TABLE IF NOT EXISTS ocr_page_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    page_number INTEGER NOT NULL,  -- 1-indexed
+    ocr_text TEXT NOT NULL,
+    ocr_engine TEXT,
+    confidence REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(document_id, page_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_documents_patient_id ON documents(patient_id);

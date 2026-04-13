@@ -119,9 +119,12 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
               </button>
 
               {/* "All pages" rotate — click-to-toggle dropdown */}
-              <div className="relative">
+              <div className="relative"
+                onMouseLeave={() => setShowAllMenu(false)}
+              >
                 <button
                   onClick={() => setShowAllMenu(!showAllMenu)}
+                  onMouseEnter={() => setShowAllMenu(true)}
                   disabled={rotating}
                   className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                   title="Rotate all pages"
@@ -129,10 +132,8 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
                   All
                 </button>
                 {showAllMenu && (
-                  <>
-                    {/* Invisible backdrop to close menu on outside click */}
-                    <div className="fixed inset-0 z-10" onClick={() => setShowAllMenu(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-20 rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl flex gap-1">
+                  <div className="absolute right-0 top-full pt-1 z-20">
+                    <div className="rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl flex gap-1">
                       <button
                         onClick={() => handleRotate(270, "all")}
                         disabled={rotating}
@@ -148,7 +149,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
                         <RotateCw className="h-3.5 w-3.5" /> All 90° right
                       </button>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </>

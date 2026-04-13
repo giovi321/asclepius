@@ -39,20 +39,24 @@ export default function DocumentDetailPage() {
 
   const [aiInstruction, setAiInstruction] = useState("");
   const [aiEditing, setAiEditing] = useState(false);
-  // Rotation is handled inside PdfViewer via onRotate callback
+
+  // Lightweight doc update — merges new fields without full reload (preserves scroll)
+  const updateDocFields = (updated?: any) => {
+    if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
+  };
 
   const handleReprocess = async () => {
     await api.post(`/documents/${id}/reprocess`);
-    await loadDoc();
+    await loadDoc(false);
   };
 
   const handleAiEdit = async () => {
     if (!aiInstruction.trim()) return;
     setAiEditing(true);
     try {
-      await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
+      const res = await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
       setAiInstruction("");
-      await loadDoc();
+      await loadDoc(false);
     } catch (e: any) {
       alert("AI edit failed: " + (e.response?.data?.detail || e.message));
     } finally {
@@ -129,35 +133,39 @@ export default function DocumentDetailPage() {
     }
   };
 
+  // IDs of documents already linked (both directions)
+  const alreadyLinkedIds = new Set(
+    linkedDocs.flatMap((l: any) => [l.source_document_id, l.target_document_id])
+  );
+  alreadyLinkedIds.add(Number(id)); // exclude self
+
+  const filterLinked = (docs: any[]) =>
+    docs.filter((d: any) => !alreadyLinkedIds.has(d.id));
+
   const handleSearchLink = async () => {
     if (!linkSearch.trim()) {
-      // Show all documents if search is empty
       try {
-        const res = await api.get("/documents", { params: { limit: 20 } });
-        setLinkResults((res.data.items || []).filter((d: any) => d.id !== Number(id)));
+        const res = await api.get("/documents", { params: { limit: 30 } });
+        setLinkResults(filterLinked(res.data.items || []));
       } catch { setLinkResults([]); }
       return;
     }
     try {
-      // Try FTS search first
-      const res = await api.get("/documents", { params: { q: linkSearch, limit: 20 } });
-      let results = (res.data.items || []).filter((d: any) => d.id !== Number(id));
+      const res = await api.get("/documents", { params: { q: linkSearch, limit: 30 } });
+      let results = filterLinked(res.data.items || []);
 
-      // If FTS returns nothing, fallback to fetching all and filtering client-side
       if (results.length === 0) {
         const allRes = await api.get("/documents", { params: { limit: 100 } });
         const all = allRes.data.items || [];
         const term = linkSearch.toLowerCase();
-        results = all.filter((d: any) =>
-          d.id !== Number(id) && (
-            d.original_filename?.toLowerCase().includes(term) ||
-            d.doc_type?.toLowerCase().includes(term) ||
-            d.doctor_name?.toLowerCase().includes(term) ||
-            d.facility_name?.toLowerCase().includes(term) ||
-            d.summary_en?.toLowerCase().includes(term) ||
-            d.patient_name?.toLowerCase().includes(term)
-          )
-        ).slice(0, 20);
+        results = filterLinked(all.filter((d: any) =>
+          d.original_filename?.toLowerCase().includes(term) ||
+          d.doc_type?.toLowerCase().includes(term) ||
+          d.doctor_name?.toLowerCase().includes(term) ||
+          d.facility_name?.toLowerCase().includes(term) ||
+          d.summary_en?.toLowerCase().includes(term) ||
+          d.patient_name?.toLowerCase().includes(term)
+        )).slice(0, 20);
       }
 
       setLinkResults(results);
@@ -168,11 +176,16 @@ export default function DocumentDetailPage() {
 
   const handleLinkDocument = async (targetId: number) => {
     try {
-      await api.post(`/documents/${id}/link`, { target_document_id: targetId, link_type: linkType });
-      await loadDoc();
-      setShowLinkSearch(false);
-      setLinkSearch("");
-      setLinkResults([]);
+      const res = await api.post(`/documents/${id}/link`, { target_document_id: targetId, link_type: linkType });
+      // Update linked docs locally — no full page reload
+      const linked = linkResults.find((d: any) => d.id === targetId);
+      setLinkedDocs((prev) => [...prev, {
+        ...res.data,
+        target_filename: linked?.original_filename,
+        target_doc_type: linked?.doc_type,
+      }]);
+      // Remove from search results so it can't be linked again
+      setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
     } catch {
       alert("Failed to link document");
     }
@@ -289,20 +302,22 @@ export default function DocumentDetailPage() {
         <div className="space-y-4">
           <Section title="Document Info">
             <InfoRow label="Status" value={doc.status} />
-            <EditableField label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={loadDoc} />
-            <EditableField label="Summary" value={doc.summary_en} field="summary_en" docId={doc.id} onSave={loadDoc} multiline />
+            <EditableField label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Summary" value={doc.summary_en} field="summary_en" docId={doc.id} onSave={updateDocFields} multiline />
             <InfoRow label="Language" value={doc.language_source} />
             <InfoRow label="OCR Engine" value={doc.ocr_engine} />
             <InfoRow label="OCR Confidence" value={doc.ocr_confidence?.toFixed(2)} />
           </Section>
 
           {/* Medical Event */}
-          <EventSelector docId={doc.id} patientId={doc.patient_id} currentEventId={doc.event_id} onUpdate={loadDoc} />
+          <EventSelector docId={doc.id} patientId={doc.patient_id} currentEventId={doc.event_id} onUpdate={(eventId) => {
+            setDoc((prev: any) => ({ ...prev, event_id: eventId }));
+          }} />
 
           {/* Lab Results */}
           {doc.lab_results?.length > 0 && (
@@ -504,19 +519,37 @@ export default function DocumentDetailPage() {
           <Section title="Linked Documents" icon={Link2}>
             {linkedDocs.length > 0 ? (
               <div className="space-y-2">
-                {linkedDocs.map((link: any) => (
-                  <div key={link.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                    <a
-                      href={`/documents/${link.target_document_id || link.linked_document_id}`}
-                      className="text-primary hover:underline truncate flex-1"
-                    >
-                      {link.target_filename || link.linked_filename || `Document #${link.target_document_id || link.linked_document_id}`}
-                    </a>
-                    <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {link.link_type || "related"}
-                    </span>
-                  </div>
-                ))}
+                {linkedDocs.map((link: any) => {
+                  const linkedId = link.source_document_id === Number(id) ? link.target_document_id : link.source_document_id;
+                  const linkedName = link.source_document_id === Number(id)
+                    ? (link.target_filename || `Document #${link.target_document_id}`)
+                    : (link.source_filename || `Document #${link.source_document_id}`);
+                  return (
+                    <div key={link.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                      <a
+                        href={`/documents/${linkedId}`}
+                        className="text-primary hover:underline truncate flex-1"
+                      >
+                        {linkedName}
+                      </a>
+                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {link.link_type || "related"}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.delete(`/documents/${id}/links/${link.id}`);
+                            setLinkedDocs((prev) => prev.filter((l: any) => l.id !== link.id));
+                          } catch { alert("Failed to remove link"); }
+                        }}
+                        className="ml-2 rounded p-1 text-muted-foreground hover:text-destructive"
+                        title="Remove link"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No linked documents</p>
@@ -529,7 +562,9 @@ export default function DocumentDetailPage() {
                 >
                   <Plus className="h-3 w-3" /> Link manually
                 </button>
-                <SuggestLinksButton docId={doc.id} onLink={loadDoc} />
+                <SuggestLinksButton docId={doc.id} onLink={(newLink) => {
+                  if (newLink) setLinkedDocs((prev) => [...prev, newLink]);
+                }} />
               </div>
             ) : (
               <div className="mt-2 space-y-2 rounded-md border p-3">
@@ -572,7 +607,7 @@ export default function DocumentDetailPage() {
                 </div>
                 {linkResults.length > 0 && (
                   <div className="max-h-60 overflow-y-auto divide-y rounded-md border">
-                    {linkResults.filter((d: any) => d.id !== doc.id).map((d: any) => (
+                    {linkResults.filter((d: any) => !alreadyLinkedIds.has(d.id)).map((d: any) => (
                       <div key={d.id} className="group relative">
                         <button
                           onClick={() => handleLinkDocument(d.id)}
@@ -694,7 +729,7 @@ function OcrSection({ text }: { text: string | null }) {
   );
 }
 
-function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => void }) {
+function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: (newLink?: any) => void }) {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[] | null>(null);
 
@@ -712,9 +747,14 @@ function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => vo
 
   const handleAccept = async (targetId: number, linkType: string) => {
     try {
-      await api.post(`/documents/${docId}/link`, { target_document_id: targetId, link_type: linkType });
+      const res = await api.post(`/documents/${docId}/link`, { target_document_id: targetId, link_type: linkType });
       setSuggestions((s) => s?.filter((sg) => sg.document_id !== targetId) || null);
-      onLink();
+      const sg = suggestions?.find((s) => s.document_id === targetId);
+      onLink({
+        ...res.data,
+        target_filename: sg?.filename,
+        target_doc_type: sg?.doc_type,
+      });
     } catch {
       alert("Failed to link");
     }
@@ -790,7 +830,7 @@ function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: () => vo
 }
 
 function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
-  docId: number; patientId: number | null; currentEventId: number | null; onUpdate: () => void;
+  docId: number; patientId: number | null; currentEventId: number | null; onUpdate: (eventId: number) => void;
 }) {
   const [events, setEvents] = useState<any[]>([]);
   const [suggesting, setSuggesting] = useState(false);
@@ -805,7 +845,7 @@ function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
 
   const handleAssign = async (eventId: number) => {
     await api.post(`/events/${eventId}/link`, { document_id: docId });
-    onUpdate();
+    onUpdate(eventId);
   };
 
   const handleSuggest = async () => {
@@ -829,7 +869,7 @@ function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
     });
     await api.post(`/events/${res.data.id}/link`, { document_id: docId });
     setSuggestion(null);
-    onUpdate();
+    onUpdate(res.data.id);
     // Reload events list
     api.get("/events", { params: { patient_id: patientId } })
       .then((r) => setEvents(r.data || []));
@@ -898,7 +938,7 @@ function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
 }
 
 function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false }: {
-  label: string; value: any; field: string; docId: number; onSave: () => void;
+  label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
   type?: string; multiline?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -908,9 +948,10 @@ function EditableField({ label, value, field, docId, onSave, type = "text", mult
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.patch(`/documents/${docId}`, { [field]: val || null });
+      const res = await api.patch(`/documents/${docId}`, { [field]: val || null });
       setEditing(false);
-      onSave();
+      // Pass updated doc back so parent can update state without full reload
+      onSave(res.data);
     } catch { alert("Failed to save"); }
     setSaving(false);
   };

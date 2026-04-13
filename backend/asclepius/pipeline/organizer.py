@@ -18,10 +18,12 @@ def build_organized_path(
     doc_type: str | None,
     original_filename: str,
     event_slug: str | None = None,
+    summary_slug: str | None = None,
 ) -> str:
     """Build the organized file path.
 
-    Format: patients/{slug}/{YYYY}/{event-slug}/{YYYYMMDD}_{provider}_{doctype}.{ext}
+    Format: patients/{slug}/{YYYY}/{event-slug}/{YYYYMMDD}_{summary_slug}.{ext}
+    Falls back to doc_type if no summary_slug is provided.
     Date is compact format (20251231). If no event, the event-slug folder is omitted.
     If no patient, goes to unclassified/
     """
@@ -29,10 +31,15 @@ def build_organized_path(
     year = doc_date[:4] if doc_date else "unknown"
     # Compact date: 2025-12-31 → 20251231
     date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
-    provider = provider_slug or "unknown"
-    dtype = doc_type or "other"
 
-    filename = f"{date_prefix}_{provider}_{dtype}{ext}"
+    name_part = summary_slug or doc_type or "document"
+    # Ensure max 60 chars, lowercase, alphanumeric + hyphens only
+    name_part = name_part.lower()
+    name_part = re.sub(r"[^a-z0-9]+", "-", name_part)
+    name_part = re.sub(r"-+", "-", name_part).strip("-")
+    name_part = name_part[:60]
+
+    filename = f"{date_prefix}_{name_part}{ext}"
     # Sanitize
     filename = re.sub(r"[^\w\-.]", "-", filename)
     filename = re.sub(r"-+", "-", filename)

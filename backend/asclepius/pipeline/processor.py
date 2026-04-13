@@ -411,7 +411,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # Get document metadata for file organization
             cursor = await db.execute(
                 """SELECT d.patient_id, d.doc_type, d.doc_date, d.doctor_id, d.facility_id,
-                          d.event_id,
+                          d.event_id, d.summary_en,
                           p.slug as patient_slug,
                           doc.slug as doctor_slug,
                           f.slug as facility_slug,
@@ -429,11 +429,18 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # Use facility slug for path organization, fall back to doctor slug
             provider_slug = None
             event_slug = None
+            summary_slug = None
             if doc:
                 provider_slug = doc["facility_slug"] or doc["doctor_slug"]
                 if doc["event_title"]:
                     from asclepius.pipeline.organizer import slugify_event
                     event_slug = slugify_event(doc["event_title"])
+                # Generate a summary slug from summary_en
+                if doc["summary_en"]:
+                    import re as _re
+                    summary_slug = doc["summary_en"][:60].lower()
+                    summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
+                    summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
 
             # Organize file
             dest_path = build_organized_path(
@@ -444,15 +451,17 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 doc["doc_type"] if doc else None,
                 path.name,
                 event_slug=event_slug,
+                summary_slug=summary_slug,
             )
             final_path = move_file(config, file_path, dest_path)
 
-            # Update document with final path and status
+            # Update document with final path, new filename, and status
+            new_filename = Path(final_path).name
             await db.execute(
                 """UPDATE documents SET
-                   file_path = ?, status = 'done', updated_at = CURRENT_TIMESTAMP
+                   file_path = ?, original_filename = ?, status = 'done', updated_at = CURRENT_TIMESTAMP
                    WHERE id = ?""",
-                (final_path, doc_id),
+                (final_path, new_filename, doc_id),
             )
             await db.commit()
 

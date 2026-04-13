@@ -1,7 +1,9 @@
 """Document API routes."""
 
 import json
+import logging
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -16,6 +18,8 @@ from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.documents.service import get_document, list_documents
 from asclepius.patients.service import check_patient_access
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -155,6 +159,12 @@ class DocumentUpdate(BaseModel):
     event_id: int | None = None
     notes: str | None = None
     tags: str | None = None
+    original_filename: str | None = None
+    user_notes: str | None = None
+
+
+class RenameRequest(BaseModel):
+    filename: str
 
 
 class DocumentMoveRequest(BaseModel):
@@ -506,10 +516,19 @@ async def move_doc(
                 from asclepius.pipeline.organizer import slugify_event
                 event_slug = slugify_event(ev_row[0])
 
+        # Generate summary slug for filename
+        summary_slug = None
+        if doc.get("summary_en"):
+            _summary = doc["summary_en"][:60].lower()
+            _summary = re.sub(r"[^a-z0-9]+", "-", _summary)
+            _summary = re.sub(r"-+", "-", _summary).strip("-")
+            summary_slug = _summary
+
         new_relative = build_organized_path(
             config, target_slug, doc.get("doc_date"), provider_slug,
             doc.get("doc_type"), doc["original_filename"],
             event_slug=event_slug,
+            summary_slug=summary_slug,
         )
         new_dest = vault_root / new_relative
         new_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -982,6 +1001,154 @@ async def rotate_document(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to rotate PDF: {str(e)}")
+
+
+@router.post("/{doc_id}/rename")
+async def rename_document(
+    doc_id: int,
+    body: RenameRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Rename a document's file on disk and in the database."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    new_name = body.filename.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Filename cannot be empty")
+
+    # Ensure the extension is preserved
+    old_ext = Path(doc["original_filename"]).suffix.lower()
+    new_ext = Path(new_name).suffix.lower()
+    if not new_ext:
+        new_name += old_ext
+    elif new_ext != old_ext:
+        raise HTTPException(status_code=400, detail=f"Cannot change file extension from {old_ext} to {new_ext}")
+
+    # Sanitize filename
+    stem = Path(new_name).stem
+    ext = Path(new_name).suffix
+    stem = re.sub(r'[^\w\-. ]', '-', stem)
+    stem = re.sub(r'-+', '-', stem).strip('-')
+    new_name = f"{stem}{ext}"
+
+    # Rename file on disk if it exists
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+    old_path = vault_root / doc["file_path"]
+
+    if old_path.exists():
+        new_path = old_path.parent / new_name
+        if new_path.exists() and new_path != old_path:
+            raise HTTPException(status_code=409, detail="A file with that name already exists")
+        old_path.rename(new_path)
+        new_file_path = str(new_path.relative_to(vault_root))
+    else:
+        new_file_path = doc["file_path"]
+
+    await db.execute(
+        "UPDATE documents SET original_filename = ?, file_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_name, new_file_path, doc_id),
+    )
+    await db.commit()
+    return await get_document(db, doc_id)
+
+
+@router.get("/{doc_id}/relevant")
+async def get_relevant_documents(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Get AI-suggested relevant documents. Returns cached results if available."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.get("patient_id"):
+        return {"suggestions": []}
+
+    # Check access
+    role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+    if not role:
+        raise HTTPException(status_code=403, detail="No access")
+
+    # Get existing links to exclude
+    existing_links = await _get_document_links(db, doc_id)
+    linked_ids = set()
+    for link in existing_links:
+        linked_ids.add(link["source_document_id"])
+        linked_ids.add(link["target_document_id"])
+
+    # Get all other documents for the same patient
+    cursor = await db.execute(
+        """SELECT d.id, d.doc_type, d.doc_date, d.summary_en, d.original_filename,
+                  doc.name as doctor_name, f.name as facility_name
+           FROM documents d
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
+           WHERE d.patient_id = ? AND d.id != ? AND d.status = 'done'
+           ORDER BY d.doc_date DESC
+           LIMIT 50""",
+        (doc["patient_id"], doc_id),
+    )
+    rows = await cursor.fetchall()
+    other_docs = [dict(r) for r in rows if r["id"] not in linked_ids]
+
+    if not other_docs:
+        return {"suggestions": []}
+
+    other_docs_text = "\n".join(
+        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('doc_date', 'unknown')}, "
+        f"Doctor: {d.get('doctor_name', 'unknown')}, Facility: {d.get('facility_name', 'unknown')}, "
+        f"Summary: {d.get('summary_en', 'N/A')}"
+        for d in other_docs
+    )
+
+    from asclepius.llm.prompts import LINK_SUGGESTION_PROMPT
+    from asclepius.pipeline.processor import get_llm_provider
+
+    config = get_config()
+    llm = get_llm_provider(config)
+
+    prompt = LINK_SUGGESTION_PROMPT.format(
+        doc_id=doc_id,
+        doc_type=doc.get("doc_type", "unknown"),
+        doc_date=doc.get("doc_date", "unknown"),
+        doctor_name=doc.get("doctor_name", "unknown"),
+        facility_name=doc.get("facility_name", "unknown"),
+        summary=doc.get("summary_en", "N/A"),
+        other_documents=other_docs_text,
+    )
+
+    try:
+        if hasattr(llm, "_generate"):
+            response_text = await llm._generate(prompt)
+            result = llm._parse_json(response_text)
+        else:
+            return {"suggestions": []}
+
+        suggestions = result.get("suggestions", [])
+        valid_ids = {d["id"] for d in other_docs}
+        suggestions = [s for s in suggestions if s.get("document_id") in valid_ids]
+
+        # Enrich with doc metadata
+        docs_by_id = {d["id"]: d for d in other_docs}
+        for s in suggestions:
+            d = docs_by_id.get(s["document_id"], {})
+            s["filename"] = d.get("original_filename")
+            s["doc_type"] = d.get("doc_type")
+            s["doc_date"] = d.get("doc_date")
+            s["doctor_name"] = d.get("doctor_name")
+            s["facility_name"] = d.get("facility_name")
+            s["summary_en"] = d.get("summary_en")
+
+        return {"suggestions": suggestions}
+    except Exception as e:
+        logger.exception("Failed to get relevant documents for doc %d", doc_id)
+        return {"suggestions": []}
 
 
 async def _get_document_links(db: aiosqlite.Connection, doc_id: int) -> list[dict]:

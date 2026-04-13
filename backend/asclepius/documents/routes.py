@@ -949,8 +949,21 @@ async def rotate_document(
             page = pdf[page_idx]
             page.set_rotation((page.rotation + body.degrees) % 360)
 
-        pdf.save(str(file_path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
-        pdf.close()
+        # Full rewrite (not incremental) to ensure rotation is properly persisted
+        # Save to temp file then replace, to avoid corruption on failure
+        import tempfile, shutil
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pdf", dir=str(file_path.parent))
+        try:
+            import os
+            os.close(tmp_fd)
+            pdf.save(tmp_path, garbage=3, deflate=True)
+            pdf.close()
+            shutil.move(tmp_path, str(file_path))
+        except Exception:
+            pdf.close()
+            if Path(tmp_path).exists():
+                Path(tmp_path).unlink()
+            raise
 
         rotated_desc = (
             f"pages {body.pages}" if body.pages

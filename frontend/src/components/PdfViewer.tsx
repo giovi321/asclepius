@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
@@ -22,23 +22,37 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
 
-  // Store PDF binary data directly — bypasses all URL/browser/pdfjs caching
-  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
+  // Store PDF as Uint8Array + a version key to force react-pdf to re-mount
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [pdfVersion, setPdfVersion] = useState(0);
   const [loadingPdf, setLoadingPdf] = useState(true);
+  const fetchIdRef = useRef(0); // prevent stale fetches
 
   const fetchPdf = useCallback(async () => {
+    const thisId = ++fetchIdRef.current;
     setLoadingPdf(true);
     setError(null);
     try {
-      const resp = await fetch(url, { cache: "no-store" });
+      const resp = await fetch(url, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const buf = await resp.arrayBuffer();
-      setPdfData(buf.slice(0)); // copy to detach from response
+      // Only apply if this is still the latest fetch
+      if (thisId === fetchIdRef.current) {
+        setPdfData(new Uint8Array(buf));
+        setPdfVersion((v) => v + 1); // change key to force Document remount
+      }
     } catch (e) {
       console.error("Failed to fetch PDF:", e);
-      setError("Failed to load PDF");
+      if (thisId === fetchIdRef.current) {
+        setError("Failed to load PDF");
+      }
     }
-    setLoadingPdf(false);
+    if (thisId === fetchIdRef.current) {
+      setLoadingPdf(false);
+    }
   }, [url]);
 
   // Initial load
@@ -188,6 +202,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
           <div className="text-muted-foreground text-sm py-8">Loading PDF...</div>
         ) : pdfData ? (
           <Document
+            key={pdfVersion}
             file={{ data: pdfData }}
             onLoadSuccess={onDocumentLoadSuccess}
             onLoadError={onDocumentLoadError}

@@ -18,6 +18,9 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
+  const [userZoomed, setUserZoomed] = useState(false);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
@@ -59,6 +62,19 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   useEffect(() => {
     fetchPdf();
   }, [fetchPdf]);
+
+  // Measure container width for fit-to-width mode
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width - 32); // subtract padding
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -116,22 +132,31 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
         <div className="flex items-center gap-1">
           {/* Zoom */}
           <button
-            onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
+            onClick={() => { setScale((s) => Math.max(0.5, s - 0.2)); setUserZoomed(true); }}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom out"
           >
             <ZoomOut className="h-4 w-4" />
           </button>
           <span className="text-sm text-muted-foreground min-w-[40px] text-center">
-            {Math.round(scale * 100)}%
+            {userZoomed ? `${Math.round(scale * 100)}%` : "Fit"}
           </span>
           <button
-            onClick={() => setScale((s) => Math.min(3.0, s + 0.2))}
+            onClick={() => { setScale((s) => Math.min(3.0, s + 0.2)); setUserZoomed(true); }}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
           </button>
+          {userZoomed && (
+            <button
+              onClick={() => { setUserZoomed(false); setScale(1.0); }}
+              className="rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              title="Fit to width"
+            >
+              Fit
+            </button>
+          )}
 
           {/* Rotate controls */}
           {onRotate && (
@@ -195,7 +220,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       </div>
 
       {/* PDF display */}
-      <div className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
+      <div ref={containerRef} className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
         {error ? (
           <div className="text-destructive text-sm py-8">{error}</div>
         ) : loadingPdf ? (
@@ -212,7 +237,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
           >
             <Page
               pageNumber={pageNumber}
-              scale={scale}
+              {...(userZoomed ? { scale } : containerWidth ? { width: containerWidth } : { scale: 1.0 })}
               renderTextLayer={true}
               renderAnnotationLayer={true}
             />

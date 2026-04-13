@@ -1067,16 +1067,31 @@ async def generate_filename(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Build filename from metadata: YYYYMMDD_summary-slug.ext
     ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
     doc_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or ""
     date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
 
-    summary = doc.get("summary_en") or doc.get("doc_type") or "document"
-    # Slugify summary
-    slug = summary[:60].lower()
-    slug = re.sub(r"[^a-z0-9]+", "-", slug)
-    slug = re.sub(r"-+", "-", slug).strip("-")
+    # Use LLM to generate a concise, descriptive name
+    from asclepius.pipeline.organizer import generate_ai_filename
+    from asclepius.pipeline.processor import get_llm_provider
+
+    config = get_config()
+    llm = get_llm_provider(config)
+
+    doc_meta = {
+        "doc_type": doc.get("doc_type"),
+        "doc_date": doc_date,
+        "doctor_name": doc.get("doctor_name"),
+        "facility_name": doc.get("facility_name"),
+        "summary_en": doc.get("summary_en"),
+    }
+
+    slug = await generate_ai_filename(llm, doc_meta)
+
+    # Fallback if LLM fails
+    if not slug:
+        fallback = doc.get("doc_type") or "document"
+        slug = re.sub(r"[^a-z0-9]+", "-", fallback.lower()).strip("-")
 
     suggested = f"{date_prefix}_{slug}{ext}"
     return {"suggested_filename": suggested}

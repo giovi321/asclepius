@@ -435,8 +435,21 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 if doc["event_title"]:
                     from asclepius.pipeline.organizer import slugify_event
                     event_slug = slugify_event(doc["event_title"])
-                # Generate a summary slug from summary_en
-                if doc["summary_en"]:
+                # Generate AI filename
+                from asclepius.pipeline.organizer import generate_ai_filename
+                try:
+                    doc_meta = {
+                        "doc_type": doc["doc_type"],
+                        "doc_date": doc["doc_date"],
+                        "doctor_name": doc["doctor_slug"],
+                        "facility_name": doc["facility_slug"],
+                        "summary_en": doc["summary_en"],
+                    }
+                    summary_slug = await generate_ai_filename(llm, doc_meta)
+                except Exception:
+                    logger.warning("AI filename generation failed for doc %d, using summary fallback", doc_id)
+                # Fallback to summary slug if AI failed
+                if not summary_slug and doc["summary_en"]:
                     import re as _re
                     summary_slug = doc["summary_en"][:60].lower()
                     summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)

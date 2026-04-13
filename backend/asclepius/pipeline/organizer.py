@@ -10,6 +10,40 @@ from asclepius.config import AppConfig
 logger = logging.getLogger(__name__)
 
 
+async def generate_ai_filename(llm, doc_metadata: dict) -> str | None:
+    """Use LLM to generate a concise, descriptive filename stem.
+
+    Returns the slug (e.g. 'knee-mri-report') or None on failure.
+    """
+    from asclepius.llm.prompts import FILENAME_GENERATION_PROMPT
+
+    prompt = FILENAME_GENERATION_PROMPT.format(
+        doc_type=doc_metadata.get("doc_type") or "unknown",
+        doc_date=doc_metadata.get("doc_date") or "unknown",
+        doctor_name=doc_metadata.get("doctor_name") or "unknown",
+        facility_name=doc_metadata.get("facility_name") or "unknown",
+        summary=doc_metadata.get("summary_en") or "N/A",
+    )
+
+    try:
+        raw = await llm._generate(prompt, force_json=False, timeout_override=15)
+        # Clean up: strip quotes, whitespace, extension if accidentally included
+        name = raw.strip().strip('"\'').strip()
+        # Remove any extension the LLM might have added
+        name = re.sub(r'\.[a-z]{2,4}$', '', name)
+        # Sanitize to slug
+        name = name.lower()
+        name = re.sub(r"[^a-z0-9]+", "-", name)
+        name = re.sub(r"-+", "-", name).strip("-")
+        # Enforce reasonable length (3-60 chars)
+        if len(name) < 3:
+            return None
+        return name[:60]
+    except Exception as e:
+        logger.warning("LLM filename generation failed: %s", e)
+        return None
+
+
 def build_organized_path(
     config: AppConfig,
     patient_slug: str | None,

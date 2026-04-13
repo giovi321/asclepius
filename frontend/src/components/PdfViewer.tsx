@@ -1,15 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Set worker source — use local copy bundled by Vite (no CDN dependency)
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+// Set worker source — use local copy via Vite's ?url import
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PdfViewerProps {
   url: string;
@@ -27,44 +25,12 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
+  const [cacheBuster, setCacheBuster] = useState(0);
 
-  // Store PDF as Uint8Array + a version key to force react-pdf to re-mount
-  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
-  const [pdfVersion, setPdfVersion] = useState(0);
-  const [loadingPdf, setLoadingPdf] = useState(true);
-  const fetchIdRef = useRef(0); // prevent stale fetches
-
-  const fetchPdf = useCallback(async () => {
-    const thisId = ++fetchIdRef.current;
-    setLoadingPdf(true);
-    setError(null);
-    try {
-      const resp = await fetch(url, {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const buf = await resp.arrayBuffer();
-      // Only apply if this is still the latest fetch
-      if (thisId === fetchIdRef.current) {
-        setPdfData(new Uint8Array(buf));
-        setPdfVersion((v) => v + 1); // change key to force Document remount
-      }
-    } catch (e) {
-      console.error("Failed to fetch PDF:", e);
-      if (thisId === fetchIdRef.current) {
-        setError("Failed to load PDF");
-      }
-    }
-    if (thisId === fetchIdRef.current) {
-      setLoadingPdf(false);
-    }
-  }, [url]);
-
-  // Initial load
-  useEffect(() => {
-    fetchPdf();
-  }, [fetchPdf]);
+  // Build the file URL with cache-busting parameter
+  const fileUrl = cacheBuster > 0
+    ? `${url}${url.includes("?") ? "&" : "?"}v=${cacheBuster}`
+    : url;
 
   // Measure container width for fit-to-width mode
   useEffect(() => {
@@ -85,8 +51,9 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     setError(null);
   };
 
-  const onDocumentLoadError = () => {
-    setError("Failed to load PDF");
+  const onDocumentLoadError = (err: Error) => {
+    console.error("PDF load error:", err);
+    setError(`Failed to load PDF: ${err.message}`);
   };
 
   const handleRotate = async (degrees: number, mode: "page" | "all") => {
@@ -96,8 +63,8 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     try {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
-      // Re-fetch the PDF binary to get the rotated version
-      await fetchPdf();
+      // Force PDF reload with new cache buster
+      setCacheBuster(Date.now());
     } catch (e) {
       console.error("Rotation failed:", e);
     }
@@ -226,17 +193,18 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       <div ref={containerRef} className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
         {error ? (
           <div className="text-destructive text-sm py-8">{error}</div>
-        ) : loadingPdf ? (
-          <div className="text-muted-foreground text-sm py-8">Loading PDF...</div>
-        ) : pdfData ? (
+        ) : (
           <Document
-            key={pdfVersion}
-            file={{ data: pdfData }}
+            key={cacheBuster}
+            file={fileUrl}
             onLoadSuccess={onDocumentLoadSuccess}
             onLoadError={onDocumentLoadError}
             loading={
               <div className="text-muted-foreground text-sm py-8">Loading PDF...</div>
             }
+            options={{
+              withCredentials: true,
+            }}
           >
             <Page
               pageNumber={pageNumber}
@@ -245,7 +213,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
               renderAnnotationLayer={true}
             />
           </Document>
-        ) : null}
+        )}
       </div>
     </div>
   );

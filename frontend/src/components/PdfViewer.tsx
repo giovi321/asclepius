@@ -21,6 +21,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [rotating, setRotating] = useState(false);
   const [pdfKey, setPdfKey] = useState(0); // force re-render after rotation
+  const [showAllMenu, setShowAllMenu] = useState(false);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -35,13 +36,14 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const handleRotate = async (degrees: number, mode: "page" | "all") => {
     if (!onRotate || rotating) return;
     setRotating(true);
+    setShowAllMenu(false);
     try {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
       // Force PDF reload after rotation
       setPdfKey((k) => k + 1);
-    } catch {
-      // parent handles errors
+    } catch (e) {
+      console.error("Rotation failed:", e);
     }
     setRotating(false);
   };
@@ -116,31 +118,38 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
                 <RotateCw className="h-4 w-4" />
               </button>
 
-              {/* Dropdown for "all pages" rotate */}
-              <div className="relative group">
+              {/* "All pages" rotate — click-to-toggle dropdown */}
+              <div className="relative">
                 <button
+                  onClick={() => setShowAllMenu(!showAllMenu)}
                   disabled={rotating}
                   className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
                   title="Rotate all pages"
                 >
                   All
                 </button>
-                <div className="absolute right-0 top-full mt-1 hidden group-hover:flex z-10 rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl gap-1">
-                  <button
-                    onClick={() => handleRotate(270, "all")}
-                    disabled={rotating}
-                    className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" /> All 90° left
-                  </button>
-                  <button
-                    onClick={() => handleRotate(90, "all")}
-                    disabled={rotating}
-                    className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
-                  >
-                    <RotateCw className="h-3.5 w-3.5" /> All 90° right
-                  </button>
-                </div>
+                {showAllMenu && (
+                  <>
+                    {/* Invisible backdrop to close menu on outside click */}
+                    <div className="fixed inset-0 z-10" onClick={() => setShowAllMenu(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-20 rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl flex gap-1">
+                      <button
+                        onClick={() => handleRotate(270, "all")}
+                        disabled={rotating}
+                        className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" /> All 90° left
+                      </button>
+                      <button
+                        onClick={() => handleRotate(90, "all")}
+                        disabled={rotating}
+                        className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
+                      >
+                        <RotateCw className="h-3.5 w-3.5" /> All 90° right
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}

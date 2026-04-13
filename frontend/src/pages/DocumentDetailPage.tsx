@@ -22,8 +22,8 @@ export default function DocumentDetailPage() {
   const [linkResults, setLinkResults] = useState<any[]>([]);
   const [linkType, setLinkType] = useState("related");
 
-  const loadDoc = async () => {
-    setLoading(true);
+  const loadDoc = async (showLoading = true) => {
+    if (showLoading && !doc) setLoading(true);
     const res = await api.get(`/documents/${id}`);
     setDoc(res.data);
     setNotes(res.data.user_notes || "");
@@ -70,8 +70,14 @@ export default function DocumentDetailPage() {
   };
 
   const handleRotate = async (degrees: number, pages: number[] | null) => {
-    await api.post(`/documents/${id}/rotate`, { degrees, pages });
-    await loadDoc();
+    try {
+      await api.post(`/documents/${id}/rotate`, { degrees, pages });
+      await loadDoc(false);
+    } catch (e: any) {
+      console.error("Rotate failed:", e);
+      alert("Rotation failed: " + (e.response?.data?.detail || e.message));
+      throw e; // Re-throw so PdfViewer knows it failed
+    }
   };
 
   // Auto-refresh while processing
@@ -251,7 +257,7 @@ export default function DocumentDetailPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Document viewer */}
         <div className="space-y-4">
-          {doc.file_path?.endsWith(".pdf") ? (
+          {(doc.file_path?.toLowerCase().endsWith(".pdf") || doc.original_filename?.toLowerCase().endsWith(".pdf")) ? (
             <div className="rounded-lg border overflow-hidden h-[700px]">
               <PdfViewer url={`/api/documents/${id}/file`} onRotate={handleRotate} />
             </div>

@@ -1060,6 +1060,7 @@ function EditableFilename({ value, docId, onSave }: { value: string; docId: numb
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => { setVal(value || ""); }, [value]);
 
@@ -1074,6 +1075,21 @@ function EditableFilename({ value, docId, onSave }: { value: string; docId: numb
       alert("Rename failed: " + (e.response?.data?.detail || e.message));
     }
     setSaving(false);
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await api.post(`/documents/${docId}/generate-filename`);
+      const suggested = res.data.suggested_filename;
+      if (suggested) {
+        setVal(suggested);
+        setEditing(true);
+      }
+    } catch (e: any) {
+      alert("Failed to generate filename: " + (e.response?.data?.detail || e.message));
+    }
+    setGenerating(false);
   };
 
   if (editing) {
@@ -1096,9 +1112,23 @@ function EditableFilename({ value, docId, onSave }: { value: string; docId: numb
   }
 
   return (
-    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2" onClick={() => setEditing(true)}>
-      {value}
-      <span className="opacity-0 group-hover:opacity-100 text-muted-foreground text-xs font-normal">&#x270E;</span>
+    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2">
+      <span onClick={() => setEditing(true)}>{value}</span>
+      <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+        <button onClick={() => setEditing(true)}
+          className="text-muted-foreground text-xs font-normal hover:text-foreground" title="Edit filename">
+          &#x270E;
+        </button>
+        <button onClick={handleGenerate} disabled={generating}
+          className="text-muted-foreground text-xs font-normal hover:text-primary disabled:opacity-50"
+          title="Generate filename from document data">
+          {generating ? (
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </span>
     </h1>
   );
 }

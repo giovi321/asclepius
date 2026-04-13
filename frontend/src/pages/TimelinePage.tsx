@@ -14,6 +14,9 @@ interface TimelineDoc {
   doctor_name: string | null;
   facility_name: string | null;
   summary_en: string | null;
+  event_title: string | null;
+  event_type: string | null;
+  event_color: string | null;
 }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string; dot: string; label: string }> = {
@@ -245,22 +248,44 @@ export default function TimelinePage() {
                       <button
                         onClick={(e) => openDocument(doc.id, e)}
                         onAuxClick={(e) => { if (e.button === 1) openDocument(doc.id, e); }}
-                        className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent/50"
+                        className="w-full rounded-lg border bg-card text-left transition-colors hover:bg-accent/50 overflow-hidden"
                       >
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">{fmtDate(bestDate(doc) || null)}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${style.bg} ${style.text}`}>
-                            {style.label}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium truncate">{doc.original_filename}</p>
-                        <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-                          {doc.doctor_name && <span>{doc.doctor_name}</span>}
-                          {doc.facility_name && <span>{doc.facility_name}</span>}
-                        </div>
-                        {doc.summary_en && (
-                          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{doc.summary_en}</p>
+                        {/* Medical event banner */}
+                        {doc.event_title && (
+                          <div
+                            className="px-3 py-1.5 text-xs font-semibold flex items-center gap-2"
+                            style={{
+                              backgroundColor: doc.event_color ? `${doc.event_color}20` : "rgb(var(--primary) / 0.1)",
+                              color: doc.event_color || "rgb(var(--primary))",
+                              borderBottom: `2px solid ${doc.event_color || "rgb(var(--primary))"}`,
+                            }}
+                          >
+                            <span className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: doc.event_color || "rgb(var(--primary))" }} />
+                            {doc.event_title}
+                            {doc.event_type && (
+                              <span className="opacity-60 text-[10px] font-normal">
+                                {doc.event_type.replace(/_/g, " ")}
+                              </span>
+                            )}
+                          </div>
                         )}
+                        <div className="p-3">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="text-sm font-medium">{fmtDate(bestDate(doc) || null)}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${style.bg} ${style.text}`}>
+                              {style.label}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium truncate">{doc.original_filename}</p>
+                          <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                            {doc.doctor_name && <span>{doc.doctor_name}</span>}
+                            {doc.facility_name && <span>{doc.facility_name}</span>}
+                          </div>
+                          {doc.summary_en && (
+                            <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{doc.summary_en}</p>
+                          )}
+                        </div>
                       </button>
                     </div>
                   );

@@ -98,10 +98,14 @@ async def list_documents(
     select_cols = """d.*,
                      p.display_name as patient_name,
                      COALESCE(d.doctor_name, doc.name) as doctor_name,
-                     COALESCE(d.facility_name, f.name) as facility_name"""
+                     COALESCE(d.facility_name, f.name) as facility_name,
+                     me.title as event_title,
+                     me.event_type as event_type,
+                     me.color as event_color"""
     joins = """LEFT JOIN patients p ON d.patient_id = p.id
                LEFT JOIN doctors doc ON d.doctor_id = doc.id
-               LEFT JOIN facilities f ON d.facility_id = f.id"""
+               LEFT JOIN facilities f ON d.facility_id = f.id
+               LEFT JOIN medical_events me ON d.event_id = me.id"""
 
     query = f"""SELECT {select_cols}
                 FROM documents d {joins}

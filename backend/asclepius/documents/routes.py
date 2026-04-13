@@ -1056,6 +1056,32 @@ async def rename_document(
     return await get_document(db, doc_id)
 
 
+@router.post("/{doc_id}/generate-filename")
+async def generate_filename(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Generate an AI-suggested filename based on document metadata."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Build filename from metadata: YYYYMMDD_summary-slug.ext
+    ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
+    doc_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or ""
+    date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
+
+    summary = doc.get("summary_en") or doc.get("doc_type") or "document"
+    # Slugify summary
+    slug = summary[:60].lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-")
+
+    suggested = f"{date_prefix}_{slug}{ext}"
+    return {"suggested_filename": suggested}
+
+
 @router.get("/{doc_id}/relevant")
 async def get_relevant_documents(
     doc_id: int,

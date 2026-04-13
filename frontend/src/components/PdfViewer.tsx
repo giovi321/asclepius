@@ -41,7 +41,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
       // Force PDF reload after rotation
-      setPdfKey((k) => k + 1);
+      setPdfKey(Date.now());
     } catch (e) {
       console.error("Rotation failed:", e);
     }

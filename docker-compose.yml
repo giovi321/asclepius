@@ -1,6 +1,9 @@
 services:
   asclepius:
-    build: .
+    image: asclepius
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8070:8000"
     volumes:

@@ -54,7 +54,7 @@ export default function DocumentDetailPage() {
     if (!aiInstruction.trim()) return;
     setAiEditing(true);
     try {
-      const res = await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
+      await api.post(`/documents/${id}/edit-with-ai`, { instruction: aiInstruction });
       setAiInstruction("");
       await loadDoc(false);
     } catch (e: any) {

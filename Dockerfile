@@ -37,8 +37,8 @@ COPY backend/ .
 # Copy built frontend
 COPY --from=frontend-build /frontend/dist /app/static
 
-# Create vault directories
-RUN mkdir -p /vault/inbox /vault/patients /vault/unclassified
+# Create data directories (vault + config)
+RUN mkdir -p /data/vault/inbox /data/vault/patients /data/vault/unclassified /data/config
 
 EXPOSE 8000
 

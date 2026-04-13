@@ -5,13 +5,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8070:8000"
+      - "${ASCLEPIUS_PORT:-8070}:8000"
     volumes:
-      - ./vault:/vault
-      - ./config:/config
+      - ${ASCLEPIUS_DATA_PATH:-./data}:/data
     environment:
-      - ASCLEPIUS_VAULT_PATH=/vault
-      - ASCLEPIUS_CONFIG_PATH=/config/settings.yaml
+      - ASCLEPIUS_VAULT_PATH=/data/vault
+      - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
       - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}

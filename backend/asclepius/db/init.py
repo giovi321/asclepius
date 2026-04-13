@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import aiosqlite
@@ -9,7 +10,7 @@ import aiosqlite
 logger = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
-SEEDS_DIR = Path("/config/seeds")
+SEEDS_DIR = Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "/data/config/settings.yaml")).parent / "seeds"
 
 
 async def initialize_database(db_path: str) -> None:

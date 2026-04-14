@@ -135,7 +135,6 @@ export default function TimelinePage() {
 
     const updateIndicator = () => {
       // Find which year section is in the viewport
-      const viewTop = window.scrollY || (scrollParent instanceof Element ? scrollParent.scrollTop : 0);
       const viewHeight = window.innerHeight;
 
       for (const y of years) {

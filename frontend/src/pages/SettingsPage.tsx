@@ -4,7 +4,7 @@ import {
   Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check,
   FileCode, RotateCcw, Download, ScrollText, Power, ChevronUp,
   ChevronDown, FileSearch, Search, Edit3, GitMerge, X, ChevronRight,
-  Zap, AlertTriangle, Loader2, Play, Square,
+  Zap, AlertTriangle, Loader2, Play,
 } from "lucide-react";
 
 export default function SettingsPage() {

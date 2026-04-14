@@ -653,6 +653,10 @@ async def reprocess_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Mark as pending immediately so the UI reflects the change
+    await db.execute("UPDATE documents SET status = 'pending' WHERE id = ?", (doc_id,))
+    await db.commit()
+
     # Run reprocessing in background
     import asyncio
     from asclepius.pipeline.processor import reprocess_document

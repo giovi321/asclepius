@@ -97,7 +97,7 @@ export default function MultiSelectFilter({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-30 rounded-lg border bg-popover shadow-xl min-w-[220px] max-w-[300px]">
+        <div className="absolute left-0 top-full mt-1 z-30 rounded-lg border bg-background shadow-xl min-w-[220px] max-w-[300px]">
           {/* Search box */}
           {searchable && (
             <div className="p-2 border-b">

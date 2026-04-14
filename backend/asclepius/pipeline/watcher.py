@@ -60,12 +60,17 @@ class InboxHandler(FileSystemEventHandler):
         self.queue.put((file_size, str(path)))
 
 
-def _pipeline_worker(config: AppConfig, queue: PriorityQueue) -> None:
+AUTO_STOP_THRESHOLD = 5  # consecutive provider failures before auto-stopping
+
+
+def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) -> None:
     """Worker thread that processes files. Runs in its own thread with its own event loop."""
     import asyncio
 
     async def _run():
-        from asclepius.pipeline.processor import process_file
+        from asclepius.pipeline.processor import process_file, ProviderUnreachableError
+
+        consecutive_provider_failures = 0
 
         while True:
             try:
@@ -76,6 +81,28 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue) -> None:
             try:
                 logger.info("Pipeline worker processing: %s", Path(file_path).name)
                 await process_file(file_path, config)
+                consecutive_provider_failures = 0  # success resets counter
+            except ProviderUnreachableError as e:
+                consecutive_provider_failures += 1
+                logger.error("Provider unreachable (%d/%d): %s — %s",
+                             consecutive_provider_failures, AUTO_STOP_THRESHOLD,
+                             Path(file_path).name, e)
+                if consecutive_provider_failures >= AUTO_STOP_THRESHOLD:
+                    logger.warning(
+                        "All providers appear unreachable after %d consecutive failures. "
+                        "Auto-pausing pipeline.", AUTO_STOP_THRESHOLD)
+                    if app_state is not None:
+                        app_state.pipeline_auto_stopped = True
+                        app_state.pipeline_auto_stop_reason = (
+                            f"Auto-paused after {AUTO_STOP_THRESHOLD} consecutive provider failures"
+                        )
+                    # Put the file back in the queue so it's retried on restart
+                    try:
+                        file_size = os.path.getsize(file_path)
+                    except OSError:
+                        file_size = 0
+                    queue.put((file_size, file_path))
+                    break  # stop worker loop
             except Exception:
                 logger.exception("Pipeline error for: %s", file_path)
             except BaseException:
@@ -101,7 +128,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue) -> None:
         loop.close()
 
 
-async def start_watcher(config: AppConfig) -> None:
+async def start_watcher(config: AppConfig, app_state=None) -> None:
     """Start the file watcher and pipeline worker thread.
 
     The pipeline runs in a SEPARATE THREAD with its own event loop,
@@ -113,10 +140,15 @@ async def start_watcher(config: AppConfig) -> None:
     # Thread-safe priority queue (not asyncio.Queue) — smaller files first
     queue: PriorityQueue[tuple[int, str]] = PriorityQueue()
 
+    # Reset auto-stop state on start
+    if app_state is not None:
+        app_state.pipeline_auto_stopped = False
+        app_state.pipeline_auto_stop_reason = ""
+
     # Start pipeline worker in a daemon thread
     worker = threading.Thread(
         target=_pipeline_worker,
-        args=(config, queue),
+        args=(config, queue, app_state),
         daemon=True,
         name="pipeline-worker",
     )

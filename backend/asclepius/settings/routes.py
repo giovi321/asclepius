@@ -331,6 +331,25 @@ async def update_settings(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
 
+    # Runtime pipeline start/stop when pipeline_watch_enabled changes
+    if "pipeline_watch_enabled" in changes and request is not None:
+        import asyncio
+        from asclepius.pipeline.watcher import start_watcher
+        app_state = request.app.state
+        if changes["pipeline_watch_enabled"]:
+            # Start pipeline if not already running
+            task = getattr(app_state, "pipeline_task", None)
+            if task is None or task.done():
+                app_state.pipeline_task = asyncio.create_task(start_watcher(config, app_state))
+        else:
+            # Stop pipeline if running
+            task = getattr(app_state, "pipeline_task", None)
+            if task is not None and not task.done():
+                task.cancel()
+                app_state.pipeline_task = None
+                app_state.pipeline_auto_stopped = False
+                app_state.pipeline_auto_stop_reason = ""
+
     # Audit log
     ip = get_client_ip(request) if request else None
     await audit_log(db, current_user["id"], "settings.update", "settings", details={"changed_keys": list(changes.keys())}, ip_address=ip)
@@ -452,6 +471,97 @@ async def update_ocr_providers(
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
 
     return {"status": "saved", "count": len(new_providers)}
+
+
+# --- Provider testing ---
+
+class TestProviderRequest(BaseModel):
+    provider_id: str
+
+
+@router.post("/test-llm-provider")
+async def test_llm_provider(
+    body: TestProviderRequest,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Test connectivity to an LLM provider by sending a tiny prompt."""
+    config = get_config()
+    entry = next((p for p in config.llm.providers if p.id == body.provider_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    try:
+        from asclepius.pipeline.processor import _build_llm_provider
+        provider = _build_llm_provider(entry)
+        response = await provider._generate("Reply with exactly: OK", force_json=False, timeout_override=15)
+        return {"ok": True, "response": response.strip()[:200]}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+
+@router.post("/test-ocr-provider")
+async def test_ocr_provider(
+    body: TestProviderRequest,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Test connectivity to an OCR provider."""
+    config = get_config()
+    entry = next((p for p in config.ocr.providers if p.id == body.provider_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    try:
+        if entry.type == "tesseract":
+            import subprocess
+            result = subprocess.run(
+                ["tesseract", "--version"],
+                capture_output=True, text=True, timeout=10,
+            )
+            version = result.stdout.split("\n")[0] if result.stdout else result.stderr.split("\n")[0]
+            return {"ok": True, "detail": f"Tesseract {version}"}
+
+        elif entry.type == "tesseract_remote":
+            import httpx
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(entry.remote_url.rstrip("/") + "/")
+                return {"ok": True, "detail": f"Remote OCR reachable (HTTP {resp.status_code})"}
+
+        elif entry.type == "llm_vision":
+            # Build and test the underlying LLM provider
+            from asclepius.pipeline.processor import _build_llm_provider
+            from asclepius.config import LlmProviderEntry
+            llm_entry = LlmProviderEntry(
+                id="test-vision",
+                type=entry.llm_provider,
+                name="test",
+                base_url=entry.llm_base_url,
+                model=entry.llm_model,
+                api_key=entry.llm_api_key,
+                timeout=15,
+            )
+            provider = _build_llm_provider(llm_entry)
+            response = await provider._generate("Reply with exactly: OK", force_json=False, timeout_override=15)
+            return {"ok": True, "detail": f"LLM Vision OK: {response.strip()[:100]}"}
+
+        elif entry.type == "google_vision":
+            if not entry.google_vision_key:
+                return {"ok": False, "error": "No Google Vision API key configured"}
+            import httpx
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    f"https://vision.googleapis.com/v1/images:annotate?key={entry.google_vision_key}",
+                    json={"requests": []},
+                )
+                if resp.status_code in (200, 400):
+                    # 400 with empty requests is expected — means the API key works
+                    return {"ok": True, "detail": "Google Vision API key is valid"}
+                return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+
+        else:
+            return {"ok": False, "error": f"Unknown provider type: {entry.type}"}
+
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
 
 
 # --- User management ---

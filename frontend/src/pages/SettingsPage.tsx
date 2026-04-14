@@ -4,6 +4,7 @@ import {
   Users, Database, Brain, Eye, Shield, Workflow, Plus, Trash2, Save, Check,
   FileCode, RotateCcw, Download, ScrollText, Power, ChevronUp,
   ChevronDown, FileSearch, Search, Edit3, GitMerge, X, ChevronRight,
+  Zap, AlertTriangle, Loader2, Play, Square,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -237,6 +238,8 @@ function LlmProvidersTab() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   useEffect(() => {
     api.get("/settings/llm-providers").then((res) => {
@@ -380,6 +383,46 @@ function LlmProvidersTab() {
                   )}
                   <NumberField label="Timeout (seconds)" value={p.timeout}
                     onChange={(v) => updateProvider(p.id, { timeout: v })} min={30} max={600} step={10} />
+
+                  {/* Test connection button */}
+                  <div className="pt-2 border-t">
+                    <button
+                      onClick={async () => {
+                        setTestingId(p.id);
+                        setTestResults((r) => { const copy = { ...r }; delete copy[p.id]; return copy; });
+                        try {
+                          const res = await api.post("/settings/test-llm-provider", { provider_id: p.id });
+                          setTestResults((r) => ({
+                            ...r,
+                            [p.id]: res.data.ok
+                              ? { ok: true, message: res.data.response || "OK" }
+                              : { ok: false, message: res.data.error || "Failed" },
+                          }));
+                        } catch (e: any) {
+                          setTestResults((r) => ({
+                            ...r,
+                            [p.id]: { ok: false, message: e.response?.data?.detail || e.message || "Request failed" },
+                          }));
+                        }
+                        setTestingId(null);
+                      }}
+                      disabled={testingId === p.id}
+                      className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+                    >
+                      {testingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                      {testingId === p.id ? "Testing..." : "Test Connection"}
+                    </button>
+                    {testResults[p.id] && (
+                      <div className={`mt-2 rounded-md px-3 py-2 text-xs font-mono break-all ${
+                        testResults[p.id].ok
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                          : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                      }`}>
+                        {testResults[p.id].ok ? <Check className="h-3 w-3 inline mr-1" /> : <X className="h-3 w-3 inline mr-1" />}
+                        {testResults[p.id].message}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -443,6 +486,8 @@ function OcrProvidersTab() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   useEffect(() => {
     api.get("/settings/ocr-providers").then((res) => {
@@ -623,6 +668,46 @@ function OcrProvidersTab() {
                       onChange={(v) => updateProvider(p.id, { google_vision_key: v })} type="password"
                       placeholder={p.has_google_vision_key ? "configured" : "Enter API key"} />
                   )}
+
+                  {/* Test connection button */}
+                  <div className="pt-2 border-t">
+                    <button
+                      onClick={async () => {
+                        setTestingId(p.id);
+                        setTestResults((r) => { const copy = { ...r }; delete copy[p.id]; return copy; });
+                        try {
+                          const res = await api.post("/settings/test-ocr-provider", { provider_id: p.id });
+                          setTestResults((r) => ({
+                            ...r,
+                            [p.id]: res.data.ok
+                              ? { ok: true, message: res.data.detail || "OK" }
+                              : { ok: false, message: res.data.error || "Failed" },
+                          }));
+                        } catch (e: any) {
+                          setTestResults((r) => ({
+                            ...r,
+                            [p.id]: { ok: false, message: e.response?.data?.detail || e.message || "Request failed" },
+                          }));
+                        }
+                        setTestingId(null);
+                      }}
+                      disabled={testingId === p.id}
+                      className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+                    >
+                      {testingId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                      {testingId === p.id ? "Testing..." : "Test Connection"}
+                    </button>
+                    {testResults[p.id] && (
+                      <div className={`mt-2 rounded-md px-3 py-2 text-xs font-mono break-all ${
+                        testResults[p.id].ok
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                          : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                      }`}>
+                        {testResults[p.id].ok ? <Check className="h-3 w-3 inline mr-1" /> : <X className="h-3 w-3 inline mr-1" />}
+                        {testResults[p.id].message}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -666,6 +751,12 @@ function PipelineTab() {
   const { saving, saved, save } = useSettingsSave();
   const [failedDocs, setFailedDocs] = useState<any[]>([]);
   const [retryingAll, setRetryingAll] = useState(false);
+  const [pipelineStatus, setPipelineStatus] = useState<any>(null);
+  const [startingPipeline, setStartingPipeline] = useState(false);
+
+  const loadStatus = () => {
+    api.get("/pipeline/status").then((res) => setPipelineStatus(res.data)).catch(() => {});
+  };
 
   useEffect(() => {
     api.get("/settings").then((res) => {
@@ -679,6 +770,9 @@ function PipelineTab() {
       });
     });
     loadFailed();
+    loadStatus();
+    const interval = setInterval(loadStatus, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadFailed = () => {
@@ -707,9 +801,64 @@ function PipelineTab() {
 
   if (!s) return <div className="text-muted-foreground">Loading...</div>;
 
+  const restartPipeline = async () => {
+    setStartingPipeline(true);
+    try {
+      await api.post("/pipeline/start");
+      setTimeout(loadStatus, 1000);
+    } catch { alert("Failed to start pipeline"); }
+    setStartingPipeline(false);
+  };
+
   return (
     <div className="space-y-6">
-      <SettingsForm title="Pipeline & Auth" saving={saving} saved={saved}
+      {/* Auto-stop warning banner */}
+      {pipelineStatus?.auto_stopped && (
+        <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-800 dark:text-amber-300">Pipeline automatically paused</p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+              {pipelineStatus.auto_stop_reason || "All providers appear unreachable after consecutive failures."}
+              {" "}Check your provider settings and restart when ready.
+            </p>
+          </div>
+          <button onClick={restartPipeline} disabled={startingPipeline}
+            className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex-shrink-0">
+            {startingPipeline ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            Restart
+          </button>
+        </div>
+      )}
+
+      {/* Pipeline status indicator */}
+      {pipelineStatus && (
+        <div className="rounded-lg border p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className={`inline-block h-2.5 w-2.5 rounded-full ${
+                pipelineStatus.watcher_active ? "bg-green-500 animate-pulse" : "bg-gray-400"
+              }`} />
+              <span className="text-sm font-medium">
+                {pipelineStatus.watcher_active ? "Pipeline active" : "Pipeline stopped"}
+              </span>
+              {pipelineStatus.processing && (
+                <span className="text-xs text-muted-foreground">
+                  Processing: {pipelineStatus.processing} ({pipelineStatus.processing_step})
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Processed: {pipelineStatus.total_processed}</span>
+              {pipelineStatus.total_errors > 0 && (
+                <span className="text-red-500">Errors: {pipelineStatus.total_errors}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SettingsForm title="Automatic Document Processing" saving={saving} saved={saved}
         onSave={() => save({
           pipeline_watch_enabled: f.pipeline_watch_enabled !== s.pipeline.watch_enabled ? f.pipeline_watch_enabled : undefined,
           pipeline_poll_interval: f.pipeline_poll_interval !== s.pipeline.poll_interval_seconds ? f.pipeline_poll_interval : undefined,
@@ -717,9 +866,9 @@ function PipelineTab() {
           pipeline_max_retries: f.pipeline_max_retries !== s.pipeline.max_retries ? f.pipeline_max_retries : undefined,
           session_ttl_hours: f.session_ttl_hours !== s.auth.session_ttl_hours ? f.session_ttl_hours : undefined,
         })}>
-        <ToggleField label="Pipeline Watch" value={f.pipeline_watch_enabled}
+        <ToggleField label="Automatic Document Processing" value={f.pipeline_watch_enabled}
           onChange={(v) => setF({ ...f, pipeline_watch_enabled: v })}
-          description="Automatically process files dropped into the inbox" />
+          description="Automatically process new files dropped into the inbox folder" />
         <NumberField label="Poll Interval (seconds)" value={f.pipeline_poll_interval}
           onChange={(v) => setF({ ...f, pipeline_poll_interval: v })} min={1} max={60} step={1} />
         <NumberField label="Retry Interval (seconds)" value={f.pipeline_retry_interval}

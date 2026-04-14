@@ -16,6 +16,36 @@ from asclepius.pipeline.organizer import build_organized_path, move_file
 
 logger = logging.getLogger(__name__)
 
+
+class ProviderUnreachableError(Exception):
+    """Raised when LLM/OCR providers are unreachable (connectivity failures)."""
+    pass
+
+
+# Connectivity exception types that indicate provider is unreachable
+_CONNECTIVITY_ERRORS = (
+    "ConnectError", "ConnectTimeout", "ReadTimeout",
+    "APIConnectionError", "APITimeoutError",
+    "ConnectionRefusedError", "TimeoutError",
+)
+
+
+def _is_provider_unreachable(exc: Exception) -> bool:
+    """Check if an exception indicates provider connectivity failure."""
+    exc_type = type(exc).__name__
+    if exc_type in _CONNECTIVITY_ERRORS:
+        return True
+    # Check cause chain
+    cause = exc.__cause__ or exc.__context__
+    if cause and type(cause).__name__ in _CONNECTIVITY_ERRORS:
+        return True
+    # Check for HTTP 5xx status errors
+    if hasattr(exc, "response") and hasattr(exc.response, "status_code"):
+        if exc.response.status_code >= 500:
+            return True
+    return False
+
+
 # Pipeline status tracking (in-memory)
 pipeline_status = {
     "queue_depth": 0,
@@ -509,6 +539,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 await db.commit()
             except Exception:
                 pass
+
+            # Re-raise as ProviderUnreachableError if it's a connectivity issue
+            if _is_provider_unreachable(e):
+                raise ProviderUnreachableError(error_msg) from e
 
     pipeline_status["processing"] = None
     pipeline_status["processing_step"] = None

@@ -79,17 +79,19 @@ async def lifespan(app: FastAPI):
     # Note: no default admin user is created — the setup wizard handles first-user creation
 
     # Start pipeline watcher (imported here to avoid circular imports)
-    pipeline_task = None
+    app.state.pipeline_task = None
+    app.state.pipeline_auto_stopped = False
+    app.state.pipeline_auto_stop_reason = ""
     if config.pipeline.watch_enabled:
         import asyncio
         from asclepius.pipeline.watcher import start_watcher
-        pipeline_task = asyncio.create_task(start_watcher(config))
+        app.state.pipeline_task = asyncio.create_task(start_watcher(config, app.state))
 
     yield
 
     # Shutdown
-    if pipeline_task:
-        pipeline_task.cancel()
+    if app.state.pipeline_task:
+        app.state.pipeline_task.cancel()
 
 
 def create_app() -> FastAPI:

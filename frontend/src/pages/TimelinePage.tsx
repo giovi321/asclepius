@@ -183,12 +183,24 @@ export default function TimelinePage() {
       ) : (
         <div className="flex gap-4">
           {/* Mini-map sidebar */}
-          <div className="hidden md:flex flex-col items-center gap-1 sticky top-0 h-[calc(100vh-12rem)] pt-2">
-            <div className="relative flex-1 w-6 flex flex-col items-center">
-              <div className="absolute inset-x-[11px] top-0 bottom-0 w-0.5 bg-border" />
+          <div className="hidden md:flex flex-col sticky top-0 h-[calc(100vh-12rem)] pt-2">
+            <div className="relative flex-1 flex flex-col justify-between py-2 pl-1 pr-2">
+              {/* Vertical line */}
+              <div className="absolute left-[3px] top-0 bottom-0 w-0.5 bg-border" />
               {years.map((year) => {
                 const isActive = currentYear === year;
                 const count = grouped[year].length;
+                // Collect months for this year
+                const months = new Set<string>();
+                for (const doc of grouped[year]) {
+                  const d = bestDate(doc);
+                  if (d && d.length >= 7) months.add(d.substring(0, 7)); // "YYYY-MM"
+                }
+                const monthLabels = Array.from(months).sort().reverse().map((m) => {
+                  const dt = new Date(m + "-01");
+                  return dt.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+                });
+                const tooltip = `${year} — ${count} doc${count !== 1 ? "s" : ""}${monthLabels.length > 0 ? "\n" + monthLabels.join(", ") : ""}`;
                 return (
                   <button
                     key={year}
@@ -196,19 +208,22 @@ export default function TimelinePage() {
                       const el = yearRefs.current[year];
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
                     }}
-                    className={`relative z-10 mb-1 flex items-center justify-center rounded-full text-[9px] font-bold transition-all ${
+                    className={`relative z-10 text-left pl-3 py-0.5 text-[11px] font-medium transition-colors whitespace-nowrap ${
                       isActive
-                        ? "h-6 w-6 bg-primary text-primary-foreground"
-                        : "h-4 w-4 bg-muted-foreground/30 text-transparent hover:bg-muted-foreground/60"
+                        ? "text-primary font-bold"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
-                    title={`${year} (${count} docs)`}
-                  />
+                    title={tooltip}
+                  >
+                    {/* Tick mark on the line */}
+                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-0.5 ${
+                      isActive ? "bg-primary" : "bg-muted-foreground/40"
+                    }`} />
+                    {year}
+                  </button>
                 );
               })}
             </div>
-            {currentYear && (
-              <span className="text-[10px] font-bold text-primary mt-1">{currentYear}</span>
-            )}
           </div>
 
           {/* Main timeline */}
@@ -226,7 +241,7 @@ export default function TimelinePage() {
                 {/* Year label */}
                 <div className="relative flex items-center mb-3 -ml-6">
                   <div className="w-6 flex justify-center">
-                    <div className="h-3 w-3 rounded-full bg-primary" />
+                    <div className="h-1 w-3 bg-primary rounded-full" />
                   </div>
                   <span className="ml-2 text-lg font-bold">{year}</span>
                   <span className="ml-2 text-xs text-muted-foreground">
@@ -239,9 +254,9 @@ export default function TimelinePage() {
                   const style = getStyle(doc.doc_type);
                   return (
                     <div key={doc.id} className="relative mb-2">
-                      {/* Dot aligned with line */}
-                      <div className="absolute -left-6 top-4 w-6 flex justify-center">
-                        <div className={`h-2.5 w-2.5 rounded-full ${style.dot}`} />
+                      {/* Tick mark aligned with line */}
+                      <div className="absolute -left-6 top-5 w-6 flex justify-center">
+                        <div className={`h-0.5 w-2 rounded-full ${style.dot}`} />
                       </div>
 
                       {/* Card */}

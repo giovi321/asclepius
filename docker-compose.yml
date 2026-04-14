@@ -7,10 +7,12 @@ services:
     ports:
       - "${ASCLEPIUS_PORT:-8070}:8000"
     volumes:
-      - ${ASCLEPIUS_DATA_PATH:-./data}:/data
+      - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
+      - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
     environment:
       - ASCLEPIUS_VAULT_PATH=/data/vault
       - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
+      - ASCLEPIUS_DB_PATH=/data/config/asclepius.sqlite
       - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:-change-me-in-production}
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}

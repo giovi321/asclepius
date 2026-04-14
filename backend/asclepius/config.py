@@ -144,7 +144,8 @@ def load_config() -> AppConfig:
         config.vault.inbox_path = f"{vault_path}/inbox"
         config.vault.patients_path = f"{vault_path}/patients"
         config.vault.unclassified_path = f"{vault_path}/unclassified"
-        config.database.path = f"{vault_path}/asclepius.sqlite"
+    if db_path := os.environ.get("ASCLEPIUS_DB_PATH"):
+        config.database.path = db_path
     if ollama_url := os.environ.get("ASCLEPIUS_OLLAMA_URL"):
         config.llm.ollama_base_url = ollama_url
     if api_key := os.environ.get("ASCLEPIUS_ANTHROPIC_API_KEY"):

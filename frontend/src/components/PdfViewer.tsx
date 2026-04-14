@@ -23,7 +23,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(0);

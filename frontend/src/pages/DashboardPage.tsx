@@ -22,6 +22,9 @@ interface PipelineStatus {
   total_errors: number;
   recent_errors: { file: string; error: string }[];
   queued_files: { filename: string; size: number }[];
+  watcher_active: boolean;
+  auto_stopped: boolean;
+  auto_stop_reason: string;
 }
 
 export default function DashboardPage() {

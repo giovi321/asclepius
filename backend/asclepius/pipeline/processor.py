@@ -680,8 +680,17 @@ def _merge_extractions(base: dict, additional: dict) -> dict:
     return base
 
 
-async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
-    """Re-run LLM extraction on an existing document. Does NOT re-OCR or move files."""
+async def reprocess_document(
+    doc_id: int,
+    config: AppConfig,
+    mode: str = "both",
+    llm_provider_id: str | None = None,
+) -> dict:
+    """Re-run OCR and/or LLM extraction on an existing document.
+
+    mode: "ocr" = re-OCR only, "llm" = re-extract only, "both" = full reprocess.
+    llm_provider_id: if set, use this specific provider instead of the default.
+    """
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA journal_mode=WAL")
@@ -696,8 +705,11 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
             return {"error": "Document not found"}
 
         ocr_text = doc["ocr_text"]
-        if not ocr_text or not ocr_text.strip():
-            # Need to re-OCR — find the file
+        run_ocr = mode in ("ocr", "both")
+        run_llm = mode in ("llm", "both")
+
+        # --- OCR phase ---
+        if run_ocr:
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
@@ -722,27 +734,62 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
                 (ocr_text, confidence, engine, doc_id),
             )
             await db.commit()
-            # Cache pages
             try:
                 await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
             except Exception:
                 pass
+        elif run_llm and (not ocr_text or not ocr_text.strip()):
+            # LLM-only but no OCR text — need to OCR first
+            file_path = Path(config.vault.root_path) / doc["file_path"]
+            if not file_path.exists():
+                await db.execute(
+                    """UPDATE documents SET status = 'failed', error_message = 'File not found on disk',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (doc_id,),
+                )
+                await db.commit()
+                return {"error": f"File not found: {doc['file_path']}"}
+            logger.info("No OCR text for doc %d, running OCR before LLM", doc_id)
+            await db.execute(
+                """UPDATE documents SET status = 'processing', error_message = NULL,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (doc_id,),
+            )
+            await db.commit()
+            ocr_text, confidence, engine = await extract_text(str(file_path), config)
+            await db.execute(
+                """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (ocr_text, confidence, engine, doc_id),
+            )
+            await db.commit()
 
         if not ocr_text or not ocr_text.strip():
             await db.execute(
-                "UPDATE documents SET status = 'needs_review', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                """UPDATE documents SET status = 'needs_review', error_message = 'No text could be extracted',
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
                 (doc_id,),
             )
             await db.commit()
             return {"error": "No text could be extracted"}
 
+        # OCR-only mode: done here
+        if not run_llm:
+            await db.execute(
+                "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+            logger.info("OCR-only reprocess complete for doc %d", doc_id)
+            return {"status": "done", "document_id": doc_id}
+
+        # --- LLM phase ---
         # Clear old extracted data
         for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.commit()
 
-        # Run LLM extraction — only set 'processing' right before actual work begins
-        logger.info("Re-running LLM extraction on doc %d", doc_id)
+        logger.info("Re-running LLM extraction on doc %d (provider=%s)", doc_id, llm_provider_id or "default")
         try:
             await db.execute(
                 """UPDATE documents SET status = 'processing', error_message = NULL,
@@ -751,7 +798,22 @@ async def reprocess_document(doc_id: int, config: AppConfig) -> dict:
             )
             await db.commit()
 
-            llm = get_llm_provider(config)
+            # Build LLM provider — use specific one if requested
+            if llm_provider_id:
+                from asclepius.config import get_config as _get_config
+                cfg = _get_config()
+                entry = None
+                for p in cfg.llm.providers:
+                    if p.id == llm_provider_id and p.enabled:
+                        entry = p
+                        break
+                if entry:
+                    llm = _build_llm_provider(entry)
+                else:
+                    llm = get_llm_provider(config)
+            else:
+                llm = get_llm_provider(config)
+
             extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:

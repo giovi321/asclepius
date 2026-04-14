@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search,
+  Eye, EyeOff, Trash2, Plus, X, Link2, Search, ChevronDown,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
@@ -45,8 +45,41 @@ export default function DocumentDetailPage() {
     if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
   };
 
-  const handleReprocess = async () => {
-    await api.post(`/documents/${id}/reprocess`);
+  // Reprocess popover state
+  const [showReprocessMenu, setShowReprocessMenu] = useState(false);
+  const [llmProviders, setLlmProviders] = useState<any[]>([]);
+  const [reprocessMode, setReprocessMode] = useState("both");
+  const [reprocessProvider, setReprocessProvider] = useState("");
+  const reprocessRef = useRef<HTMLDivElement>(null);
+
+  // Load LLM providers once
+  useEffect(() => {
+    api.get("/settings/llm-providers").then((res) => {
+      const providers = (res.data || []).filter((p: any) => p.enabled);
+      setLlmProviders(providers);
+    }).catch(() => {});
+  }, []);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showReprocessMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (reprocessRef.current && !reprocessRef.current.contains(e.target as Node)) {
+        setShowReprocessMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showReprocessMenu]);
+
+  const handleReprocess = async (mode?: string, providerId?: string) => {
+    setShowReprocessMenu(false);
+    const m = mode || reprocessMode;
+    const p = providerId || reprocessProvider;
+    await api.post(`/documents/${id}/reprocess`, {
+      mode: m,
+      ...(p ? { llm_provider_id: p } : {}),
+    });
     await loadDoc(false);
   };
 
@@ -216,12 +249,63 @@ export default function DocumentDetailPage() {
             </button>
           )}
           {doc.status !== "processing" && (
-            <button
-              onClick={handleReprocess}
-              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-            >
-              <RefreshCw className="h-4 w-4" /> Reprocess
-            </button>
+            <div ref={reprocessRef} className="relative">
+              <button
+                onClick={() => setShowReprocessMenu(!showReprocessMenu)}
+                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              >
+                <RefreshCw className="h-4 w-4" /> Reprocess <ChevronDown className="h-3 w-3 ml-0.5" />
+              </button>
+              {showReprocessMenu && (
+                <div className="absolute right-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground">What to reprocess</p>
+                  <div className="flex gap-1">
+                    {[
+                      { value: "both", label: "OCR + LLM" },
+                      { value: "ocr", label: "OCR only" },
+                      { value: "llm", label: "LLM only" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setReprocessMode(opt.value)}
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                          reprocessMode === opt.value
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {reprocessMode !== "ocr" && llmProviders.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
+                      <select
+                        value={reprocessProvider}
+                        onChange={(e) => setReprocessProvider(e.target.value)}
+                        className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                      >
+                        <option value="">Default (highest priority)</option>
+                        {llmProviders.map((p: any) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label || p.id} ({p.type} / {p.model})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => handleReprocess()}
+                    className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    Start Reprocessing
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           <button
             onClick={handleDelete}

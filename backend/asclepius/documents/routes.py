@@ -643,9 +643,15 @@ async def delete_link(
     return {"status": "deleted", "link_id": link_id}
 
 
+class ReprocessRequest(BaseModel):
+    mode: str = "both"  # "ocr", "llm", or "both"
+    llm_provider_id: str | None = None  # optional override
+
+
 @router.post("/{doc_id}/reprocess")
 async def reprocess_doc(
     doc_id: int,
+    body: ReprocessRequest = ReprocessRequest(),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -662,7 +668,9 @@ async def reprocess_doc(
     from asclepius.pipeline.processor import reprocess_document
 
     config = get_config()
-    asyncio.create_task(reprocess_document(doc_id, config))
+    asyncio.create_task(reprocess_document(
+        doc_id, config, mode=body.mode, llm_provider_id=body.llm_provider_id,
+    ))
     return {"status": "reprocessing", "document_id": doc_id}
 
 

@@ -38,8 +38,8 @@ async def list_documents(
     limit: int = 50,
     offset: int = 0,
     specialty: str | None = None,
-    doctor_id: int | None = None,
-    facility_id: int | None = None,
+    doctor_id: str | int | None = None,
+    facility_id: str | int | None = None,
 ) -> dict:
     """List documents with filters. Returns {items, total}."""
     conditions = []
@@ -49,8 +49,14 @@ async def list_documents(
         conditions.append("d.patient_id = ?")
         params.append(patient_id)
     if doc_type:
-        conditions.append("d.doc_type = ?")
-        params.append(doc_type)
+        types = [t.strip() for t in doc_type.split(",") if t.strip()]
+        if len(types) == 1:
+            conditions.append("d.doc_type = ?")
+            params.append(types[0])
+        elif types:
+            placeholders = ",".join(["?"] * len(types))
+            conditions.append(f"d.doc_type IN ({placeholders})")
+            params.extend(types)
     if date_from:
         # Use the best available date
         conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) >= ?")
@@ -59,23 +65,47 @@ async def list_documents(
         conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) <= ?")
         params.append(date_to)
     if status:
-        conditions.append("d.status = ?")
-        params.append(status)
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        if len(statuses) == 1:
+            conditions.append("d.status = ?")
+            params.append(statuses[0])
+        elif statuses:
+            placeholders = ",".join(["?"] * len(statuses))
+            conditions.append(f"d.status IN ({placeholders})")
+            params.extend(statuses)
     if doctor_id is not None:
-        conditions.append("d.doctor_id = ?")
-        params.append(doctor_id)
+        doctor_ids = [int(x) for x in str(doctor_id).split(",") if x.strip().isdigit()]
+        if len(doctor_ids) == 1:
+            conditions.append("d.doctor_id = ?")
+            params.append(doctor_ids[0])
+        elif doctor_ids:
+            placeholders = ",".join(["?"] * len(doctor_ids))
+            conditions.append(f"d.doctor_id IN ({placeholders})")
+            params.extend(doctor_ids)
     if facility_id is not None:
-        conditions.append("d.facility_id = ?")
-        params.append(facility_id)
+        facility_ids = [int(x) for x in str(facility_id).split(",") if x.strip().isdigit()]
+        if len(facility_ids) == 1:
+            conditions.append("d.facility_id = ?")
+            params.append(facility_ids[0])
+        elif facility_ids:
+            placeholders = ",".join(["?"] * len(facility_ids))
+            conditions.append(f"d.facility_id IN ({placeholders})")
+            params.extend(facility_ids)
     if specialty:
-        conditions.append(
-            "(d.norm_specialty_id = ? OR d.specialty_original LIKE ?)"
-        )
-        try:
-            spec_id = int(specialty)
-            params.extend([spec_id, f"%{specialty}%"])
-        except ValueError:
-            params.extend([-1, f"%{specialty}%"])
+        spec_values = [s.strip() for s in specialty.split(",") if s.strip()]
+        if len(spec_values) == 1:
+            conditions.append("(d.norm_specialty_id = ? OR d.specialty_original LIKE ?)")
+            try:
+                spec_id = int(spec_values[0])
+                params.extend([spec_id, f"%{spec_values[0]}%"])
+            except ValueError:
+                params.extend([-1, f"%{spec_values[0]}%"])
+        elif spec_values:
+            or_parts = []
+            for sv in spec_values:
+                or_parts.append("d.specialty_original LIKE ?")
+                params.append(f"%{sv}%")
+            conditions.append(f"({' OR '.join(or_parts)})")
 
     # Fuzzy search across multiple columns using LIKE
     if q:

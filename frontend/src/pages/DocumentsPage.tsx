@@ -4,6 +4,7 @@ import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { FileText, Search, Upload, Pencil, Check, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
+import MultiSelectFilter from "@/components/MultiSelectFilter";
 
 const DOC_TYPES = [
   "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
@@ -25,10 +26,11 @@ export default function DocumentsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [specialtyFilter, setSpecialtyFilter] = useState("");
-  const [doctorFilter, setDoctorFilter] = useState("");
-  const [facilityFilter, setFacilityFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [specialtyFilter, setSpecialtyFilter] = useState<string[]>([]);
+  const [doctorFilter, setDoctorFilter] = useState<string[]>([]);
+  const [facilityFilter, setFacilityFilter] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(0);
@@ -58,10 +60,11 @@ export default function DocumentsPage() {
     const params: Record<string, any> = { limit, offset: page * limit };
     if (selectedPatient) params.patient_id = selectedPatient.id;
     if (search) params.q = search;
-    if (typeFilter) params.type = typeFilter;
-    if (specialtyFilter) params.specialty = specialtyFilter;
-    if (doctorFilter) params.doctor = doctorFilter;
-    if (facilityFilter) params.facility = facilityFilter;
+    if (typeFilter.length) params.type = typeFilter.join(",");
+    if (statusFilter.length) params.status = statusFilter.join(",");
+    if (specialtyFilter.length) params.specialty = specialtyFilter.join(",");
+    if (doctorFilter.length) params.doctor_id = doctorFilter.join(",");
+    if (facilityFilter.length) params.facility_id = facilityFilter.join(",");
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
 
@@ -71,7 +74,7 @@ export default function DocumentsPage() {
       setLoading(false);
     });
     api.get("/pipeline/status").then((res) => setPipeline(res.data)).catch(() => {});
-  }, [selectedPatient, search, typeFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
+  }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
 
   // Poll pipeline status for live page progress
   useEffect(() => {
@@ -109,7 +112,7 @@ export default function DocumentsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 items-start">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
@@ -120,57 +123,64 @@ export default function DocumentsPage() {
             className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm"
           />
         </div>
-        <select
-          value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(0); }}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">All types</option>
-          {DOC_TYPES.map((t) => (
-            <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
-          ))}
-        </select>
-        <select
-          value={specialtyFilter}
-          onChange={(e) => { setSpecialtyFilter(e.target.value); setPage(0); }}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">All specialties</option>
-          {specialties.map((s) => (
-            <option key={s.id || s.canonical_code} value={s.canonical_code || s.canonical_display}>
-              {s.canonical_display || s.canonical_code}
-            </option>
-          ))}
-        </select>
-        <select
-          value={doctorFilter}
-          onChange={(e) => { setDoctorFilter(e.target.value); setPage(0); }}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">All doctors</option>
-          {doctors.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.title ? `${d.title} ` : ""}{d.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={facilityFilter}
-          onChange={(e) => { setFacilityFilter(e.target.value); setPage(0); }}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
-        >
-          <option value="">All facilities</option>
-          {facilities.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}{f.city ? ` (${f.city})` : ""}
-            </option>
-          ))}
-        </select>
+
+        <MultiSelectFilter
+          label="Type"
+          options={DOC_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))}
+          selected={typeFilter}
+          onChange={(v) => { setTypeFilter(v); setPage(0); }}
+        />
+
+        <MultiSelectFilter
+          label="Status"
+          options={[
+            { value: "done", label: "Done" },
+            { value: "processing", label: "Processing" },
+            { value: "pending", label: "Pending" },
+            { value: "needs_review", label: "Needs Review" },
+            { value: "failed", label: "Failed" },
+            { value: "cancelled", label: "Cancelled" },
+          ]}
+          selected={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(0); }}
+          searchable={false}
+        />
+
+        <MultiSelectFilter
+          label="Specialty"
+          options={specialties.map((s) => ({
+            value: s.canonical_code || s.canonical_display,
+            label: s.canonical_display || s.canonical_code,
+          }))}
+          selected={specialtyFilter}
+          onChange={(v) => { setSpecialtyFilter(v); setPage(0); }}
+        />
+
+        <MultiSelectFilter
+          label="Doctor"
+          options={doctors.map((d) => ({
+            value: String(d.id),
+            label: `${d.title ? d.title + " " : ""}${d.name}`,
+          }))}
+          selected={doctorFilter}
+          onChange={(v) => { setDoctorFilter(v); setPage(0); }}
+        />
+
+        <MultiSelectFilter
+          label="Facility"
+          options={facilities.map((f) => ({
+            value: String(f.id),
+            label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
+          }))}
+          selected={facilityFilter}
+          onChange={(v) => { setFacilityFilter(v); setPage(0); }}
+        />
       </div>
-      {/* Date range (filters by visit/exam date) */}
+
+      {/* Date range + clear */}
       <div className="flex flex-wrap gap-3 items-center">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Visit date from:</span>
+          <span className="text-muted-foreground">Date from:</span>
           <input
             type="date"
             value={dateFrom}
@@ -187,15 +197,16 @@ export default function DocumentsPage() {
             className="rounded-md border bg-background px-3 py-2 text-sm"
           />
         </label>
-        {(dateFrom || dateTo || specialtyFilter || doctorFilter || facilityFilter) && (
+        {(dateFrom || dateTo || typeFilter.length || statusFilter.length || specialtyFilter.length || doctorFilter.length || facilityFilter.length) && (
           <button
             onClick={() => {
-              setDateFrom(""); setDateTo(""); setSpecialtyFilter("");
-              setDoctorFilter(""); setFacilityFilter(""); setPage(0);
+              setDateFrom(""); setDateTo(""); setTypeFilter([]);
+              setStatusFilter([]); setSpecialtyFilter([]);
+              setDoctorFilter([]); setFacilityFilter([]); setPage(0);
             }}
-            className="rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent"
+            className="flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
           >
-            Clear filters
+            <X className="h-3 w-3" /> Clear all filters
           </button>
         )}
       </div>

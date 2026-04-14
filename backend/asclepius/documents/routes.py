@@ -227,8 +227,11 @@ async def list_docs(
     status: str | None = None,
     q: str | None = None,
     specialty: str | None = None,
-    doctor_id: int | None = None,
-    facility_id: int | None = None,
+    doctor_id: str | None = Query(default=None, alias="doctor_id"),
+    facility_id: str | None = Query(default=None, alias="facility_id"),
+    # Legacy parameter aliases (frontend may send "doctor" or "facility")
+    doctor: str | None = None,
+    facility: str | None = None,
     limit: int = Query(default=50),
     offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
@@ -240,9 +243,13 @@ async def list_docs(
         if not role:
             raise HTTPException(status_code=403, detail="No access to this patient")
 
+    # Accept both "doctor_id" and "doctor" parameter names
+    effective_doctor = doctor_id or doctor
+    effective_facility = facility_id or facility
+
     return await list_documents(
         db, current_user["id"], patient_id, type, date_from, date_to, status, q, limit, offset,
-        specialty=specialty, doctor_id=doctor_id, facility_id=facility_id,
+        specialty=specialty, doctor_id=effective_doctor, facility_id=effective_facility,
     )
 
 

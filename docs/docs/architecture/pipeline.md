@@ -219,3 +219,21 @@ The pipeline maintains an in-memory status dict visible via `GET /api/pipeline/s
   ]
 }
 ```
+
+## Runtime Pipeline Control
+
+The pipeline can be started and stopped at runtime from the Settings UI without restarting the application:
+
+- **Start/Stop buttons** in Settings > Pipeline tab
+- `POST /api/pipeline/start` and `POST /api/pipeline/stop` endpoints (admin only)
+- Toggling `pipeline_watch_enabled` in settings also starts/stops the pipeline immediately
+
+### Auto-Stop on Provider Failures
+
+If the pipeline encounters **5 consecutive provider connectivity failures** (connection refused, timeout, HTTP 5xx), it automatically pauses and sets an `auto_stopped` flag. A warning banner appears in the Settings UI with a "Restart" button.
+
+Only connectivity errors trigger auto-stop — document-specific extraction failures (malformed content, unsupported format) do not.
+
+### Extraction Validation
+
+After LLM extraction, the pipeline validates that at least one meaningful field was produced (doc_type, summary, dates, lab results, medications, or diagnoses). If the extraction is completely empty, the document is marked `needs_review` with the error message "LLM extraction returned empty results" instead of being silently marked as `done`.

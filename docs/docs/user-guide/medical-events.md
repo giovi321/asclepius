@@ -67,16 +67,6 @@ Documents can be linked to events in several ways:
 2. In the Medical Event section, select an existing event or create a new one
 3. The document's `event_id` field is set to the primary event
 
-### AI-Powered Suggestions
-
-Click **Suggest Event** on any document's detail page to have the LLM:
-
-1. Analyze the document's content (type, date, doctor, facility, summary)
-2. Compare against existing events for the same patient
-3. Recommend either:
-    - An existing event with a confidence level (high/medium/low) and reason
-    - A new event suggestion with title, type, description, and start date
-
 ## Event Detail Page
 
 The event detail page shows:
@@ -94,11 +84,12 @@ Click any field on the event detail page to edit it inline.
 
 ### Deleting
 
-Deleting an event:
+Two deletion options are available:
 
-- Removes all document-event links
-- Clears the `event_id` field on any documents that had this as their primary event
-- Does **not** delete the linked documents themselves
+- **Delete Event** -- removes the event and unlinks all documents (documents are kept)
+- **Delete Event & Documents** -- removes the event AND permanently deletes all linked documents from disk and database
+
+Both options require confirmation.
 
 ### Filtering
 
@@ -134,4 +125,3 @@ On the Medical Events list page, filter by:
 | `document_id` | Linked document |
 | `event_id` | Linked event |
 | `relevance` | primary, secondary, or background |
-| `auto_linked` | true if linked by LLM, false if by user |

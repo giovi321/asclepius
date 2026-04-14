@@ -26,19 +26,29 @@ The Documents page shows all documents for the selected patient (or all accessib
 
 ### Filtering
 
-Filter documents by:
+Documents can be filtered using **Excel-style multi-select dropdowns** with search. Each filter supports selecting multiple values simultaneously:
 
-- **Document type** (bloodtest, prescription, specialist_report, etc.)
-- **Date range** (from/to)
-- **Status** (pending, processing, done, failed, needs_review, cancelled)
-- **Specialty**
-- **Doctor**
-- **Facility**
-- **Search query** (full-text search across OCR text and metadata)
+- **Document type** (bloodtest, prescription, specialist_report, etc.) -- multi-select with search
+- **Status** (pending, processing, done, failed, needs_review, cancelled) -- multi-select
+- **Specialty** -- multi-select with search, populated from extracted specialties
+- **Doctor** -- multi-select with search, populated from the doctors table
+- **Facility** -- multi-select with search, populated from the facilities table
+- **Date range** (from/to date pickers)
+- **Search query** (full-text search across OCR text, filenames, summaries, and metadata)
+
+Each dropdown supports:
+
+- **Search within options** -- type to filter the option list
+- **Select all / Clear** -- bulk select or deselect all options
+- **Add search results to selection** -- when searching, add all matching results to your current selection
+- **Badge count** -- shows how many values are selected
+- **Clear all filters** button -- resets all active filters at once
+
+All filter parameters support comma-separated multi-values in the API (e.g., `?type=bloodtest,prescription&status=done,needs_review`).
 
 ### Pagination
 
-Documents are loaded in pages of 50. Use the pagination controls at the bottom to navigate.
+Documents are loaded in pages of 20. Use the Previous/Next controls at the bottom to navigate.
 
 ## Document Detail Page
 
@@ -110,12 +120,20 @@ Assign the document to a medical event, or use **Suggest Event** for AI-powered 
 
 ## Reprocessing
 
-Click **Reprocess** to re-run LLM extraction on a document. This:
+Click the **Reprocess** dropdown button to re-run processing on a document. A popover lets you choose:
 
-1. Clears all existing extracted data (lab results, encounters, medications, etc.)
-2. Re-runs the OCR if no text is present
-3. Runs the full two-phase LLM extraction again
-4. Does **not** move the file -- the path stays the same
+- **What to reprocess:**
+    - **OCR + LLM** -- full reprocess (re-extract text and re-run LLM analysis)
+    - **OCR only** -- re-extract text without re-running LLM
+    - **LLM only** -- re-run LLM analysis using existing OCR text
+- **OCR Provider** (when OCR is included) -- select which OCR provider to use, or leave as default
+- **LLM Provider** (when LLM is included) -- select which LLM provider to use, or leave as default
+
+This is useful for:
+
+- Trying a different OCR engine (e.g., switching from Tesseract to Chandra for better quality)
+- Re-running extraction with a more capable LLM model
+- Fixing documents that were marked "done" with empty results
 
 ## Cancelling Processing
 
@@ -129,7 +147,7 @@ Click **Delete** to permanently remove a document:
 - All database records (document + child tables) are removed via CASCADE
 - If the document was being processed, it is cancelled first
 
-Only users with the `owner` role on the patient can delete documents.
+Admins can delete any document. Editors and owners can delete documents for patients they have access to. Viewers cannot delete documents.
 
 ## Moving Documents
 

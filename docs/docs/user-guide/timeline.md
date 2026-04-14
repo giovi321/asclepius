@@ -8,43 +8,58 @@ The Timeline page shows all documents for the selected patient arranged chronolo
 
 ### Vertical Timeline
 
-Documents are displayed as entries on a vertical timeline, each showing:
+Documents are displayed as cards on a vertical timeline, grouped by year. Each card shows:
 
 - **Date** -- the most relevant date (visit date, issue date, or document date)
-- **Document type** -- with a color-coded dot
+- **Document type** -- with a color-coded badge and tick mark
+- **Filename** -- the document filename
 - **Doctor / Facility** -- who created the document
-- **Summary** -- brief description of the document content
+- **Summary** -- brief description of the document content (2-line preview)
+- **Medical event banner** -- if the document is linked to an event, a colored banner shows the event title and type
 
-Click any timeline entry to navigate to the document detail page.
+Click any card to navigate to the document detail page. Middle-click or Ctrl+click opens in a new tab.
 
-### Mini-Map
+### Mini-Map Sidebar
 
-A mini-map on the right side of the timeline provides a compressed overview of the entire timeline. It shows:
+A mini-map on the left side of the timeline provides navigation:
 
-- The distribution of documents across years
-- Your current viewport position
-- Click anywhere on the mini-map to jump to that time period
+- **Year labels** -- each year is listed with the currently visible year highlighted
+- **Viewport indicator** -- a translucent highlight moves in real-time to show which portion of the timeline is currently visible on screen
+- **Click to navigate** -- click any year label to scroll to that section
+- **Hover tooltips** -- hover over a year to see the document count and month breakdown (e.g., "2025 -- 9 docs, Jun 2025, May 2025, Mar 2025")
 
-### Jump-to-Date
+### Go to Date
 
-Use the jump-to-date control to quickly navigate to a specific date or time period. Enter a year or a full date to scroll the timeline to that point.
+A floating date picker in the bottom-right corner lets you jump to any date:
+
+1. Select a date using the date picker
+2. Click **Go to date** to scroll the timeline to that period
 
 ### Color Coding
 
-Timeline entries are color-coded by document type, making it easy to identify patterns:
+Timeline entries are color-coded by document type:
 
-- Different colors for blood tests, specialist reports, prescriptions, imaging, etc.
-- Medical events can have custom colors set when creating them
+| Color | Document Types |
+|-------|---------------|
+| Primary (blue) | Specialist reports, discharge letters, ER reports, surgical reports |
+| Blue | Blood tests, lab tests |
+| Emerald | Invoices, receipts, insurance claims |
+| Purple | Radiology reports, DICOM imaging |
+| Orange | Prescriptions |
+| Teal | Vaccinations |
+
+Medical events can have custom colors set when creating them, displayed as colored banners on the cards.
 
 ## Usage
 
 1. Select a patient from the sidebar
 2. Go to **Timeline** in the sidebar
-3. Scroll through the timeline or use the mini-map / jump-to-date for navigation
-4. Click any entry to view the full document
+3. Scroll through the timeline or use the mini-map / Go to Date for navigation
+4. Click any card to view the full document
 
 ## Tips
 
 - The timeline preserves your scroll position when you navigate to a document and return
-- Use the mini-map to quickly identify periods with high medical activity
+- Use the mini-map viewport indicator to orient yourself in large timelines
 - Color patterns can help you spot recurring visit types (e.g., regular blood tests)
+- Medical event banners group related documents visually

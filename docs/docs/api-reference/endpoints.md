@@ -71,7 +71,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `PATCH` | `/api/documents/{id}` | Yes | Update document metadata |
 | `DELETE` | `/api/documents/{id}` | Yes | Delete document and file |
 | `POST` | `/api/documents/{id}/move` | Yes | Reassign document to another patient |
-| `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run LLM extraction |
+| `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run OCR and/or LLM extraction |
 | `POST` | `/api/documents/{id}/cancel` | Yes | Cancel processing |
 | `POST` | `/api/documents/{id}/edit-with-ai` | Yes | Edit metadata via natural language |
 | `POST` | `/api/documents/{id}/link` | Yes | Link to another document |
@@ -84,14 +84,14 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `patient_id` | int | Filter by patient |
-| `type` | string | Filter by document type |
+| `type` | string | Filter by document type (comma-separated for multiple) |
 | `date_from` | string | Filter by date (YYYY-MM-DD) |
 | `date_to` | string | Filter by date (YYYY-MM-DD) |
-| `status` | string | Filter by status (pending, processing, done, failed, needs_review, cancelled) |
+| `status` | string | Filter by status (comma-separated for multiple: pending, processing, done, failed, needs_review, cancelled) |
 | `q` | string | Full-text search query |
-| `specialty` | string | Filter by specialty |
-| `doctor_id` | int | Filter by doctor |
-| `facility_id` | int | Filter by facility |
+| `specialty` | string | Filter by specialty (comma-separated for multiple) |
+| `doctor_id` | string | Filter by doctor (comma-separated for multiple) |
+| `facility_id` | string | Filter by facility (comma-separated for multiple) |
 | `limit` | int | Results per page (default: 50) |
 | `offset` | int | Pagination offset |
 
@@ -107,6 +107,22 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 }
 ```
 
+### Reprocess Request
+
+```json
+{
+  "mode": "both",
+  "llm_provider_id": "claude-1",
+  "ocr_provider_id": "tesseract-1"
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | string | `"both"` | `"ocr"` (OCR only), `"llm"` (LLM only), or `"both"` |
+| `llm_provider_id` | string | null | Specific LLM provider ID (null = default highest-priority) |
+| `ocr_provider_id` | string | null | Specific OCR provider ID (null = default highest-priority) |
+
 ### Document Link Types
 
 `invoice_for`, `report_for`, `imaging_for`, `follow_up`, `related`
@@ -119,7 +135,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `GET` | `/api/events/{id}` | Yes | Get event with linked documents |
 | `POST` | `/api/events` | Yes | Create a new event |
 | `PATCH` | `/api/events/{id}` | Yes | Update event fields |
-| `DELETE` | `/api/events/{id}` | Yes | Delete event (unlinks documents) |
+| `DELETE` | `/api/events/{id}` | Yes | Delete event (unlinks documents). Pass `?delete_documents=true` to also delete linked documents |
 | `POST` | `/api/events/{id}/link` | Yes | Link a document to the event |
 | `DELETE` | `/api/events/{id}/link/{doc_id}` | Yes | Unlink a document from the event |
 | `POST` | `/api/events/suggest-for-document/{doc_id}` | Yes | AI-suggest event for a document |
@@ -204,6 +220,28 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/pipeline/status` | Yes | Get pipeline processing status |
+| `POST` | `/api/pipeline/start` | Admin | Start the processing pipeline |
+| `POST` | `/api/pipeline/stop` | Admin | Stop the processing pipeline |
+
+### Pipeline Status Response
+
+```json
+{
+  "queue_depth": 2,
+  "processing": "document.pdf",
+  "processing_step": "llm_extraction",
+  "processing_doc_id": 42,
+  "processing_pages": 15,
+  "processing_page_current": 7,
+  "total_processed": 128,
+  "total_errors": 3,
+  "recent_errors": [],
+  "queued_files": [{"filename": "next.pdf", "size": 1234567}],
+  "watcher_active": true,
+  "auto_stopped": false,
+  "auto_stop_reason": ""
+}
+```
 
 ## Settings
 
@@ -211,6 +249,12 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 |--------|------|------|-------------|
 | `GET` | `/api/settings` | Yes | Get all settings |
 | `PATCH` | `/api/settings` | Yes | Update settings (persisted to YAML) |
+| `GET` | `/api/settings/llm-providers` | Yes | List LLM providers |
+| `PUT` | `/api/settings/llm-providers` | Yes | Update LLM providers |
+| `GET` | `/api/settings/ocr-providers` | Yes | List OCR providers |
+| `PUT` | `/api/settings/ocr-providers` | Yes | Update OCR providers |
+| `POST` | `/api/settings/test-llm-provider` | Yes | Test an LLM provider connection |
+| `POST` | `/api/settings/test-ocr-provider` | Yes | Test an OCR provider connection |
 
 ### Settings Update Fields
 

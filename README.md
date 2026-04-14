@@ -31,6 +31,12 @@ On first launch, a setup wizard guides you through creating your account and fir
 - **Full-text search**: SQLite FTS5 across all document content
 - **Normalization**: Canonical mapping for lab tests, diagnoses, medications, specialties across languages
 - **Multi-language**: Handles documents in any language, extracts to English canonical forms
+- **Timeline view**: Visual chronological timeline with mini-map navigation and real-time viewport indicator
+- **Medical events**: Group related documents into medical stories (diagnosis, surgery, treatment, etc.)
+- **Runtime pipeline control**: Start/stop processing from the UI, auto-stop on provider failures
+- **Provider testing**: Test LLM and OCR provider connectivity from Settings
+- **Selective reprocessing**: Re-run OCR only, LLM only, or both, with specific provider selection
+- **Excel-style filters**: Multi-select dropdowns with search on all document list columns
 
 ## Tech Stack
 

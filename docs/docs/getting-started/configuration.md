@@ -10,7 +10,7 @@ server:
   port: 8000               # Internal port (container)
 
 database:
-  path: "/vault/asclepius.sqlite"  # SQLite database path
+  path: "asclepius.sqlite"         # SQLite database path
 
 vault:
   root_path: "/vault"              # Root directory for all files
@@ -35,7 +35,7 @@ oidc:
 
 ocr:
   engine: "tesseract"         # tesseract, tesseract_remote, llm_vision, google_vision
-  language: "eng+ita+deu"     # Tesseract language codes, + separated
+  language: "eng"              # Tesseract language codes, + separated
   confidence_threshold: 0.7   # Below this, document marked as needs_review
   remote_url: ""              # URL for remote Tesseract server
   remote_api_key: ""          # API key for remote Tesseract server
@@ -154,6 +154,8 @@ These environment variables override `settings.yaml` values:
 |----------|-----------|
 | `ASCLEPIUS_SECRET_KEY` | `auth.secret_key` |
 | `ASCLEPIUS_VAULT_PATH` | `vault.root_path` and all sub-paths + `database.path` |
+| `ASCLEPIUS_DATA_PATH` | Separate path for database and config data |
+| `ASCLEPIUS_DB_PATH` | `database.path` |
 | `ASCLEPIUS_OLLAMA_URL` | `llm.ollama_base_url` |
 | `ASCLEPIUS_ANTHROPIC_API_KEY` | `llm.claude_api_key` |
 | `ASCLEPIUS_GOOGLE_VISION_KEY` | `ocr.google_vision_key` (also enables `cloud_ocr_enabled`) |

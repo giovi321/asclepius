@@ -291,6 +291,19 @@ export default function DocumentDetailPage() {
         <div className="space-y-4">
           <Section title="Document Info">
             <InfoRow label="Status" value={doc.status} />
+            {(doc.status === "failed" || doc.status === "needs_review") && doc.error_message && (
+              <div className="rounded-md bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+                  {doc.status === "failed" ? "Processing Error" : "Review Required"}
+                  {doc.retry_count > 0 && (
+                    <span className="font-normal ml-2 text-red-500">({doc.retry_count} retries)</span>
+                  )}
+                </p>
+                <pre className="text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all leading-relaxed">
+                  {doc.error_message}
+                </pre>
+              </div>
+            )}
             <EditableField label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />

@@ -5,8 +5,10 @@ import { usePatient } from "@/contexts/PatientContext";
 import {
   FileText,
   AlertCircle,
+  AlertTriangle,
   Activity,
   Clock,
+  XCircle,
 } from "lucide-react";
 
 interface PipelineStatus {
@@ -26,7 +28,7 @@ export default function DashboardPage() {
   const { selectedPatient } = usePatient();
   const [documents, setDocuments] = useState<any[]>([]);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
-  const [stats, setStats] = useState({ total: 0, pending: 0, unclassified: 0 });
+  const [stats, setStats] = useState({ total: 0, pending: 0, unclassified: 0, needs_review: 0, failed: 0 });
 
   const fetchData = () => {
     const params: Record<string, any> = { limit: 10 };
@@ -45,6 +47,14 @@ export default function DashboardPage() {
       setStats((s) => ({ ...s, pending: s.pending + (res.data.total || 0) }));
     });
 
+    api.get("/documents", { params: { status: "needs_review", limit: 1 } }).then((res) => {
+      setStats((s) => ({ ...s, needs_review: res.data.total || 0 }));
+    });
+
+    api.get("/documents", { params: { status: "failed", limit: 1 } }).then((res) => {
+      setStats((s) => ({ ...s, failed: res.data.total || 0 }));
+    });
+
     api.get("/pipeline/status").then((res) => setPipeline(res.data));
   };
 
@@ -60,7 +70,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-semibold">Dashboard</h1>
 
       {/* Stats cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           icon={FileText}
           label="Total Documents"
@@ -69,9 +79,23 @@ export default function DashboardPage() {
         />
         <StatCard
           icon={Clock}
-          label="Pending Processing"
+          label="Pending"
           value={stats.pending}
           href="/documents"
+        />
+        <StatCard
+          icon={AlertTriangle}
+          label="Needs Review"
+          value={stats.needs_review}
+          href="/documents"
+          color={stats.needs_review > 0 ? "amber" : undefined}
+        />
+        <StatCard
+          icon={XCircle}
+          label="Failed"
+          value={stats.failed}
+          href="/settings"
+          color={stats.failed > 0 ? "red" : undefined}
         />
         <StatCard
           icon={AlertCircle}
@@ -82,8 +106,9 @@ export default function DashboardPage() {
         <StatCard
           icon={Activity}
           label="Pipeline"
-          value={pipeline?.processing ? "Active" : "Idle"}
+          value={pipeline?.watcher_active ? (pipeline?.processing ? "Active" : "Idle") : "Stopped"}
           href="/settings"
+          color={pipeline?.watcher_active ? undefined : "red"}
         />
       </div>
 
@@ -196,22 +221,40 @@ function StatCard({
   label,
   value,
   href,
+  color,
 }: {
   icon: any;
   label: string;
   value: string | number;
   href: string;
+  color?: "red" | "amber";
 }) {
+  const colorClasses = color === "red"
+    ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10"
+    : color === "amber"
+    ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10"
+    : "";
+  const iconColor = color === "red"
+    ? "text-red-500"
+    : color === "amber"
+    ? "text-amber-500"
+    : "text-muted-foreground";
+  const valueColor = color === "red"
+    ? "text-red-700 dark:text-red-400"
+    : color === "amber"
+    ? "text-amber-700 dark:text-amber-400"
+    : "";
+
   return (
     <Link
       to={href}
-      className="rounded-lg border p-4 transition-colors hover:bg-accent/50"
+      className={`rounded-lg border p-4 transition-colors hover:bg-accent/50 ${colorClasses}`}
     >
       <div className="flex items-center gap-3">
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <Icon className={`h-5 w-5 ${iconColor}`} />
         <div>
           <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-xl font-semibold">{value}</p>
+          <p className={`text-xl font-semibold ${valueColor}`}>{value}</p>
         </div>
       </div>
     </Link>

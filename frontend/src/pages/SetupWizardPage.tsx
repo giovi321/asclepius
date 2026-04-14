@@ -130,14 +130,14 @@ export default function SetupWizardPage() {
             <div>
               <label className={labelClass}>Display Name</label>
               <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
-                className={inputClass} placeholder="e.g. Giovanni Crapelli" autoFocus />
+                className={inputClass} placeholder="e.g. John Smith" autoFocus />
               <p className="mt-1 text-xs text-muted-foreground">Your full name (used to pre-fill patient profile)</p>
             </div>
 
             <div>
               <label className={labelClass}>Username *</label>
               <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                className={inputClass} placeholder="e.g. giovanni" required />
+                className={inputClass} placeholder="e.g. jsmith" required />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -37,11 +37,11 @@ COPY backend/ .
 # Copy built frontend
 COPY --from=frontend-build /frontend/dist /app/static
 
-# Copy seed data for initial database setup
-COPY config/seeds /data/config/seeds
-
 # Create data directories (vault + config/db)
 RUN mkdir -p /data/vault/inbox /data/vault/patients /data/vault/unclassified /data/config
+
+# Copy seed data for initial database setup
+COPY config/ /app/bundled_config/
 
 EXPOSE 8000
 

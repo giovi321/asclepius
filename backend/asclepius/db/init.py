@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 SEEDS_DIR = Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "/data/config/settings.yaml")).parent / "seeds"
+# Bundled seeds inside the Docker image (fallback)
+BUNDLED_SEEDS_DIR = Path(__file__).parent.parent.parent / "bundled_config" / "seeds"
 
 
 async def initialize_database(db_path: str) -> None:
@@ -117,6 +119,9 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
 async def _seed_normalization_tables(db: aiosqlite.Connection) -> None:
     """Load seed data from JSON files into normalization tables."""
     seeds_dir = SEEDS_DIR
+    # Check bundled seeds inside the Docker image
+    if not seeds_dir.exists():
+        seeds_dir = BUNDLED_SEEDS_DIR
     # Also check relative path for local development
     if not seeds_dir.exists():
         seeds_dir = Path(__file__).parent.parent.parent.parent / "config" / "seeds"

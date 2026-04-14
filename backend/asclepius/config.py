@@ -51,7 +51,7 @@ class OcrProviderEntry(BaseModel):
     enabled: bool = True
     priority: int = 1
     # Tesseract settings
-    language: str = "eng+ita+deu"
+    language: str = "eng"
     # Remote Tesseract settings
     remote_url: str = ""
     remote_api_key: str = ""
@@ -82,7 +82,7 @@ class LlmProviderEntry(BaseModel):
 class OcrConfig(BaseModel):
     # Legacy flat fields (kept for backward compatibility during migration)
     engine: str = "tesseract"
-    language: str = "eng+ita+deu"
+    language: str = "eng"
     confidence_threshold: float = 0.7
     remote_url: str = ""
     remote_api_key: str = ""

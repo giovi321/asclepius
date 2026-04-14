@@ -516,7 +516,7 @@ function OcrProvidersTab() {
       name: typeInfo?.label || type,
       enabled: true,
       priority: providers.length + 1,
-      language: "eng+ita+deu",
+      language: "eng",
       remote_url: "",
       remote_api_key: "",
       llm_provider: "ollama",
@@ -619,7 +619,7 @@ function OcrProvidersTab() {
                     <>
                       <TextField label="OCR Languages" value={p.language}
                         onChange={(v) => updateProvider(p.id, { language: v })}
-                        placeholder="e.g. eng+ita+deu" description="Tesseract language codes separated by +" />
+                        placeholder="e.g. eng+fra+deu" description="Tesseract language codes separated by +" />
                       <NumberField label="Confidence Threshold" value={p.confidence_threshold}
                         onChange={(v) => updateProvider(p.id, { confidence_threshold: v })} min={0} max={1} step={0.05} />
                     </>
@@ -648,7 +648,7 @@ function OcrProvidersTab() {
                         options={LLM_VISION_PROVIDERS} />
                       <TextField label="Vision Model" value={p.llm_model}
                         onChange={(v) => updateProvider(p.id, { llm_model: v })}
-                        placeholder={p.llm_provider === "ollama" ? "e.g. chandra-ocr-2" : p.llm_provider === "claude" ? "e.g. claude-sonnet-4-20250514" : "e.g. gpt-4o"} />
+                        placeholder={p.llm_provider === "ollama" ? "e.g. llava" : p.llm_provider === "claude" ? "e.g. claude-sonnet-4-20250514" : "e.g. gpt-4o"} />
                       {(p.llm_provider === "ollama") && (
                         <TextField label="Ollama URL" value={p.llm_base_url}
                           onChange={(v) => updateProvider(p.id, { llm_base_url: v })}

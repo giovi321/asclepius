@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { Loader2, Calendar } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 interface TimelineDoc {
   id: number;
@@ -59,6 +59,8 @@ export default function TimelinePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const yearRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const mainRef = useRef<HTMLDivElement>(null);
+  const minimapRef = useRef<HTMLDivElement>(null);
+  const [viewportIndicator, setViewportIndicator] = useState({ top: 0, height: 0 });
 
   // Restore scroll position when returning from document detail
   useEffect(() => {
@@ -126,25 +128,58 @@ export default function TimelinePage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // Track which year is visible
+  // Track which year is visible + position viewport indicator on mini-map
   useEffect(() => {
-    if (!scrollRef.current || years.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const y = entry.target.getAttribute("data-year");
-            if (y) setCurrentYear(y);
-          }
+    if (years.length === 0) return;
+    const scrollParent = mainRef.current?.closest("main") || window;
+
+    const updateIndicator = () => {
+      // Find which year section is in the viewport
+      const viewTop = window.scrollY || (scrollParent instanceof Element ? scrollParent.scrollTop : 0);
+      const viewHeight = window.innerHeight;
+
+      for (const y of years) {
+        const el = yearRefs.current[y];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        // Year section is visible if its top is in the upper half of viewport
+        if (rect.top <= viewHeight * 0.4 && rect.bottom > 0) {
+          setCurrentYear(y);
         }
-      },
-      { root: scrollRef.current, threshold: 0.3 }
-    );
-    for (const y of years) {
-      const el = yearRefs.current[y];
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
+      }
+
+      // Position the viewport indicator on the mini-map
+      const minimap = minimapRef.current;
+      const timeline = scrollRef.current;
+      if (!minimap || !timeline) return;
+
+      const timelineRect = timeline.getBoundingClientRect();
+      const minimapRect = minimap.getBoundingClientRect();
+      const timelineH = timeline.scrollHeight;
+
+      if (timelineH <= 0 || minimapRect.height <= 0) return;
+
+      // How much of the timeline is above the viewport top
+      const scrolledPast = -timelineRect.top;
+      const visibleFraction = viewHeight / timelineH;
+      const scrollFraction = scrolledPast / timelineH;
+
+      const indicatorTop = Math.max(0, scrollFraction * minimapRect.height);
+      const indicatorHeight = Math.max(8, Math.min(minimapRect.height, visibleFraction * minimapRect.height));
+
+      setViewportIndicator({ top: indicatorTop, height: indicatorHeight });
+    };
+
+    const target = scrollParent instanceof Element ? scrollParent : window;
+    target.addEventListener("scroll", updateIndicator, { passive: true });
+    window.addEventListener("resize", updateIndicator, { passive: true });
+    // Initial position
+    requestAnimationFrame(updateIndicator);
+
+    return () => {
+      target.removeEventListener("scroll", updateIndicator);
+      window.removeEventListener("resize", updateIndicator);
+    };
   }, [years.join(",")]);
 
   if (loading) {
@@ -156,25 +191,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div ref={mainRef} className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Timeline</h1>
-        {/* Jump to date */}
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <input
-            type="date"
-            value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
-            className="rounded-md border bg-background px-2 py-1 text-sm"
-          />
-          <button onClick={scrollToDate}
-            className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90">
-            Go
-          </button>
-        </div>
-      </div>
-
+    <div ref={mainRef}>
       {documents.length === 0 ? (
         <p className="text-muted-foreground">
           No documents found.
@@ -184,9 +201,16 @@ export default function TimelinePage() {
         <div className="flex gap-4">
           {/* Mini-map sidebar */}
           <div className="hidden md:flex flex-col sticky top-0 h-[calc(100vh-12rem)] pt-2">
-            <div className="relative flex-1 flex flex-col justify-between py-2 pl-1 pr-2">
+            <div ref={minimapRef} className="relative flex-1 flex flex-col justify-between py-2 pl-1 pr-2">
               {/* Vertical line */}
               <div className="absolute left-[3px] top-0 bottom-0 w-0.5 bg-border" />
+
+              {/* Viewport indicator — shows current visible area */}
+              <div
+                className="absolute left-0 right-0 bg-primary/10 border-l-2 border-primary rounded-r-sm pointer-events-none transition-all duration-150"
+                style={{ top: viewportIndicator.top, height: viewportIndicator.height }}
+              />
+
               {years.map((year) => {
                 const isActive = currentYear === year;
                 const count = grouped[year].length;
@@ -308,6 +332,22 @@ export default function TimelinePage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Floating "Go to date" picker — bottom right */}
+      {documents.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-20 flex items-center gap-2 rounded-lg border bg-background shadow-lg px-3 py-2">
+          <input
+            type="date"
+            value={targetDate}
+            onChange={(e) => setTargetDate(e.target.value)}
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+          />
+          <button onClick={scrollToDate}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap">
+            Go to date
+          </button>
         </div>
       )}
     </div>

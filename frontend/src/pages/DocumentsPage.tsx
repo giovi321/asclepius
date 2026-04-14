@@ -212,16 +212,16 @@ export default function DocumentsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border">
-        <table className="w-full text-sm">
+      <div className="rounded-lg border overflow-hidden">
+        <table className="w-full text-sm table-fixed">
           <thead className="border-b bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">File</th>
-              <th className="px-4 py-2 text-left font-medium">Type</th>
-              <th className="px-4 py-2 text-left font-medium">Date</th>
-              <th className="px-4 py-2 text-left font-medium">Patient</th>
-              <th className="px-4 py-2 text-left font-medium">Doctor / Facility</th>
-              <th className="px-4 py-2 text-left font-medium">Status</th>
+              <th className="px-4 py-2 text-left font-medium w-[30%]">File</th>
+              <th className="px-4 py-2 text-left font-medium w-[12%]">Type</th>
+              <th className="px-4 py-2 text-left font-medium w-[10%]">Date</th>
+              <th className="px-4 py-2 text-left font-medium w-[16%]">Patient</th>
+              <th className="px-4 py-2 text-left font-medium w-[20%]">Doctor / Facility</th>
+              <th className="px-4 py-2 text-left font-medium w-[12%]">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -232,15 +232,15 @@ export default function DocumentsPage() {
             ) : (
               documents.map((doc) => (
                 <tr key={doc.id} className="hover:bg-accent/50">
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 overflow-hidden">
                     <InlineRenameCell doc={doc} onRenamed={(updated) => {
                       setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, ...updated } : d));
                     }} />
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.doc_type?.replace(/_/g, " ") || "\u2014"}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.date_visit || doc.date_issued || doc.doc_date || "\u2014"}</td>
-                  <td className="px-4 py-2">{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
-                  <td className="px-4 py-2 text-muted-foreground">{doc.doctor_name || doc.facility_name || "\u2014"}</td>
+                  <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doc_type?.replace(/_/g, " ") || ""}>{doc.doc_type?.replace(/_/g, " ") || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground truncate">{doc.date_visit || doc.date_issued || doc.doc_date || "—"}</td>
+                  <td className="px-4 py-2 truncate" title={doc.patient_name || "Unclassified"}>{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
+                  <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || doc.facility_name || ""}>{doc.doctor_name || doc.facility_name || "—"}</td>
                   <td className="px-4 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs ${
                       doc.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
@@ -265,7 +265,7 @@ export default function DocumentsPage() {
       {total > limit && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * limit + 1}\u2013{Math.min((page + 1) * limit, total)} of {total}
+            Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
           </span>
           <div className="flex gap-2">
             <button
@@ -326,9 +326,9 @@ function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: a
 
   return (
     <div className="flex items-center gap-2 group">
-      <Link to={`/documents/${doc.id}`} className="flex items-center gap-2 text-primary hover:underline flex-1 min-w-0">
+      <Link to={`/documents/${doc.id}`} className="flex items-center gap-2 text-primary hover:underline flex-1 min-w-0" title={doc.original_filename}>
         <FileText className="h-4 w-4 flex-shrink-0" />
-        <span className="max-w-[200px] truncate">{doc.original_filename}</span>
+        <span className="truncate">{doc.original_filename}</span>
       </Link>
       <button
         onClick={(e) => { e.stopPropagation(); setVal(doc.original_filename); setEditing(true); }}

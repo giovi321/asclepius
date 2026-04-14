@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
@@ -23,6 +23,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(0);
@@ -45,16 +46,30 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     return () => observer.disconnect();
   }, []);
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    if (pageNumber > numPages) setPageNumber(1);
+    setPageNumber((prev) => (prev > numPages ? 1 : prev));
     setError(null);
-  };
+    setLoading(false);
+  }, []);
 
-  const onDocumentLoadError = (err: Error) => {
+  const onDocumentLoadError = useCallback((err: Error) => {
+    // Ignore errors from destroyed worker (component unmounted during load)
+    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
+      return;
+    }
     console.error("PDF load error:", err);
     setError(`Failed to load PDF: ${err.message}`);
-  };
+    setLoading(false);
+  }, []);
+
+  const onPageRenderError = useCallback((err: Error) => {
+    // Suppress worker-destroyed errors — these are harmless race conditions
+    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
+      return;
+    }
+    console.error("PDF page render error:", err);
+  }, []);
 
   const handleRotate = async (degrees: number, mode: "page" | "all") => {
     if (!onRotate || rotating) return;
@@ -64,6 +79,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
       // Force PDF reload with new cache buster
+      setLoading(true);
       setCacheBuster(Date.now());
     } catch (e) {
       console.error("Rotation failed:", e);
@@ -192,7 +208,15 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       {/* PDF display */}
       <div ref={containerRef} className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
         {error ? (
-          <div className="text-destructive text-sm py-8">{error}</div>
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="text-destructive text-sm">{error}</div>
+            <button
+              onClick={() => { setError(null); setLoading(true); setCacheBuster(Date.now()); }}
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              Retry
+            </button>
+          </div>
         ) : (
           <Document
             key={cacheBuster}
@@ -211,6 +235,10 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
               {...(userZoomed ? { scale } : containerWidth ? { width: containerWidth } : { scale: 1.0 })}
               renderTextLayer={true}
               renderAnnotationLayer={true}
+              onRenderError={onPageRenderError}
+              loading={
+                <div className="text-muted-foreground text-sm py-8">Rendering page...</div>
+              }
             />
           </Document>
         )}

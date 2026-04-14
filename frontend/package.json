@@ -16,6 +16,7 @@
     "lucide-react": "^0.468.0",
     "recharts": "^2.15.0",
     "react-pdf": "^9.2.0",
+    "pdfjs-dist": "^4.8.69",
     "@cornerstonejs/core": "^2.0.0",
     "@cornerstonejs/dicom-image-loader": "^2.0.0",
     "dicom-parser": "^1.8.21",

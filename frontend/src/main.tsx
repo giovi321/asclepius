@@ -6,6 +6,11 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { PatientProvider } from "./contexts/PatientContext";
 import "./index.css";
 
+// Initialise pdf.js worker once at app startup (before any component mounts)
+import { pdfjs } from "react-pdf";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>

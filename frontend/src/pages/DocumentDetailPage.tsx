@@ -261,7 +261,7 @@ export default function DocumentDetailPage() {
         <div className="space-y-4">
           {(doc.file_path?.toLowerCase().endsWith(".pdf") || doc.original_filename?.toLowerCase().endsWith(".pdf")) ? (
             <div className="rounded-lg border overflow-hidden h-[700px]">
-              <PdfViewer url={`/api/documents/${id}/file`} onRotate={handleRotate} />
+              <PdfViewer key={`pdf-${id}`} url={`/api/documents/${id}/file`} onRotate={handleRotate} />
             </div>
           ) : doc.file_path?.match(/\.(jpg|jpeg|png|tiff|tif)$/i) ? (
             <div className="rounded-lg border overflow-hidden">

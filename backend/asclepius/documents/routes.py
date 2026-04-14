@@ -416,11 +416,11 @@ async def delete_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check access
-    if doc["patient_id"]:
+    # Check access — admins can always delete, others need patient access
+    if doc["patient_id"] and current_user.get("role") != "admin":
         role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-        if role != "owner":
-            raise HTTPException(status_code=403, detail="Only owners can delete documents")
+        if not role or role == "viewer":
+            raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
 
     # If document is being processed, cancel it first
     if doc["status"] in ("processing", "pending"):

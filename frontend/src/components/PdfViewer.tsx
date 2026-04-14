@@ -14,6 +14,21 @@ interface PdfViewerProps {
   onRotate?: (degrees: number, pages: number[] | null) => Promise<void>;
 }
 
+/**
+ * Hook that debounces a value — the returned value only updates after
+ * `delay` ms of inactivity.  This prevents rapid zoom clicks from
+ * flooding react-pdf with concurrent render requests that crash the
+ * pdf.js worker.
+ */
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
 export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
@@ -26,6 +41,9 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(0);
+
+  // Debounce the scale so rapid zoom clicks don't flood the worker
+  const debouncedScale = useDebouncedValue(scale, 150);
 
   // Build the file URL with cache-busting parameter
   const fileUrl = cacheBuster > 0
@@ -53,12 +71,22 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   }, []);
 
   const onDocumentLoadError = useCallback((err: Error) => {
+    // Suppress worker-destroyed errors — these happen when the component
+    // unmounts while a render is in flight (e.g. navigating away).
+    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
+      return;
+    }
     console.error("PDF load error:", err);
     setError(`Failed to load PDF: ${err.message}`);
     setLoading(false);
   }, []);
 
   const onPageRenderError = useCallback((err: Error) => {
+    // Suppress worker race-condition errors — the debounce prevents most
+    // of these, but a stale render can still fire during rapid interaction.
+    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
+      return;
+    }
     console.error("PDF page render error:", err);
   }, []);
 
@@ -109,7 +137,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
         <div className="flex items-center gap-1">
           {/* Zoom */}
           <button
-            onClick={() => { setScale((s) => Math.max(0.5, s - 0.2)); setUserZoomed(true); }}
+            onClick={() => { setScale((s) => Math.max(0.5, +(s - 0.2).toFixed(1))); setUserZoomed(true); }}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom out"
           >
@@ -119,21 +147,25 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
             {userZoomed ? `${Math.round(scale * 100)}%` : "Fit"}
           </span>
           <button
-            onClick={() => { setScale((s) => Math.min(3.0, s + 0.2)); setUserZoomed(true); }}
+            onClick={() => { setScale((s) => Math.min(3.0, +(s + 0.2).toFixed(1))); setUserZoomed(true); }}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
           </button>
-          {userZoomed && (
-            <button
-              onClick={() => { setUserZoomed(false); setScale(1.0); }}
-              className="rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
-              title="Fit to width"
-            >
-              Fit
-            </button>
-          )}
+          {/* Fit button — always rendered to prevent layout shift */}
+          <button
+            onClick={() => { setUserZoomed(false); setScale(1.0); }}
+            disabled={!userZoomed}
+            className={`rounded px-1.5 py-1 text-[11px] transition-colors ${
+              userZoomed
+                ? "text-primary hover:bg-accent hover:text-foreground"
+                : "text-muted-foreground/40 cursor-default"
+            }`}
+            title="Fit to width"
+          >
+            Fit
+          </button>
 
           {/* Rotate controls */}
           {onRotate && (
@@ -223,7 +255,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
           >
             <Page
               pageNumber={pageNumber}
-              {...(userZoomed ? { scale } : containerWidth ? { width: containerWidth } : { scale: 1.0 })}
+              {...(userZoomed ? { scale: debouncedScale } : containerWidth ? { width: containerWidth } : { scale: 1.0 })}
               renderTextLayer={true}
               renderAnnotationLayer={true}
               onRenderError={onPageRenderError}

@@ -646,6 +646,7 @@ async def delete_link(
 class ReprocessRequest(BaseModel):
     mode: str = "both"  # "ocr", "llm", or "both"
     llm_provider_id: str | None = None  # optional override
+    ocr_provider_id: str | None = None  # optional override
 
 
 @router.post("/{doc_id}/reprocess")
@@ -669,7 +670,9 @@ async def reprocess_doc(
 
     config = get_config()
     asyncio.create_task(reprocess_document(
-        doc_id, config, mode=body.mode, llm_provider_id=body.llm_provider_id,
+        doc_id, config, mode=body.mode,
+        llm_provider_id=body.llm_provider_id,
+        ocr_provider_id=body.ocr_provider_id,
     ))
     return {"status": "reprocessing", "document_id": doc_id}
 

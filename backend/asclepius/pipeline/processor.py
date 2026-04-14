@@ -421,6 +421,42 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     "error": extraction.get("error", "Unknown"),
                 })
                 pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
+                await db.execute(
+                    """UPDATE documents SET status = 'failed', error_message = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (extraction.get("error", "Extraction failed")[:2000], doc_id),
+                )
+                await db.commit()
+                return
+
+            # Validate that the LLM actually produced meaningful content.
+            # If all key fields are empty, mark needs_review instead of done.
+            _has_content = any([
+                extraction.get("doc_type"),
+                extraction.get("summary_en"),
+                extraction.get("summary_original"),
+                extraction.get("date_visit"),
+                extraction.get("date_issued"),
+                extraction.get("doc_date"),
+                extraction.get("lab_results"),
+                extraction.get("medications"),
+                extraction.get("diagnoses"),
+            ])
+            if not _has_content:
+                logger.warning("LLM extraction produced no meaningful content for doc %d", doc_id)
+                await db.execute(
+                    """UPDATE documents SET status = 'needs_review',
+                       error_message = 'LLM extraction returned empty results',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (doc_id,),
+                )
+                await db.commit()
+                pipeline_status["total_errors"] += 1
+                pipeline_status["recent_errors"].append({
+                    "file": path.name,
+                    "error": "LLM extraction returned empty results",
+                })
+                pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
                 return
 
             # Check cancellation before organizing
@@ -685,11 +721,13 @@ async def reprocess_document(
     config: AppConfig,
     mode: str = "both",
     llm_provider_id: str | None = None,
+    ocr_provider_id: str | None = None,
 ) -> dict:
     """Re-run OCR and/or LLM extraction on an existing document.
 
     mode: "ocr" = re-OCR only, "llm" = re-extract only, "both" = full reprocess.
-    llm_provider_id: if set, use this specific provider instead of the default.
+    llm_provider_id: if set, use this specific LLM provider instead of the default.
+    ocr_provider_id: if set, use this specific OCR provider instead of the default.
     """
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
@@ -727,7 +765,7 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config)
+            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
@@ -756,7 +794,7 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config)
+            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
@@ -818,11 +856,34 @@ async def reprocess_document(
 
             if "error" in extraction:
                 await db.execute(
-                    "UPDATE documents SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (doc_id,),
+                    """UPDATE documents SET status = 'failed', error_message = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (extraction.get("error", "Extraction failed")[:2000], doc_id),
                 )
                 await db.commit()
                 return extraction
+
+            # Validate meaningful content
+            _has_content = any([
+                extraction.get("doc_type"),
+                extraction.get("summary_en"),
+                extraction.get("summary_original"),
+                extraction.get("date_visit"),
+                extraction.get("date_issued"),
+                extraction.get("doc_date"),
+                extraction.get("lab_results"),
+                extraction.get("medications"),
+                extraction.get("diagnoses"),
+            ])
+            if not _has_content:
+                await db.execute(
+                    """UPDATE documents SET status = 'needs_review',
+                       error_message = 'LLM extraction returned empty results',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (doc_id,),
+                )
+                await db.commit()
+                return {"error": "LLM extraction returned empty results"}
 
             await db.execute(
                 "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",

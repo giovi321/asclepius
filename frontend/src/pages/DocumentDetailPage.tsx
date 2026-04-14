@@ -48,15 +48,19 @@ export default function DocumentDetailPage() {
   // Reprocess popover state
   const [showReprocessMenu, setShowReprocessMenu] = useState(false);
   const [llmProviders, setLlmProviders] = useState<any[]>([]);
+  const [ocrProviders, setOcrProviders] = useState<any[]>([]);
   const [reprocessMode, setReprocessMode] = useState("both");
-  const [reprocessProvider, setReprocessProvider] = useState("");
+  const [reprocessLlmProvider, setReprocessLlmProvider] = useState("");
+  const [reprocessOcrProvider, setReprocessOcrProvider] = useState("");
   const reprocessRef = useRef<HTMLDivElement>(null);
 
-  // Load LLM providers once
+  // Load providers once
   useEffect(() => {
     api.get("/settings/llm-providers").then((res) => {
-      const providers = (res.data || []).filter((p: any) => p.enabled);
-      setLlmProviders(providers);
+      setLlmProviders((res.data || []).filter((p: any) => p.enabled));
+    }).catch(() => {});
+    api.get("/settings/ocr-providers").then((res) => {
+      setOcrProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});
   }, []);
 
@@ -72,13 +76,12 @@ export default function DocumentDetailPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showReprocessMenu]);
 
-  const handleReprocess = async (mode?: string, providerId?: string) => {
+  const handleReprocess = async () => {
     setShowReprocessMenu(false);
-    const m = mode || reprocessMode;
-    const p = providerId || reprocessProvider;
     await api.post(`/documents/${id}/reprocess`, {
-      mode: m,
-      ...(p ? { llm_provider_id: p } : {}),
+      mode: reprocessMode,
+      ...(reprocessLlmProvider ? { llm_provider_id: reprocessLlmProvider } : {}),
+      ...(reprocessOcrProvider ? { ocr_provider_id: reprocessOcrProvider } : {}),
     });
     await loadDoc(false);
   };
@@ -279,12 +282,30 @@ export default function DocumentDetailPage() {
                     ))}
                   </div>
 
+                  {reprocessMode !== "llm" && ocrProviders.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
+                      <select
+                        value={reprocessOcrProvider}
+                        onChange={(e) => setReprocessOcrProvider(e.target.value)}
+                        className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                      >
+                        <option value="">Default (highest priority)</option>
+                        {ocrProviders.map((p: any) => (
+                          <option key={p.id} value={p.id}>
+                            {p.label || p.id} ({p.type})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   {reprocessMode !== "ocr" && llmProviders.length > 0 && (
                     <div>
                       <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
                       <select
-                        value={reprocessProvider}
-                        onChange={(e) => setReprocessProvider(e.target.value)}
+                        value={reprocessLlmProvider}
+                        onChange={(e) => setReprocessLlmProvider(e.target.value)}
                         className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
                       >
                         <option value="">Default (highest priority)</option>

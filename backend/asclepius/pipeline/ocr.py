@@ -15,16 +15,29 @@ from asclepius.config import AppConfig, OcrProviderEntry, get_active_ocr_provide
 logger = logging.getLogger(__name__)
 
 
-async def extract_text(file_path: str, config: AppConfig, ocr_priority: int = 1) -> tuple[str, float, str]:
+async def extract_text(
+    file_path: str,
+    config: AppConfig,
+    ocr_priority: int = 1,
+    ocr_provider_id: str | None = None,
+) -> tuple[str, float, str]:
     """Extract text from a file using OCR.
 
-    Uses the OCR provider at the given priority rank from the provider list.
+    Uses the OCR provider at the given priority rank from the provider list,
+    or a specific provider by ID if ocr_provider_id is set.
     Falls back to legacy config.ocr.engine if no provider list is configured.
 
     Returns: (text, confidence, engine_used)
     """
     path = Path(file_path)
     ext = path.suffix.lower()
+
+    # Use a specific OCR provider if requested
+    if ocr_provider_id:
+        for p in config.ocr.providers:
+            if p.id == ocr_provider_id and p.enabled:
+                return await _extract_with_provider(file_path, config, p)
+        logger.warning("OCR provider %s not found or disabled, falling back to default", ocr_provider_id)
 
     # Try the new provider list first
     provider_entry = get_active_ocr_provider_config(config, ocr_priority)

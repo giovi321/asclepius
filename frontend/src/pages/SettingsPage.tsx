@@ -801,14 +801,30 @@ function PipelineTab() {
 
   if (!s) return <div className="text-muted-foreground">Loading...</div>;
 
-  const restartPipeline = async () => {
+  const startPipeline = async () => {
     setStartingPipeline(true);
     try {
       await api.post("/pipeline/start");
+      // Also update the setting so it persists across restarts
+      await api.patch("/settings", { pipeline_watch_enabled: true });
+      setF((prev: any) => ({ ...prev, pipeline_watch_enabled: true }));
       setTimeout(loadStatus, 1000);
     } catch { alert("Failed to start pipeline"); }
     setStartingPipeline(false);
   };
+
+  const stopPipeline = async () => {
+    setStartingPipeline(true);
+    try {
+      await api.post("/pipeline/stop");
+      await api.patch("/settings", { pipeline_watch_enabled: false });
+      setF((prev: any) => ({ ...prev, pipeline_watch_enabled: false }));
+      setTimeout(loadStatus, 1000);
+    } catch { alert("Failed to stop pipeline"); }
+    setStartingPipeline(false);
+  };
+
+  const isActive = pipelineStatus?.watcher_active;
 
   return (
     <div className="space-y-6">
@@ -823,7 +839,7 @@ function PipelineTab() {
               {" "}Check your provider settings and restart when ready.
             </p>
           </div>
-          <button onClick={restartPipeline} disabled={startingPipeline}
+          <button onClick={startPipeline} disabled={startingPipeline}
             className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex-shrink-0">
             {startingPipeline ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
             Restart
@@ -831,44 +847,79 @@ function PipelineTab() {
         </div>
       )}
 
-      {/* Pipeline status indicator */}
+      {/* Pipeline status & controls */}
       {pipelineStatus && (
-        <div className="rounded-lg border p-4">
+        <div className={`rounded-lg border-2 p-5 ${
+          isActive
+            ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10"
+            : "border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/10"
+        }`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className={`inline-block h-2.5 w-2.5 rounded-full ${
-                pipelineStatus.watcher_active ? "bg-green-500 animate-pulse" : "bg-gray-400"
-              }`} />
-              <span className="text-sm font-medium">
-                {pipelineStatus.watcher_active ? "Pipeline active" : "Pipeline stopped"}
-              </span>
-              {pipelineStatus.processing && (
-                <span className="text-xs text-muted-foreground">
-                  Processing: {pipelineStatus.processing} ({pipelineStatus.processing_step})
-                </span>
-              )}
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center justify-center h-10 w-10 rounded-full ${
+                isActive ? "bg-green-100 dark:bg-green-900/30" : "bg-gray-100 dark:bg-gray-800"
+              }`}>
+                {isActive
+                  ? <Play className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  : <Power className="h-5 w-5 text-gray-400" />
+                }
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${
+                    isActive ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                  }`} />
+                  <span className="font-semibold">
+                    {isActive ? "Pipeline Running" : "Pipeline Stopped"}
+                  </span>
+                </div>
+                {isActive && pipelineStatus.processing ? (
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Processing: <span className="font-medium">{pipelineStatus.processing}</span>
+                    {pipelineStatus.processing_step && (
+                      <span className="ml-1 text-xs">({pipelineStatus.processing_step})</span>
+                    )}
+                  </p>
+                ) : isActive ? (
+                  <p className="text-sm text-muted-foreground mt-0.5">Watching inbox for new documents</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-0.5">Documents in inbox will not be processed</p>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Processed: {pipelineStatus.total_processed}</span>
-              {pipelineStatus.total_errors > 0 && (
-                <span className="text-red-500">Errors: {pipelineStatus.total_errors}</span>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right text-xs text-muted-foreground mr-2">
+                <div>Processed: <span className="font-medium">{pipelineStatus.total_processed}</span></div>
+                {pipelineStatus.total_errors > 0 && (
+                  <div className="text-red-500">Errors: {pipelineStatus.total_errors}</div>
+                )}
+              </div>
+              {isActive ? (
+                <button onClick={stopPipeline} disabled={startingPipeline}
+                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
+                  {startingPipeline ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+                  Stop Pipeline
+                </button>
+              ) : (
+                <button onClick={startPipeline} disabled={startingPipeline}
+                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors">
+                  {startingPipeline ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                  Start Pipeline
+                </button>
               )}
             </div>
           </div>
         </div>
       )}
 
-      <SettingsForm title="Automatic Document Processing" saving={saving} saved={saved}
+      <SettingsForm title="Pipeline Settings" saving={saving} saved={saved}
         onSave={() => save({
-          pipeline_watch_enabled: f.pipeline_watch_enabled !== s.pipeline.watch_enabled ? f.pipeline_watch_enabled : undefined,
           pipeline_poll_interval: f.pipeline_poll_interval !== s.pipeline.poll_interval_seconds ? f.pipeline_poll_interval : undefined,
           pipeline_retry_interval: f.pipeline_retry_interval !== s.pipeline.retry_interval_seconds ? f.pipeline_retry_interval : undefined,
           pipeline_max_retries: f.pipeline_max_retries !== s.pipeline.max_retries ? f.pipeline_max_retries : undefined,
           session_ttl_hours: f.session_ttl_hours !== s.auth.session_ttl_hours ? f.session_ttl_hours : undefined,
         })}>
-        <ToggleField label="Automatic Document Processing" value={f.pipeline_watch_enabled}
-          onChange={(v) => setF({ ...f, pipeline_watch_enabled: v })}
-          description="Automatically process new files dropped into the inbox folder" />
         <NumberField label="Poll Interval (seconds)" value={f.pipeline_poll_interval}
           onChange={(v) => setF({ ...f, pipeline_poll_interval: v })} min={1} max={60} step={1} />
         <NumberField label="Retry Interval (seconds)" value={f.pipeline_retry_interval}

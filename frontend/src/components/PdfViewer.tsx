@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Document, Page } from "react-pdf";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, RotateCcw } from "lucide-react";
 
@@ -49,6 +49,10 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const fileUrl = cacheBuster > 0
     ? `${url}${url.includes("?") ? "&" : "?"}v=${cacheBuster}`
     : url;
+
+  // Stable reference — react-pdf deep-compares options and reloads the
+  // entire document (destroying the worker connection) when it changes.
+  const docOptions = useMemo(() => ({ withCredentials: true }), []);
 
   // Measure container width for fit-to-width mode
   useEffect(() => {
@@ -249,9 +253,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
             loading={
               <div className="text-muted-foreground text-sm py-8">Loading PDF...</div>
             }
-            options={{
-              withCredentials: true,
-            }}
+            options={docOptions}
           >
             <Page
               pageNumber={pageNumber}

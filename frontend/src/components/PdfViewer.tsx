@@ -27,6 +27,8 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   const [rotating, setRotating] = useState(false);
   const [showAllMenu, setShowAllMenu] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(0);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Build the file URL with cache-busting parameter
   const fileUrl = cacheBuster > 0
@@ -46,16 +48,29 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     return () => observer.disconnect();
   }, []);
 
+  const isWorkerCrash = (err: Error) =>
+    err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise");
+
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber((prev) => (prev > numPages ? 1 : prev));
     setError(null);
     setLoading(false);
+    retryCountRef.current = 0;
   }, []);
 
   const onDocumentLoadError = useCallback((err: Error) => {
-    // Ignore errors from destroyed worker (component unmounted during load)
-    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
+    // Auto-retry on worker crash (race condition during load)
+    if (isWorkerCrash(err)) {
+      if (retryCountRef.current < maxRetries) {
+        retryCountRef.current += 1;
+        console.warn(`PDF worker crash, auto-retrying (${retryCountRef.current}/${maxRetries})...`);
+        setTimeout(() => setCacheBuster(Date.now()), 500);
+        return;
+      }
+      // Exhausted retries — show error with retry button
+      setError("PDF viewer failed to initialize. Click Retry to try again.");
+      setLoading(false);
       return;
     }
     console.error("PDF load error:", err);
@@ -64,9 +79,13 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   }, []);
 
   const onPageRenderError = useCallback((err: Error) => {
-    // Suppress worker-destroyed errors — these are harmless race conditions
-    if (err?.message?.includes("messageHandler") || err?.message?.includes("sendWithPromise")) {
-      return;
+    if (isWorkerCrash(err)) {
+      if (retryCountRef.current < maxRetries) {
+        retryCountRef.current += 1;
+        console.warn(`PDF page render crash, auto-retrying (${retryCountRef.current}/${maxRetries})...`);
+        setTimeout(() => setCacheBuster(Date.now()), 500);
+        return;
+      }
     }
     console.error("PDF page render error:", err);
   }, []);
@@ -211,7 +230,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
           <div className="flex flex-col items-center gap-3 py-8">
             <div className="text-destructive text-sm">{error}</div>
             <button
-              onClick={() => { setError(null); setLoading(true); setCacheBuster(Date.now()); }}
+              onClick={() => { setError(null); setLoading(true); retryCountRef.current = 0; setCacheBuster(Date.now()); }}
               className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
             >
               Retry

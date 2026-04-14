@@ -177,12 +177,28 @@ async def update_event(
 @router.delete("/{event_id}")
 async def delete_event(
     event_id: int,
+    delete_documents: bool = False,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    # Remove links first
+    if delete_documents:
+        # Delete all linked documents from disk and DB
+        cursor = await db.execute(
+            "SELECT id, file_path FROM documents WHERE event_id = ?", (event_id,)
+        )
+        docs = await cursor.fetchall()
+        import os
+        for doc in docs:
+            if doc["file_path"]:
+                try:
+                    os.remove(doc["file_path"])
+                except OSError:
+                    pass
+            await db.execute("DELETE FROM documents WHERE id = ?", (doc["id"],))
+
+    # Remove links
     await db.execute("DELETE FROM document_event_links WHERE event_id = ?", (event_id,))
-    # Clear event_id from documents
+    # Clear event_id from remaining documents
     await db.execute("UPDATE documents SET event_id = NULL WHERE event_id = ?", (event_id,))
     await db.execute("DELETE FROM medical_events WHERE id = ?", (event_id,))
     await db.commit()

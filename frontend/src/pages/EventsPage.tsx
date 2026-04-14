@@ -59,8 +59,14 @@ export default function EventsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this medical event and all its document links?")) return;
+    if (!confirm("Delete this medical event? Documents will be unlinked but kept.")) return;
     await api.delete(`/events/${id}`);
+    loadEvents();
+  };
+
+  const handleDeleteWithDocs = async (id: number) => {
+    if (!confirm("Delete this medical event AND all its linked documents? This cannot be undone.")) return;
+    await api.delete(`/events/${id}`, { params: { delete_documents: true } });
     loadEvents();
   };
 
@@ -193,6 +199,10 @@ export default function EventsPage() {
                     <button onClick={() => handleDelete(event.id)}
                       className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950">
                       <Trash2 className="h-3 w-3" /> Delete Event
+                    </button>
+                    <button onClick={() => handleDeleteWithDocs(event.id)}
+                      className="flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700">
+                      <Trash2 className="h-3 w-3" /> Delete Event & Documents
                     </button>
                   </div>
                 </div>

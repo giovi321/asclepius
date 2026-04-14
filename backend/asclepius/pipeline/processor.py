@@ -508,12 +508,6 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             )
             await db.commit()
 
-            # Auto-assign to medical event if not already assigned
-            try:
-                await _auto_assign_event(db, llm, doc_id, config)
-            except Exception:
-                logger.warning("Auto-event assignment failed for doc %d (non-fatal)", doc_id)
-
             pipeline_status["total_processed"] += 1
             pipeline_status["last_processed"] = path.name
             logger.info("Completed processing doc %d: %s -> %s", doc_id, path.name, final_path)
@@ -589,88 +583,6 @@ async def _load_cached_ocr_pages(db: aiosqlite.Connection, doc_id: int) -> list[
     if not rows:
         return None
     return [row[0] for row in rows]
-
-
-async def _auto_assign_event(
-    db: aiosqlite.Connection, llm, doc_id: int, config: AppConfig
-) -> None:
-    """Auto-assign a document to a medical event after extraction.
-
-    Skips if the document already has an event_id assigned.
-    Uses LLM to match against existing events or suggest a new one.
-    """
-    # Check if already assigned
-    cursor = await db.execute(
-        "SELECT event_id, patient_id, doc_type, summary_en, doctor_name, facility_name, "
-        "COALESCE(date_visit, date_issued, doc_date) as best_date "
-        "FROM documents WHERE id = ?",
-        (doc_id,),
-    )
-    doc = await cursor.fetchone()
-    if not doc or doc["event_id"] or not doc["patient_id"]:
-        return  # Already assigned, no patient, or doc not found
-
-    doc = dict(doc)
-
-    # Get existing events for this patient
-    cursor = await db.execute(
-        """SELECT id, title, event_type, date_start, date_end, is_ongoing, diagnosis_text
-           FROM medical_events WHERE patient_id = ? ORDER BY date_start DESC""",
-        (doc["patient_id"],),
-    )
-    events = [dict(r) for r in await cursor.fetchall()]
-
-    events_text = "\n".join(
-        f"- ID {e['id']}: \"{e['title']}\" ({e['event_type']}, {e.get('date_start', '?')})"
-        + (f" — {e.get('diagnosis_text', '')}" if e.get("diagnosis_text") else "")
-        for e in events
-    ) or "No events exist yet."
-
-    prompt = f"""Match this document to a medical event, or suggest creating a new one.
-
-Document: type={doc.get('doc_type','?')}, date={doc.get('best_date','?')}, doctor={doc.get('doctor_name','?')}, facility={doc.get('facility_name','?')}
-Summary: {(doc.get('summary_en') or 'N/A')[:300]}
-
-Existing events:
-{events_text}
-
-JSON response:
-{{"existing_event_id": number or null, "new_event": {{"title": "string", "event_type": "string", "date_start": "YYYY-MM-DD or null"}} or null}}"""
-
-    try:
-        response = await llm._generate(prompt)
-        result = llm._parse_json(response)
-    except Exception:
-        return
-
-    if result.get("existing_event_id"):
-        # Verify event exists
-        eid = result["existing_event_id"]
-        cursor = await db.execute("SELECT id FROM medical_events WHERE id = ?", (eid,))
-        if await cursor.fetchone():
-            await db.execute("UPDATE documents SET event_id = ? WHERE id = ?", (eid, doc_id))
-            await db.execute(
-                "INSERT OR IGNORE INTO document_event_links (document_id, event_id, auto_linked) VALUES (?, ?, 1)",
-                (doc_id, eid),
-            )
-            await db.commit()
-            logger.info("Auto-assigned doc %d to event %d", doc_id, eid)
-    elif result.get("new_event"):
-        ne = result["new_event"]
-        if ne.get("title"):
-            cursor = await db.execute(
-                """INSERT INTO medical_events (patient_id, title, event_type, date_start)
-                   VALUES (?, ?, ?, ?)""",
-                (doc["patient_id"], ne["title"], ne.get("event_type", "other"), ne.get("date_start")),
-            )
-            new_eid = cursor.lastrowid
-            await db.execute("UPDATE documents SET event_id = ? WHERE id = ?", (new_eid, doc_id))
-            await db.execute(
-                "INSERT OR IGNORE INTO document_event_links (document_id, event_id, auto_linked) VALUES (?, ?, 1)",
-                (doc_id, new_eid),
-            )
-            await db.commit()
-            logger.info("Auto-created event '%s' (id=%d) and assigned doc %d", ne["title"], new_eid, doc_id)
 
 
 async def _chunked_extract_and_store(

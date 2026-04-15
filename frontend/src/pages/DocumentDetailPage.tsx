@@ -233,10 +233,10 @@ export default function DocumentDetailPage() {
   if (!doc) return <div className="text-destructive">Document not found</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
           <EditableFilename value={doc.original_filename} docId={doc.id} onSave={updateDocFields} />
           <p className="text-sm text-muted-foreground">
             {formatDocType(doc.doc_type)} | {getBestDate(doc) || "No date"} | {doc.patient_name || "Unclassified"}
@@ -369,9 +369,9 @@ export default function DocumentDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         {/* Document viewer */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           {(doc.file_path?.toLowerCase().endsWith(".pdf") || doc.original_filename?.toLowerCase().endsWith(".pdf")) ? (
             <div className="rounded-lg border overflow-hidden h-[700px]">
               <PdfViewer key={`pdf-${id}`} url={`/api/documents/${id}/file`} onRotate={handleRotate} />
@@ -401,7 +401,7 @@ export default function DocumentDetailPage() {
         </div>
 
         {/* Extracted data */}
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <Section title="Document Info">
             <InfoRow label="Status" value={doc.status} />
             {(doc.status === "failed" || doc.status === "needs_review") && doc.error_message && (

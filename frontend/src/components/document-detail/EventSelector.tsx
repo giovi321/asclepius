@@ -70,12 +70,15 @@ export default function EventSelector({ docId, patientId, currentEventId, onUpda
         <select
           value={currentEventId || ""}
           onChange={(e) => { if (e.target.value) handleAssign(Number(e.target.value)); }}
-          className="rounded-md border bg-background px-2 py-1.5 text-xs"
+          className="rounded-md border bg-background px-2 py-1.5 text-xs max-w-full truncate"
+          style={{ maxWidth: "min(100%, 20rem)" }}
         >
           <option value="">Assign to event...</option>
-          {events.map((ev) => (
-            <option key={ev.id} value={ev.id}>{ev.title} ({ev.event_type?.replace(/_/g, " ")})</option>
-          ))}
+          {events.map((ev) => {
+            const label = `${ev.title} (${ev.event_type?.replace(/_/g, " ")})`;
+            const short = label.length > 60 ? label.slice(0, 57) + "..." : label;
+            return <option key={ev.id} value={ev.id}>{short}</option>;
+          })}
         </select>
 
         <button onClick={handleSuggest} disabled={suggesting}

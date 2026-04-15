@@ -236,6 +236,11 @@ async def classify_and_extract(
         # Merge: classification provides the base, type-specific adds structured arrays
         extraction = {**classification, **type_extraction}
 
+    # Log what we're about to write — helps diagnose "no data" issues
+    _summary_keys = {k: type(v).__name__ if isinstance(v, (dict, list)) else repr(v)[:80]
+                     for k, v in extraction.items() if v}
+    logger.info("Extraction for doc %d: %s", doc_id, _summary_keys)
+
     # Delegate to extract_and_store for DB writes
     return await extract_and_store(db, llm, doc_id, ocr_text, config, extraction_override=extraction)
 
@@ -339,6 +344,9 @@ async def extract_and_store(
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [doc_id]
         await db.execute(f"UPDATE documents SET {set_clause} WHERE id = ?", values)
+        logger.info("Doc %d metadata updated: %s", doc_id, list(updates.keys()))
+    else:
+        logger.warning("Doc %d: no metadata fields to update from extraction", doc_id)
 
     # Upsert facility
     facility_id = None

@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePatient } from "@/contexts/PatientContext";
 import { useTheme } from "@/hooks/useTheme";
 import PatientSelector from "@/components/PatientSelector";
+import packageJson from "../../../package.json";
 import {
   LayoutDashboard,
   FileText,
@@ -120,7 +121,7 @@ export default function AppLayout() {
                 rel="noreferrer"
                 className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
-                Asclepius v0.2
+                Asclepius v{packageJson.version}
               </a>
             </div>
           )}

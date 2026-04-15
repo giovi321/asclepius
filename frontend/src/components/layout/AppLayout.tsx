@@ -57,7 +57,7 @@ export default function AppLayout() {
         }`}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 border-b px-4 py-3">
+        <div className="flex items-center gap-3 px-4 py-3">
           <img src="/logo.svg" alt="Asclepius" className="h-10 w-10 rounded-lg flex-shrink-0" />
           {sidebarOpen && (
             <span className="text-lg font-semibold">Asclepius</span>

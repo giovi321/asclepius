@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Loader2 } from "lucide-react";
+import { getBestDate, formatDate, formatDocType } from "@/lib/utils";
 
 interface TimelineDoc {
   id: number;
@@ -36,15 +37,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string; dot: string; label
 };
 
 function getStyle(t: string) {
-  return TYPE_COLORS[t] || { bg: "bg-muted", text: "text-muted-foreground", dot: "bg-muted-foreground", label: t?.replace(/_/g, " ") || "Other" };
-}
-
-function bestDate(d: TimelineDoc) { return d.date_visit || d.date_issued || d.doc_date || ""; }
-
-function fmtDate(s: string | null) {
-  if (!s) return "No date";
-  const d = new Date(s + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return TYPE_COLORS[t] || { bg: "bg-muted", text: "text-muted-foreground", dot: "bg-muted-foreground", label: formatDocType(t) || "Other" };
 }
 
 function getYear(s: string | null): string { return s ? s.substring(0, 4) : "Unknown"; }
@@ -74,7 +67,7 @@ export default function TimelinePage() {
     }
   }, [loading, documents.length]);
 
-  const openDocument = (docId: number, e: React.MouseEvent) => {
+  const openDocument = (docId: number, e: any) => {
     // Save scroll position before navigating
     const parent = mainRef.current?.closest("main");
     if (parent) sessionStorage.setItem("timeline_scroll", String(parent.scrollTop));
@@ -92,10 +85,10 @@ export default function TimelinePage() {
     const params: Record<string, any> = { limit: 5000 };
     if (selectedPatient) params.patient_id = selectedPatient.id;
     api.get("/documents", { params })
-      .then((res) => {
+      .then((res: any) => {
         const items: TimelineDoc[] = res.data.items || res.data || [];
         items.sort((a, b) => {
-          const da = bestDate(a), db = bestDate(b);
+          const da = getBestDate(a), db = getBestDate(b);
           if (!da && !db) return 0;
           if (!da) return 1;
           if (!db) return -1;
@@ -110,7 +103,7 @@ export default function TimelinePage() {
   // Group by year
   const grouped: Record<string, TimelineDoc[]> = {};
   for (const doc of documents) {
-    const y = getYear(bestDate(doc) || null);
+    const y = getYear(getBestDate(doc) || null);
     if (!grouped[y]) grouped[y] = [];
     grouped[y].push(doc);
   }
@@ -216,7 +209,7 @@ export default function TimelinePage() {
                 // Collect months for this year
                 const months = new Set<string>();
                 for (const doc of grouped[year]) {
-                  const d = bestDate(doc);
+                  const d = getBestDate(doc);
                   if (d && d.length >= 7) months.add(d.substring(0, 7)); // "YYYY-MM"
                 }
                 const monthLabels = Array.from(months).sort().reverse().map((m) => {
@@ -254,10 +247,10 @@ export default function TimelinePage() {
             {/* Vertical line */}
             <div className="absolute left-[11px] top-0 bottom-0 w-0.5 bg-border" />
 
-            {years.map((year) => (
+            {years.map((year: string) => (
               <div
                 key={year}
-                ref={(el) => { yearRefs.current[year] = el; }}
+                ref={(el: any) => { yearRefs.current[year] = el; }}
                 data-year={year}
                 className="mb-6"
               >
@@ -284,8 +277,8 @@ export default function TimelinePage() {
 
                       {/* Card */}
                       <button
-                        onClick={(e) => openDocument(doc.id, e)}
-                        onAuxClick={(e) => { if (e.button === 1) openDocument(doc.id, e); }}
+                        onClick={(e: any) => openDocument(doc.id, e)}
+                        onAuxClick={(e: any) => { if (e.button === 1) openDocument(doc.id, e); }}
                         className="w-full rounded-lg border bg-card text-left transition-colors hover:bg-accent/50 overflow-hidden"
                       >
                         {/* Medical event banner */}
@@ -310,7 +303,7 @@ export default function TimelinePage() {
                         )}
                         <div className="p-3">
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <span className="text-sm font-medium">{fmtDate(bestDate(doc) || null)}</span>
+                            <span className="text-sm font-medium">{formatDate(getBestDate(doc) || null)}</span>
                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${style.bg} ${style.text}`}>
                               {style.label}
                             </span>
@@ -340,7 +333,7 @@ export default function TimelinePage() {
           <input
             type="date"
             value={targetDate}
-            onChange={(e) => setTargetDate(e.target.value)}
+            onChange={(e: any) => setTargetDate(e.target.value)}
             className="rounded-md border bg-background px-2 py-1 text-sm"
           />
           <button onClick={scrollToDate}

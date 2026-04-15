@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import api from "@/api/client";
-
-interface Patient {
-  id: number;
-  slug: string;
-  display_name: string;
-}
+import type { Patient } from "@/types";
 
 interface PatientContextType {
   selectedPatient: Patient | null;

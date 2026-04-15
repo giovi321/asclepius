@@ -164,3 +164,124 @@ def compute_file_hash(file_path: str | Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             sha256.update(chunk)
     return sha256.hexdigest()
+
+
+# ── Repository helpers ───────────────────────────────────────────
+
+async def update_document_status(
+    db: aiosqlite.Connection,
+    doc_id: int,
+    status: str,
+    error_message: str | None = None,
+    increment_retry: bool = False,
+) -> None:
+    """Update a document's status (and optionally error_message / retry_count)."""
+    parts = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
+    params: list = [status]
+    if error_message is not None:
+        parts.append("error_message = ?")
+        params.append(error_message[:2000])
+    if increment_retry:
+        parts.append("retry_count = COALESCE(retry_count, 0) + 1")
+    params.append(doc_id)
+    await db.execute(
+        f"UPDATE documents SET {', '.join(parts)} WHERE id = ?", params
+    )
+    await db.commit()
+
+
+async def update_document_fields(
+    db: aiosqlite.Connection, doc_id: int, updates: dict
+) -> None:
+    """Generic field update on a document row."""
+    if not updates:
+        return
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [doc_id]
+    await db.execute(
+        f"UPDATE documents SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        values,
+    )
+    await db.commit()
+
+
+_VALID_RELATED_TABLES = {"lab_results", "encounters", "medications", "vaccinations"}
+
+
+async def get_related_records(
+    db: aiosqlite.Connection, table: str, doc_id: int
+) -> list[dict]:
+    """Get related records from a child table."""
+    if table not in _VALID_RELATED_TABLES:
+        raise ValueError(f"Invalid related table: {table}")
+    cursor = await db.execute(
+        f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,)
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_document_sections(
+    db: aiosqlite.Connection, doc_id: int
+) -> list[dict]:
+    """Get page-level sections for a document."""
+    cursor = await db.execute(
+        """SELECT id, section_index, page_start, page_end, section_type, summary_en
+           FROM document_sections WHERE document_id = ? ORDER BY section_index""",
+        (doc_id,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_document_links(
+    db: aiosqlite.Connection, doc_id: int
+) -> list[dict]:
+    """Get all document links (both directions) for a document."""
+    cursor = await db.execute(
+        """SELECT dl.id, dl.link_type, dl.created_at,
+                  dl.source_document_id, dl.target_document_id,
+                  sd.original_filename as source_filename, sd.doc_type as source_doc_type,
+                  td.original_filename as target_filename, td.doc_type as target_doc_type
+           FROM document_links dl
+           JOIN documents sd ON dl.source_document_id = sd.id
+           JOIN documents td ON dl.target_document_id = td.id
+           WHERE dl.source_document_id = ? OR dl.target_document_id = ?""",
+        (doc_id, doc_id),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_failed_documents(
+    db: aiosqlite.Connection, limit: int = 50
+) -> list[dict]:
+    """List failed documents with error messages for the review queue."""
+    cursor = await db.execute(
+        """SELECT d.id, d.original_filename, d.file_path, d.status, d.error_message,
+                  d.retry_count, d.created_at, d.updated_at,
+                  p.display_name as patient_name
+           FROM documents d
+           LEFT JOIN patients p ON d.patient_id = p.id
+           WHERE d.status IN ('failed', 'needs_review')
+           ORDER BY d.updated_at DESC
+           LIMIT ?""",
+        (limit,),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def delete_document_record(
+    db: aiosqlite.Connection, doc_id: int
+) -> None:
+    """Delete a document record (CASCADE handles child tables)."""
+    await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    await db.commit()
+
+
+async def move_child_records(
+    db: aiosqlite.Connection, doc_id: int, new_patient_id: int
+) -> None:
+    """Update patient_id on all child records when moving a document."""
+    for table in ["lab_results", "encounters", "medications", "vaccinations"]:
+        await db.execute(
+            f"UPDATE {table} SET patient_id = ? WHERE document_id = ?",
+            (new_patient_id, doc_id),
+        )

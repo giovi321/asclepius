@@ -1,6 +1,8 @@
-"""Main pipeline processor — orchestrates OCR, LLM extraction, and file organization."""
+"""Main pipeline processor — orchestrates OCR, LLM extraction, and file organization.
 
-import json
+Sub-modules handle provider factory, OCR caching, chunked extraction, and reprocessing.
+"""
+
 import logging
 import os
 from pathlib import Path
@@ -8,42 +10,30 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig
-from asclepius.db.connection import get_db
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.extractor import classify_and_extract, extract_and_store
 from asclepius.pipeline.organizer import build_organized_path, move_file
 
-logger = logging.getLogger(__name__)
-
-
-class ProviderUnreachableError(Exception):
-    """Raised when LLM/OCR providers are unreachable (connectivity failures)."""
-    pass
-
-
-# Connectivity exception types that indicate provider is unreachable
-_CONNECTIVITY_ERRORS = (
-    "ConnectError", "ConnectTimeout", "ReadTimeout",
-    "APIConnectionError", "APITimeoutError",
-    "ConnectionRefusedError", "TimeoutError",
+# Re-export from sub-modules for backward compatibility
+from asclepius.pipeline.provider_factory import (  # noqa: F401
+    ProviderUnreachableError,
+    get_llm_provider,
+    _build_llm_provider,
+    get_llm_provider_count,
+    is_provider_unreachable as _is_provider_unreachable,
 )
+from asclepius.pipeline.ocr_cache import (  # noqa: F401
+    cache_ocr_pages as _cache_ocr_pages,
+    load_cached_ocr_pages as _load_cached_ocr_pages,
+)
+from asclepius.pipeline.chunked_extraction import (  # noqa: F401
+    chunked_extract_and_store as _chunked_extract_and_store,
+    merge_extractions as _merge_extractions,
+)
+from asclepius.pipeline.reprocessor import reprocess_document  # noqa: F401
 
-
-def _is_provider_unreachable(exc: Exception) -> bool:
-    """Check if an exception indicates provider connectivity failure."""
-    exc_type = type(exc).__name__
-    if exc_type in _CONNECTIVITY_ERRORS:
-        return True
-    # Check cause chain
-    cause = exc.__cause__ or exc.__context__
-    if cause and type(cause).__name__ in _CONNECTIVITY_ERRORS:
-        return True
-    # Check for HTTP 5xx status errors
-    if hasattr(exc, "response") and hasattr(exc.response, "status_code"):
-        if exc.response.status_code >= 500:
-            return True
-    return False
+logger = logging.getLogger(__name__)
 
 
 # Pipeline status tracking (in-memory)
@@ -63,69 +53,6 @@ pipeline_status = {
 
 # Set of doc IDs that have been requested for cancellation
 cancelled_docs: set[int] = set()
-
-
-def get_llm_provider(config: AppConfig, priority: int = 1):
-    """Factory function to get an LLM provider by priority rank.
-
-    Uses the new provider list if available, falls back to legacy flat config.
-    priority=1 returns the highest-priority enabled provider.
-    """
-    from asclepius.config import get_active_llm_provider_config
-
-    entry = get_active_llm_provider_config(config, priority)
-    if entry:
-        return _build_llm_provider(entry)
-
-    # Fallback to legacy config
-    if config.llm.provider == "claude" and config.llm.claude_api_key:
-        from asclepius.llm.claude import ClaudeProvider
-        return ClaudeProvider(
-            api_key=config.llm.claude_api_key,
-            model=config.llm.claude_model,
-            timeout=config.llm.extraction_timeout,
-        )
-    else:
-        from asclepius.llm.ollama import OllamaProvider
-        return OllamaProvider(
-            base_url=config.llm.ollama_base_url,
-            model=config.llm.ollama_model,
-            timeout=config.llm.extraction_timeout,
-        )
-
-
-def _build_llm_provider(entry):
-    """Instantiate an LLM provider from a LlmProviderEntry."""
-    if entry.type == "claude":
-        from asclepius.llm.claude import ClaudeProvider
-        return ClaudeProvider(
-            api_key=entry.api_key,
-            model=entry.model,
-            timeout=entry.timeout,
-        )
-    elif entry.type in ("openai", "vllm"):
-        from asclepius.llm.openai_provider import OpenAIProvider
-        base_url = entry.base_url if entry.type == "vllm" else "https://api.openai.com/v1"
-        if entry.base_url and entry.type == "openai":
-            base_url = entry.base_url
-        return OpenAIProvider(
-            api_key=entry.api_key,
-            model=entry.model,
-            base_url=base_url,
-            timeout=entry.timeout,
-        )
-    else:  # ollama
-        from asclepius.llm.ollama import OllamaProvider
-        return OllamaProvider(
-            base_url=entry.base_url,
-            model=entry.model,
-            timeout=entry.timeout,
-        )
-
-
-def get_llm_provider_count(config: AppConfig) -> int:
-    """Return the number of enabled LLM providers."""
-    return len([p for p in config.llm.providers if p.enabled])
 
 
 def _count_pages(file_path: str) -> int | None:
@@ -272,7 +199,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # OCR (with retry for transient failures like timeouts)
+            # ── OCR phase ────────────────────────────────────────────
             pipeline_status["processing_step"] = "ocr"
             pipeline_status["processing_doc_id"] = doc_id
             pipeline_status["processing_pages"] = page_count
@@ -339,7 +266,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # LLM extraction
+            # ── LLM extraction phase ─────────────────────────────────
             pipeline_status["processing_step"] = "llm_extraction"
             logger.info("Running LLM extraction on doc %d", doc_id)
             llm = get_llm_provider(config)
@@ -430,7 +357,6 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 return
 
             # Validate that the LLM actually produced meaningful content.
-            # If all key fields are empty, mark needs_review instead of done.
             _has_content = any([
                 extraction.get("doc_type"),
                 extraction.get("summary_en"),
@@ -471,7 +397,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # Organize file
+            # ── Organize phase ───────────────────────────────────────
             pipeline_status["processing_step"] = "organizing"
 
             # Get document metadata for file organization
@@ -579,328 +505,3 @@ async def process_file(file_path: str, config: AppConfig) -> None:
     pipeline_status["processing_doc_id"] = None
     pipeline_status["processing_pages"] = None
     pipeline_status["processing_page_current"] = None
-
-
-async def _cache_ocr_pages(
-    db: aiosqlite.Connection, doc_id: int, ocr_text: str, engine: str, confidence: float
-) -> None:
-    """Cache per-page OCR text for a document."""
-    if not ocr_text or not ocr_text.strip():
-        return
-
-    # Split by page separator (LLM vision uses \n\n)
-    if "\n\n" in ocr_text:
-        pages = ocr_text.split("\n\n")
-    else:
-        pages = [ocr_text]
-
-    # Clear old cache
-    await db.execute("DELETE FROM ocr_page_cache WHERE document_id = ?", (doc_id,))
-
-    for i, page_text in enumerate(pages, start=1):
-        if page_text.strip():
-            await db.execute(
-                """INSERT OR REPLACE INTO ocr_page_cache
-                   (document_id, page_number, ocr_text, ocr_engine, confidence)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (doc_id, i, page_text.strip(), engine, confidence),
-            )
-    await db.commit()
-    logger.debug("Cached %d OCR pages for doc %d", len(pages), doc_id)
-
-
-async def _load_cached_ocr_pages(db: aiosqlite.Connection, doc_id: int) -> list[str] | None:
-    """Load cached per-page OCR text. Returns None if no cache exists."""
-    cursor = await db.execute(
-        "SELECT ocr_text FROM ocr_page_cache WHERE document_id = ? ORDER BY page_number",
-        (doc_id,),
-    )
-    rows = await cursor.fetchall()
-    if not rows:
-        return None
-    return [row[0] for row in rows]
-
-
-async def _chunked_extract_and_store(
-    db: aiosqlite.Connection,
-    llm,
-    doc_id: int,
-    ocr_text: str,
-    config: AppConfig,
-) -> dict:
-    """Split long text into overlapping chunks, extract from each, and merge results."""
-    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
-
-    chunk_size = 10000
-    overlap = 1000
-    chunks = []
-    start = 0
-    while start < len(ocr_text):
-        end = start + chunk_size
-        chunks.append(ocr_text[start:end])
-        start = end - overlap
-
-    logger.info("Splitting doc %d into %d chunks for LLM extraction", doc_id, len(chunks))
-
-    # Extract first chunk normally (this writes to DB)
-    extraction = await extract_and_store(db, llm, doc_id, chunks[0], config)
-    if "error" in extraction:
-        return extraction
-
-    # Extract remaining chunks and merge
-    context = await build_extraction_context(db)
-    for i, chunk in enumerate(chunks[1:], start=2):
-        logger.info("Extracting chunk %d/%d for doc %d", i, len(chunks), doc_id)
-        try:
-            chunk_extraction = await llm.extract(chunk, context)
-            if "error" in chunk_extraction:
-                continue
-            extraction = _merge_extractions(extraction, chunk_extraction)
-        except Exception:
-            logger.exception("Chunk %d extraction failed for doc %d", i, doc_id)
-
-    return extraction
-
-
-def _merge_extractions(base: dict, additional: dict) -> dict:
-    """Merge additional extraction results into the base, deduplicating."""
-    # Merge lab results — deduplicate by test_name_original
-    existing_labs = {lr.get("test_name_original") for lr in base.get("lab_results", [])}
-    for lab in additional.get("lab_results", []):
-        if lab.get("test_name_original") not in existing_labs:
-            base.setdefault("lab_results", []).append(lab)
-            existing_labs.add(lab.get("test_name_original"))
-
-    # Merge medications — deduplicate by brand_name + active_ingredient_original
-    existing_meds = {
-        (m.get("brand_name"), m.get("active_ingredient_original"))
-        for m in base.get("medications", [])
-    }
-    for med in additional.get("medications", []):
-        key = (med.get("brand_name"), med.get("active_ingredient_original"))
-        if key not in existing_meds:
-            base.setdefault("medications", []).append(med)
-            existing_meds.add(key)
-
-    # Merge diagnoses — deduplicate by diagnosis_original
-    existing_diags = {d.get("diagnosis_original") for d in base.get("diagnoses", [])}
-    for diag in additional.get("diagnoses", []):
-        if diag.get("diagnosis_original") not in existing_diags:
-            base.setdefault("diagnoses", []).append(diag)
-            existing_diags.add(diag.get("diagnosis_original"))
-
-    # Merge vaccinations — deduplicate by vaccine_name + date_administered
-    existing_vax = {
-        (v.get("vaccine_name"), v.get("date_administered"))
-        for v in base.get("vaccinations", [])
-    }
-    for vax in additional.get("vaccinations", []):
-        key = (vax.get("vaccine_name"), vax.get("date_administered"))
-        if key not in existing_vax:
-            base.setdefault("vaccinations", []).append(vax)
-            existing_vax.add(key)
-
-    # Merge cost line items — deduplicate by description + amount
-    base_cost = base.get("cost", {})
-    add_cost = additional.get("cost", {})
-    existing_items = {
-        (li.get("description"), li.get("amount"))
-        for li in base_cost.get("line_items", [])
-    }
-    for item in add_cost.get("line_items", []):
-        key = (item.get("description"), item.get("amount"))
-        if key not in existing_items:
-            base_cost.setdefault("line_items", []).append(item)
-            existing_items.add(key)
-
-    return base
-
-
-async def reprocess_document(
-    doc_id: int,
-    config: AppConfig,
-    mode: str = "both",
-    llm_provider_id: str | None = None,
-    ocr_provider_id: str | None = None,
-) -> dict:
-    """Re-run OCR and/or LLM extraction on an existing document.
-
-    mode: "ocr" = re-OCR only, "llm" = re-extract only, "both" = full reprocess.
-    llm_provider_id: if set, use this specific LLM provider instead of the default.
-    ocr_provider_id: if set, use this specific OCR provider instead of the default.
-    """
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
-        cursor = await db.execute(
-            "SELECT id, ocr_text, file_path, original_filename, patient_id FROM documents WHERE id = ?",
-            (doc_id,),
-        )
-        doc = await cursor.fetchone()
-        if not doc:
-            return {"error": "Document not found"}
-
-        ocr_text = doc["ocr_text"]
-        run_ocr = mode in ("ocr", "both")
-        run_llm = mode in ("llm", "both")
-
-        # --- OCR phase ---
-        if run_ocr:
-            file_path = Path(config.vault.root_path) / doc["file_path"]
-            if not file_path.exists():
-                await db.execute(
-                    """UPDATE documents SET status = 'failed', error_message = 'File not found on disk',
-                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (doc_id,),
-                )
-                await db.commit()
-                return {"error": f"File not found: {doc['file_path']}"}
-
-            logger.info("Re-running OCR on doc %d", doc_id)
-            await db.execute(
-                """UPDATE documents SET status = 'processing', error_message = NULL,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (doc_id,),
-            )
-            await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
-            await db.execute(
-                """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (ocr_text, confidence, engine, doc_id),
-            )
-            await db.commit()
-            try:
-                await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
-            except Exception:
-                pass
-        elif run_llm and (not ocr_text or not ocr_text.strip()):
-            # LLM-only but no OCR text — need to OCR first
-            file_path = Path(config.vault.root_path) / doc["file_path"]
-            if not file_path.exists():
-                await db.execute(
-                    """UPDATE documents SET status = 'failed', error_message = 'File not found on disk',
-                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (doc_id,),
-                )
-                await db.commit()
-                return {"error": f"File not found: {doc['file_path']}"}
-            logger.info("No OCR text for doc %d, running OCR before LLM", doc_id)
-            await db.execute(
-                """UPDATE documents SET status = 'processing', error_message = NULL,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (doc_id,),
-            )
-            await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
-            await db.execute(
-                """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (ocr_text, confidence, engine, doc_id),
-            )
-            await db.commit()
-
-        if not ocr_text or not ocr_text.strip():
-            await db.execute(
-                """UPDATE documents SET status = 'needs_review', error_message = 'No text could be extracted',
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (doc_id,),
-            )
-            await db.commit()
-            return {"error": "No text could be extracted"}
-
-        # OCR-only mode: done here
-        if not run_llm:
-            await db.execute(
-                "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (doc_id,),
-            )
-            await db.commit()
-            logger.info("OCR-only reprocess complete for doc %d", doc_id)
-            return {"status": "done", "document_id": doc_id}
-
-        # --- LLM phase ---
-        # Clear old extracted data
-        for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
-            await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
-        await db.commit()
-
-        logger.info("Re-running LLM extraction on doc %d (provider=%s)", doc_id, llm_provider_id or "default")
-        try:
-            await db.execute(
-                """UPDATE documents SET status = 'processing', error_message = NULL,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (doc_id,),
-            )
-            await db.commit()
-
-            # Build LLM provider — use specific one if requested
-            if llm_provider_id:
-                from asclepius.config import get_config as _get_config
-                cfg = _get_config()
-                entry = None
-                for p in cfg.llm.providers:
-                    if p.id == llm_provider_id and p.enabled:
-                        entry = p
-                        break
-                if entry:
-                    llm = _build_llm_provider(entry)
-                else:
-                    llm = get_llm_provider(config)
-            else:
-                llm = get_llm_provider(config)
-
-            extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
-
-            if "error" in extraction:
-                await db.execute(
-                    """UPDATE documents SET status = 'failed', error_message = ?,
-                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (extraction.get("error", "Extraction failed")[:2000], doc_id),
-                )
-                await db.commit()
-                return extraction
-
-            # Validate meaningful content
-            _has_content = any([
-                extraction.get("doc_type"),
-                extraction.get("summary_en"),
-                extraction.get("summary_original"),
-                extraction.get("date_visit"),
-                extraction.get("date_issued"),
-                extraction.get("doc_date"),
-                extraction.get("lab_results"),
-                extraction.get("medications"),
-                extraction.get("diagnoses"),
-            ])
-            if not _has_content:
-                await db.execute(
-                    """UPDATE documents SET status = 'needs_review',
-                       error_message = 'LLM extraction returned empty results',
-                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (doc_id,),
-                )
-                await db.commit()
-                return {"error": "LLM extraction returned empty results"}
-
-            await db.execute(
-                "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (doc_id,),
-            )
-            await db.commit()
-            logger.info("Reprocessing complete for doc %d", doc_id)
-            return {"status": "done", "document_id": doc_id}
-
-        except Exception as e:
-            logger.exception("Reprocessing failed for doc %d", doc_id)
-            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
-            await db.execute(
-                """UPDATE documents SET status = 'failed', error_message = ?,
-                   retry_count = COALESCE(retry_count, 0) + 1,
-                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                (error_msg[:2000], doc_id),
-            )
-            await db.commit()
-            return {"error": str(e)}

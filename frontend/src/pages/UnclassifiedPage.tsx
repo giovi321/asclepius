@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertCircle } from "lucide-react";
+import { formatDocType, getBestDate } from "@/lib/utils";
 
 export default function UnclassifiedPage() {
   const { user } = useAuth();
@@ -47,7 +48,7 @@ export default function UnclassifiedPage() {
                   {doc.original_filename}
                 </Link>
                 <p className="text-sm text-muted-foreground">
-                  {doc.doc_type?.replace(/_/g, " ") || "Unknown type"} | {doc.doc_date || "No date"}
+                  {formatDocType(doc.doc_type)} | {getBestDate(doc) || "No date"}
                 </p>
                 {doc.ocr_text && (
                   <p className="mt-1 max-w-lg truncate text-xs text-muted-foreground">

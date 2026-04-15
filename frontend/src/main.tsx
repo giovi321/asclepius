@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PatientProvider } from "./contexts/PatientContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import "./index.css";
 
 // Initialise pdf.js worker once at app startup (before any component mounts).
@@ -17,7 +18,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <AuthProvider>
         <PatientProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </PatientProvider>
       </AuthProvider>
     </BrowserRouter>

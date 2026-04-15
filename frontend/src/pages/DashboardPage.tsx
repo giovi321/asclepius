@@ -10,22 +10,8 @@ import {
   Clock,
   XCircle,
 } from "lucide-react";
-
-interface PipelineStatus {
-  queue_depth: number;
-  processing: string | null;
-  processing_step: string | null;
-  processing_doc_id: number | null;
-  processing_pages: number | null;
-  processing_page_current: number | null;
-  total_processed: number;
-  total_errors: number;
-  recent_errors: { file: string; error: string }[];
-  queued_files: { filename: string; size: number }[];
-  watcher_active: boolean;
-  auto_stopped: boolean;
-  auto_stop_reason: string;
-}
+import type { PipelineStatus } from "@/types";
+import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { selectedPatient } = usePatient();
@@ -194,19 +180,11 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium">{doc.original_filename}</p>
                   <p className="text-xs text-muted-foreground">
-                    {doc.doc_type || "—"} | {doc.date_visit || doc.date_issued || doc.doc_date || "—"} | {doc.patient_name || "Unclassified"}
+                    {formatDocType(doc.doc_type)} | {getBestDate(doc) || "—"} | {doc.patient_name || "Unclassified"}
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    doc.status === "done"
-                      ? "bg-green-100 text-green-700"
-                      : doc.status === "failed"
-                      ? "bg-red-100 text-red-700"
-                      : doc.status === "needs_review"
-                      ? "bg-yellow-100 text-yellow-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
+                  className={`rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}
                 >
                   {doc.status}
                 </span>

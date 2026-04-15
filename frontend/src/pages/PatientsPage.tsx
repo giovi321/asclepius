@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
 import { Plus, Trash2, ChevronDown, ChevronUp, Save, X } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
 
 interface Patient {
   id: number;
@@ -19,6 +20,7 @@ interface Patient {
 }
 
 export default function PatientsPage() {
+  const { toast } = useToast();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -61,7 +63,7 @@ export default function PatientsPage() {
       setExpandedId(null);
       setEditData({});
     } catch {
-      alert("Failed to save patient");
+      toast({ title: "Failed to save patient", variant: "error" });
     }
     setSaving(false);
   };
@@ -76,7 +78,7 @@ export default function PatientsPage() {
         setEditData({});
       }
     } catch {
-      alert("Failed to delete patient");
+      toast({ title: "Failed to delete patient", variant: "error" });
     }
   };
 
@@ -101,7 +103,7 @@ export default function PatientsPage() {
       setShowCreate(false);
       await loadPatients();
     } catch {
-      alert("Failed to create patient");
+      toast({ title: "Failed to create patient", variant: "error" });
     }
     setSaving(false);
   };

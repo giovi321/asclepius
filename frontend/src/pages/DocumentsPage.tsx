@@ -5,20 +5,15 @@ import { usePatient } from "@/contexts/PatientContext";
 import { FileText, Search, Upload, Pencil, Check, X } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
+import type { PipelineStatus } from "@/types";
+import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
+import { useToast } from "@/contexts/ToastContext";
 
 const DOC_TYPES = [
   "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
   "insurance_claim", "referral", "discharge", "specialist_report",
   "radiology_report", "surgical_report", "vaccination", "other",
 ];
-
-interface PipelineStatus {
-  processing: string | null;
-  processing_step: string | null;
-  processing_doc_id: number | null;
-  processing_pages: number | null;
-  processing_page_current: number | null;
-}
 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
@@ -44,13 +39,13 @@ export default function DocumentsPage() {
   const [facilities, setFacilities] = useState<any[]>([]);
 
   useEffect(() => {
-    api.get("/normalization/specialties").then((res) => {
+    api.get("/normalization/specialties").then((res: any) => {
       setSpecialties(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
-    api.get("/normalization/doctors").then((res) => {
+    api.get("/normalization/doctors").then((res: any) => {
       setDoctors(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
-    api.get("/normalization/facilities").then((res) => {
+    api.get("/normalization/facilities").then((res: any) => {
       setFacilities(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
   }, []);
@@ -68,18 +63,18 @@ export default function DocumentsPage() {
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
 
-    api.get("/documents", { params }).then((res) => {
+    api.get("/documents", { params }).then((res: any) => {
       setDocuments(res.data.items || []);
       setTotal(res.data.total || 0);
       setLoading(false);
     });
-    api.get("/pipeline/status").then((res) => setPipeline(res.data)).catch(() => {});
+    api.get("/pipeline/status").then((res: any) => setPipeline(res.data)).catch(() => {});
   }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
 
   // Poll pipeline status for live page progress
   useEffect(() => {
     const interval = setInterval(() => {
-      api.get("/pipeline/status").then((res) => setPipeline(res.data)).catch(() => {});
+      api.get("/pipeline/status").then((res: any) => setPipeline(res.data)).catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -103,7 +98,7 @@ export default function DocumentsPage() {
           setLoading(true);
           const params: Record<string, any> = { limit, offset: 0 };
           if (selectedPatient) params.patient_id = selectedPatient.id;
-          api.get("/documents", { params }).then((res) => {
+          api.get("/documents", { params }).then((res: any) => {
             setDocuments(res.data.items || []);
             setTotal(res.data.total || 0);
             setLoading(false);
@@ -119,16 +114,16 @@ export default function DocumentsPage() {
             type="text"
             placeholder="Search documents..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(0); }}
             className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm"
           />
         </div>
 
         <MultiSelectFilter
           label="Type"
-          options={DOC_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, " ") }))}
+          options={DOC_TYPES.map((t: string) => ({ value: t, label: t.replace(/_/g, " ") }))}
           selected={typeFilter}
-          onChange={(v) => { setTypeFilter(v); setPage(0); }}
+          onChange={(v: string[]) => { setTypeFilter(v); setPage(0); }}
         />
 
         <MultiSelectFilter
@@ -142,38 +137,38 @@ export default function DocumentsPage() {
             { value: "cancelled", label: "Cancelled" },
           ]}
           selected={statusFilter}
-          onChange={(v) => { setStatusFilter(v); setPage(0); }}
+          onChange={(v: string[]) => { setStatusFilter(v); setPage(0); }}
           searchable={false}
         />
 
         <MultiSelectFilter
           label="Specialty"
-          options={specialties.map((s) => ({
+          options={specialties.map((s: any) => ({
             value: s.canonical_code || s.canonical_display,
             label: s.canonical_display || s.canonical_code,
           }))}
           selected={specialtyFilter}
-          onChange={(v) => { setSpecialtyFilter(v); setPage(0); }}
+          onChange={(v: string[]) => { setSpecialtyFilter(v); setPage(0); }}
         />
 
         <MultiSelectFilter
           label="Doctor"
-          options={doctors.map((d) => ({
+          options={doctors.map((d: any) => ({
             value: String(d.id),
             label: `${d.title ? d.title + " " : ""}${d.name}`,
           }))}
           selected={doctorFilter}
-          onChange={(v) => { setDoctorFilter(v); setPage(0); }}
+          onChange={(v: string[]) => { setDoctorFilter(v); setPage(0); }}
         />
 
         <MultiSelectFilter
           label="Facility"
-          options={facilities.map((f) => ({
+          options={facilities.map((f: any) => ({
             value: String(f.id),
             label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
           }))}
           selected={facilityFilter}
-          onChange={(v) => { setFacilityFilter(v); setPage(0); }}
+          onChange={(v: string[]) => { setFacilityFilter(v); setPage(0); }}
         />
       </div>
 
@@ -184,7 +179,7 @@ export default function DocumentsPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setDateFrom(e.target.value); setPage(0); }}
             className="rounded-md border bg-background px-3 py-2 text-sm"
           />
         </label>
@@ -193,7 +188,7 @@ export default function DocumentsPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setDateTo(e.target.value); setPage(0); }}
             className="rounded-md border bg-background px-3 py-2 text-sm"
           />
         </label>
@@ -230,24 +225,19 @@ export default function DocumentsPage() {
             ) : documents.length === 0 ? (
               <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
             ) : (
-              documents.map((doc) => (
+              documents.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-accent/50">
                   <td className="px-4 py-2 overflow-hidden">
-                    <InlineRenameCell doc={doc} onRenamed={(updated) => {
-                      setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, ...updated } : d));
+                    <InlineRenameCell doc={doc} onRenamed={(updated: any) => {
+                      setDocuments((prev: any[]) => prev.map((d: any) => d.id === doc.id ? { ...d, ...updated } : d));
                     }} />
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doc_type?.replace(/_/g, " ") || ""}>{doc.doc_type?.replace(/_/g, " ") || "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground truncate">{doc.date_visit || doc.date_issued || doc.doc_date || "—"}</td>
+                  <td className="px-4 py-2 text-muted-foreground truncate" title={formatDocType(doc.doc_type)}>{formatDocType(doc.doc_type)}</td>
+                  <td className="px-4 py-2 text-muted-foreground truncate">{getBestDate(doc) || "—"}</td>
                   <td className="px-4 py-2 truncate" title={doc.patient_name || "Unclassified"}>{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
                   <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || doc.facility_name || ""}>{doc.doctor_name || doc.facility_name || "—"}</td>
                   <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${
-                      doc.status === "done" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
-                      doc.status === "failed" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" :
-                      doc.status === "needs_review" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" :
-                      "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
-                    }`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
                       {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
                         && pipeline?.processing_pages && pipeline?.processing_page_current != null
                         ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`
@@ -269,12 +259,12 @@ export default function DocumentsPage() {
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage(p => Math.max(0, p - 1))}
+              onClick={() => setPage((p: number) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >Previous</button>
             <button
-              onClick={() => setPage(p => p + 1)}
+              onClick={() => setPage((p: number) => p + 1)}
               disabled={(page + 1) * limit >= total}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >Next</button>
@@ -286,6 +276,7 @@ export default function DocumentsPage() {
 }
 
 function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: any) => void }) {
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(doc.original_filename || "");
   const [saving, setSaving] = useState(false);
@@ -298,7 +289,7 @@ function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: a
       setEditing(false);
       onRenamed(res.data);
     } catch (e: any) {
-      alert("Rename failed: " + (e.response?.data?.detail || e.message));
+      toast({ title: "Rename failed", description: e.response?.data?.detail || e.message, variant: "error" });
     }
     setSaving(false);
   };
@@ -306,11 +297,11 @@ function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: a
   if (editing) {
     return (
       <div className="flex items-center gap-1">
-        <input value={val} onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(doc.original_filename); } }}
+        <input value={val} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVal(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(doc.original_filename); } }}
           className="flex-1 rounded border bg-background px-2 py-0.5 text-sm min-w-0"
           autoFocus disabled={saving}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
         />
         <button onClick={handleSave} disabled={saving}
           className="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-50">
@@ -331,7 +322,7 @@ function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: a
         <span className="truncate">{doc.original_filename}</span>
       </Link>
       <button
-        onClick={(e) => { e.stopPropagation(); setVal(doc.original_filename); setEditing(true); }}
+        onClick={(e: React.MouseEvent) => { e.stopPropagation(); setVal(doc.original_filename); setEditing(true); }}
         className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
         title="Rename"
       >

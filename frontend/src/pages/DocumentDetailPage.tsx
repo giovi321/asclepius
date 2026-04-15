@@ -3,13 +3,22 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
   RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
-  Eye, EyeOff, Trash2, Plus, X, Link2, Search, ChevronDown,
+  Trash2, Plus, X, Link2, Search, ChevronDown,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
+import { formatDocType, getBestDate } from "@/lib/utils";
+import {
+  Section, InfoRow, EditableField, EditableSummary, EditableFilename,
+  OcrSection, getSectionTypeStyle, MedFormBadge,
+} from "@/components/document-detail/DocumentDetailHelpers";
+import EventSelector from "@/components/document-detail/EventSelector";
+import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
+import { useToast } from "@/contexts/ToastContext";
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState("");
@@ -56,10 +65,10 @@ export default function DocumentDetailPage() {
 
   // Load providers once
   useEffect(() => {
-    api.get("/settings/llm-providers").then((res) => {
+    api.get("/settings/llm-providers").then((res: any) => {
       setLlmProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});
-    api.get("/settings/ocr-providers").then((res) => {
+    api.get("/settings/ocr-providers").then((res: any) => {
       setOcrProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});
   }, []);
@@ -94,7 +103,7 @@ export default function DocumentDetailPage() {
       setAiInstruction("");
       await loadDoc(false);
     } catch (e: any) {
-      alert("AI edit failed: " + (e.response?.data?.detail || e.message));
+      toast({ title: "AI edit failed", description: e.response?.data?.detail || e.message, variant: "error" });
     } finally {
       setAiEditing(false);
     }
@@ -105,7 +114,7 @@ export default function DocumentDetailPage() {
       await api.post(`/documents/${id}/cancel`);
       await loadDoc();
     } catch {
-      alert("Failed to cancel processing");
+      toast({ title: "Failed to cancel processing", variant: "error" });
     }
   };
 
@@ -114,8 +123,7 @@ export default function DocumentDetailPage() {
       await api.post(`/documents/${id}/rotate`, { degrees, pages });
       await loadDoc(false);
     } catch (e: any) {
-      console.error("Rotate failed:", e);
-      alert("Rotation failed: " + (e.response?.data?.detail || e.message));
+      toast({ title: "Rotation failed", description: e.response?.data?.detail || e.message, variant: "error" });
       throw e; // Re-throw so PdfViewer knows it failed
     }
   };
@@ -133,7 +141,7 @@ export default function DocumentDetailPage() {
     if (!doc?.patient_id || !doc?.id) return;
     setLoadingRelevant(true);
     api.get(`/documents/${doc.id}/relevant`)
-      .then((res) => setRelevantDocs(res.data.suggestions || []))
+      .then((res: any) => setRelevantDocs(res.data.suggestions || []))
       .catch(() => {})
       .finally(() => setLoadingRelevant(false));
   }, [doc?.id, doc?.patient_id]);
@@ -144,7 +152,7 @@ export default function DocumentDetailPage() {
       await api.delete(`/documents/${id}`);
       navigate("/documents");
     } catch {
-      alert("Failed to delete document");
+      toast({ title: "Failed to delete document", variant: "error" });
     }
   };
 
@@ -153,7 +161,7 @@ export default function DocumentDetailPage() {
       await api.patch(`/documents/${id}`, { user_notes: notes });
       setEditingNotes(false);
     } catch {
-      alert("Failed to save notes");
+      toast({ title: "Failed to save notes", variant: "error" });
     }
   };
 
@@ -203,19 +211,19 @@ export default function DocumentDetailPage() {
     try {
       const res = await api.post(`/documents/${id}/link`, { target_document_id: targetId, link_type: linkType });
       const linked = linkResults.find((d: any) => d.id === targetId);
-      setLinkedDocs((prev) => [...prev, {
+      setLinkedDocs((prev: any[]) => [...prev, {
         ...res.data,
         target_filename: linked?.original_filename,
         target_doc_type: linked?.doc_type,
       }]);
-      setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
+      setLinkResults((prev: any[]) => prev.filter((d: any) => d.id !== targetId));
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 409) {
-        alert(detail || "These documents are already linked");
-        setLinkResults((prev) => prev.filter((d: any) => d.id !== targetId));
+        toast({ title: detail || "These documents are already linked", variant: "warning" });
+        setLinkResults((prev: any[]) => prev.filter((d: any) => d.id !== targetId));
       } else {
-        alert(detail || "Failed to link document");
+        toast({ title: detail || "Failed to link document", variant: "error" });
       }
     }
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
@@ -231,7 +239,7 @@ export default function DocumentDetailPage() {
         <div>
           <EditableFilename value={doc.original_filename} docId={doc.id} onSave={updateDocFields} />
           <p className="text-sm text-muted-foreground">
-            {doc.doc_type?.replace(/_/g, " ")} | {doc.date_visit || doc.date_issued || doc.doc_date || "No date"} | {doc.patient_name || "Unclassified"}
+            {formatDocType(doc.doc_type)} | {getBestDate(doc) || "No date"} | {doc.patient_name || "Unclassified"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -609,7 +617,7 @@ export default function DocumentDetailPage() {
                           try {
                             await api.delete(`/documents/${id}/links/${link.id}`);
                             setLinkedDocs((prev) => prev.filter((l: any) => l.id !== link.id));
-                          } catch { alert("Failed to remove link"); }
+                          } catch { toast({ title: "Failed to remove link", variant: "error" }); }
                         }}
                         className="ml-2 rounded p-1 text-muted-foreground hover:text-destructive"
                         title="Remove link"
@@ -653,7 +661,7 @@ export default function DocumentDetailPage() {
                               if (e?.response?.status === 409) {
                                 setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id));
                               } else {
-                                alert("Failed to link: " + (e.response?.data?.detail || e.message));
+                                toast({ title: "Failed to link", description: e.response?.data?.detail || e.message, variant: "error" });
                               }
                             }
                             requestAnimationFrame(() => window.scrollTo(0, scrollY));
@@ -765,488 +773,3 @@ export default function DocumentDetailPage() {
   );
 }
 
-function getSectionTypeStyle(type: string): string {
-  const styles: Record<string, string> = {
-    lab_results_page: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    clinical_notes: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    nursing_notes: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
-    vital_signs: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    consent_form: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    cover_page: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
-    medication_chart: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-    operative_notes: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    discharge_summary: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    imaging_report: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
-    correspondence: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-    invoice_page: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-  };
-  return styles[type] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-}
-
-function MedFormBadge({ form }: { form?: string }) {
-  if (!form) return <span className="text-muted-foreground">{"\u2014"}</span>;
-  const lower = form.toLowerCase();
-  let color = "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-  let Icon: any = Pill;
-
-  if (lower.includes("tablet") || lower.includes("pill") || lower.includes("capsule")) {
-    color = "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
-    Icon = Pill;
-  } else if (lower.includes("inject") || lower.includes("iv") || lower.includes("syringe")) {
-    color = "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
-    Icon = Syringe;
-  } else if (lower.includes("cream") || lower.includes("ointment") || lower.includes("topical")) {
-    color = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-  } else if (lower.includes("liquid") || lower.includes("syrup") || lower.includes("solution")) {
-    color = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
-  } else if (lower.includes("inhaler") || lower.includes("spray") || lower.includes("nasal")) {
-    color = "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300";
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
-      <Icon className="h-3 w-3" />
-      {form}
-    </span>
-  );
-}
-
-function Section({ title, icon: Icon, children }: { title: string; icon?: any; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border p-4">
-      <h3 className="mb-3 flex items-center gap-2 font-medium">
-        {Icon && <Icon className="h-4 w-4" />}
-        {title}
-      </h3>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function OcrSection({ text }: { text: string | null }) {
-  const [open, setOpen] = useState(false);
-  if (!text) return null;
-  return (
-    <div className="rounded-lg border">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between p-4 hover:bg-accent/50"
-      >
-        <h3 className="flex items-center gap-2 font-medium">
-          {open ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          OCR Text
-        </h3>
-        <span className="text-xs text-muted-foreground">
-          {open ? "Hide" : "Show"} ({text.length} chars)
-        </span>
-      </button>
-      {open && (
-        <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap border-t bg-muted/30 p-4 text-xs">
-          {text}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-function SuggestLinksButton({ docId, onLink }: { docId: number; onLink: (newLink?: any) => void }) {
-  const [loading, setLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[] | null>(null);
-
-  const handleSuggest = async () => {
-    setLoading(true);
-    setSuggestions(null);
-    try {
-      const res = await api.post(`/documents/${docId}/suggest-links`);
-      setSuggestions(res.data.suggestions || []);
-    } catch {
-      alert("Failed to get suggestions");
-    }
-    setLoading(false);
-  };
-
-  const handleAccept = async (targetId: number, linkType: string) => {
-    try {
-      const res = await api.post(`/documents/${docId}/link`, { target_document_id: targetId, link_type: linkType });
-      setSuggestions((s) => s?.filter((sg) => sg.document_id !== targetId) || null);
-      const sg = suggestions?.find((s) => s.document_id === targetId);
-      onLink({
-        ...res.data,
-        target_filename: sg?.filename,
-        target_doc_type: sg?.doc_type,
-      });
-    } catch {
-      alert("Failed to link");
-    }
-  };
-
-  return (
-    <div>
-      <button
-        onClick={handleSuggest}
-        disabled={loading}
-        className="flex items-center gap-1 rounded-md border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
-      >
-        {loading ? (
-          <>
-            <div className="animate-spin h-3 w-3 border border-primary border-t-transparent rounded-full" />
-            Analyzing...
-          </>
-        ) : (
-          <>
-            <Stethoscope className="h-3 w-3" /> Suggest links (AI)
-          </>
-        )}
-      </button>
-
-      {suggestions !== null && (
-        <div className="mt-2 space-y-2">
-          {suggestions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No related documents found</p>
-          ) : (
-            suggestions.map((sg: any) => (
-              <div key={sg.document_id} className="rounded-md border p-3 text-xs space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <a href={`/documents/${sg.document_id}`} className="font-medium text-primary hover:underline block truncate">
-                      {sg.filename || `Document #${sg.document_id}`}
-                    </a>
-                    <div className="flex flex-wrap gap-2 mt-1 text-muted-foreground">
-                      {sg.doc_type && <span className="rounded bg-muted px-1.5 py-0.5">{sg.doc_type.replace(/_/g, " ")}</span>}
-                      {sg.doc_date && <span>{sg.doc_date}</span>}
-                      {sg.doctor_name && <span>{sg.doctor_name}</span>}
-                      {sg.facility_name && <span>{sg.facility_name}</span>}
-                    </div>
-                    {sg.summary_en && (
-                      <p className="mt-1 text-muted-foreground line-clamp-2">{sg.summary_en}</p>
-                    )}
-                  </div>
-                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] whitespace-nowrap">
-                    {sg.link_type?.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <p className="flex-1 text-muted-foreground italic">{sg.reason}</p>
-                  <button
-                    onClick={() => handleAccept(sg.document_id, sg.link_type)}
-                    className="rounded bg-primary px-3 py-1 text-primary-foreground hover:bg-primary/90"
-                  >
-                    Link
-                  </button>
-                  <button
-                    onClick={() => setSuggestions((s) => s?.filter((x) => x.document_id !== sg.document_id) || null)}
-                    className="rounded border px-3 py-1 hover:bg-accent"
-                  >
-                    Skip
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
-  docId: number; patientId: number | null; currentEventId: number | null; onUpdate: (eventId: number) => void;
-}) {
-  const [events, setEvents] = useState<any[]>([]);
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestion, setSuggestion] = useState<any>(null);
-
-  useEffect(() => {
-    if (!patientId) return;
-    api.get("/events", { params: { patient_id: patientId } })
-      .then((res) => setEvents(res.data || []))
-      .catch(() => {});
-  }, [patientId]);
-
-  const handleAssign = async (eventId: number) => {
-    await api.post(`/events/${eventId}/link`, { document_id: docId });
-    onUpdate(eventId);
-  };
-
-  const handleSuggest = async () => {
-    setSuggesting(true);
-    setSuggestion(null);
-    try {
-      const res = await api.post(`/events/suggest-for-document/${docId}`);
-      setSuggestion(res.data);
-    } catch { alert("Failed to get suggestion"); }
-    setSuggesting(false);
-  };
-
-  const handleCreateAndLink = async (s: any) => {
-    if (!patientId || !s) return;
-    const res = await api.post("/events", {
-      patient_id: patientId,
-      title: s.title,
-      event_type: s.event_type || "other",
-      description: s.description,
-      date_start: s.date_start,
-    });
-    await api.post(`/events/${res.data.id}/link`, { document_id: docId });
-    setSuggestion(null);
-    onUpdate(res.data.id);
-    // Reload events list
-    api.get("/events", { params: { patient_id: patientId } })
-      .then((r) => setEvents(r.data || []));
-  };
-
-  if (!patientId) return null;
-
-  const currentEvent = events.find((e) => e.id === currentEventId);
-
-  return (
-    <Section title="Medical Event" icon={Stethoscope}>
-      {currentEvent ? (
-        <div className="flex items-center gap-2 text-sm">
-          <span className="font-medium">{currentEvent.title}</span>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{currentEvent.event_type?.replace(/_/g, " ")}</span>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground mb-2">No medical event assigned.</p>
-      )}
-
-      <div className="flex flex-wrap gap-2 mt-2">
-        <select
-          value={currentEventId || ""}
-          onChange={(e) => { if (e.target.value) handleAssign(Number(e.target.value)); }}
-          className="rounded-md border bg-background px-2 py-1.5 text-xs"
-        >
-          <option value="">Assign to event...</option>
-          {events.map((ev) => (
-            <option key={ev.id} value={ev.id}>{ev.title} ({ev.event_type?.replace(/_/g, " ")})</option>
-          ))}
-        </select>
-
-        <button onClick={handleSuggest} disabled={suggesting}
-          className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50">
-          {suggesting ? "Analyzing..." : "Suggest (AI)"}
-        </button>
-      </div>
-
-      {suggestion && (
-        <div className="mt-2 rounded-md border p-3 text-xs space-y-2">
-          {suggestion.existing_event_id && suggestion.matched_event ? (
-            <div>
-              <p className="font-medium">Matches: {suggestion.matched_event.title}</p>
-              <p className="text-muted-foreground">{suggestion.reason}</p>
-              <button onClick={() => handleAssign(suggestion.existing_event_id)}
-                className="mt-1 rounded bg-primary px-3 py-1 text-primary-foreground">
-                Link to this event
-              </button>
-            </div>
-          ) : suggestion.new_event_suggestion ? (
-            <div>
-              <p className="font-medium">Suggest new event: {suggestion.new_event_suggestion.title}</p>
-              <p className="text-muted-foreground">{suggestion.new_event_suggestion.description}</p>
-              <button onClick={() => handleCreateAndLink(suggestion.new_event_suggestion)}
-                className="mt-1 rounded bg-primary px-3 py-1 text-primary-foreground">
-                Create & Link
-              </button>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No matching event found.</p>
-          )}
-        </div>
-      )}
-    </Section>
-  );
-}
-
-function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false }: {
-  label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
-  type?: string; multiline?: boolean;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(value || "");
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await api.patch(`/documents/${docId}`, { [field]: val || null });
-      setEditing(false);
-      // Pass updated doc back so parent can update state without full reload
-      onSave(res.data);
-    } catch { alert("Failed to save"); }
-    setSaving(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !multiline) handleSave();
-    if (e.key === "Escape") { setEditing(false); setVal(value || ""); }
-  };
-
-  if (editing) {
-    return (
-      <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">{label}</span>
-        <div className="flex-1 flex gap-1">
-          {multiline ? (
-            <textarea value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm" rows={2} autoFocus disabled={saving} />
-          ) : (
-            <input type={type} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm" autoFocus disabled={saving} />
-          )}
-          <button onClick={handleSave} disabled={saving}
-            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
-            {saving ? "..." : "OK"}
-          </button>
-          <button onClick={() => { setEditing(false); setVal(value || ""); }}
-            className="rounded border px-2 py-1 text-xs">
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
-      onClick={() => { setVal(value || ""); setEditing(true); }}>
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">
-        {value || <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
-      </span>
-    </div>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: any }) {
-  if (!value) return null;
-  return (
-    <div className="flex justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
-function EditableSummary({ value, docId, onSave }: { value: string | null; docId: number; onSave: (updated?: any) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(value || "");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { setVal(value || ""); }, [value]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await api.patch(`/documents/${docId}`, { summary_en: val || null });
-      setEditing(false);
-      onSave(res.data);
-    } catch { alert("Failed to save"); }
-    setSaving(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-        <h3 className="mb-2 text-sm font-medium text-primary">Summary</h3>
-        <textarea value={val} onChange={(e) => setVal(e.target.value)}
-          className="w-full rounded border bg-background px-3 py-2 text-sm" rows={3} autoFocus disabled={saving} />
-        <div className="flex gap-2 mt-2">
-          <button onClick={handleSave} disabled={saving}
-            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button onClick={() => { setEditing(false); setVal(value || ""); }}
-            className="rounded border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 cursor-pointer hover:bg-primary/10 transition-colors group"
-      onClick={() => setEditing(true)}>
-      <h3 className="mb-1 text-sm font-medium text-primary flex items-center justify-between">
-        Summary
-        <span className="text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">click to edit</span>
-      </h3>
-      <p className="text-sm">{value || <span className="text-muted-foreground italic">No summary — click to add</span>}</p>
-    </div>
-  );
-}
-
-function EditableFilename({ value, docId, onSave }: { value: string; docId: number; onSave: (updated?: any) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(value || "");
-  const [saving, setSaving] = useState(false);
-  const [generating, setGenerating] = useState(false);
-
-  useEffect(() => { setVal(value || ""); }, [value]);
-
-  const handleSave = async () => {
-    if (!val.trim() || val === value) { setEditing(false); return; }
-    setSaving(true);
-    try {
-      const res = await api.post(`/documents/${docId}/rename`, { filename: val });
-      setEditing(false);
-      onSave(res.data);
-    } catch (e: any) {
-      alert("Rename failed: " + (e.response?.data?.detail || e.message));
-    }
-    setSaving(false);
-  };
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      const res = await api.post(`/documents/${docId}/generate-filename`);
-      const suggested = res.data.suggested_filename;
-      if (suggested) {
-        setVal(suggested);
-        setEditing(true);
-      }
-    } catch (e: any) {
-      alert("Failed to generate filename: " + (e.response?.data?.detail || e.message));
-    }
-    setGenerating(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-2">
-        <input value={val} onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
-          className="text-xl font-semibold bg-background border rounded px-2 py-1 flex-1"
-          autoFocus disabled={saving} />
-        <button onClick={handleSave} disabled={saving}
-          className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
-          {saving ? "..." : "Save"}
-        </button>
-        <button onClick={() => { setEditing(false); setVal(value); }}
-          className="rounded border px-2 py-1.5 text-xs hover:bg-accent">
-          <X className="h-3 w-3" />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2">
-      <span onClick={() => setEditing(true)}>{value}</span>
-      <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-        <button onClick={() => setEditing(true)}
-          className="text-muted-foreground text-xs font-normal hover:text-foreground" title="Edit filename">
-          &#x270E;
-        </button>
-        <button onClick={handleGenerate} disabled={generating}
-          className="text-muted-foreground text-xs font-normal hover:text-primary disabled:opacity-50"
-          title="Generate filename from document data">
-          {generating ? (
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-        </button>
-      </span>
-    </h1>
-  );
-}

@@ -111,9 +111,24 @@ Uses the Google Cloud Vision API for OCR. Requires an API key.
 
 After OCR, the extracted text is sent to the LLM in two phases:
 
+### Retrieval-Augmented Extraction (Few-Shot Examples)
+
+Before classification, the pipeline searches for **similar previously-processed documents** to use as few-shot examples in the prompt. This dramatically improves extraction quality, especially for smaller models like qwen2.5.
+
+**Example selection priority:**
+
+1. Documents with user corrections from the same facility (highest quality — human-verified)
+2. Documents with user corrections from any facility
+3. Completed documents from the same facility
+4. FTS5 text similarity search (BM25 ranking on OCR text)
+
+The system injects 1-2 compact examples (500-char OCR snippet + extraction result) into the classification prompt. If user corrections exist for an example document, the corrected values are used instead of the raw LLM output.
+
+Facility detection happens heuristically by matching known facility names against the first 500 characters of OCR text (the letterhead area).
+
 ### Phase 1: Classification
 
-A single prompt classifies the document and extracts basic metadata. The prompt is structured with the document content first and the JSON schema last (recency bias helps smaller models follow the schema).
+A single prompt classifies the document and extracts basic metadata. The prompt is structured with the document content first, few-shot examples in the middle, and the JSON schema last (recency bias helps smaller models follow the schema).
 
 - **Document type** (bloodtest, specialist_report, prescription, invoice, discharge, radiology_report, vaccination, surgical_report, and 15+ other types)
 - **Patient name** (matched against existing patients)
@@ -250,3 +265,22 @@ Only connectivity errors trigger auto-stop — document-specific extraction fail
 ### Extraction Validation
 
 After LLM extraction, the pipeline validates that at least one meaningful field was produced (doc_type, summary, dates, lab results, medications, or diagnoses). If the extraction is completely empty, the document is marked `needs_review` with the error message "LLM extraction returned empty results" instead of being silently marked as `done`.
+
+## Correction-Driven Learning
+
+When users manually edit document metadata (doc_type, dates, doctor name, facility name, summary, etc.) through the web UI or the AI Edit feature, the system captures these corrections as training signals.
+
+Each correction records:
+
+- **Document ID** -- which document was corrected
+- **Field name** -- which field was changed (e.g. `doctor_name`, `doc_type`)
+- **LLM value** -- what the LLM originally extracted (from `raw_extraction`)
+- **Corrected value** -- what the user set
+- **Facility ID and doc type** -- denormalized for fast lookup by facility/type
+
+These corrections serve two purposes:
+
+1. **Few-shot example quality** -- Documents with corrections are preferred as few-shot examples in retrieval-augmented extraction, since they represent human-verified ground truth
+2. **Learning signal** -- Corrections from the same facility are especially valuable, as documents from the same source share the same layout and formatting patterns
+
+Corrections are logged transparently — no UI changes needed. The system compares each edit against the original `raw_extraction` JSON and only logs fields that actually differ from what the LLM produced.

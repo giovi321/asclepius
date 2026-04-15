@@ -196,9 +196,19 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 
 ## Normalization
 
-The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms. When the LLM extracts terms like lab test names, diagnoses, medications, and specialties, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed.
+The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms, doctors, and facilities. When the LLM extracts terms like lab test names, diagnoses, medications, specialties, doctor names, and facility names, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed. Use "Merge" to consolidate duplicate entries (e.g., "Dr. M. Bianchi" and "Dr. Marco Bianchi").
 
 See [Normalization](../user-guide/normalization.md) for details.
+
+## Correction-Driven Learning
+
+When you manually edit document metadata (doc_type, dates, doctor name, etc.) in the document detail page or via AI Edit, Asclepius captures the correction — what the LLM originally extracted vs. what you set. These corrections accumulate over time and are used to improve future extractions:
+
+- Documents with user corrections are **preferred as few-shot examples** when processing new documents
+- Corrections from the same facility are especially valuable since documents from the same source share formatting patterns
+- The system automatically injects 1-2 relevant examples into the classification prompt based on similarity
+
+This means extraction quality improves progressively as you correct more documents — no fine-tuning or model retraining needed.
 
 ## Backward Compatibility
 

@@ -35,6 +35,8 @@ On first launch, a setup wizard guides you through creating your account and fir
 - **Medical events**: Group related documents into medical stories (diagnosis, surgery, treatment, etc.)
 - **Runtime pipeline control**: Start/stop processing from the UI, auto-stop on provider failures
 - **Provider testing**: Test LLM and OCR provider connectivity from Settings
+- **Correction-driven learning**: User edits are captured as training signals to improve future extractions
+- **Retrieval-augmented extraction**: Similar previously-processed documents are injected as few-shot examples
 - **Selective reprocessing**: Re-run OCR only, LLM only, or both, with specific provider selection
 - **Timezone support**: Configurable via `TZ` environment variable
 - **Excel-style filters**: Multi-select dropdowns with search on all document list columns

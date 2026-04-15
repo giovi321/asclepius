@@ -213,7 +213,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `DELETE` | `/api/normalization/{type}/aliases/{alias_id}` | Yes | Delete an alias |
 | `POST` | `/api/normalization/{type}/merge` | Yes | Merge two entries |
 
-**Types:** `lab_tests`, `specialties`, `diagnoses`, `medications`
+**Types:** `lab_tests`, `specialties`, `diagnoses`, `medications`, `doctors`, `facilities`
 
 ## Pipeline
 

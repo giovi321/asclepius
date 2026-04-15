@@ -350,6 +350,12 @@ erDiagram
 | `norm_diagnoses` + `norm_diagnosis_aliases` | Diagnosis codes (ICD-10) with aliases |
 | `norm_medications` + `norm_medication_aliases` | Medication names (ATC codes) with aliases |
 
+### Learning Tables
+
+| Table | Purpose |
+|-------|---------|
+| `extraction_corrections` | Tracks user edits to LLM-extracted fields (before/after values) for correction-driven learning |
+
 ### System Tables
 
 | Table | Purpose |

@@ -57,19 +57,12 @@ export default function AppLayout() {
         }`}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b px-4">
-          <img src="/logo.svg" alt="Asclepius" className="h-7 w-7 rounded" />
+        <div className="flex items-center gap-3 border-b px-4 py-3">
+          <img src="/logo.svg" alt="Asclepius" className="h-10 w-10 rounded-lg flex-shrink-0" />
           {sidebarOpen && (
             <span className="text-lg font-semibold">Asclepius</span>
           )}
         </div>
-
-        {/* Patient selector */}
-        {sidebarOpen && (
-          <div className="border-b p-3">
-            <PatientSelector />
-          </div>
-        )}
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2">
@@ -96,34 +89,29 @@ export default function AppLayout() {
           })}
         </nav>
 
-        {/* User info */}
-        <div className="border-t p-3">
+        {/* Patient selector + logout */}
+        <div className="border-t p-3 space-y-2">
+          {sidebarOpen && <PatientSelector />}
           <div className="flex items-center justify-between">
-            {sidebarOpen && (
-              <span className="text-sm text-muted-foreground truncate">
-                {user?.display_name || user?.username}
-              </span>
-            )}
             <button
               onClick={logout}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center gap-2 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />
+              {sidebarOpen && <span className="text-xs">{user?.display_name || user?.username}</span>}
             </button>
-          </div>
-          {sidebarOpen && (
-            <div className="mt-2 text-center">
+            {sidebarOpen && (
               <a
                 href="https://github.com/giovi321/asclepius"
                 target="_blank"
                 rel="noreferrer"
                 className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
-                Asclepius v{packageJson.version}
+                v{packageJson.version}
               </a>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </aside>
 

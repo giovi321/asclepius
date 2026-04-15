@@ -172,7 +172,7 @@ async def generate_filename(
         raise HTTPException(status_code=404, detail="Document not found")
 
     ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
-    doc_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or ""
+    doc_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or doc.get("date_received") or ""
     date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
 
     # Use LLM to generate a concise, descriptive name

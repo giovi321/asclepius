@@ -359,8 +359,9 @@ async def move_doc(
             _summary = re.sub(r"-+", "-", _summary).strip("-")
             summary_slug = _summary
 
+        best_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or doc.get("date_received")
         new_relative = build_organized_path(
-            config, target_slug, doc.get("doc_date"), provider_slug,
+            config, target_slug, best_date, provider_slug,
             doc.get("doc_type"), doc["original_filename"],
             event_slug=event_slug,
             summary_slug=summary_slug,

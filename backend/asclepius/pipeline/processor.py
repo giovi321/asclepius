@@ -402,7 +402,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Get document metadata for file organization
             cursor = await db.execute(
-                """SELECT d.patient_id, d.doc_type, d.doc_date, d.doctor_id, d.facility_id,
+                """SELECT d.patient_id, d.doc_type, d.doc_date, d.date_visit, d.date_issued,
+                          d.date_received, d.doctor_id, d.facility_id,
                           d.event_id, d.summary_en,
                           p.slug as patient_slug,
                           doc.slug as doctor_slug,
@@ -447,11 +448,16 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
                     summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
 
+            # Use the best available date: date_visit > date_issued > doc_date > date_received
+            best_date = None
+            if doc:
+                best_date = doc["date_visit"] or doc["date_issued"] or doc["doc_date"] or doc["date_received"]
+
             # Organize file
             dest_path = build_organized_path(
                 config,
                 doc["patient_slug"] if doc else None,
-                doc["doc_date"] if doc else None,
+                best_date,
                 provider_slug,
                 doc["doc_type"] if doc else None,
                 path.name,

@@ -120,9 +120,22 @@ async def reprocess_document(
             return {"status": "done", "document_id": doc_id}
 
         # --- LLM phase ---
-        # Clear old extracted data before re-extraction
+        # Clear old extracted data before re-extraction (child tables + document metadata)
         for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
+        await db.execute(
+            """UPDATE documents SET
+               doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
+               language_source = NULL, summary_en = NULL, summary_original = NULL,
+               doctor_id = NULL, doctor_name = NULL, facility_id = NULL, facility_name = NULL,
+               specialty_original = NULL, norm_specialty_id = NULL,
+               cost_amount = NULL, cost_currency = NULL,
+               insurance_company = NULL, insurance_policy = NULL,
+               raw_extraction = NULL, llm_provider = NULL,
+               updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (doc_id,),
+        )
         await db.commit()
 
         logger.info("Re-running LLM extraction on doc %d (provider=%s)", doc_id, llm_provider_id or "default")

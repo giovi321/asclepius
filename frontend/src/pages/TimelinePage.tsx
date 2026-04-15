@@ -122,44 +122,49 @@ export default function TimelinePage() {
   };
 
   // Track which year is visible + position viewport indicator on mini-map
+  const minimapYearRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
   useEffect(() => {
     if (years.length === 0) return;
     const scrollParent = mainRef.current?.closest("main") || window;
 
     const updateIndicator = () => {
-      // Find which year section is in the viewport
       const viewHeight = window.innerHeight;
 
+      // Find which year sections are visible in the viewport
+      let firstVisibleYear = "";
+      let lastVisibleYear = "";
       for (const y of years) {
         const el = yearRefs.current[y];
         if (!el) continue;
         const rect = el.getBoundingClientRect();
-        // Year section is visible if its top is in the upper half of viewport
         if (rect.top <= viewHeight * 0.4 && rect.bottom > 0) {
           setCurrentYear(y);
         }
+        // Track first and last year whose section overlaps the viewport
+        if (rect.bottom > 0 && rect.top < viewHeight) {
+          if (!firstVisibleYear) firstVisibleYear = y;
+          lastVisibleYear = y;
+        }
       }
 
-      // Position the viewport indicator on the mini-map
+      // Position the viewport indicator by mapping visible years to minimap year buttons
       const minimap = minimapRef.current;
-      const timeline = scrollRef.current;
-      if (!minimap || !timeline) return;
+      if (!minimap || !firstVisibleYear) return;
 
-      const timelineRect = timeline.getBoundingClientRect();
       const minimapRect = minimap.getBoundingClientRect();
-      const timelineH = timeline.scrollHeight;
+      const firstBtn = minimapYearRefs.current[firstVisibleYear];
+      const lastBtn = minimapYearRefs.current[lastVisibleYear];
+      if (!firstBtn || !lastBtn) return;
 
-      if (timelineH <= 0 || minimapRect.height <= 0) return;
+      const firstBtnRect = firstBtn.getBoundingClientRect();
+      const lastBtnRect = lastBtn.getBoundingClientRect();
 
-      // How much of the timeline is above the viewport top
-      const scrolledPast = -timelineRect.top;
-      const visibleFraction = viewHeight / timelineH;
-      const scrollFraction = scrolledPast / timelineH;
+      const indicatorTop = firstBtnRect.top - minimapRect.top;
+      const indicatorBottom = lastBtnRect.bottom - minimapRect.top;
+      const indicatorHeight = Math.max(8, indicatorBottom - indicatorTop);
 
-      const indicatorTop = Math.max(0, scrollFraction * minimapRect.height);
-      const indicatorHeight = Math.max(8, Math.min(minimapRect.height, visibleFraction * minimapRect.height));
-
-      setViewportIndicator({ top: indicatorTop, height: indicatorHeight });
+      setViewportIndicator({ top: Math.max(0, indicatorTop), height: indicatorHeight });
     };
 
     const target = scrollParent instanceof Element ? scrollParent : window;
@@ -220,6 +225,7 @@ export default function TimelinePage() {
                 return (
                   <button
                     key={year}
+                    ref={(el: any) => { minimapYearRefs.current[year] = el; }}
                     onClick={() => {
                       const el = yearRefs.current[year];
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });

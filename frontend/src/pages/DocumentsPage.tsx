@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { FileText, Search, Upload, Pencil, Check, X } from "lucide-react";
@@ -17,12 +17,16 @@ const DOC_TYPES = [
 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>(() => {
+    const s = searchParams.get("status");
+    return s ? s.split(",") : [];
+  });
   const [specialtyFilter, setSpecialtyFilter] = useState<string[]>([]);
   const [doctorFilter, setDoctorFilter] = useState<string[]>([]);
   const [facilityFilter, setFacilityFilter] = useState<string[]>([]);

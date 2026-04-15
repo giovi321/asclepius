@@ -70,20 +70,20 @@ export default function DashboardPage() {
           icon={Clock}
           label="Pending"
           value={stats.pending}
-          href="/documents"
+          href="/documents?status=pending,processing"
         />
         <StatCard
           icon={AlertTriangle}
           label="Needs Review"
           value={stats.needs_review}
-          href="/documents"
+          href="/documents?status=needs_review"
           color={stats.needs_review > 0 ? "amber" : undefined}
         />
         <StatCard
           icon={XCircle}
           label="Failed"
           value={stats.failed}
-          href="/settings"
+          href="/documents?status=failed"
           color={stats.failed > 0 ? "red" : undefined}
         />
         <StatCard

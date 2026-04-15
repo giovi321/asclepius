@@ -17,7 +17,7 @@ const DOC_TYPES = [
 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [documents, setDocuments] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

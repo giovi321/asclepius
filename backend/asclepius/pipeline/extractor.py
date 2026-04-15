@@ -210,8 +210,16 @@ async def classify_and_extract(
                 )
                 response_text = await llm._generate(formatted)
                 classification = llm._parse_json(response_text)
-            except Exception:
-                logger.warning("Custom classification prompt failed, using default")
+                logger.info("Classification result for doc %d: doc_type=%s, summary=%s, dates=%s/%s/%s, doctor=%s",
+                            doc_id,
+                            classification.get("doc_type"),
+                            repr(classification.get("summary_en", ""))[:60],
+                            classification.get("doc_date"),
+                            classification.get("date_issued"),
+                            classification.get("date_visit"),
+                            classification.get("doctor", {}).get("name") if isinstance(classification.get("doctor"), dict) else classification.get("doctor"))
+            except Exception as e:
+                logger.warning("Classification prompt failed for doc %d: %s, using default", doc_id, e)
                 classification = await llm.classify(ocr_text, context)
         else:
             classification = await llm.classify(ocr_text, context)

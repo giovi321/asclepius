@@ -266,15 +266,27 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # ── LLM extraction phase ─────────────────────────────────
-            pipeline_status["processing_step"] = "llm_extraction"
-            logger.info("Running LLM extraction on doc %d", doc_id)
-            llm = get_llm_provider(config)
+            # ── Check for vision extraction (single-step — OCR + extraction already done) ──
+            from asclepius.pipeline.ocr import _vision_extraction_results
+            vision_result = _vision_extraction_results.pop(file_path, None)
+            if vision_result:
+                logger.info("Using vision extraction result for doc %d (skipping LLM phase)", doc_id)
+                pipeline_status["processing_step"] = "llm_extraction"
+                from asclepius.pipeline.extractor import extract_and_store, _salvage_classification, _normalize_doc_type
+                _salvage_classification(vision_result)
+                vision_result["doc_type"] = _normalize_doc_type(vision_result.get("doc_type", "other"))
+                llm = get_llm_provider(config)
+                extraction = await extract_and_store(db, llm, doc_id, ocr_text, config, extraction_override=vision_result)
+            else:
+                # ── Standard LLM extraction phase ─────────────────────────────
+                pipeline_status["processing_step"] = "llm_extraction"
+                logger.info("Running LLM extraction on doc %d", doc_id)
+                llm = get_llm_provider(config)
 
-            # Check if document needs page-level sectioning
-            from asclepius.pipeline.section_processor import should_section, process_with_sections
+                # Check if document needs page-level sectioning
+                from asclepius.pipeline.section_processor import should_section, process_with_sections
 
-            if await should_section(file_path):
+                if await should_section(file_path):
                 logger.info("Large document (%s pages) — using page-level sectioning for doc %d", page_count, doc_id)
 
                 # Try loading from OCR page cache first
@@ -334,12 +346,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     # Sectioning failed — fall through to normal extraction
                     logger.info("Falling back to chunked extraction for doc %d", doc_id)
                     extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
-            # Chunked LLM extraction for very long texts
-            elif len(ocr_text) > 15000:
-                logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
-                extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
-            else:
-                extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
+                # Chunked LLM extraction for very long texts
+                elif len(ocr_text) > 15000:
+                    logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
+                    extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
+                else:
+                    extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
                 pipeline_status["total_errors"] += 1

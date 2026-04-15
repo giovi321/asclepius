@@ -46,7 +46,7 @@ class OidcConfig(BaseModel):
 class OcrProviderEntry(BaseModel):
     """A single OCR provider configuration."""
     id: str = ""
-    type: str = "tesseract"  # tesseract, tesseract_remote, llm_vision, google_vision
+    type: str = "tesseract"  # tesseract, tesseract_remote, llm_vision, vision_extraction, google_vision
     name: str = ""
     enabled: bool = True
     priority: int = 1

@@ -2,6 +2,7 @@
 
 import base64
 import io
+import json
 import logging
 from pathlib import Path
 
@@ -13,6 +14,10 @@ from PIL import Image
 from asclepius.config import AppConfig, OcrProviderEntry, get_active_ocr_provider_config
 
 logger = logging.getLogger(__name__)
+
+# Vision extraction results — when a vision_extraction provider is used, the extraction
+# JSON is stored here keyed by file_path so the processor can skip the LLM phase.
+_vision_extraction_results: dict[str, dict] = {}
 
 
 async def extract_text(
@@ -81,7 +86,11 @@ async def _extract_with_provider(
     path = Path(file_path)
     ext = path.suffix.lower()
 
-    if provider.type == "llm_vision":
+    if provider.type == "vision_extraction":
+        return await _extract_and_classify_vision(
+            file_path, config, provider_entry=provider,
+        )
+    elif provider.type == "llm_vision":
         return await _extract_llm_vision(
             file_path, config, provider_entry=provider,
         )
@@ -488,6 +497,229 @@ async def _llm_vision_page(
             resp.raise_for_status()
             data = resp.json()
             return data.get("response", "")
+
+
+async def _extract_and_classify_vision(
+    file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None,
+) -> tuple[str, float, str]:
+    """Single-step vision extraction: send page images directly to a vision LLM
+    with the classification prompt. Returns OCR text (for search/storage) AND
+    stores the extraction JSON in _vision_extraction_results for the processor.
+
+    This skips the separate OCR→LLM pipeline — one model does both reading and extraction.
+    """
+    path = Path(file_path)
+    ext = path.suffix.lower()
+
+    from asclepius.pipeline.processor import pipeline_status
+    from asclepius.llm.prompts import CLASSIFICATION_PROMPT
+
+    vision_model = provider_entry.llm_model if provider_entry else ""
+
+    # Build the extraction prompt — we ask the model to both read and classify
+    prompt = (
+        "Look at this medical document image carefully. "
+        "First, read ALL the text you can see. Then classify the document.\n\n"
+        "IMPORTANT: Respond with ONLY this exact JSON structure. No markdown, no extra keys.\n\n"
+        "{\n"
+        '  "ocr_text": "ALL text you can read from the document, preserving structure",\n'
+        '  "patient_name": "string or null",\n'
+        '  "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|'
+        'labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|'
+        'referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|'
+        'mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",\n'
+        '  "doc_date": "YYYY-MM-DD or null",\n'
+        '  "date_issued": "YYYY-MM-DD or null",\n'
+        '  "date_visit": "YYYY-MM-DD or null",\n'
+        '  "language_detected": "ISO 639-1 code",\n'
+        '  "doctor": { "name": "string or null", "title": "string or null", '
+        '"specialty_original": "string or null" },\n'
+        '  "facility": { "name": "string or null", "type": "hospital|clinic|lab|pharmacy|other|null", '
+        '"address": "string or null", "city": "string or null" },\n'
+        '  "summary_en": "1-3 sentence English summary",\n'
+        '  "summary_original": "1-3 sentence summary in source language"\n'
+        "}"
+    )
+
+    all_text_parts = []
+    all_extractions = []
+
+    if ext == ".pdf":
+        doc = fitz.open(str(path))
+        total_pages = len(doc)
+        pipeline_status["processing_pages"] = total_pages
+
+        for page_idx, page in enumerate(doc):
+            pipeline_status["processing_page_current"] = page_idx + 1
+            logger.info("Vision extraction: page %d/%d of %s", page_idx + 1, total_pages, path.name)
+
+            b64_image = _render_page_for_vision(page)
+            raw_response = await _vision_call_with_retry(
+                b64_image, prompt, config, vision_model, provider_entry=provider_entry,
+            )
+
+            # Parse the JSON response
+            parsed = _parse_vision_extraction(raw_response)
+            if parsed:
+                ocr_text = parsed.pop("ocr_text", "")
+                all_text_parts.append(ocr_text)
+                all_extractions.append(parsed)
+            else:
+                all_text_parts.append(raw_response)  # Fallback: treat raw as OCR text
+
+        doc.close()
+
+    elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+        img = Image.open(str(path))
+        b64_image = _compress_image_for_vision(img)
+
+        raw_response = await _vision_call_with_retry(
+            b64_image, prompt, config, vision_model, provider_entry=provider_entry,
+        )
+
+        parsed = _parse_vision_extraction(raw_response)
+        if parsed:
+            ocr_text = parsed.pop("ocr_text", "")
+            all_text_parts.append(ocr_text)
+            all_extractions.append(parsed)
+        else:
+            all_text_parts.append(raw_response)
+    else:
+        return "", 0.0, "none"
+
+    full_text = "\n\n".join(all_text_parts)
+
+    # Merge extractions from all pages — first page usually has the metadata
+    merged_extraction = {}
+    for ex in all_extractions:
+        for key, val in ex.items():
+            if val and not merged_extraction.get(key):
+                merged_extraction[key] = val
+
+    # Store extraction result for the processor to pick up
+    _vision_extraction_results[file_path] = merged_extraction
+    logger.info("Vision extraction complete for %s: %d pages, keys=%s",
+                path.name, len(all_extractions), list(merged_extraction.keys()))
+
+    return full_text, 0.90, "vision_extraction"
+
+
+def _parse_vision_extraction(raw: str) -> dict | None:
+    """Parse JSON from vision extraction response."""
+    import re
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # Try to find JSON block
+    match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+    # Try to find JSON object
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    logger.warning("Failed to parse vision extraction JSON: %s", raw[:200])
+    return None
+
+
+async def _vision_call_with_retry(
+    b64_image: str, prompt: str, config: AppConfig, vision_model: str,
+    max_retries: int = 3, provider_entry: OcrProviderEntry | None = None,
+) -> str:
+    """Call the vision LLM with retry + backoff. Same providers as _llm_vision_page."""
+    import asyncio as _asyncio
+
+    for attempt in range(max_retries):
+        try:
+            return await _vision_call(b64_image, prompt, config, vision_model, provider_entry=provider_entry)
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
+            wait = 30 * (attempt + 1)
+            logger.warning("Vision extraction %s (attempt %d/%d), retrying in %ds...",
+                           type(e).__name__, attempt + 1, max_retries, wait)
+            if attempt < max_retries - 1:
+                await _asyncio.sleep(wait)
+            else:
+                raise
+        except Exception as e:
+            if "rate_limit" in str(e) or "429" in str(e):
+                wait = 30 * (attempt + 1)
+                logger.warning("Rate limited, waiting %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                await _asyncio.sleep(wait)
+            elif attempt < max_retries - 1:
+                wait = 30 * (attempt + 1)
+                logger.warning("Vision extraction error (attempt %d/%d): %s", attempt + 1, max_retries, e)
+                await _asyncio.sleep(wait)
+            else:
+                raise
+    return await _vision_call(b64_image, prompt, config, vision_model, provider_entry=provider_entry)
+
+
+async def _vision_call(
+    b64_image: str, prompt: str, config: AppConfig, vision_model: str,
+    provider_entry: OcrProviderEntry | None = None,
+) -> str:
+    """Send image + prompt to a vision LLM. Supports Ollama, Claude, OpenAI."""
+    if provider_entry:
+        vision_provider = provider_entry.llm_provider
+    else:
+        vision_provider = config.ocr.llm_vision_provider or config.llm.provider
+
+    vision_api_key = (provider_entry.llm_api_key if provider_entry else None) or config.llm.claude_api_key
+
+    if vision_provider == "claude" and vision_api_key:
+        from anthropic import AsyncAnthropic
+        client = AsyncAnthropic(api_key=vision_api_key)
+        model = vision_model or config.llm.claude_model
+        response = await client.messages.create(
+            model=model, max_tokens=4096,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64_image}},
+                {"type": "text", "text": prompt},
+            ]}],
+        )
+        return response.content[0].text
+
+    elif vision_provider == "openai" and vision_api_key:
+        model = vision_model or "gpt-4o"
+        base_url = (provider_entry.llm_base_url if provider_entry and provider_entry.llm_base_url else "https://api.openai.com/v1").rstrip("/")
+        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
+        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
+        headers = {"Authorization": f"Bearer {vision_api_key}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{base_url}/chat/completions", headers=headers,
+                json={"model": model, "messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+                    {"type": "text", "text": prompt},
+                ]}], "max_tokens": 4096},
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+    else:
+        # Ollama
+        model = vision_model or config.llm.ollama_model
+        if provider_entry and provider_entry.llm_base_url:
+            ollama_url = provider_entry.llm_base_url.rstrip("/")
+        else:
+            ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
+        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
+        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
+        logger.info("Vision extraction: model=%s, url=%s", model, ollama_url)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{ollama_url}/api/generate",
+                json={"model": model, "prompt": prompt, "images": [b64_image], "stream": False, "format": "json"},
+            )
+            resp.raise_for_status()
+            return resp.json().get("response", "")
 
 
 async def _extract_remote_ocr(file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:

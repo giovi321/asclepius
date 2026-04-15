@@ -12,6 +12,7 @@ export const OCR_TYPES = [
   { value: "tesseract", label: "Tesseract (Local)", description: "Local Tesseract OCR engine" },
   { value: "tesseract_remote", label: "Tesseract (Remote)", description: "Remote Tesseract OCR server" },
   { value: "llm_vision", label: "LLM Vision", description: "Send page images to an LLM for OCR" },
+  { value: "vision_extraction", label: "Vision Extraction", description: "Single-step: vision LLM reads and extracts in one pass" },
   { value: "google_vision", label: "Google Cloud Vision", description: "Google Cloud Vision API" },
 ];
 
@@ -178,11 +179,12 @@ export default function OcrProvidersTab() {
                   )}
 
                   {/* LLM Vision */}
-                  {p.type === "llm_vision" && (
+                  {(p.type === "llm_vision" || p.type === "vision_extraction") && (
                     <>
                       <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-700 dark:text-blue-300">
-                        Vision OCR sends page images to an LLM for text extraction. This can use a
-                        different provider/model than your extraction LLM (e.g. Chandra for OCR + llama3.1 for extraction).
+                        {p.type === "vision_extraction"
+                          ? "Vision Extraction sends page images directly to a vision LLM which reads the document AND extracts structured data in one step. No separate OCR or extraction LLM needed."
+                          : "Vision OCR sends page images to an LLM for text extraction. This can use a different provider/model than your extraction LLM (e.g. Chandra for OCR + llama3.1 for extraction)."}
                       </div>
                       <SelectField label="Vision LLM Provider" value={p.llm_provider}
                         onChange={(v) => updateProvider(p.id, { llm_provider: v })}

@@ -29,14 +29,16 @@ On first launch, a setup wizard guides you through creating your account and fir
 - **Medical imaging**: DICOM viewer (Cornerstone.js) with windowing, zoom, scroll
 - **RAG chat**: Ask questions about medical history, powered by structured DB queries
 - **Full-text search**: SQLite FTS5 across all document content
-- **Normalization**: Canonical mapping for lab tests, diagnoses, medications, specialties across languages
+- **Normalization**: Canonical mapping for lab tests, diagnoses, medications, specialties, doctors, and facilities across languages
 - **Multi-language**: Handles documents in any language, extracts to English canonical forms
 - **Timeline view**: Visual chronological timeline with mini-map navigation and real-time viewport indicator
 - **Medical events**: Group related documents into medical stories (diagnosis, surgery, treatment, etc.)
 - **Runtime pipeline control**: Start/stop processing from the UI, auto-stop on provider failures
 - **Provider testing**: Test LLM and OCR provider connectivity from Settings
 - **Selective reprocessing**: Re-run OCR only, LLM only, or both, with specific provider selection
+- **Timezone support**: Configurable via `TZ` environment variable
 - **Excel-style filters**: Multi-select dropdowns with search on all document list columns
+- **Dashboard navigation**: Status cards link directly to filtered document views
 
 ## Tech Stack
 

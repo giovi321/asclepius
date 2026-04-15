@@ -16,7 +16,7 @@ Normalization maps these variations to a single canonical form, enabling:
 
 ## Normalization Categories
 
-Asclepius normalizes four categories of medical data:
+Asclepius normalizes six categories of medical data:
 
 | Category | Canonical Table | Alias Table | Standard Code |
 |----------|----------------|-------------|---------------|
@@ -24,13 +24,21 @@ Asclepius normalizes four categories of medical data:
 | Specialties | `norm_specialties` | `norm_specialty_aliases` | -- |
 | Diagnoses | `norm_diagnoses` | `norm_diagnosis_aliases` | ICD-10 |
 | Medications | `norm_medications` | `norm_medication_aliases` | ATC |
+| Doctors | `doctors` | `doctor_aliases` | -- |
+| Facilities | `facilities` | `facility_aliases` | -- |
 
 Each canonical entry has:
 
-- **Canonical code** -- a unique identifier (e.g., `HEMOGLOBIN`, `CARDIOLOGY`)
+- **Canonical code** -- a unique identifier (e.g., `HEMOGLOBIN`, `CARDIOLOGY`, or a slug like `dr-hans-mueller`)
 - **Canonical display name** -- human-readable name in English
 - **Standard code** (where applicable) -- LOINC, ICD-10, or ATC code
 - **Aliases** -- multiple alternative names in different languages
+
+### Doctors & Facilities
+
+Doctors and facilities use the same normalization system as medical concepts. The existing `doctors` and `facilities` tables have been extended with `canonical_code` and `canonical_display` columns, and new alias tables (`doctor_aliases`, `facility_aliases`) enable the same alias management, merge, and review workflows.
+
+This is useful because the same doctor may appear under different name variations across documents (e.g., "Dr. M. Bianchi" vs. "Dr. Marco Bianchi"). Merging these entries consolidates all document references to a single record.
 
 ## How Normalization Works
 
@@ -83,7 +91,7 @@ Asclepius ships with seed data for common medical terms across multiple language
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/normalization/{type}` | List canonical entries (type: lab_tests, specialties, diagnoses, medications) |
+| `GET` | `/api/normalization/{type}` | List canonical entries (type: lab_tests, specialties, diagnoses, medications, doctors, facilities) |
 | `POST` | `/api/normalization/{type}` | Create a new canonical entry |
 | `PATCH` | `/api/normalization/{type}/{id}` | Update a canonical entry |
 | `DELETE` | `/api/normalization/{type}/{id}` | Delete a canonical entry |

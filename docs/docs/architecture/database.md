@@ -29,9 +29,11 @@ erDiagram
 
     medical_events ||--o{ document_event_links : linked
 
+    doctors ||--o{ doctor_aliases : has
     doctors ||--o{ documents : referenced
     doctors ||--o{ encounters : referenced
     doctors ||--o{ imaging_studies : referenced
+    facilities ||--o{ facility_aliases : has
     facilities ||--o{ documents : referenced
     facilities ||--o{ doctors : belongs_to
     facilities ||--o{ encounters : referenced
@@ -153,6 +155,8 @@ erDiagram
         int id PK
         text name
         text slug UK
+        text canonical_code UK
+        text canonical_display
         text type
         text address
         text city
@@ -162,15 +166,33 @@ erDiagram
         text website
     }
 
+    facility_aliases {
+        int id PK
+        int facility_id FK
+        text alias
+        text language
+        bool auto_mapped
+    }
+
     doctors {
         int id PK
         text name
         text slug UK
+        text canonical_code UK
+        text canonical_display
         text title
         int norm_specialty_id FK
         int facility_id FK
         text phone
         text email
+    }
+
+    doctor_aliases {
+        int id PK
+        int doctor_id FK
+        text alias
+        text language
+        bool auto_mapped
     }
 
     lab_results {
@@ -314,8 +336,10 @@ erDiagram
 | `document_event_links` | Many-to-many links between documents and events with relevance level |
 | `document_links` | Direct links between related documents (e.g., invoice_for, follow_up) |
 | `document_sections` | Page-level sections for large documents with per-section OCR and extraction |
-| `facilities` | Healthcare facilities (hospitals, clinics, labs) |
-| `doctors` | Doctors with specialty and facility affiliation |
+| `facilities` | Healthcare facilities (hospitals, clinics, labs) with normalization support |
+| `facility_aliases` | Name aliases for facilities (for normalization/merge) |
+| `doctors` | Doctors with specialty and facility affiliation, with normalization support |
+| `doctor_aliases` | Name aliases for doctors (for normalization/merge) |
 
 ### Normalization Tables
 

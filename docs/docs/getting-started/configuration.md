@@ -160,3 +160,4 @@ These environment variables override `settings.yaml` values:
 | `ASCLEPIUS_ANTHROPIC_API_KEY` | `llm.claude_api_key` |
 | `ASCLEPIUS_GOOGLE_VISION_KEY` | `ocr.google_vision_key` (also enables `cloud_ocr_enabled`) |
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` (default: `config/settings.yaml`) |
+| `TZ` | Container timezone (default: `Europe/Zurich`) |

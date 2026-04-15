@@ -18,7 +18,7 @@ Asclepius is a self-hosted application that ingests, OCRs, extracts, organizes, 
 - **Timeline view** -- Vertical timeline with mini-map navigation, jump-to-date, and color-coded event types
 - **RAG chat** -- Ask questions about medical history, powered by SQL generation and structured DB queries
 - **Full-text search** -- SQLite FTS5 across all document content and metadata
-- **Normalization** -- Canonical mapping for lab tests, diagnoses, medications, and specialties across languages
+- **Normalization** -- Canonical mapping for lab tests, diagnoses, medications, specialties, doctors, and facilities across languages with merge and alias management
 - **Customizable prompts** -- All LLM prompts are editable from the UI with reset-to-default
 - **OIDC / SSO** -- Single sign-on with Authentik, Keycloak, or any OIDC provider
 - **Self-hosted** -- Your data stays on your server, deployed as a single Docker container

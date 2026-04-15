@@ -71,7 +71,16 @@ The pipeline reads and deletes the hint file during processing, then sets the `p
 
 ## OCR Phase
 
-The OCR engine is selected via `ocr.engine` in the configuration. All engines return `(text, confidence, engine_name)`.
+OCR providers are configured as an ordered list in Settings. The pipeline tries each enabled provider in **priority order**, falling back to the next if a provider returns empty text or fails. All engines return `(text, confidence, provider_name)`.
+
+The `provider_name` stored in the database is the user-configured display name (e.g., "My Remote OCR") rather than the technical engine type.
+
+### Provider Fallback Chain
+
+1. Try provider at priority 1
+2. If empty text or error → try priority 2
+3. Continue until text is extracted or all providers exhausted
+4. If all fail → mark document as `needs_review`
 
 ### Tesseract (Local)
 
@@ -83,7 +92,7 @@ The OCR engine is selected via `ocr.engine` in the configuration. All engines re
 ### LLM Vision
 
 1. Render each PDF page as a JPEG image (150 DPI, auto-downscale if >4.5MB)
-2. Send each page image to the LLM (Claude or Ollama with vision model)
+2. Send each page image to the LLM (Claude, OpenAI, or Ollama with vision model)
 3. LLM transcribes all visible text, preserving structure
 4. Supports rate-limit retry with exponential backoff (30s, 60s, 90s)
 5. Can use a **separate** provider/model/URL from the extraction LLM
@@ -104,15 +113,19 @@ After OCR, the extracted text is sent to the LLM in two phases:
 
 ### Phase 1: Classification
 
-A single prompt classifies the document and extracts basic metadata:
+A single prompt classifies the document and extracts basic metadata. The prompt is structured with the document content first and the JSON schema last (recency bias helps smaller models follow the schema).
 
-- **Document type** (bloodtest, specialist_report, prescription, invoice, discharge, radiology_report, vaccination, surgical_report, imaging_report, other)
+- **Document type** (bloodtest, specialist_report, prescription, invoice, discharge, radiology_report, vaccination, surgical_report, and 15+ other types)
 - **Patient name** (matched against existing patients)
-- **Doctor name** (matched/created in the doctors table)
-- **Facility name** (matched/created in the facilities table)
+- **Doctor name** (matched/created in the doctors table, with alias)
+- **Facility name** (matched/created in the facilities table, with alias)
 - **Dates** (doc_date, date_issued, date_visit)
 - **Specialty** (normalized against the specialties table)
-- **Summary** (English)
+- **Summary** (English + source language)
+
+When smaller LLMs return non-conforming JSON (e.g., using `responsible` instead of `doctor`), a salvage step attempts to map common alternative key names to the expected schema.
+
+The LLM provider name and model used for extraction are stored on the document (visible under "Processing details" in the document view).
 
 ### Phase 2: Type-Specific Extraction
 

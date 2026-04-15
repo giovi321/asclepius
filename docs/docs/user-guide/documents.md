@@ -62,12 +62,14 @@ The left panel shows the PDF in an embedded viewer. For DICOM studies, the imagi
 
 The right panel shows all extracted metadata, all fields are **inline-editable** -- click any field to edit:
 
-- **Document type** -- dropdown with all supported types
+- **Document type** -- dropdown selector with all 25+ supported types
 - **Dates** -- document date, date issued, date of visit, date received
-- **Doctor** -- extracted doctor name (linked to doctors table)
-- **Facility** -- extracted facility name (linked to facilities table)
+- **Doctor** -- extracted doctor name (linked to doctors table with normalization)
+- **Facility** -- extracted facility name (linked to facilities table with normalization)
 - **Specialty** -- medical specialty
 - **Summary** -- English summary of the document content
+
+A collapsible **Processing details** section shows technical metadata: OCR engine name, OCR confidence score, and the LLM provider/model used for extraction.
 
 ### AI Edit
 
@@ -126,8 +128,10 @@ Click the **Reprocess** dropdown button to re-run processing on a document. A po
     - **OCR + LLM** -- full reprocess (re-extract text and re-run LLM analysis)
     - **OCR only** -- re-extract text without re-running LLM
     - **LLM only** -- re-run LLM analysis using existing OCR text
-- **OCR Provider** (when OCR is included) -- select which OCR provider to use, or leave as default
-- **LLM Provider** (when LLM is included) -- select which LLM provider to use, or leave as default
+- **OCR Provider** (when OCR is included) -- select which OCR provider to use by name, or leave as default (highest priority)
+- **LLM Provider** (when LLM is included) -- select which LLM provider to use by name, or leave as default (highest priority)
+
+When reprocessing with LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, ensuring a clean slate rather than stale data persisting.
 
 This is useful for:
 

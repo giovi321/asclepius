@@ -44,12 +44,14 @@ You can set environment variables in a `.env` file alongside `docker-compose.yml
 | `SECRET_KEY` | Session signing key (change in production!) | `change-me-in-production` |
 | `ANTHROPIC_API_KEY` | Claude API key (optional, for Claude LLM provider) | -- |
 | `GOOGLE_VISION_KEY` | Google Cloud Vision API key (optional) | -- |
+| `TZ` | Container timezone (IANA timezone name) | `Europe/Zurich` |
 
 Example `.env` file:
 
 ```env
 SECRET_KEY=your-random-secret-key-at-least-32-chars
 ANTHROPIC_API_KEY=sk-ant-api03-...
+TZ=Europe/Zurich
 ```
 
 ### Connecting to Ollama

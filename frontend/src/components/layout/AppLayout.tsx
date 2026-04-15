@@ -16,7 +16,6 @@ import {
   Settings,
   LogOut,
   Menu,
-  Activity,
   Users,
   Clock,
   Heart,
@@ -59,7 +58,7 @@ export default function AppLayout() {
       >
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b px-4">
-          <Activity className="h-6 w-6 text-primary" />
+          <img src="/logo.svg" alt="Asclepius" className="h-7 w-7 rounded" />
           {sidebarOpen && (
             <span className="text-lg font-semibold">Asclepius</span>
           )}

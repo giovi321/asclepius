@@ -1,3 +1,7 @@
+<div style="text-align: center; margin-bottom: 1rem;">
+  <img src="assets/logo.svg" alt="Asclepius" width="96" height="96" style="border-radius: 12px;" />
+</div>
+
 # Asclepius
 
 **Self-hosted medical records manager**

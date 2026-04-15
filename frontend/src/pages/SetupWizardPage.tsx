@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
-import { Activity, User, Heart, ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { User, Heart, ChevronRight, ChevronLeft, Check } from "lucide-react";
 
 type Step = "welcome" | "account" | "patient" | "done";
 
@@ -97,7 +97,7 @@ export default function SetupWizardPage() {
         {/* Welcome */}
         {step === "welcome" && (
           <div className="text-center space-y-4">
-            <Activity className="h-12 w-12 mx-auto text-primary" />
+            <img src="/logo.svg" alt="Asclepius" className="h-14 w-14 mx-auto rounded-lg" />
             <h1 className="text-2xl font-semibold">Welcome to Asclepius</h1>
             <p className="text-muted-foreground text-sm">
               Your self-hosted medical records manager. Let's set up your account

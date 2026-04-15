@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
-import { Activity, Shield } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -46,7 +46,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
       <div className="w-full max-w-sm rounded-lg border bg-card p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center gap-2">
-          <Activity className="h-10 w-10 text-primary" />
+          <img src="/logo.svg" alt="Asclepius" className="h-12 w-12 rounded-lg" />
           <h1 className="text-2xl font-semibold">Asclepius</h1>
           <p className="text-sm text-muted-foreground">
             Sign in to your medical records

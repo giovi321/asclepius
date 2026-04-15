@@ -4,47 +4,35 @@
 # Phase 1: Classification prompt (same for ALL document types)
 # ---------------------------------------------------------------------------
 
-CLASSIFICATION_PROMPT = """You are a medical document classifier.
+CLASSIFICATION_PROMPT = """You are a medical document classifier. Read the document below, then fill in the JSON schema that follows.
 
-The OCR text may be in one of these formats:
-- Plain text (from Tesseract)
-- Markdown with headers (#) and tables (|)
-- HTML with data-bbox and data-label attributes (from Chandra OCR). In this format:
-  - data-label="Page-Header" = letterhead, header info (facility name, NOT the patient)
-  - data-label="Page-Footer" = footer info (ignore for classification)
-  - data-label="Section-Header" = section titles within the document
-  - data-label="Text" = regular content
-  - The PATIENT name is usually in the top-right header area
-  - The SIGNING DOCTOR is usually near the bottom, before the footer, with "Dott." or "Dr."
-  - "Responsabile" in the header = department head, NOT the treating doctor
-
-STEP 1: Look at the document for these keywords to determine doc_type:
-- "FATTURA", "Fattura", "Rechnung", "Invoice", "Bill", "TARMED", "importo", "Betrag", "CHF", "EUR", "totale" with prices → doc_type = "invoice"
-- "RICEVUTA", "Quittung", "Receipt", "pagamento", "Zahlung" → doc_type = "receipt"
-- "RICETTA", "Rezept", "Prescription", "prescrizione" → doc_type = "prescription"
-- "REFERTO", "Befund", "Report", "visita", "controllo", "Untersuchung", "esame" → doc_type = "specialist_report"
-- "DIMISSIONE", "Austritt", "Discharge", "dimissioni" → doc_type = "discharge"
-- "ANALISI", "Blutbild", "lab", "emocromo", "esami del sangue" with numeric values → doc_type = "bloodtest"
-- "RADIOLOGIA", "Röntgen", "X-ray", "CT", "MRI", "RMN", "ecografia" → doc_type = "radiology_report"
-- "VACCINAZIONE", "Impfung", "Vaccination" → doc_type = "vaccination"
-
-STEP 2: Identify the PATIENT (person receiving care, NOT the doctor or sender).
-Match against known patients: {patient_list}
-
-STEP 2b: Identify the DOCTOR who treated/examined the patient.
-- The doctor is the person who SIGNED the document or performed the examination.
-- Look for: "Dr.", "Dott.", "Prof.", signature at the bottom, "Arzt", "Medico"
-- Do NOT use: department heads listed in letterheads/headers/footers, hospital directors, administrative contacts
-- The doctor who signs at the BOTTOM of the document is usually the correct one.
-- If multiple doctors are mentioned, prefer the one who signed or performed the exam.
-
-STEP 3: Identify doctor and facility.
+Known patients: {patient_list}
 Known facilities: {facility_list}
 Known doctors: {doctor_list}
 
-NOTE: OCR text may be in Markdown format (headers, tables with |). Parse it as structured text.
+The OCR text may be plain text, Markdown, or HTML with data-bbox/data-label attributes (from Chandra OCR).
+In HTML format: data-label="Page-Header" = letterhead (facility, NOT the patient), "Page-Footer" = ignore,
+"Text" = content. The PATIENT name is usually top-right. The SIGNING DOCTOR is near the bottom with "Dott."/"Dr."
+"Responsabile" in headers = department head, NOT the treating doctor.
 
-Respond in JSON only. No markdown, no explanation.
+--- DOCUMENT START ---
+{ocr_text}
+--- DOCUMENT END ---
+
+Now classify the document above. Use these rules:
+- "FATTURA"/"Rechnung"/"Invoice"/"TARMED" with prices → "invoice"
+- "RICEVUTA"/"Quittung"/"Receipt" → "receipt"
+- "RICETTA"/"Rezept"/"Prescription" → "prescription"
+- "REFERTO"/"Befund"/"Report"/"visita"/"controllo" → "specialist_report"
+- "DIMISSIONE"/"Austritt"/"Discharge" → "discharge"
+- "ANALISI"/"Blutbild"/"lab"/"emocromo" with numeric values → "bloodtest"
+- "RADIOLOGIA"/"Röntgen"/"X-ray"/"CT"/"MRI" → "radiology_report"
+- "VACCINAZIONE"/"Impfung"/"Vaccination" → "vaccination"
+- When in doubt, use "specialist_report" rather than "other"
+
+The DOCTOR is whoever SIGNED the document or performed the exam (bottom of page), not department heads in letterheads.
+
+IMPORTANT: You MUST respond with ONLY this exact JSON structure. Do not add extra keys. Do not use markdown.
 
 {{
   "patient_name": "string or null",
@@ -57,14 +45,9 @@ Respond in JSON only. No markdown, no explanation.
   "facility": {{ "name": "string or null", "type": "hospital|clinic|lab|pharmacy|imaging_center|other|null", "address": "string or null", "city": "string or null", "country": "string or null", "phone": "string or null" }},
   "specialty": {{ "original": "string or null", "canonical": "string or null", "mapped": false }},
   "insurance": {{ "company": "string or null", "policy_number": "string or null" }},
-  "summary_en": "1-3 sentence English summary",
-  "summary_original": "1-3 sentence summary in source language"
-}}
-
-OCR text:
----
-{ocr_text}
----"""
+  "summary_en": "1-3 sentence English summary of the document",
+  "summary_original": "1-3 sentence summary in the document's source language"
+}}"""
 
 
 # ---------------------------------------------------------------------------

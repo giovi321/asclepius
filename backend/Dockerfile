@@ -2,6 +2,7 @@ FROM python:3.12-slim AS base
 
 # System dependencies for Tesseract, PDF rendering, DICOM
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    tzdata \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-ita \

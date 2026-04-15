@@ -10,6 +10,7 @@ services:
       - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
       - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
     environment:
+      - TZ=${TZ:-Europe/Zurich}
       - ASCLEPIUS_VAULT_PATH=/data/vault
       - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
       - ASCLEPIUS_DB_PATH=/data/config/asclepius.sqlite

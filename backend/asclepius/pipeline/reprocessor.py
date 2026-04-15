@@ -120,7 +120,7 @@ async def reprocess_document(
             return {"status": "done", "document_id": doc_id}
 
         # --- LLM phase ---
-        # Clear old extracted data
+        # Clear old extracted data before re-extraction
         for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.commit()
@@ -153,10 +153,15 @@ async def reprocess_document(
             extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
+                raw_resp = extraction.get("raw_response", "")
+                error_detail = extraction.get("error", "Extraction failed")
+                if raw_resp:
+                    error_detail = f"{error_detail}\n\nRaw LLM response:\n{raw_resp}"
+                logger.error("LLM extraction error for doc %d: %s", doc_id, error_detail[:500])
                 await db.execute(
                     """UPDATE documents SET status = 'failed', error_message = ?,
                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (extraction.get("error", "Extraction failed")[:2000], doc_id),
+                    (error_detail[:2000], doc_id),
                 )
                 await db.commit()
                 return extraction
@@ -174,6 +179,8 @@ async def reprocess_document(
                 extraction.get("diagnoses"),
             ])
             if not _has_content:
+                logger.warning("LLM extraction returned empty results for doc %d. Keys present: %s",
+                               doc_id, list(extraction.keys()))
                 await db.execute(
                     """UPDATE documents SET status = 'needs_review',
                        error_message = 'LLM extraction returned empty results',

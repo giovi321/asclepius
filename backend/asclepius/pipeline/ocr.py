@@ -25,6 +25,7 @@ async def extract_text(
 
     Uses the OCR provider at the given priority rank from the provider list,
     or a specific provider by ID if ocr_provider_id is set.
+    Falls back through lower-priority providers if text extraction is empty.
     Falls back to legacy config.ocr.engine if no provider list is configured.
 
     Returns: (text, confidence, engine_used)
@@ -36,26 +37,41 @@ async def extract_text(
     if ocr_provider_id:
         for p in config.ocr.providers:
             if p.id == ocr_provider_id and p.enabled:
-                return await _extract_with_provider(file_path, config, p)
-        logger.warning("OCR provider %s not found or disabled, falling back to default", ocr_provider_id)
+                text, confidence, engine = await _extract_with_provider(file_path, config, p)
+                if text.strip():
+                    return text, confidence, p.name or engine
+                logger.warning("OCR provider %s returned empty text, trying next providers", p.name or p.id)
+                break
+        else:
+            logger.warning("OCR provider %s not found or disabled, falling back to default", ocr_provider_id)
 
-    # Try the new provider list first
-    provider_entry = get_active_ocr_provider_config(config, ocr_priority)
-    if provider_entry:
-        return await _extract_with_provider(file_path, config, provider_entry)
+    # Try providers in priority order, falling back to next if empty
+    enabled_providers = sorted(
+        [p for p in config.ocr.providers if p.enabled],
+        key=lambda p: p.priority,
+    )
+    for provider in enabled_providers:
+        try:
+            text, confidence, engine = await _extract_with_provider(file_path, config, provider)
+            if text.strip():
+                return text, confidence, provider.name or engine
+            logger.warning("OCR provider '%s' (priority %d) returned empty text, trying next", provider.name or provider.id, provider.priority)
+        except Exception as e:
+            logger.warning("OCR provider '%s' (priority %d) failed: %s, trying next", provider.name or provider.id, provider.priority, e)
 
-    # Legacy fallback
-    if config.ocr.engine == "llm_vision":
-        return await _extract_llm_vision(file_path, config)
-    if config.ocr.engine == "tesseract_remote" and config.ocr.remote_url:
-        return await _extract_remote_ocr(file_path, config)
+    # Legacy fallback (no provider list configured)
+    if not enabled_providers:
+        if config.ocr.engine == "llm_vision":
+            return await _extract_llm_vision(file_path, config)
+        if config.ocr.engine == "tesseract_remote" and config.ocr.remote_url:
+            return await _extract_remote_ocr(file_path, config)
 
-    if ext == ".pdf":
-        return await _extract_from_pdf(path, config)
-    elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
-        return await _extract_from_image(path, config)
-    else:
-        return "", 0.0, "none"
+        if ext == ".pdf":
+            return await _extract_from_pdf(path, config)
+        elif ext in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
+            return await _extract_from_image(path, config)
+
+    return "", 0.0, "none"
 
 
 async def _extract_with_provider(

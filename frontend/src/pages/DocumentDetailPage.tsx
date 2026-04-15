@@ -9,7 +9,7 @@ import PdfViewer from "@/components/PdfViewer";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
   Section, InfoRow, EditableField, EditableSummary, EditableFilename,
-  OcrSection, getSectionTypeStyle, MedFormBadge,
+  OcrSection, TechnicalDetails, getSectionTypeStyle, MedFormBadge,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
 import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
@@ -301,7 +301,7 @@ export default function DocumentDetailPage() {
                         <option value="">Default (highest priority)</option>
                         {ocrProviders.map((p: any) => (
                           <option key={p.id} value={p.id}>
-                            {p.label || p.id} ({p.type})
+                            {p.name || p.id}
                           </option>
                         ))}
                       </select>
@@ -319,7 +319,7 @@ export default function DocumentDetailPage() {
                         <option value="">Default (highest priority)</option>
                         {llmProviders.map((p: any) => (
                           <option key={p.id} value={p.id}>
-                            {p.label || p.id} ({p.type} / {p.model})
+                            {p.name || p.id}
                           </option>
                         ))}
                       </select>
@@ -424,8 +424,13 @@ export default function DocumentDetailPage() {
             <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} />
             <InfoRow label="Language" value={doc.language_source} />
-            <InfoRow label="OCR Engine" value={doc.ocr_engine} />
-            <InfoRow label="OCR Confidence" value={doc.ocr_confidence?.toFixed(2)} />
+            {(doc.ocr_engine || doc.ocr_confidence != null || doc.llm_provider) && (
+              <TechnicalDetails
+                ocrEngine={doc.ocr_engine}
+                ocrConfidence={doc.ocr_confidence}
+                llmProvider={doc.llm_provider}
+              />
+            )}
           </Section>
 
           {/* Medical Event */}

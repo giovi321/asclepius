@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "@/api/client";
-import { Eye, EyeOff, Pill, Syringe, RefreshCw, X } from "lucide-react";
+import { Eye, EyeOff, Pill, Syringe, RefreshCw, X, ChevronRight } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 
 // ─── Section wrapper ───────────────────────────────────────────
@@ -219,6 +219,47 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
         </button>
       </span>
     </h1>
+  );
+}
+
+// ─── TechnicalDetails (collapsible) ───────────────────────────
+
+export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider }: {
+  ocrEngine: string | null; ocrConfidence: number | null; llmProvider: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="pt-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+      >
+        <ChevronRight className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`} />
+        Processing details
+      </button>
+      {open && (
+        <div className="mt-1.5 ml-4 space-y-1 text-xs text-muted-foreground">
+          {ocrEngine && (
+            <div className="flex justify-between">
+              <span>OCR Engine</span>
+              <span className="font-medium text-foreground/70">{ocrEngine}</span>
+            </div>
+          )}
+          {ocrConfidence != null && (
+            <div className="flex justify-between">
+              <span>OCR Confidence</span>
+              <span className="font-medium text-foreground/70">{ocrConfidence.toFixed(2)}</span>
+            </div>
+          )}
+          {llmProvider && (
+            <div className="flex justify-between">
+              <span>LLM Provider</span>
+              <span className="font-medium text-foreground/70">{llmProvider}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

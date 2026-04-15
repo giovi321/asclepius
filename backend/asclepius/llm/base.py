@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 class LLMProvider(ABC):
     """Base class for LLM providers (Ollama, Claude)."""
 
+    # Human-readable label set by the factory (e.g. "My Claude / claude-sonnet-4-20250514")
+    provider_label: str = ""
+
     @abstractmethod
     async def classify(self, ocr_text: str, context: dict) -> dict:
         """Classify document and extract basic metadata.

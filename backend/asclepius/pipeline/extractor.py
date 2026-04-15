@@ -275,10 +275,11 @@ async def extract_and_store(
         await db.commit()
         return extraction
 
-    # Store raw extraction
+    # Store raw extraction — use the provider label if available, else fall back to config
+    llm_label = getattr(llm, "provider_label", "") or config.llm.provider
     await db.execute(
         "UPDATE documents SET raw_extraction = ?, llm_provider = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (json.dumps(extraction), config.llm.provider, doc_id),
+        (json.dumps(extraction), llm_label, doc_id),
     )
 
     # Get the document's patient_id

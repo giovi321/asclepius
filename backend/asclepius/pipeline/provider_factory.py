@@ -63,9 +63,11 @@ def get_llm_provider(config: AppConfig, priority: int = 1):
 
 def _build_llm_provider(entry):
     """Instantiate an LLM provider from a LlmProviderEntry."""
+    label = f"{entry.name} / {entry.model}" if entry.name else f"{entry.type} / {entry.model}"
+
     if entry.type == "claude":
         from asclepius.llm.claude import ClaudeProvider
-        return ClaudeProvider(
+        provider = ClaudeProvider(
             api_key=entry.api_key,
             model=entry.model,
             timeout=entry.timeout,
@@ -75,7 +77,7 @@ def _build_llm_provider(entry):
         base_url = entry.base_url if entry.type == "vllm" else "https://api.openai.com/v1"
         if entry.base_url and entry.type == "openai":
             base_url = entry.base_url
-        return OpenAIProvider(
+        provider = OpenAIProvider(
             api_key=entry.api_key,
             model=entry.model,
             base_url=base_url,
@@ -83,11 +85,14 @@ def _build_llm_provider(entry):
         )
     else:  # ollama
         from asclepius.llm.ollama import OllamaProvider
-        return OllamaProvider(
+        provider = OllamaProvider(
             base_url=entry.base_url,
             model=entry.model,
             timeout=entry.timeout,
         )
+
+    provider.provider_label = label
+    return provider
 
 
 def get_llm_provider_count(config: AppConfig) -> int:

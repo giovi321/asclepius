@@ -233,7 +233,7 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
       </div>
 
       {/* PDF display */}
-      <div ref={containerRef} className="flex-1 overflow-auto flex justify-center bg-muted/20 p-4">
+      <div ref={containerRef} className="flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto">
         {error ? (
           <div className="flex flex-col items-center gap-3 py-8">
             <div className="text-destructive text-sm">{error}</div>

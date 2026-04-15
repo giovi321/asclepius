@@ -174,6 +174,68 @@ def _normalize_doc_type(raw: str | None) -> str:
     return "other"
 
 
+def _salvage_classification(c: dict) -> None:
+    """Try to map non-standard LLM keys to the expected classification schema.
+
+    Small models (e.g. qwen2.5:7b) often ignore the requested JSON schema and
+    return their own key names. This attempts to rescue useful data.
+    """
+    # Doctor name — LLM might use "responsible", "signing_doctor", "medico", etc.
+    if not c.get("doctor") or (isinstance(c.get("doctor"), dict) and not c["doctor"].get("name")):
+        for alt_key in ("responsible", "signing_doctor", "medico", "physician", "arzt"):
+            val = c.get(alt_key)
+            if val and isinstance(val, str):
+                c["doctor"] = {"name": val}
+                break
+            elif val and isinstance(val, dict) and val.get("name"):
+                c["doctor"] = val
+                break
+
+    # Facility — LLM might use "department", "hospital", "clinic", "struttura"
+    if not c.get("facility") or (isinstance(c.get("facility"), dict) and not c["facility"].get("name")):
+        for alt_key in ("department", "hospital", "clinic", "struttura", "krankenhaus"):
+            val = c.get(alt_key)
+            if val and isinstance(val, str):
+                c["facility"] = {"name": val.split("\n")[0].strip()}
+                break
+            elif val and isinstance(val, dict) and val.get("name"):
+                c["facility"] = val
+                break
+
+    # Summary — LLM might use "conclusions", "summary", "riassunto", "zusammenfassung"
+    if not c.get("summary_en"):
+        for alt_key in ("conclusions", "summary", "riassunto", "zusammenfassung", "description"):
+            val = c.get(alt_key)
+            if val and isinstance(val, str):
+                c["summary_en"] = val[:500]
+                break
+            elif val and isinstance(val, list):
+                c["summary_en"] = "; ".join(str(x) for x in val[:5])[:500]
+                break
+
+    # Date — LLM might use "date", "visit_date", "data", "datum"
+    if not c.get("doc_date") and not c.get("date_visit"):
+        for alt_key in ("date", "visit_date", "data", "datum", "consultation_date"):
+            val = c.get(alt_key)
+            if val and isinstance(val, str) and len(val) >= 8:
+                c["doc_date"] = val
+                break
+
+    # Visit type → doc_type mapping
+    if not c.get("doc_type"):
+        visit_type = c.get("visit_type") or c.get("type") or c.get("document_type")
+        if visit_type and isinstance(visit_type, str):
+            c["doc_type"] = visit_type
+
+    # Patient name
+    if not c.get("patient_name"):
+        patient = c.get("patient")
+        if isinstance(patient, dict):
+            c["patient_name"] = patient.get("name") or patient.get("full_name")
+        elif isinstance(patient, str):
+            c["patient_name"] = patient
+
+
 async def classify_and_extract(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -232,6 +294,10 @@ async def classify_and_extract(
             )
             await db.commit()
             return classification
+
+        # Salvage data from non-conforming LLM responses — small models often
+        # ignore the schema and return their own key names
+        _salvage_classification(classification)
 
         # Normalize doc_type to valid code
         doc_type = _normalize_doc_type(classification.get("doc_type", "other"))
@@ -381,6 +447,8 @@ async def extract_and_store(
     # Insert lab results
     if patient_id:
         for lab in extraction.get("lab_results", []):
+            if not isinstance(lab, dict):
+                continue
             norm_id = await _resolve_lab_test(db, lab)
             await db.execute(
                 """INSERT INTO lab_results
@@ -401,6 +469,8 @@ async def extract_and_store(
         if not isinstance(encounter, dict):
             encounter = {}
         for diag in extraction.get("diagnoses", []):
+            if not isinstance(diag, dict):
+                continue
             norm_diag_id = await _resolve_diagnosis(db, diag)
             norm_spec_id = None
             if doctor_data.get("specialty_canonical"):
@@ -441,6 +511,8 @@ async def extract_and_store(
 
         # Insert medications
         for med in extraction.get("medications", []):
+            if not isinstance(med, dict):
+                continue
             norm_med_id = await _resolve_medication(db, med)
             await db.execute(
                 """INSERT INTO medications
@@ -457,6 +529,8 @@ async def extract_and_store(
 
         # Insert vaccinations
         for vax in extraction.get("vaccinations", []):
+            if not isinstance(vax, dict):
+                continue
             await db.execute(
                 """INSERT INTO vaccinations
                    (document_id, patient_id, vaccine_name, manufacturer,
@@ -469,8 +543,10 @@ async def extract_and_store(
 
     # Insert invoice line items (not gated on patient_id — invoices may not have a patient)
     cost_data = extraction.get("cost", {})
+    if not isinstance(cost_data, dict):
+        cost_data = {}
     for item in cost_data.get("line_items", []):
-        if not item.get("description"):
+        if not isinstance(item, dict) or not item.get("description"):
             continue
         await db.execute(
             """INSERT INTO invoice_items

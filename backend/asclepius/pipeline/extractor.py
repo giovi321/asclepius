@@ -659,16 +659,22 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
         return row[0]
 
     cursor = await db.execute(
-        """INSERT INTO facilities (name, slug, type, address, city, country, phone)
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (name, slug,
+        """INSERT INTO facilities (name, slug, canonical_code, canonical_display, type, address, city, country, phone)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, slug, slug, name,
          facility_data.get("type"),
          facility_data.get("address"),
          facility_data.get("city"),
          facility_data.get("country"),
          facility_data.get("phone")),
     )
-    return cursor.lastrowid
+    facility_id = cursor.lastrowid
+    # Create alias for the extracted name
+    await db.execute(
+        "INSERT INTO facility_aliases (facility_id, alias, auto_mapped) VALUES (?, ?, 1)",
+        (facility_id, name),
+    )
+    return facility_id
 
 
 async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_id: int | None = None) -> int:
@@ -689,15 +695,21 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
         norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
 
     cursor = await db.execute(
-        """INSERT INTO doctors (name, slug, title, norm_specialty_id, specialty_original, facility_id)
-           VALUES (?, ?, ?, ?, ?, ?)""",
-        (name, slug,
+        """INSERT INTO doctors (name, slug, canonical_code, canonical_display, title, norm_specialty_id, specialty_original, facility_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (name, slug, slug, name,
          doctor_data.get("title"),
          norm_spec_id,
          doctor_data.get("specialty_original"),
          facility_id),
     )
-    return cursor.lastrowid
+    doctor_id = cursor.lastrowid
+    # Create alias for the extracted name
+    await db.execute(
+        "INSERT INTO doctor_aliases (doctor_id, alias, auto_mapped) VALUES (?, ?, 1)",
+        (doctor_id, name),
+    )
+    return doctor_id
 
 
 async def _resolve_specialty_from_doctor(db: aiosqlite.Connection, doctor_data: dict) -> int | None:

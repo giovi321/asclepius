@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS facilities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
+    canonical_code TEXT,
+    canonical_display TEXT,
     type TEXT,  -- 'hospital', 'clinic', 'lab', 'pharmacy', 'imaging_center', 'other'
     address TEXT,
     city TEXT,
@@ -48,10 +50,23 @@ CREATE TABLE IF NOT EXISTS facilities (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS facility_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+    alias TEXT NOT NULL,
+    language TEXT,
+    auto_mapped BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_facility_aliases_alias ON facility_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_facility_aliases_fk ON facility_aliases(facility_id);
+
 CREATE TABLE IF NOT EXISTS doctors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
+    canonical_code TEXT,
+    canonical_display TEXT,
     title TEXT,  -- 'Dr.', 'Prof.', etc.
     norm_specialty_id INTEGER REFERENCES norm_specialties(id),
     specialty_original TEXT,
@@ -60,6 +75,17 @@ CREATE TABLE IF NOT EXISTS doctors (
     email TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS doctor_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+    alias TEXT NOT NULL,
+    language TEXT,
+    auto_mapped BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_doctor_aliases_alias ON doctor_aliases(alias);
+CREATE INDEX IF NOT EXISTS idx_doctor_aliases_fk ON doctor_aliases(doctor_id);
 
 CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

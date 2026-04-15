@@ -16,29 +16,52 @@ NORM_TABLES = {
         "main": "norm_lab_tests",
         "aliases": "norm_lab_test_aliases",
         "fk": "norm_lab_test_id",
-        "ref_table": "lab_results",
-        "ref_col": "norm_lab_test_id",
+        "ref_tables": [{"table": "lab_results", "col": "norm_lab_test_id"}],
     },
     "specialties": {
         "main": "norm_specialties",
         "aliases": "norm_specialty_aliases",
         "fk": "norm_specialty_id",
-        "ref_table": "encounters",
-        "ref_col": "norm_specialty_id",
+        "ref_tables": [{"table": "encounters", "col": "norm_specialty_id"}],
     },
     "diagnoses": {
         "main": "norm_diagnoses",
         "aliases": "norm_diagnosis_aliases",
         "fk": "norm_diagnosis_id",
-        "ref_table": "encounters",
-        "ref_col": "norm_diagnosis_id",
+        "ref_tables": [{"table": "encounters", "col": "norm_diagnosis_id"}],
     },
     "medications": {
         "main": "norm_medications",
         "aliases": "norm_medication_aliases",
         "fk": "norm_medication_id",
-        "ref_table": "medications",
-        "ref_col": "norm_medication_id",
+        "ref_tables": [{"table": "medications", "col": "norm_medication_id"}],
+    },
+    "doctors": {
+        "main": "doctors",
+        "aliases": "doctor_aliases",
+        "fk": "doctor_id",
+        "ref_tables": [
+            {"table": "documents", "col": "doctor_id"},
+            {"table": "encounters", "col": "doctor_id"},
+            {"table": "imaging_studies", "col": "doctor_id"},
+        ],
+        "denorm_updates": [
+            {"table": "documents", "fk_col": "doctor_id", "text_col": "doctor_name"},
+        ],
+    },
+    "facilities": {
+        "main": "facilities",
+        "aliases": "facility_aliases",
+        "fk": "facility_id",
+        "ref_tables": [
+            {"table": "documents", "col": "facility_id"},
+            {"table": "encounters", "col": "facility_id"},
+            {"table": "imaging_studies", "col": "facility_id"},
+            {"table": "doctors", "col": "facility_id"},
+        ],
+        "denorm_updates": [
+            {"table": "documents", "fk_col": "facility_id", "text_col": "facility_name"},
+        ],
     },
 }
 

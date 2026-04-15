@@ -113,6 +113,66 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         ON document_links(source_document_id, target_document_id)
     """)
 
+    # Add canonical_code/canonical_display + alias tables for doctors & facilities
+    cursor = await db.execute("PRAGMA table_info(doctors)")
+    doctor_cols = [row[1] for row in await cursor.fetchall()]
+    if "canonical_code" not in doctor_cols:
+        await db.execute("ALTER TABLE doctors ADD COLUMN canonical_code TEXT")
+        await db.execute("ALTER TABLE doctors ADD COLUMN canonical_display TEXT")
+        await db.execute("UPDATE doctors SET canonical_code = slug, canonical_display = name WHERE canonical_code IS NULL")
+        logger.info("Migration: added canonical_code/canonical_display to doctors")
+
+    cursor = await db.execute("PRAGMA table_info(facilities)")
+    facility_cols = [row[1] for row in await cursor.fetchall()]
+    if "canonical_code" not in facility_cols:
+        await db.execute("ALTER TABLE facilities ADD COLUMN canonical_code TEXT")
+        await db.execute("ALTER TABLE facilities ADD COLUMN canonical_display TEXT")
+        await db.execute("UPDATE facilities SET canonical_code = slug, canonical_display = name WHERE canonical_code IS NULL")
+        logger.info("Migration: added canonical_code/canonical_display to facilities")
+
+    # Create alias tables (idempotent)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS doctor_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+            alias TEXT NOT NULL,
+            language TEXT,
+            auto_mapped BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_doctor_aliases_alias ON doctor_aliases(alias)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_doctor_aliases_fk ON doctor_aliases(doctor_id)")
+
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS facility_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+            alias TEXT NOT NULL,
+            language TEXT,
+            auto_mapped BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_facility_aliases_alias ON facility_aliases(alias)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_facility_aliases_fk ON facility_aliases(facility_id)")
+
+    # Backfill alias rows for existing doctors/facilities that don't have any yet
+    await db.execute("""
+        INSERT OR IGNORE INTO doctor_aliases (doctor_id, alias, auto_mapped)
+        SELECT id, name, 0 FROM doctors
+        WHERE id NOT IN (SELECT DISTINCT doctor_id FROM doctor_aliases)
+    """)
+    await db.execute("""
+        INSERT OR IGNORE INTO facility_aliases (facility_id, alias, auto_mapped)
+        SELECT id, name, 0 FROM facilities
+        WHERE id NOT IN (SELECT DISTINCT facility_id FROM facility_aliases)
+    """)
+
+    # Unique indexes on canonical_code (can't do via ALTER TABLE in SQLite)
+    await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_canonical_code ON doctors(canonical_code)")
+    await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_facilities_canonical_code ON facilities(canonical_code)")
+
     await db.commit()
 
 

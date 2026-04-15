@@ -9,12 +9,17 @@ VALID_TABLES = {
     "norm_specialties", "norm_specialty_aliases",
     "norm_diagnoses", "norm_diagnosis_aliases",
     "norm_medications", "norm_medication_aliases",
+    "doctors", "doctor_aliases",
+    "facilities", "facility_aliases",
     "lab_results", "encounters", "medications",
+    "documents", "imaging_studies",
 }
 
 VALID_COLUMNS = {
     "norm_lab_test_id", "norm_specialty_id",
     "norm_diagnosis_id", "norm_medication_id",
+    "doctor_id", "facility_id",
+    "doctor_name", "facility_name",
 }
 
 
@@ -41,8 +46,24 @@ class NormService:
         self.main_table = _validate_table(tables["main"])
         self.alias_table = _validate_table(tables["aliases"])
         self.fk_col = _validate_column(tables["fk"])
-        self.ref_table = _validate_table(tables["ref_table"])
-        self.ref_col = _validate_column(tables["ref_col"])
+        # Support multiple reference tables (for doctors/facilities that are referenced
+        # from documents, encounters, etc.) — backward-compatible with single ref_table
+        if "ref_tables" in tables:
+            self.ref_tables = [
+                (_validate_table(r["table"]), _validate_column(r["col"]))
+                for r in tables["ref_tables"]
+            ]
+        else:
+            self.ref_tables = [
+                (_validate_table(tables["ref_table"]), _validate_column(tables["ref_col"]))
+            ]
+        # Optional denormalized text columns to update on merge (e.g. documents.doctor_name)
+        self.denorm_updates = [
+            {"table": _validate_table(u["table"]),
+             "fk_col": _validate_column(u["fk_col"]),
+             "text_col": _validate_column(u["text_col"])}
+            for u in tables.get("denorm_updates", [])
+        ]
 
     async def list_all(self, filter_unreviewed: bool = False, search: str | None = None) -> list[dict]:
         """List all normalization entries with alias/unreviewed counts.
@@ -148,11 +169,25 @@ class NormService:
             (target_id, source_id),
         )
 
-        # Update references in data tables
-        await self.db.execute(
-            f"UPDATE {self.ref_table} SET {self.ref_col} = ? WHERE {self.ref_col} = ?",
-            (target_id, source_id),
-        )
+        # Update references in all data tables
+        for ref_table, ref_col in self.ref_tables:
+            await self.db.execute(
+                f"UPDATE {ref_table} SET {ref_col} = ? WHERE {ref_col} = ?",
+                (target_id, source_id),
+            )
+
+        # Update denormalized text fields (e.g. documents.doctor_name → target's canonical_display)
+        if self.denorm_updates:
+            cursor = await self.db.execute(
+                f"SELECT canonical_display FROM {self.main_table} WHERE id = ?", (target_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[0]:
+                for upd in self.denorm_updates:
+                    await self.db.execute(
+                        f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
+                        (row[0], target_id),
+                    )
 
         # Delete source
         await self.db.execute(

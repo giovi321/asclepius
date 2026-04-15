@@ -124,6 +124,8 @@ export default function NormalizationTab() {
           <option value="specialties">Specialties</option>
           <option value="diagnoses">Diagnoses</option>
           <option value="medications">Medications</option>
+          <option value="doctors">Doctors</option>
+          <option value="facilities">Facilities</option>
         </select>
         <select value={normFilter || ""} onChange={(e: any) => setNormFilter(e.target.value || null)}
           className="rounded-md border bg-background px-3 py-2 text-sm">

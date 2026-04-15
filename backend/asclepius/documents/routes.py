@@ -209,6 +209,10 @@ async def update_doc(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
+    # Log corrections before applying updates (compares against raw_extraction)
+    from asclepius.documents.corrections import log_corrections
+    await log_corrections(db, doc_id, updates)
+
     await update_document_fields(db, doc_id, updates)
     return await get_document(db, doc_id)
 

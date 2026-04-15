@@ -25,6 +25,7 @@ class ClaudeProvider(LLMProvider):
             facility_list=json.dumps(context.get("facility_list", []), indent=2),
             doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
             ocr_text=ocr_text,
+            few_shot_examples=context.get("few_shot_examples", ""),
         )
 
         response = await self.client.messages.create(

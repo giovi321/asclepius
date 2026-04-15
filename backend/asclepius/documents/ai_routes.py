@@ -155,6 +155,10 @@ async def edit_document_with_ai(
         updates["facility_name"] = facility_name_str
 
     if updates:
+        # Log corrections before applying updates
+        from asclepius.documents.corrections import log_corrections
+        await log_corrections(db, doc_id, updates)
+
         await update_document_fields(db, doc_id, updates)
 
     return {"status": "updated", "document_id": doc_id, "changes": changes}

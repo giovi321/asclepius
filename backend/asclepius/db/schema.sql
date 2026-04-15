@@ -391,6 +391,21 @@ CREATE TABLE IF NOT EXISTS document_sections (
 
 CREATE INDEX IF NOT EXISTS idx_document_sections_document ON document_sections(document_id);
 
+-- Extraction corrections (tracks user edits to LLM-extracted fields for learning)
+CREATE TABLE IF NOT EXISTS extraction_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    llm_value TEXT,
+    corrected_value TEXT,
+    facility_id INTEGER,
+    doc_type TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_corrections_doc ON extraction_corrections(document_id);
+CREATE INDEX IF NOT EXISTS idx_corrections_facility ON extraction_corrections(facility_id);
+CREATE INDEX IF NOT EXISTS idx_corrections_type ON extraction_corrections(doc_type);
+
 -- Full-text search index
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     ocr_text,

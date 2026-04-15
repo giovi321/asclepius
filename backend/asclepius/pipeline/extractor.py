@@ -258,6 +258,18 @@ async def classify_and_extract(
     if extraction_override:
         extraction = extraction_override
     else:
+        # Retrieve few-shot examples from similar documents
+        few_shot_str = ""
+        try:
+            from asclepius.pipeline.few_shot import find_few_shot_examples, format_few_shot_examples
+            examples = await find_few_shot_examples(db, ocr_text, current_doc_id=doc_id)
+            few_shot_str = format_few_shot_examples(examples)
+        except Exception:
+            logger.debug("Few-shot example retrieval failed (non-fatal)", exc_info=True)
+
+        # Add few-shot examples to context so provider .classify() methods can use them
+        context["few_shot_examples"] = few_shot_str
+
         # Phase 1: Classify (use custom prompt if configured)
         logger.info("Phase 1 — classifying doc %d", doc_id)
         from asclepius.llm.prompt_manager import get_prompt
@@ -269,6 +281,7 @@ async def classify_and_extract(
                     facility_list=json.dumps(context.get("facility_list", []), indent=2),
                     doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
                     ocr_text=ocr_text,
+                    few_shot_examples=few_shot_str,
                 )
                 response_text = await llm._generate(formatted)
                 classification = llm._parse_json(response_text)

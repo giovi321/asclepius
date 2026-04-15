@@ -173,6 +173,23 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_canonical_code ON doctors(canonical_code)")
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_facilities_canonical_code ON facilities(canonical_code)")
 
+    # Extraction corrections table (correction-driven learning)
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS extraction_corrections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+            field_name TEXT NOT NULL,
+            llm_value TEXT,
+            corrected_value TEXT,
+            facility_id INTEGER,
+            doc_type TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_doc ON extraction_corrections(document_id)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_facility ON extraction_corrections(facility_id)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_type ON extraction_corrections(doc_type)")
+
     await db.commit()
 
 

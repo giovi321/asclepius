@@ -18,7 +18,7 @@ In HTML format: data-label="Page-Header" = letterhead (facility, NOT the patient
 --- DOCUMENT START ---
 {ocr_text}
 --- DOCUMENT END ---
-
+{few_shot_examples}
 Now classify the document above. Use these rules:
 - "FATTURA"/"Rechnung"/"Invoice"/"TARMED" with prices → "invoice"
 - "RICEVUTA"/"Quittung"/"Receipt" → "receipt"

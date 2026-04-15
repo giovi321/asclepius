@@ -8,7 +8,7 @@ import {
 import PdfViewer from "@/components/PdfViewer";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
-  Section, InfoRow, EditableField, EditableSummary, EditableFilename,
+  Section, InfoRow, EditableField, EditableSelect, EditableSummary, EditableFilename,
   OcrSection, TechnicalDetails, getSectionTypeStyle, MedFormBadge,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
@@ -417,7 +417,15 @@ export default function DocumentDetailPage() {
                 </pre>
               </div>
             )}
-            <EditableField label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={updateDocFields} />
+            <EditableSelect label="Type" value={doc.doc_type} field="doc_type" docId={doc.id} onSave={updateDocFields}
+              options={[
+                "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
+                "insurance_claim", "insurance_doc", "referral", "discharge",
+                "specialist_report", "radiology_report", "pathology_report",
+                "surgical_report", "er_report", "vaccination", "allergy", "sick_leave",
+                "medical_cert", "physio_report", "dental", "ophthalmology",
+                "mental_health", "consent", "advance_directive", "correspondence", "other",
+              ]} />
             <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} />

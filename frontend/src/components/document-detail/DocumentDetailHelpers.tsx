@@ -92,6 +92,59 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
   );
 }
 
+// ─── EditableSelect ───────────────────────────────────────────
+
+export function EditableSelect({ label, value, field, docId, onSave, options, formatLabel }: {
+  label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
+  options: string[]; formatLabel?: (v: string) => string;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+  const fmt = formatLabel || ((v: string) => v.replace(/_/g, " "));
+
+  const handleSave = async (newVal: string) => {
+    setSaving(true);
+    try {
+      const res = await api.patch(`/documents/${docId}`, { [field]: newVal || null });
+      setEditing(false);
+      setVal(newVal);
+      onSave(res.data);
+    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0">{label}</span>
+        <select value={val} onChange={(e) => handleSave(e.target.value)} disabled={saving}
+          className="flex-1 rounded border bg-background px-2 py-1 text-sm" autoFocus>
+          <option value="">— none —</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{fmt(opt)}</option>
+          ))}
+        </select>
+        <button onClick={() => setEditing(false)}
+          className="rounded border px-2 py-1 text-xs">
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => { setVal(value || ""); setEditing(true); }}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">
+        {value ? fmt(value) : <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+      </span>
+    </div>
+  );
+}
+
 // ─── EditableSummary ───────────────────────────────────────────
 
 export function EditableSummary({ value, docId, onSave }: { value: string | null; docId: number; onSave: (updated?: any) => void }) {

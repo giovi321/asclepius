@@ -108,7 +108,7 @@ export default function AppLayout() {
                 rel="noreferrer"
                 className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
               >
-                v{packageJson.version}
+                Asclepius v{packageJson.version}
               </a>
             )}
           </div>

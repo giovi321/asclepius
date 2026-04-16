@@ -90,7 +90,7 @@ export default function AppLayout() {
         </nav>
 
         {/* Patient selector + logout */}
-        <div className="border-t p-3 space-y-2">
+        <div className="p-3 space-y-2">
           {sidebarOpen && <PatientSelector />}
           <div className="flex items-center justify-between">
             <button

@@ -22,7 +22,8 @@ On first launch, a setup wizard guides you through creating your account and fir
 ## Features
 
 - **Document ingestion**: Drop PDFs, images, or DICOM files into the inbox
-- **OCR**: Multi-provider with priority (Tesseract, LLM Vision, Google Vision, remote Tesseract)
+- **OCR**: Multi-provider with priority (Tesseract, LLM Vision, Google Vision, remote Tesseract, Vision Extraction)
+- **Vision Extraction**: Single-step mode where a vision LLM reads and extracts from page images directly
 - **LLM extraction**: Multi-provider with priority and escalation (Ollama, vLLM, Claude, OpenAI)
 - **Multi-patient**: Organize records by patient with access control
 - **Lab results**: Extracted and normalized, with trend tracking

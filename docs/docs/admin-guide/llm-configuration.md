@@ -104,6 +104,7 @@ OCR providers extract text from scanned documents and images.
 | **Tesseract (Local)** | `tesseract` | Local Tesseract OCR. Free, no network needed. |
 | **Tesseract (Remote)** | `tesseract_remote` | Remote Tesseract server via HTTP API. |
 | **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR. Best quality. |
+| **Vision Extraction** | `vision_extraction` | Single-step: vision LLM reads and extracts in one pass. No separate OCR or extraction LLM needed. |
 | **Google Cloud Vision** | `google_vision` | Google Cloud Vision API. |
 
 ### LLM Vision OCR
@@ -126,6 +127,25 @@ For the highest OCR quality, use **Chandra OCR** as the vision model:
 2. Add an LLM Vision OCR provider
 3. Set Vision LLM Provider to **Ollama**
 4. Set Vision Model to `fredrezones55/chandra-ocr-2`
+
+### Vision Extraction (Single-Step)
+
+Vision Extraction is a different approach that **combines OCR and classification into one step**. Instead of OCR→text→LLM, it sends page images directly to a vision LLM which reads the document AND returns structured data in one pass.
+
+This is useful when:
+
+- You have limited VRAM (one model instead of two)
+- OCR quality is poor and the LLM can do better by seeing the actual document
+- You want faster processing (one model call instead of two with model swapping)
+
+#### Setup
+
+1. Pull a vision model: `ollama pull qwen2.5vl:7b`
+2. Go to **Settings** > **Document Analysis** > **OCR Providers**
+3. Click **Add Provider** > **Vision Extraction**
+4. Set Vision LLM Provider to **Ollama**
+5. Set Vision Model to `qwen2.5vl:7b`
+6. Set priority (e.g., priority 1, with Chandra→qwen as priority 2 fallback)
 
 Chandra produces structured HTML output that significantly improves downstream extraction accuracy.
 

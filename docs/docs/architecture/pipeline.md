@@ -107,6 +107,22 @@ The `provider_name` stored in the database is the user-configured display name (
 
 Uses the Google Cloud Vision API for OCR. Requires an API key.
 
+### Vision Extraction (Single-Step)
+
+A fundamentally different approach that **skips the OCR→LLM two-step pipeline** entirely. Instead, page images are sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model reads the document AND returns structured classification JSON in one pass.
+
+1. Render each PDF page as a JPEG image
+2. Send image + classification prompt to a vision LLM (e.g., `qwen2.5-vl:7b`)
+3. Model returns JSON containing both `ocr_text` (for search/storage) and all classification fields (doc_type, dates, doctor, facility, summary)
+4. The pipeline **skips the LLM extraction phase** since extraction is already done
+5. Supports Ollama, Claude, and OpenAI vision providers
+
+**Advantages:** One model call instead of two (faster, no model swapping), the model sees visual layout cues (bold headers, table grids, letterhead positioning, signatures) that OCR strips away.
+
+**Best for:** Documents where OCR quality is poor, or when running on limited VRAM where two large models can't coexist.
+
+**Recommended model:** `qwen2.5-vl:7b` (~6 GB VRAM) via Ollama.
+
 ## Two-Phase Extraction
 
 After OCR, the extracted text is sent to the LLM in two phases:

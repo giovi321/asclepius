@@ -5,36 +5,51 @@ from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
+from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.normalization.auto_merge import suggest_merges
 from asclepius.normalization.service import NormService
+from asclepius.pipeline.processor import get_llm_provider
 
 router = APIRouter()
 
-# Mapping of type names to table info
+# Mapping of type names to table info.
+#
+# doc_sources: list of (table, fk_col) pairs the "documents linked" endpoint walks to
+# find the set of documents that reference this entry. Each source must be either
+# `documents` itself (fk is the referring column) or a table with a `document_id`
+# column pointing back to documents.
 NORM_TABLES = {
     "lab_tests": {
         "main": "norm_lab_tests",
         "aliases": "norm_lab_test_aliases",
         "fk": "norm_lab_test_id",
         "ref_tables": [{"table": "lab_results", "col": "norm_lab_test_id"}],
+        "doc_sources": [("lab_results", "norm_lab_test_id")],
     },
     "specialties": {
         "main": "norm_specialties",
         "aliases": "norm_specialty_aliases",
         "fk": "norm_specialty_id",
         "ref_tables": [{"table": "encounters", "col": "norm_specialty_id"}],
+        "doc_sources": [
+            ("documents", "norm_specialty_id"),
+            ("encounters", "norm_specialty_id"),
+        ],
     },
     "diagnoses": {
         "main": "norm_diagnoses",
         "aliases": "norm_diagnosis_aliases",
         "fk": "norm_diagnosis_id",
         "ref_tables": [{"table": "encounters", "col": "norm_diagnosis_id"}],
+        "doc_sources": [("encounters", "norm_diagnosis_id")],
     },
     "medications": {
         "main": "norm_medications",
         "aliases": "norm_medication_aliases",
         "fk": "norm_medication_id",
         "ref_tables": [{"table": "medications", "col": "norm_medication_id"}],
+        "doc_sources": [("medications", "norm_medication_id")],
     },
     "doctors": {
         "main": "doctors",
@@ -47,6 +62,11 @@ NORM_TABLES = {
         ],
         "denorm_updates": [
             {"table": "documents", "fk_col": "doctor_id", "text_col": "doctor_name"},
+        ],
+        "doc_sources": [
+            ("documents", "doctor_id"),
+            ("encounters", "doctor_id"),
+            ("imaging_studies", "doctor_id"),
         ],
     },
     "facilities": {
@@ -61,6 +81,11 @@ NORM_TABLES = {
         ],
         "denorm_updates": [
             {"table": "documents", "fk_col": "facility_id", "text_col": "facility_name"},
+        ],
+        "doc_sources": [
+            ("documents", "facility_id"),
+            ("encounters", "facility_id"),
+            ("imaging_studies", "facility_id"),
         ],
     },
 }
@@ -199,3 +224,35 @@ async def merge_norms_batch(
     svc = NormService(db, tables)
     await svc.merge_batch(body.source_ids, body.target_id)
     return {"ok": True, "merged": len([s for s in body.source_ids if s != body.target_id])}
+
+
+@router.get("/{norm_type}/{norm_id}/documents")
+async def list_linked_documents(
+    norm_type: str,
+    norm_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    tables = _validate_type(norm_type)
+    svc = NormService(db, tables)
+    return await svc.list_documents(norm_id)
+
+
+@router.post("/{norm_type}/auto-merge")
+async def auto_merge_proposals(
+    norm_type: str,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Ask the configured LLM to propose merge groups. Does NOT execute any merge."""
+    tables = _validate_type(norm_type)
+    config = get_config()
+    llm = get_llm_provider(config)
+    return await suggest_merges(
+        db=db,
+        llm=llm,
+        main_table=tables["main"],
+        alias_table=tables["aliases"],
+        fk_col=tables["fk"],
+        norm_type_label=norm_type.replace("_", " "),
+    )

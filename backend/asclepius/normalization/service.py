@@ -20,6 +20,7 @@ VALID_COLUMNS = {
     "norm_diagnosis_id", "norm_medication_id",
     "doctor_id", "facility_id",
     "doctor_name", "facility_name",
+    "name",
 }
 
 
@@ -63,6 +64,13 @@ class NormService:
              "fk_col": _validate_column(u["fk_col"]),
              "text_col": _validate_column(u["text_col"])}
             for u in tables.get("denorm_updates", [])
+        ]
+        # Tables to walk to find documents referencing this norm entry.
+        # Each entry is (table, fk_col). `documents` is queried by its own id;
+        # other tables must have a `document_id` column linking back to documents.
+        self.doc_sources = [
+            (_validate_table(t), _validate_column(c))
+            for (t, c) in tables.get("doc_sources", [])
         ]
 
     async def list_all(self, filter_unreviewed: bool = False, search: str | None = None) -> list[dict]:
@@ -131,6 +139,11 @@ class NormService:
             updates["canonical_code"] = canonical_code
         if canonical_display is not None:
             updates["canonical_display"] = canonical_display
+            # For doctors/facilities the rest of the app reads the `name` column
+            # (document lists, filter dropdowns, extractor slug matching). Keep
+            # it in sync so an edit here is actually visible elsewhere.
+            if self.main_table in ("doctors", "facilities"):
+                updates["name"] = canonical_display
 
         if updates:
             set_clause = ", ".join(f"{k} = ?" for k in updates)
@@ -138,9 +151,50 @@ class NormService:
             await self.db.execute(
                 f"UPDATE {self.main_table} SET {set_clause} WHERE id = ?", values
             )
+            # Also propagate the rename to denormalized text fields on documents
+            # (documents.doctor_name / facility_name), same pattern as merge.
+            if canonical_display is not None and self.denorm_updates:
+                for upd in self.denorm_updates:
+                    await self.db.execute(
+                        f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
+                        (canonical_display, norm_id),
+                    )
             await self.db.commit()
 
         return await self.get_with_aliases(norm_id)
+
+    async def list_documents(self, norm_id: int) -> list[dict]:
+        """Return all documents that reference this norm entry.
+
+        Walks self.doc_sources — each entry is (table, fk_col). For `documents`
+        the fk_col is on documents itself; for other tables (lab_results,
+        encounters, medications, imaging_studies) it's a join via document_id.
+        """
+        doc_ids: set[int] = set()
+        for table, fk_col in self.doc_sources:
+            if table == "documents":
+                sql = f"SELECT id FROM documents WHERE {fk_col} = ?"
+            else:
+                sql = f"SELECT DISTINCT document_id FROM {table} WHERE {fk_col} = ?"
+            cursor = await self.db.execute(sql, (norm_id,))
+            for row in await cursor.fetchall():
+                if row[0]:
+                    doc_ids.add(row[0])
+
+        if not doc_ids:
+            return []
+
+        placeholders = ",".join("?" * len(doc_ids))
+        cursor = await self.db.execute(
+            f"""SELECT d.id, d.original_filename, d.doc_type, d.doc_date,
+                       d.patient_id, p.display_name AS patient_name
+                FROM documents d
+                LEFT JOIN patients p ON p.id = d.patient_id
+                WHERE d.id IN ({placeholders})
+                ORDER BY d.doc_date DESC, d.id DESC""",
+            list(doc_ids),
+        )
+        return [dict(r) for r in await cursor.fetchall()]
 
     async def add_alias(self, norm_id: int, alias: str, language: str | None) -> dict:
         await self.db.execute(

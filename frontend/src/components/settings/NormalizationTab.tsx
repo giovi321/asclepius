@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import {
   Plus, Trash2, Save, Check, Search, Edit3, GitMerge, X, ChevronRight,
+  FileText, Sparkles, Loader2,
 } from "lucide-react";
 
 export default function NormalizationTab() {
@@ -21,6 +22,13 @@ export default function NormalizationTab() {
   const [showMergeFor, setShowMergeFor] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchTargetId, setBatchTargetId] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [linkedDocs, setLinkedDocs] = useState<any[] | null>(null);
+  const [linkedDocsFor, setLinkedDocsFor] = useState<{ id: number; name: string } | null>(null);
+  const [linkedLoading, setLinkedLoading] = useState(false);
+  const [autoMergeLoading, setAutoMergeLoading] = useState(false);
+  const [autoMergeProposals, setAutoMergeProposals] = useState<any[] | null>(null);
+  const [autoMergeEntries, setAutoMergeEntries] = useState<any[]>([]);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadList = useCallback(() => {
@@ -93,15 +101,100 @@ export default function NormalizationTab() {
 
   const handleSaveEdit = async () => {
     if (!expandedId) return;
-    await api.patch(`/normalization/${normType}/${expandedId}`, {
-      canonical_code: editCode,
-      canonical_display: editDisplay,
+    setSaveError(null);
+    try {
+      await api.patch(`/normalization/${normType}/${expandedId}`, {
+        canonical_code: editCode,
+        canonical_display: editDisplay,
+      });
+      setEditing(false);
+      // Reload detail and list
+      const res = await api.get(`/normalization/${normType}/${expandedId}`);
+      setDetail(res.data);
+      loadList();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || "Save failed";
+      setSaveError(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+  };
+
+  const handleViewDocuments = async (id: number, name: string) => {
+    setLinkedDocsFor({ id, name });
+    setLinkedDocs(null);
+    setLinkedLoading(true);
+    try {
+      const res = await api.get(`/normalization/${normType}/${id}/documents`);
+      setLinkedDocs(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setLinkedDocs([]);
+    } finally {
+      setLinkedLoading(false);
+    }
+  };
+
+  const closeLinkedDocs = () => {
+    setLinkedDocsFor(null);
+    setLinkedDocs(null);
+  };
+
+  const handleAutoMerge = async () => {
+    setAutoMergeLoading(true);
+    setAutoMergeProposals(null);
+    try {
+      const res = await api.post(`/normalization/${normType}/auto-merge`);
+      setAutoMergeProposals(Array.isArray(res.data?.proposals) ? res.data.proposals : []);
+      setAutoMergeEntries(Array.isArray(res.data?.entries) ? res.data.entries : []);
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail || err?.message || "Auto-merge request failed";
+      alert(typeof detail === "string" ? detail : JSON.stringify(detail));
+    } finally {
+      setAutoMergeLoading(false);
+    }
+  };
+
+  const applyProposal = async (proposal: { target_id: number; source_ids: number[] }) => {
+    const sources = proposal.source_ids.filter((id) => id !== proposal.target_id);
+    if (sources.length === 0) return;
+    await api.post(`/normalization/${normType}/merge-batch`, {
+      source_ids: sources,
+      target_id: proposal.target_id,
     });
-    setEditing(false);
-    // Reload detail and list
-    const res = await api.get(`/normalization/${normType}/${expandedId}`);
-    setDetail(res.data);
+    // Drop the applied proposal from the list
+    setAutoMergeProposals((prev) => prev?.filter((p) => p !== proposal) ?? null);
     loadList();
+  };
+
+  const updateProposalTarget = (idx: number, newTargetId: number) => {
+    setAutoMergeProposals((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      const cur = next[idx];
+      // If the new target was among sources, swap it out
+      next[idx] = {
+        ...cur,
+        target_id: newTargetId,
+        source_ids: cur.source_ids
+          .filter((s: number) => s !== newTargetId)
+          .concat(cur.target_id !== newTargetId ? [cur.target_id] : []),
+      };
+      return next;
+    });
+  };
+
+  const toggleProposalSource = (idx: number, sourceId: number) => {
+    setAutoMergeProposals((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      const cur = next[idx];
+      const has = cur.source_ids.includes(sourceId);
+      next[idx] = {
+        ...cur,
+        source_ids: has
+          ? cur.source_ids.filter((s: number) => s !== sourceId)
+          : [...cur.source_ids, sourceId],
+      };
+      return next;
+    });
   };
 
   const handleAddAlias = async () => {
@@ -179,8 +272,144 @@ export default function NormalizationTab() {
             </button>
           )}
         </div>
-        <span className="text-xs text-muted-foreground ml-auto">{normItems.length} entries</span>
+        <button
+          onClick={handleAutoMerge}
+          disabled={autoMergeLoading || normItems.length < 2}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-40"
+          title="Ask the AI to propose merges — you review and approve each one"
+        >
+          {autoMergeLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          Auto-merge with AI
+        </button>
+        <span className="text-xs text-muted-foreground">{normItems.length} entries</span>
       </div>
+
+      {/* Auto-merge proposals panel */}
+      {autoMergeProposals !== null && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Sparkles className="h-4 w-4 text-primary" />
+              AI merge proposals ({autoMergeProposals.length})
+            </div>
+            <button
+              onClick={() => setAutoMergeProposals(null)}
+              className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+            >
+              Close
+            </button>
+          </div>
+          {autoMergeProposals.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No merge candidates found. All entries look distinct.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {autoMergeProposals.map((p: any, idx: number) => {
+                const entryById: Record<number, any> = Object.fromEntries(
+                  autoMergeEntries.map((e: any) => [e.id, e])
+                );
+                const groupIds: number[] = [p.target_id, ...p.source_ids];
+                return (
+                  <div key={idx} className="rounded-md border bg-background p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">Target:</span>
+                      <select
+                        value={p.target_id}
+                        onChange={(e: any) => updateProposalTarget(idx, Number(e.target.value))}
+                        className="rounded-md border bg-background px-2 py-1 text-sm"
+                      >
+                        {groupIds.map((id: number) => (
+                          <option key={id} value={id}>
+                            {entryById[id]?.canonical_display || `#${id}`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {p.reason && (
+                      <p className="text-xs italic text-muted-foreground">"{p.reason}"</p>
+                    )}
+                    <div className="space-y-1">
+                      <div className="text-xs font-medium text-muted-foreground">Merge these into target:</div>
+                      {p.source_ids.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No sources selected.</p>
+                      ) : (
+                        p.source_ids.map((sid: number) => (
+                          <label key={sid} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked
+                              onChange={() => toggleProposalSource(idx, sid)}
+                            />
+                            <span>{entryById[sid]?.canonical_display || `#${sid}`}</span>
+                            {entryById[sid]?.canonical_code && (
+                              <span className="text-xs text-muted-foreground font-mono">
+                                ({entryById[sid].canonical_code})
+                              </span>
+                            )}
+                          </label>
+                        ))
+                      )}
+                      {/* Allow re-adding a source that was toggled off — fetch untouched sources */}
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => applyProposal(p)}
+                        disabled={p.source_ids.length === 0}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-40"
+                      >
+                        <GitMerge className="h-3 w-3" /> Apply merge
+                      </button>
+                      <button
+                        onClick={() => setAutoMergeProposals((prev) => prev?.filter((_: any, i: number) => i !== idx) ?? null)}
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Linked documents modal */}
+      {linkedDocsFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={closeLinkedDocs}>
+          <div className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-5 shadow-xl" onClick={(e: any) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold">Documents referencing "{linkedDocsFor.name}"</h3>
+              <button onClick={closeLinkedDocs} className="rounded-md p-1 hover:bg-accent">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {linkedLoading ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+              </div>
+            ) : (linkedDocs?.length ?? 0) === 0 ? (
+              <p className="py-6 text-sm text-muted-foreground">No documents reference this entry.</p>
+            ) : (
+              <div className="divide-y rounded-md border">
+                {linkedDocs!.map((d: any) => (
+                  <a
+                    key={d.id}
+                    href={`/documents/${d.id}`}
+                    className="flex flex-col gap-0.5 px-3 py-2 text-sm hover:bg-accent"
+                  >
+                    <span className="font-medium truncate">{d.original_filename || `Document #${d.id}`}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {[d.doc_type, d.doc_date, d.patient_name].filter(Boolean).join(" • ")}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Batch merge bar — visible when at least one item is selected */}
       {selectedIds.size > 0 && (
@@ -276,6 +505,11 @@ export default function NormalizationTab() {
                           <Check className="h-3 w-3" /> Confirm
                         </button>
                       )}
+                      <button onClick={() => handleViewDocuments(item.id, item.canonical_display || item.name || `#${item.id}`)}
+                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
+                        title="Show documents that reference this entry">
+                        <FileText className="h-3 w-3" /> Documents
+                      </button>
                       <button onClick={() => { setShowMergeFor(showMergeFor === item.id ? null : item.id); }}
                         className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
                         title="Merge into another entry">
@@ -345,9 +579,12 @@ export default function NormalizationTab() {
                                   className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground">
                                   <Save className="h-3 w-3" /> Save
                                 </button>
-                                <button onClick={() => { setEditing(false); setEditCode(detail.canonical_code || ""); setEditDisplay(detail.canonical_display || ""); }}
+                                <button onClick={() => { setEditing(false); setSaveError(null); setEditCode(detail.canonical_code || ""); setEditDisplay(detail.canonical_display || ""); }}
                                   className="rounded-md border px-3 py-1 text-xs hover:bg-accent">Cancel</button>
                               </div>
+                              {saveError && (
+                                <p className="text-xs text-destructive">Save failed: {saveError}</p>
+                              )}
                             </div>
                           ) : (
                             <div className="flex gap-4 text-sm">

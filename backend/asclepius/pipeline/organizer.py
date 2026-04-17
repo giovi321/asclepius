@@ -26,7 +26,11 @@ async def generate_ai_filename(llm, doc_metadata: dict) -> str | None:
     )
 
     try:
-        raw = await llm._generate(prompt, force_json=False, timeout_override=15)
+        # 15 s was too tight when Ollama is busy with a concurrent reprocess —
+        # the filename prompt is small but the single-threaded server can queue
+        # it behind a 14 KB extraction job. 90 s covers realistic queue depth
+        # without letting a truly stuck call hang forever.
+        raw = await llm._generate(prompt, force_json=False, timeout_override=90)
         # Clean up: strip quotes, whitespace, extension if accidentally included
         name = raw.strip().strip('"\'').strip()
         # Remove any extension the LLM might have added

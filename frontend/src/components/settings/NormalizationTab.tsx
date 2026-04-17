@@ -558,11 +558,11 @@ export default function NormalizationTab() {
                   aria-label="Select all"
                 />
               </th>
-              <th className="px-4 py-2.5 text-left font-medium w-8"></th>
-              <th className="px-4 py-2.5 text-left font-medium">Code</th>
-              <th className="px-4 py-2.5 text-left font-medium">Display Name</th>
-              <th className="px-4 py-2.5 text-left font-medium">Aliases</th>
-              <th className="px-4 py-2.5 text-left font-medium">Actions</th>
+              <th className="px-2 py-2 text-left font-medium w-6"></th>
+              <th className="px-3 py-2 text-left font-medium">Code</th>
+              <th className="px-3 py-2 text-left font-medium">Display Name</th>
+              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Aliases</th>
+              <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -575,7 +575,7 @@ export default function NormalizationTab() {
                 {/* Main row */}
                 <tr className={`cursor-pointer transition-colors ${expandedId === item.id ? "bg-accent/30" : "hover:bg-accent/20"}`}
                     onClick={() => toggleExpand(item.id)}>
-                  <td className="px-3 py-2.5" onClick={(e: any) => e.stopPropagation()}>
+                  <td className="px-3 py-1.5 w-8" onClick={(e: any) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedIds.has(item.id)}
@@ -583,12 +583,12 @@ export default function NormalizationTab() {
                       aria-label={`Select ${item.canonical_display || item.id}`}
                     />
                   </td>
-                  <td className="px-4 py-2.5">
+                  <td className="px-2 py-1.5 w-6">
                     <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expandedId === item.id ? "rotate-90" : ""}`} />
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">{item.canonical_code}</td>
-                  <td className="px-4 py-2.5 font-medium">{item.canonical_display}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">
+                  <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground max-w-[280px] truncate" title={item.canonical_code}>{item.canonical_code}</td>
+                  <td className="px-3 py-1.5 font-medium max-w-[360px] truncate" title={item.canonical_display}>{item.canonical_display}</td>
+                  <td className="px-3 py-1.5 text-muted-foreground whitespace-nowrap">
                     {item.alias_count || 0} aliases
                     {item.unreviewed_count > 0 && (
                       <span className="ml-1.5 inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 text-[10px] font-medium text-yellow-700 dark:text-yellow-400">
@@ -596,7 +596,7 @@ export default function NormalizationTab() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5" onClick={(e: any) => e.stopPropagation()}>
+                  <td className="px-3 py-1.5 whitespace-nowrap w-px" onClick={(e: any) => e.stopPropagation()}>
                     <div className="flex gap-1.5">
                       {item.unreviewed_count > 0 && (
                         <button onClick={() => handleConfirmAll(item.id)}

@@ -191,6 +191,23 @@ export default function NormalizationTab() {
     }
   };
 
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Delete "${name}"?\n\nAll references from documents, encounters, imaging, and lab results will be cleared (the documents stay, they just lose this classification). Aliases will also be removed. This cannot be undone.`)) return;
+    try {
+      await api.delete(`/normalization/${normType}/${id}`);
+    } catch (err: any) {
+      const d = err?.response?.data?.detail || err?.message || "Delete failed";
+      alert(typeof d === "string" ? d : JSON.stringify(d));
+      return;
+    }
+    if (expandedId === id) {
+      setExpandedId(null);
+      setDetail(null);
+    }
+    closeLinkedDocs();
+    loadList();
+  };
+
   const applyProposal = async (proposal: { target_id: number; source_ids: number[] }) => {
     const sources = proposal.source_ids.filter((id) => id !== proposal.target_id);
     if (sources.length === 0) return;
@@ -458,7 +475,30 @@ export default function NormalizationTab() {
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading...
               </div>
             ) : (linkedDocs?.length ?? 0) === 0 ? (
-              <p className="py-6 text-sm text-muted-foreground">No documents reference this entry.</p>
+              <div className="space-y-3 py-4">
+                <p className="text-sm text-muted-foreground">
+                  No documents reference this entry. It's safe to delete.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      if (linkedDocsFor) {
+                        const { id, name } = linkedDocsFor;
+                        handleDelete(id, name);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete "{linkedDocsFor?.name}"
+                  </button>
+                  <button
+                    onClick={closeLinkedDocs}
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="divide-y rounded-md border">
                 {linkedDocs!.map((d: any) => (
@@ -613,6 +653,11 @@ export default function NormalizationTab() {
                         className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
                         title="Merge into another entry">
                         <GitMerge className="h-3 w-3" /> Merge
+                      </button>
+                      <button onClick={() => handleDelete(item.id, item.canonical_display || item.name || `#${item.id}`)}
+                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-1"
+                        title="Delete this entry">
+                        <Trash2 className="h-3 w-3" /> Delete
                       </button>
                     </div>
                   </td>

@@ -213,6 +213,38 @@ class NormService:
         await self.db.commit()
         return new_id
 
+    async def delete_entry(self, norm_id: int) -> None:
+        """Delete a canonical entry.
+
+        Clears every referencing FK back to NULL, blanks any denormalized
+        text fields that mirrored this entry, removes aliases, then deletes
+        the main row. Commits once.
+        """
+        # 1. Clear denormalized text columns first — they're keyed off the FK,
+        #    which we're about to null.
+        for upd in self.denorm_updates:
+            await self.db.execute(
+                f"UPDATE {upd['table']} SET {upd['text_col']} = NULL WHERE {upd['fk_col']} = ?",
+                (norm_id,),
+            )
+        # 2. Null the FKs on every referencing table.
+        for ref_table, ref_col in self.ref_tables:
+            await self.db.execute(
+                f"UPDATE {ref_table} SET {ref_col} = NULL WHERE {ref_col} = ?",
+                (norm_id,),
+            )
+        # 3. Aliases: clean explicitly — alias tables use ON DELETE CASCADE on
+        #    facility/doctor, but the norm_* alias tables may differ across
+        #    older DBs. Explicit delete is safe either way.
+        await self.db.execute(
+            f"DELETE FROM {self.alias_table} WHERE {self.fk_col} = ?", (norm_id,)
+        )
+        # 4. Finally, delete the main row.
+        await self.db.execute(
+            f"DELETE FROM {self.main_table} WHERE id = ?", (norm_id,)
+        )
+        await self.db.commit()
+
     async def list_documents(self, norm_id: int) -> list[dict]:
         """Return all documents that reference this norm entry.
 

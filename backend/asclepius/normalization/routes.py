@@ -282,6 +282,23 @@ async def merge_norms_batch(
     }
 
 
+@router.delete("/{norm_type}/{norm_id}")
+async def delete_norm(
+    norm_type: str,
+    norm_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    tables = _validate_type(norm_type)
+    svc = NormService(db, tables)
+    try:
+        await svc.delete_entry(norm_id)
+    except Exception as e:
+        logger.exception("Failed to delete %s #%d", norm_type, norm_id)
+        raise HTTPException(status_code=500, detail=f"Delete failed: {e}") from e
+    return {"ok": True}
+
+
 @router.get("/{norm_type}/{norm_id}/documents")
 async def list_linked_documents(
     norm_type: str,

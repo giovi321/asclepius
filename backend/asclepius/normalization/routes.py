@@ -1,5 +1,7 @@
 """Normalization API routes."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -10,6 +12,8 @@ from asclepius.db.connection import get_db
 from asclepius.normalization.auto_merge import suggest_merges
 from asclepius.normalization.service import NormService
 from asclepius.pipeline.processor import get_llm_provider
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -165,7 +169,25 @@ async def update_norm(
 ):
     tables = _validate_type(norm_type)
     svc = NormService(db, tables)
-    return await svc.update(norm_id, body.canonical_code, body.canonical_display)
+    try:
+        return await svc.update(norm_id, body.canonical_code, body.canonical_display)
+    except aiosqlite.IntegrityError as e:
+        msg = str(e)
+        # Most common: UNIQUE constraint on canonical_code when another entry
+        # already owns the requested code. Tell the user what to do.
+        if "canonical_code" in msg or "UNIQUE" in msg.upper():
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Another {norm_type[:-1] if norm_type.endswith('s') else norm_type} "
+                    f"already has code '{body.canonical_code}'. Use Merge to unify them "
+                    f"instead of renaming."
+                ),
+            ) from e
+        raise HTTPException(status_code=409, detail=f"Database conflict: {msg}") from e
+    except Exception as e:
+        logger.exception("Failed to update %s #%d", norm_type, norm_id)
+        raise HTTPException(status_code=500, detail=f"Update failed: {e}") from e
 
 
 @router.post("/{norm_type}/{norm_id}/aliases")
@@ -233,16 +255,26 @@ async def merge_norms_batch(
     if body.new_target is not None:
         if not body.new_target.canonical_display.strip():
             raise HTTPException(status_code=400, detail="canonical_display is required")
-        target_id = await svc.create_entry(
-            canonical_code=body.new_target.canonical_code.strip(),
-            canonical_display=body.new_target.canonical_display.strip(),
-        )
+        try:
+            target_id = await svc.create_entry(
+                canonical_code=body.new_target.canonical_code.strip(),
+                canonical_display=body.new_target.canonical_display.strip(),
+            )
+        except aiosqlite.IntegrityError as e:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Could not create new entry: {e}. Pick a different code or use an existing target.",
+            ) from e
     elif body.target_id is not None:
         target_id = body.target_id
     else:
         raise HTTPException(status_code=400, detail="target_id or new_target required")
 
-    await svc.merge_batch(body.source_ids, target_id)
+    try:
+        await svc.merge_batch(body.source_ids, target_id)
+    except Exception as e:
+        logger.exception("merge-batch failed for %s into %s", body.source_ids, target_id)
+        raise HTTPException(status_code=500, detail=f"Merge failed: {e}") from e
     return {
         "ok": True,
         "target_id": target_id,

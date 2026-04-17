@@ -692,9 +692,11 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
          facility_data.get("phone")),
     )
     facility_id = cursor.lastrowid
-    # Create alias for the extracted name
+    # Seed the initial alias with the extracted name. Because the alias is the
+    # canonical form we just created, mark it already reviewed — there is no
+    # normalization decision to make.
     await db.execute(
-        "INSERT INTO facility_aliases (facility_id, alias, auto_mapped) VALUES (?, ?, 1)",
+        "INSERT INTO facility_aliases (facility_id, alias, auto_mapped) VALUES (?, ?, 0)",
         (facility_id, name),
     )
     return facility_id
@@ -737,9 +739,10 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
          facility_id),
     )
     doctor_id = cursor.lastrowid
-    # Create alias for the extracted name
+    # Seed the initial alias with the extracted name (already-reviewed — it's the
+    # canonical form, not a normalization guess).
     await db.execute(
-        "INSERT INTO doctor_aliases (doctor_id, alias, auto_mapped) VALUES (?, ?, 1)",
+        "INSERT INTO doctor_aliases (doctor_id, alias, auto_mapped) VALUES (?, ?, 0)",
         (doctor_id, name),
     )
     return doctor_id

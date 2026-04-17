@@ -188,6 +188,28 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_canonical_code ON doctors(canonical_code)")
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_facilities_canonical_code ON facilities(canonical_code)")
 
+    # Auto-confirm aliases that are trivially identical to their parent's canonical
+    # display name — there is nothing to review when the alias IS the canonical form.
+    # Idempotent.
+    for alias_table, parent_table, fk in [
+        ("doctor_aliases", "doctors", "doctor_id"),
+        ("facility_aliases", "facilities", "facility_id"),
+        ("norm_lab_test_aliases", "norm_lab_tests", "norm_lab_test_id"),
+        ("norm_specialty_aliases", "norm_specialties", "norm_specialty_id"),
+        ("norm_diagnosis_aliases", "norm_diagnoses", "norm_diagnosis_id"),
+        ("norm_medication_aliases", "norm_medications", "norm_medication_id"),
+    ]:
+        await db.execute(f"""
+            UPDATE {alias_table}
+            SET auto_mapped = 0
+            WHERE auto_mapped = 1
+              AND EXISTS (
+                  SELECT 1 FROM {parent_table} p
+                  WHERE p.id = {alias_table}.{fk}
+                    AND LOWER(TRIM(p.canonical_display)) = LOWER(TRIM({alias_table}.alias))
+              )
+        """)
+
     # Extraction corrections table (correction-driven learning)
     await db.execute("""
         CREATE TABLE IF NOT EXISTS extraction_corrections (

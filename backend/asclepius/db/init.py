@@ -169,6 +169,21 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         WHERE id NOT IN (SELECT DISTINCT facility_id FROM facility_aliases)
     """)
 
+    # Backfill NULL canonical_code/display from slug/name (idempotent — covers rows
+    # created before the migration ran or inserted without those fields populated).
+    await db.execute(
+        "UPDATE doctors SET canonical_code = slug WHERE canonical_code IS NULL OR canonical_code = ''"
+    )
+    await db.execute(
+        "UPDATE doctors SET canonical_display = name WHERE canonical_display IS NULL OR canonical_display = ''"
+    )
+    await db.execute(
+        "UPDATE facilities SET canonical_code = slug WHERE canonical_code IS NULL OR canonical_code = ''"
+    )
+    await db.execute(
+        "UPDATE facilities SET canonical_display = name WHERE canonical_display IS NULL OR canonical_display = ''"
+    )
+
     # Unique indexes on canonical_code (can't do via ALTER TABLE in SQLite)
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_canonical_code ON doctors(canonical_code)")
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_facilities_canonical_code ON facilities(canonical_code)")

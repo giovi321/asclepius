@@ -81,6 +81,11 @@ class MergeRequest(BaseModel):
     target_id: int
 
 
+class MergeBatchRequest(BaseModel):
+    source_ids: list[int]
+    target_id: int
+
+
 def _validate_type(norm_type: str) -> dict:
     if norm_type not in NORM_TABLES:
         raise HTTPException(status_code=400, detail=f"Invalid type: {norm_type}")
@@ -205,3 +210,16 @@ async def merge_norms(
     svc = NormService(db, tables)
     await svc.merge(body.source_id, body.target_id)
     return {"ok": True}
+
+
+@router.post("/{norm_type}/merge-batch")
+async def merge_norms_batch(
+    norm_type: str,
+    body: MergeBatchRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    tables = _validate_type(norm_type)
+    svc = NormService(db, tables)
+    await svc.merge_batch(body.source_ids, body.target_id)
+    return {"ok": True, "merged": len([s for s in body.source_ids if s != body.target_id])}

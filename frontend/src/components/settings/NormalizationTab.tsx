@@ -19,6 +19,8 @@ export default function NormalizationTab() {
   const [newAliasLang, setNewAliasLang] = useState("");
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(null);
   const [showMergeFor, setShowMergeFor] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [batchTargetId, setBatchTargetId] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadList = useCallback(() => {
@@ -31,6 +33,39 @@ export default function NormalizationTab() {
   }, [normType, normFilter, searchQuery]);
 
   useEffect(() => { loadList(); }, [loadList]);
+
+  // Clear selection when switching type or filters
+  useEffect(() => { setSelectedIds(new Set()); setBatchTargetId(null); }, [normType, normFilter, searchQuery]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === normItems.length && normItems.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(normItems.map((i: any) => i.id)));
+    }
+  };
+
+  const handleBatchMerge = async () => {
+    if (!batchTargetId || selectedIds.size === 0) return;
+    const sources = Array.from(selectedIds).filter((id) => id !== batchTargetId);
+    if (sources.length === 0) return;
+    if (!confirm(`Merge ${sources.length} entries into the selected target? Aliases and references will be moved, and sources deleted.`)) return;
+    await api.post(`/normalization/${normType}/merge-batch`, { source_ids: sources, target_id: batchTargetId });
+    setSelectedIds(new Set());
+    setBatchTargetId(null);
+    setExpandedId(null);
+    setDetail(null);
+    loadList();
+  };
 
   // Debounced search
   const handleSearchInput = (val: string) => {
@@ -147,11 +182,54 @@ export default function NormalizationTab() {
         <span className="text-xs text-muted-foreground ml-auto">{normItems.length} entries</span>
       </div>
 
+      {/* Batch merge bar — visible when at least one item is selected */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 text-sm">
+          <span className="font-medium">{selectedIds.size} selected</span>
+          <span className="text-muted-foreground">Merge into:</span>
+          <select
+            value={batchTargetId ?? ""}
+            onChange={(e: any) => setBatchTargetId(Number(e.target.value) || null)}
+            className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
+          >
+            <option value="">Select target...</option>
+            {normItems
+              .filter((n: any) => !selectedIds.has(n.id))
+              .map((n: any) => (
+                <option key={n.id} value={n.id}>
+                  {n.canonical_display} ({n.canonical_code})
+                </option>
+              ))}
+          </select>
+          <button
+            onClick={handleBatchMerge}
+            disabled={!batchTargetId}
+            className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1 text-xs text-white hover:bg-orange-700 disabled:opacity-40"
+          >
+            <GitMerge className="h-3 w-3" /> Merge
+          </button>
+          <button
+            onClick={() => { setSelectedIds(new Set()); setBatchTargetId(null); }}
+            className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
             <tr>
+              <th className="px-3 py-2.5 text-left font-medium w-8">
+                <input
+                  type="checkbox"
+                  checked={normItems.length > 0 && selectedIds.size === normItems.length}
+                  onChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="px-4 py-2.5 text-left font-medium w-8"></th>
               <th className="px-4 py-2.5 text-left font-medium">Code</th>
               <th className="px-4 py-2.5 text-left font-medium">Display Name</th>
@@ -161,7 +239,7 @@ export default function NormalizationTab() {
           </thead>
           <tbody className="divide-y">
             {normItems.length === 0 ? (
-              <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">
+              <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">
                 {searchQuery ? "No matches found" : "No entries"}
               </td></tr>
             ) : normItems.map((item: any) => (
@@ -169,6 +247,14 @@ export default function NormalizationTab() {
                 {/* Main row */}
                 <tr className={`cursor-pointer transition-colors ${expandedId === item.id ? "bg-accent/30" : "hover:bg-accent/20"}`}
                     onClick={() => toggleExpand(item.id)}>
+                  <td className="px-3 py-2.5" onClick={(e: any) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelect(item.id)}
+                      aria-label={`Select ${item.canonical_display || item.id}`}
+                    />
+                  </td>
                   <td className="px-4 py-2.5">
                     <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expandedId === item.id ? "rotate-90" : ""}`} />
                   </td>
@@ -202,7 +288,7 @@ export default function NormalizationTab() {
                 {/* Merge row */}
                 {showMergeFor === item.id && (
                   <tr className="bg-orange-50 dark:bg-orange-900/10">
-                    <td colSpan={5} className="px-6 py-3" onClick={(e: any) => e.stopPropagation()}>
+                    <td colSpan={6} className="px-6 py-3" onClick={(e: any) => e.stopPropagation()}>
                       <div className="flex items-center gap-3 text-sm">
                         <span className="text-muted-foreground">Merge <strong>{item.canonical_display}</strong> into:</span>
                         <select value={mergeTargetId ?? ""} onChange={(e: any) => setMergeTargetId(Number(e.target.value) || null)}
@@ -227,7 +313,7 @@ export default function NormalizationTab() {
                 {/* Expanded detail */}
                 {expandedId === item.id && detail && (
                   <tr className="bg-muted/20">
-                    <td colSpan={5} className="px-6 py-4" onClick={(e: any) => e.stopPropagation()}>
+                    <td colSpan={6} className="px-6 py-4" onClick={(e: any) => e.stopPropagation()}>
                       <div className="space-y-4 max-w-2xl">
                         {/* Edit canonical entry */}
                         <div className="space-y-2">

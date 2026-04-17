@@ -671,6 +671,16 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
     if row:
         return row[0]
 
+    # Check facility_aliases — after a merge, the source's name lives here pointing
+    # at the merged target, so future extractions of that name resolve to target.
+    cursor = await db.execute(
+        "SELECT facility_id FROM facility_aliases WHERE alias = ? COLLATE NOCASE LIMIT 1",
+        (name,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
     cursor = await db.execute(
         """INSERT INTO facilities (name, slug, canonical_code, canonical_display, type, address, city, country, phone)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -698,6 +708,16 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
     slug = slugify(name)
 
     cursor = await db.execute("SELECT id FROM doctors WHERE slug = ?", (slug,))
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    # Check doctor_aliases — after a merge, the source's name lives here pointing
+    # at the merged target, so future extractions of that name resolve to target.
+    cursor = await db.execute(
+        "SELECT doctor_id FROM doctor_aliases WHERE alias = ? COLLATE NOCASE LIMIT 1",
+        (name,),
+    )
     row = await cursor.fetchone()
     if row:
         return row[0]

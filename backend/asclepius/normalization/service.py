@@ -163,6 +163,37 @@ class NormService:
 
     async def merge(self, source_id: int, target_id: int) -> None:
         """Merge source into target. Moves all aliases and references."""
+        await self._merge_one(source_id, target_id)
+        await self.db.commit()
+
+    async def merge_batch(self, source_ids: list[int], target_id: int) -> None:
+        """Merge multiple sources into a target in a single transaction."""
+        for sid in source_ids:
+            if sid == target_id:
+                continue
+            await self._merge_one(sid, target_id)
+        await self.db.commit()
+
+    async def _merge_one(self, source_id: int, target_id: int) -> None:
+        """Merge logic without commit — caller is responsible for committing."""
+        if source_id == target_id:
+            return
+
+        # Fetch target canonical_display once — used for denorm updates and correction logging
+        cursor = await self.db.execute(
+            f"SELECT canonical_display FROM {self.main_table} WHERE id = ?", (target_id,)
+        )
+        target_row = await cursor.fetchone()
+        target_display = target_row[0] if target_row else None
+
+        # Before touching FKs, capture correction data for documents that link to the source.
+        # This teaches the few-shot retriever that "source name → target display".
+        await self._log_merge_corrections(source_id, target_display)
+
+        # Insert the source's own name as an alias on the target, so future extractions
+        # of the source name resolve to the target via _upsert_* alias lookup.
+        await self._copy_source_name_as_alias(source_id, target_id)
+
         # Move aliases
         await self.db.execute(
             f"UPDATE {self.alias_table} SET {self.fk_col} = ? WHERE {self.fk_col} = ?",
@@ -177,20 +208,72 @@ class NormService:
             )
 
         # Update denormalized text fields (e.g. documents.doctor_name → target's canonical_display)
-        if self.denorm_updates:
-            cursor = await self.db.execute(
-                f"SELECT canonical_display FROM {self.main_table} WHERE id = ?", (target_id,)
-            )
-            row = await cursor.fetchone()
-            if row and row[0]:
-                for upd in self.denorm_updates:
-                    await self.db.execute(
-                        f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
-                        (row[0], target_id),
-                    )
+        if self.denorm_updates and target_display:
+            for upd in self.denorm_updates:
+                await self.db.execute(
+                    f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
+                    (target_display, target_id),
+                )
 
         # Delete source
         await self.db.execute(
             f"DELETE FROM {self.main_table} WHERE id = ?", (source_id,)
         )
-        await self.db.commit()
+
+    async def _copy_source_name_as_alias(self, source_id: int, target_id: int) -> None:
+        """Copy the source row's display name as an alias on the target.
+
+        Only applies to entities whose main table has a `name` column (doctors, facilities).
+        """
+        if self.main_table not in ("doctors", "facilities"):
+            return
+        cursor = await self.db.execute(
+            f"SELECT name FROM {self.main_table} WHERE id = ?", (source_id,)
+        )
+        row = await cursor.fetchone()
+        if not row or not row[0]:
+            return
+        name = row[0]
+        # Avoid dupes — check if target already has this alias
+        dup_cursor = await self.db.execute(
+            f"SELECT 1 FROM {self.alias_table} WHERE {self.fk_col} = ? AND alias = ? COLLATE NOCASE LIMIT 1",
+            (target_id, name),
+        )
+        if await dup_cursor.fetchone():
+            return
+        await self.db.execute(
+            f"INSERT INTO {self.alias_table} ({self.fk_col}, alias, auto_mapped) VALUES (?, ?, 0)",
+            (target_id, name),
+        )
+
+    async def _log_merge_corrections(self, source_id: int, target_display: str | None) -> None:
+        """Log extraction_corrections for documents affected by this merge.
+
+        Mirrors the learning signal produced when a user renames a doctor/facility from
+        the document view — each affected document gets a correction row that future
+        few-shot retrieval can surface to the LLM.
+        """
+        if not target_display:
+            return
+        for upd in self.denorm_updates:
+            if upd["table"] != "documents":
+                continue
+            if upd["text_col"] not in ("doctor_name", "facility_name"):
+                continue
+            cursor = await self.db.execute(
+                f"""SELECT id, {upd['text_col']}, doc_type, facility_id
+                    FROM {upd['table']}
+                    WHERE {upd['fk_col']} = ? AND raw_extraction IS NOT NULL""",
+                (source_id,),
+            )
+            rows = await cursor.fetchall()
+            for r in rows:
+                doc_id, llm_value, doc_type, facility_id = r[0], r[1], r[2], r[3]
+                if llm_value == target_display:
+                    continue
+                await self.db.execute(
+                    """INSERT INTO extraction_corrections
+                       (document_id, field_name, llm_value, corrected_value, facility_id, doc_type)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (doc_id, upd["text_col"], llm_value, target_display, facility_id, doc_type),
+                )

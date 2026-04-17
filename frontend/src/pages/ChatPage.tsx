@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Plus, Send } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -59,11 +59,33 @@ export default function ChatPage() {
     );
   }
 
+  const startNewChat = async () => {
+    if (loading) return;
+    try {
+      await api.delete("/chat/history", {
+        params: { patient_id: selectedPatient?.id },
+      });
+      setMessages([]);
+    } catch {
+      // ignore — leave UI as is
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col">
-      <h1 className="mb-4 text-2xl font-semibold">
-        Chat — {selectedPatient.display_name}
-      </h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">
+          Chat — {selectedPatient.display_name}
+        </h1>
+        <button
+          onClick={startNewChat}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+        >
+          <Plus className="h-4 w-4" />
+          Start new chat
+        </button>
+      </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto rounded-lg border p-4">

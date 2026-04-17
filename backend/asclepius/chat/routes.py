@@ -58,3 +58,23 @@ async def chat_history(
     )
     rows = await cursor.fetchall()
     return {"messages": [dict(r) for r in rows]}
+
+
+@router.delete("/history")
+async def clear_chat_history(
+    patient_id: int | None = None,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    if patient_id:
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+
+    await db.execute(
+        """DELETE FROM chat_history
+           WHERE user_id = ? AND (patient_id = ? OR (? IS NULL AND patient_id IS NULL))""",
+        (current_user["id"], patient_id, patient_id),
+    )
+    await db.commit()
+    return {"ok": True}

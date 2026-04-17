@@ -8,7 +8,7 @@ import {
 import PdfViewer from "@/components/PdfViewer";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
-  Section, InfoRow, EditableField, EditableSelect, EditableSummary, EditableFilename,
+  Section, InfoRow, EditableField, EditableSelect, EditableCombobox, EditableSummary, EditableFilename,
   OcrSection, TechnicalDetails, getSectionTypeStyle, MedFormBadge,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
@@ -428,9 +428,9 @@ export default function DocumentDetailPage() {
               ]} />
             <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />
-            <EditableField label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} />
-            <EditableField label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} />
-            <EditableField label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} />
+            <EditableCombobox label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} normType="doctors" />
+            <EditableCombobox label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} normType="facilities" />
+            <EditableCombobox label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} normType="specialties" />
             <InfoRow label="Language" value={doc.language_source} />
             {(doc.ocr_engine || doc.ocr_confidence != null || doc.llm_provider) && (
               <TechnicalDetails

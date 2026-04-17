@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
-import { Eye, EyeOff, Pill, Syringe, RefreshCw, X, ChevronRight } from "lucide-react";
+import { Eye, EyeOff, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 
 // ─── Section wrapper ───────────────────────────────────────────
@@ -140,6 +140,177 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">
         {value ? fmt(value) : <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+      </span>
+    </div>
+  );
+}
+
+// ─── EditableCombobox ─────────────────────────────────────────
+// Searchable dropdown backed by a normalization endpoint (doctors, facilities,
+// specialties). Shows existing entries filtered by the typed query, plus a
+// "+ Create new" row when the query has no exact match. Selecting an existing
+// entry sends the chosen display name to the backend; the PATCH handler on
+// documents will resolve it to an id via the alias-aware _upsert_* helpers.
+
+export function EditableCombobox({
+  label, value, field, docId, onSave, normType,
+}: {
+  label: string;
+  value: any;
+  field: string;
+  docId: number;
+  onSave: (updated?: any) => void;
+  normType: "doctors" | "facilities" | "specialties";
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [options, setOptions] = useState<any[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Fetch options when entering edit mode
+  useEffect(() => {
+    if (!editing) return;
+    setLoadingOptions(true);
+    api.get(`/normalization/${normType}`)
+      .then((res: any) => setOptions(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setOptions([]))
+      .finally(() => setLoadingOptions(false));
+  }, [editing, normType]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!editing) return;
+    const handler = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setEditing(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [editing]);
+
+  const commit = async (chosen: string | null) => {
+    setSaving(true);
+    try {
+      const res = await api.patch(`/documents/${docId}`, { [field]: chosen });
+      onSave(res.data);
+      setEditing(false);
+      setQuery("");
+    } catch (err: any) {
+      const d = err?.response?.data?.detail || err?.message || "Failed to save";
+      toast({ title: typeof d === "string" ? d : "Failed to save", variant: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayOf = (opt: any) =>
+    opt.canonical_display || opt.name || opt.display || "";
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? options.filter((o: any) => {
+        const d = (displayOf(o) || "").toLowerCase();
+        const c = (o.canonical_code || "").toLowerCase();
+        return d.includes(q) || c.includes(q);
+      })
+    : options;
+  const exactMatch = filtered.some((o: any) => displayOf(o).toLowerCase() === q);
+  const canCreate = q.length > 0 && !exactMatch;
+
+  if (editing) {
+    return (
+      <div className="flex items-start gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">{label}</span>
+        <div ref={rootRef} className="relative flex-1">
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setEditing(false); setQuery(""); }
+                  if (e.key === "Enter") {
+                    if (filtered.length === 1) commit(displayOf(filtered[0]));
+                    else if (canCreate) commit(query.trim());
+                  }
+                }}
+                placeholder={`Search ${normType}...`}
+                className="w-full rounded border bg-background pl-7 pr-2 py-1 text-sm"
+                autoFocus
+                disabled={saving}
+              />
+            </div>
+            <button onClick={() => commit(null)} disabled={saving}
+              className="rounded border px-2 py-1 text-xs hover:bg-accent"
+              title="Clear this field">
+              Clear
+            </button>
+            <button onClick={() => { setEditing(false); setQuery(""); }}
+              className="rounded border px-2 py-1 text-xs">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          {/* Dropdown panel */}
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
+            {loadingOptions ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+            ) : (
+              <>
+                {filtered.length === 0 && !canCreate && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    No {normType} yet. Type a name to create one.
+                  </div>
+                )}
+                {filtered.slice(0, 50).map((opt: any) => {
+                  const d = displayOf(opt);
+                  const isCurrent = value && d.toLowerCase() === String(value).toLowerCase();
+                  return (
+                    <button
+                      key={opt.id}
+                      onClick={() => commit(d)}
+                      disabled={saving}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
+                    >
+                      <span className="truncate">{d}</span>
+                      {opt.canonical_code && (
+                        <span className="text-[10px] font-mono text-muted-foreground truncate">
+                          {opt.canonical_code}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+                {canCreate && (
+                  <button
+                    onClick={() => commit(query.trim())}
+                    disabled={saving}
+                    className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Create new: <span className="font-medium">"{query.trim()}"</span>
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => { setQuery(""); setEditing(true); }}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">
+        {value || <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
       </span>
     </div>
   );

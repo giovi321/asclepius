@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { Plus, Trash2, ScrollText } from "lucide-react";
 
 export default function UsersTab() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", password: "", display_name: "", role: "editor" });
@@ -33,7 +35,12 @@ export default function UsersTab() {
   };
 
   const deleteUser = async (id: number) => {
-    if (!confirm("Delete this user?")) return;
+    const ok = await confirm({
+      title: "Delete this user?",
+      description: "The user's login will be removed and their patient-access grants revoked. Documents they uploaded stay.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await api.delete(`/settings/users/${id}`);
     setUsers(users.filter((u) => u.id !== id));
   };

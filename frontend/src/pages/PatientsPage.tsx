@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "@/api/client";
 import { Plus, Trash2, ChevronDown, ChevronUp, Save, X } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 interface Patient {
   id: number;
@@ -21,6 +22,7 @@ interface Patient {
 
 export default function PatientsPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -69,7 +71,12 @@ export default function PatientsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to delete this patient? This action cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Delete patient?",
+      description: "All documents, lab results, and medical events for this patient will also be removed. This cannot be undone.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/patients/${id}`);
       await loadPatients();

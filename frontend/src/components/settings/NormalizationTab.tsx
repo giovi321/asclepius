@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/api/client";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import { useToast } from "@/contexts/ToastContext";
 import {
   Plus, Trash2, Save, Check, Search, Edit3, GitMerge, X, ChevronRight,
   FileText, Sparkles, Loader2,
 } from "lucide-react";
 
 export default function NormalizationTab() {
+  const confirm = useConfirm();
+  const { toast } = useToast();
   const [normType, setNormType] = useState("lab_tests");
   const [normItems, setNormItems] = useState<any[]>([]);
   const [normFilter, setNormFilter] = useState<string | null>(null);
@@ -76,7 +80,7 @@ export default function NormalizationTab() {
     if (batchTargetId === -1) {
       // Create new target
       if (!batchNewDisplay.trim()) {
-        alert("Display name is required for a new target.");
+        toast({ title: "Display name is required for a new target.", variant: "warning" });
         return;
       }
       sources = Array.from(selectedIds);
@@ -97,12 +101,18 @@ export default function NormalizationTab() {
       return;
     }
 
-    if (!confirm(`Merge ${sources.length} entries into ${label}? Aliases and references will be moved, and sources deleted.`)) return;
+    const ok = await confirm({
+      title: `Merge ${sources.length} entries?`,
+      description: `Aliases and references will be moved into ${label}, and the source rows will be deleted.`,
+      confirmText: "Merge",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.post(`/normalization/${normType}/merge-batch`, payload);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Merge failed";
-      alert(typeof d === "string" ? d : JSON.stringify(d));
+      toast({ title: "Merge failed", description: typeof d === "string" ? d : JSON.stringify(d), variant: "error" });
       return;
     }
     setSelectedIds(new Set());
@@ -185,19 +195,24 @@ export default function NormalizationTab() {
       setAutoMergeEntries(Array.isArray(res.data?.entries) ? res.data.entries : []);
     } catch (err: any) {
       const detail = err?.response?.data?.detail || err?.message || "Auto-merge request failed";
-      alert(typeof detail === "string" ? detail : JSON.stringify(detail));
+      toast({ title: "Auto-merge failed", description: typeof detail === "string" ? detail : JSON.stringify(detail), variant: "error" });
     } finally {
       setAutoMergeLoading(false);
     }
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Delete "${name}"?\n\nAll references from documents, encounters, imaging, and lab results will be cleared (the documents stay, they just lose this classification). Aliases will also be removed. This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete "${name}"?`,
+      description: "References from documents, encounters, imaging, and lab results will be cleared (the documents stay, they just lose this classification). Aliases will also be removed.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/normalization/${normType}/${id}`);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Delete failed";
-      alert(typeof d === "string" ? d : JSON.stringify(d));
+      toast({ title: "Delete failed", description: typeof d === "string" ? d : JSON.stringify(d), variant: "error" });
       return;
     }
     if (expandedId === id) {
@@ -266,7 +281,11 @@ export default function NormalizationTab() {
   };
 
   const handleDeleteAlias = async (aliasId: number) => {
-    if (!confirm("Delete this alias?")) return;
+    const ok = await confirm({
+      title: "Delete this alias?",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await api.delete(`/normalization/${normType}/aliases/${aliasId}`);
     if (expandedId) {
       const res = await api.get(`/normalization/${normType}/${expandedId}`);
@@ -289,7 +308,7 @@ export default function NormalizationTab() {
     let label: string;
     if (targetId === -1) {
       if (!rowNewDisplay.trim()) {
-        alert("Display name is required for a new target.");
+        toast({ title: "Display name is required for a new target.", variant: "warning" });
         return;
       }
       label = `new "${rowNewDisplay.trim()}"`;
@@ -301,16 +320,22 @@ export default function NormalizationTab() {
         },
       };
     } else {
-      label = "target";
+      label = "the target";
       payload = { source_ids: [sourceId], target_id: targetId };
     }
-    if (!confirm(`Merge into ${label}? All aliases and references from the source will be moved. The source entry will be deleted.`)) return;
+    const ok = await confirm({
+      title: "Merge this entry?",
+      description: `All aliases and references will be moved into ${label}, and the source row will be deleted.`,
+      confirmText: "Merge",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       // Use merge-batch so we can share the new-target path with batch merge.
       await api.post(`/normalization/${normType}/merge-batch`, payload);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Merge failed";
-      alert(typeof d === "string" ? d : JSON.stringify(d));
+      toast({ title: "Merge failed", description: typeof d === "string" ? d : JSON.stringify(d), variant: "error" });
       return;
     }
     setExpandedId(null);

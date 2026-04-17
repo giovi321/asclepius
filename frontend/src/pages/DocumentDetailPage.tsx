@@ -14,11 +14,13 @@ import {
 import EventSelector from "@/components/document-detail/EventSelector";
 import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState("");
@@ -147,7 +149,12 @@ export default function DocumentDetailPage() {
   }, [doc?.id, doc?.patient_id]);
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this document? This action cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Delete this document?",
+      description: "The file will be removed from disk and all related records (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/documents/${id}`);
       navigate("/documents");

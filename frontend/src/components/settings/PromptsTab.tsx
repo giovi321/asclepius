@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import api from "@/api/client";
 import { Save, RotateCcw } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 export default function PromptsTab() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [prompts, setPrompts] = useState<any[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -27,7 +29,13 @@ export default function PromptsTab() {
   };
 
   const handleReset = async (key: string) => {
-    if (!confirm("Reset this prompt to the default? Your customization will be lost.")) return;
+    const ok = await confirm({
+      title: "Reset this prompt to the default?",
+      description: "Your customization will be lost.",
+      confirmText: "Reset",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/settings/prompts/${key}`);
       setEditing(null);

@@ -5,11 +5,13 @@ import {
 } from "lucide-react";
 import { SettingsForm, NumberField, useSettingsSave } from "./SettingsFormHelpers";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 
 export default function PipelineTab() {
   const [s, setS] = useState<any>(null);
   const [f, setF] = useState<any>({});
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { saving, saved, save } = useSettingsSave();
   const [failedDocs, setFailedDocs] = useState<any[]>([]);
   const [retryingAll, setRetryingAll] = useState(false);
@@ -56,7 +58,12 @@ export default function PipelineTab() {
   };
 
   const deleteDoc = async (docId: number) => {
-    if (!confirm("Delete this document permanently?")) return;
+    const ok = await confirm({
+      title: "Delete this document?",
+      description: "The file will be removed from disk and cannot be recovered.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await api.delete(`/documents/${docId}`);
     loadFailed();
   };

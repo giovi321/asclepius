@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { Plus, Trash2, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
 const EVENT_TYPES = [
@@ -27,6 +28,7 @@ const EVENT_COLORS: Record<string, string> = {
 
 export default function EventsPage() {
   const { selectedPatient } = usePatient();
+  const confirm = useConfirm();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -59,13 +61,24 @@ export default function EventsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this medical event? Documents will be unlinked but kept.")) return;
+    const ok = await confirm({
+      title: "Delete medical event?",
+      description: "Documents linked to this event will be unlinked but kept.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await api.delete(`/events/${id}`);
     loadEvents();
   };
 
   const handleDeleteWithDocs = async (id: number) => {
-    if (!confirm("Delete this medical event AND all its linked documents? This cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Delete event + linked documents?",
+      description: "The event AND all its linked documents will be permanently deleted. This cannot be undone.",
+      confirmText: "Delete everything",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await api.delete(`/events/${id}`, { params: { delete_documents: true } });
     loadEvents();
   };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { FileText, Search, Upload, Pencil, Check, X, ChevronDown } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
@@ -15,24 +16,36 @@ const DOC_TYPES = [
   "radiology_report", "surgical_report", "vaccination", "other",
 ];
 
+// Read URL params once at mount-time so every filter starts seeded from the
+// URL. We never re-sync on external URL changes; the component is the source
+// of truth while it's mounted and writes back via setSearchParams.
+const readList = (sp: URLSearchParams, key: string): string[] => {
+  const v = sp.get(key);
+  return v ? v.split(",").filter(Boolean) : [];
+};
+const readStr = (sp: URLSearchParams, key: string): string => sp.get(key) || "";
+const readInt = (sp: URLSearchParams, key: string, fallback: number): number => {
+  const v = sp.get(key);
+  if (!v) return fallback;
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+};
+
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [documents, setDocuments] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string[]>(() => {
-    const s = searchParams.get("status");
-    return s ? s.split(",") : [];
-  });
-  const [specialtyFilter, setSpecialtyFilter] = useState<string[]>([]);
-  const [doctorFilter, setDoctorFilter] = useState<string[]>([]);
-  const [facilityFilter, setFacilityFilter] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState(() => readStr(searchParams, "q"));
+  const [typeFilter, setTypeFilter] = useState<string[]>(() => readList(searchParams, "type"));
+  const [statusFilter, setStatusFilter] = useState<string[]>(() => readList(searchParams, "status"));
+  const [specialtyFilter, setSpecialtyFilter] = useState<string[]>(() => readList(searchParams, "specialty"));
+  const [doctorFilter, setDoctorFilter] = useState<string[]>(() => readList(searchParams, "doctor_id"));
+  const [facilityFilter, setFacilityFilter] = useState<string[]>(() => readList(searchParams, "facility_id"));
+  const [dateFrom, setDateFrom] = useState(() => readStr(searchParams, "date_from"));
+  const [dateTo, setDateTo] = useState(() => readStr(searchParams, "date_to"));
+  const [page, setPage] = useState(() => readInt(searchParams, "page", 0));
   const [showUpload, setShowUpload] = useState(false);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -40,6 +53,7 @@ export default function DocumentsPage() {
   const [reprocessOpen, setReprocessOpen] = useState(false);
   const reprocessRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const confirm = useConfirm();
   const limit = 20;
 
   // Load filter options
@@ -58,6 +72,23 @@ export default function DocumentsPage() {
       setFacilities(Array.isArray(res.data) ? res.data : []);
     }).catch(() => {});
   }, []);
+
+  // Mirror filter state back to the URL so back-navigation from a document
+  // detail page restores the exact filter/search/page state. `replace: true`
+  // so keystrokes in the search box don't pollute browser history.
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search) next.set("q", search);
+    if (typeFilter.length) next.set("type", typeFilter.join(","));
+    if (statusFilter.length) next.set("status", statusFilter.join(","));
+    if (specialtyFilter.length) next.set("specialty", specialtyFilter.join(","));
+    if (doctorFilter.length) next.set("doctor_id", doctorFilter.join(","));
+    if (facilityFilter.length) next.set("facility_id", facilityFilter.join(","));
+    if (dateFrom) next.set("date_from", dateFrom);
+    if (dateTo) next.set("date_to", dateTo);
+    if (page) next.set("page", String(page));
+    setSearchParams(next, { replace: true });
+  }, [search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page, setSearchParams]);
 
   useEffect(() => {
     setLoading(true);
@@ -177,7 +208,13 @@ export default function DocumentsPage() {
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`Delete ${selectedIds.size} document${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    const n = selectedIds.size;
+    const ok = await confirm({
+      title: `Delete ${n} document${n === 1 ? "" : "s"}?`,
+      description: "Files will be removed from disk and every related record (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
+      variant: "destructive",
+    });
+    if (!ok) return;
     await runBulk("Delete", (id) => api.delete(`/documents/${id}`).then(() => {}));
   };
 

@@ -23,6 +23,10 @@ export default function NormalizationTab() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [batchTargetId, setBatchTargetId] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [batchNewDisplay, setBatchNewDisplay] = useState("");
+  const [batchNewCode, setBatchNewCode] = useState("");
+  const [rowNewDisplay, setRowNewDisplay] = useState("");
+  const [rowNewCode, setRowNewCode] = useState("");
   const [linkedDocs, setLinkedDocs] = useState<any[] | null>(null);
   const [linkedDocsFor, setLinkedDocsFor] = useState<{ id: number; name: string } | null>(null);
   const [linkedLoading, setLinkedLoading] = useState(false);
@@ -63,13 +67,48 @@ export default function NormalizationTab() {
   };
 
   const handleBatchMerge = async () => {
-    if (!batchTargetId || selectedIds.size === 0) return;
-    const sources = Array.from(selectedIds).filter((id) => id !== batchTargetId);
-    if (sources.length === 0) return;
-    if (!confirm(`Merge ${sources.length} entries into the selected target? Aliases and references will be moved, and sources deleted.`)) return;
-    await api.post(`/normalization/${normType}/merge-batch`, { source_ids: sources, target_id: batchTargetId });
+    if (selectedIds.size === 0) return;
+
+    let payload: any;
+    let sources: number[];
+    let label: string;
+
+    if (batchTargetId === -1) {
+      // Create new target
+      if (!batchNewDisplay.trim()) {
+        alert("Display name is required for a new target.");
+        return;
+      }
+      sources = Array.from(selectedIds);
+      label = `new "${batchNewDisplay.trim()}"`;
+      payload = {
+        source_ids: sources,
+        new_target: {
+          canonical_code: batchNewCode.trim(),
+          canonical_display: batchNewDisplay.trim(),
+        },
+      };
+    } else if (batchTargetId) {
+      sources = Array.from(selectedIds).filter((id) => id !== batchTargetId);
+      if (sources.length === 0) return;
+      label = "the selected target";
+      payload = { source_ids: sources, target_id: batchTargetId };
+    } else {
+      return;
+    }
+
+    if (!confirm(`Merge ${sources.length} entries into ${label}? Aliases and references will be moved, and sources deleted.`)) return;
+    try {
+      await api.post(`/normalization/${normType}/merge-batch`, payload);
+    } catch (err: any) {
+      const d = err?.response?.data?.detail || err?.message || "Merge failed";
+      alert(typeof d === "string" ? d : JSON.stringify(d));
+      return;
+    }
     setSelectedIds(new Set());
     setBatchTargetId(null);
+    setBatchNewDisplay("");
+    setBatchNewCode("");
     setExpandedId(null);
     setDetail(null);
     loadList();
@@ -229,11 +268,40 @@ export default function NormalizationTab() {
   };
 
   const handleMerge = async (sourceId: number, targetId: number) => {
-    if (!confirm(`Merge into target? All aliases and references from the source will be moved. The source entry will be deleted.`)) return;
-    await api.post(`/normalization/${normType}/merge`, { source_id: sourceId, target_id: targetId });
+    let payload: any;
+    let label: string;
+    if (targetId === -1) {
+      if (!rowNewDisplay.trim()) {
+        alert("Display name is required for a new target.");
+        return;
+      }
+      label = `new "${rowNewDisplay.trim()}"`;
+      payload = {
+        source_ids: [sourceId],
+        new_target: {
+          canonical_code: rowNewCode.trim(),
+          canonical_display: rowNewDisplay.trim(),
+        },
+      };
+    } else {
+      label = "target";
+      payload = { source_ids: [sourceId], target_id: targetId };
+    }
+    if (!confirm(`Merge into ${label}? All aliases and references from the source will be moved. The source entry will be deleted.`)) return;
+    try {
+      // Use merge-batch so we can share the new-target path with batch merge.
+      await api.post(`/normalization/${normType}/merge-batch`, payload);
+    } catch (err: any) {
+      const d = err?.response?.data?.detail || err?.message || "Merge failed";
+      alert(typeof d === "string" ? d : JSON.stringify(d));
+      return;
+    }
     setExpandedId(null);
     setDetail(null);
     setShowMergeFor(null);
+    setMergeTargetId(null);
+    setRowNewDisplay("");
+    setRowNewCode("");
     loadList();
   };
 
@@ -413,36 +481,67 @@ export default function NormalizationTab() {
 
       {/* Batch merge bar — visible when at least one item is selected */}
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 text-sm">
-          <span className="font-medium">{selectedIds.size} selected</span>
-          <span className="text-muted-foreground">Merge into:</span>
-          <select
-            value={batchTargetId ?? ""}
-            onChange={(e: any) => setBatchTargetId(Number(e.target.value) || null)}
-            className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
-          >
-            <option value="">Select target...</option>
-            {normItems
-              .filter((n: any) => !selectedIds.has(n.id))
-              .map((n: any) => (
-                <option key={n.id} value={n.id}>
-                  {n.canonical_display} ({n.canonical_code})
-                </option>
-              ))}
-          </select>
-          <button
-            onClick={handleBatchMerge}
-            disabled={!batchTargetId}
-            className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1 text-xs text-white hover:bg-orange-700 disabled:opacity-40"
-          >
-            <GitMerge className="h-3 w-3" /> Merge
-          </button>
-          <button
-            onClick={() => { setSelectedIds(new Set()); setBatchTargetId(null); }}
-            className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-          >
-            Clear
-          </button>
+        <div className="flex flex-col gap-2 rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-medium">{selectedIds.size} selected</span>
+            <span className="text-muted-foreground">Merge into:</span>
+            <select
+              value={batchTargetId ?? ""}
+              onChange={(e: any) => {
+                const v = e.target.value;
+                if (v === "") setBatchTargetId(null);
+                else setBatchTargetId(Number(v));
+              }}
+              className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
+            >
+              <option value="">Select target...</option>
+              <option value={-1}>+ Create new entry...</option>
+              {normItems
+                .filter((n: any) => !selectedIds.has(n.id))
+                .map((n: any) => (
+                  <option key={n.id} value={n.id}>
+                    {n.canonical_display} ({n.canonical_code})
+                  </option>
+                ))}
+            </select>
+            <button
+              onClick={handleBatchMerge}
+              disabled={!batchTargetId || (batchTargetId === -1 && !batchNewDisplay.trim())}
+              className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-3 py-1 text-xs text-white hover:bg-orange-700 disabled:opacity-40"
+            >
+              <GitMerge className="h-3 w-3" /> Merge
+            </button>
+            <button
+              onClick={() => { setSelectedIds(new Set()); setBatchTargetId(null); setBatchNewDisplay(""); setBatchNewCode(""); }}
+              className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+            >
+              Clear
+            </button>
+          </div>
+          {batchTargetId === -1 && (
+            <div className="flex flex-wrap items-center gap-2 pl-1">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Name
+                <input
+                  type="text"
+                  value={batchNewDisplay}
+                  onChange={(e: any) => setBatchNewDisplay(e.target.value)}
+                  placeholder="e.g. Humanitas Medical Care"
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Code <span className="text-[10px]">(optional — defaults to slug of name)</span>
+                <input
+                  type="text"
+                  value={batchNewCode}
+                  onChange={(e: any) => setBatchNewCode(e.target.value)}
+                  placeholder="auto"
+                  className="rounded-md border bg-background px-2 py-1 text-sm font-mono"
+                />
+              </label>
+            </div>
+          )}
         </div>
       )}
 
@@ -523,22 +622,62 @@ export default function NormalizationTab() {
                 {showMergeFor === item.id && (
                   <tr className="bg-orange-50 dark:bg-orange-900/10">
                     <td colSpan={6} className="px-6 py-3" onClick={(e: any) => e.stopPropagation()}>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="text-muted-foreground">Merge <strong>{item.canonical_display}</strong> into:</span>
-                        <select value={mergeTargetId ?? ""} onChange={(e: any) => setMergeTargetId(Number(e.target.value) || null)}
-                          className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs">
-                          <option value="">Select target...</option>
-                          {normItems.filter((n: any) => n.id !== item.id).map((n: any) => (
-                            <option key={n.id} value={n.id}>{n.canonical_display} ({n.canonical_code})</option>
-                          ))}
-                        </select>
-                        <button onClick={() => mergeTargetId && handleMerge(item.id, mergeTargetId)}
-                          disabled={!mergeTargetId}
-                          className="rounded-md bg-orange-600 px-3 py-1 text-xs text-white hover:bg-orange-700 disabled:opacity-40">
-                          Merge
-                        </button>
-                        <button onClick={() => { setShowMergeFor(null); setMergeTargetId(null); }}
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent">Cancel</button>
+                      <div className="flex flex-col gap-2 text-sm">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-muted-foreground">Merge <strong>{item.canonical_display}</strong> into:</span>
+                          <select
+                            value={mergeTargetId ?? ""}
+                            onChange={(e: any) => {
+                              const v = e.target.value;
+                              if (v === "") setMergeTargetId(null);
+                              else setMergeTargetId(Number(v));
+                            }}
+                            className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
+                          >
+                            <option value="">Select target...</option>
+                            <option value={-1}>+ Create new entry...</option>
+                            {normItems.filter((n: any) => n.id !== item.id).map((n: any) => (
+                              <option key={n.id} value={n.id}>{n.canonical_display} ({n.canonical_code})</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => mergeTargetId && handleMerge(item.id, mergeTargetId)}
+                            disabled={!mergeTargetId || (mergeTargetId === -1 && !rowNewDisplay.trim())}
+                            className="rounded-md bg-orange-600 px-3 py-1 text-xs text-white hover:bg-orange-700 disabled:opacity-40"
+                          >
+                            Merge
+                          </button>
+                          <button
+                            onClick={() => { setShowMergeFor(null); setMergeTargetId(null); setRowNewDisplay(""); setRowNewCode(""); }}
+                            className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {mergeTargetId === -1 && (
+                          <div className="flex flex-wrap items-center gap-2 pl-1">
+                            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              Name
+                              <input
+                                type="text"
+                                value={rowNewDisplay}
+                                onChange={(e: any) => setRowNewDisplay(e.target.value)}
+                                placeholder="Display name for the new entry"
+                                className="rounded-md border bg-background px-2 py-1 text-sm"
+                              />
+                            </label>
+                            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              Code <span className="text-[10px]">(optional)</span>
+                              <input
+                                type="text"
+                                value={rowNewCode}
+                                onChange={(e: any) => setRowNewCode(e.target.value)}
+                                placeholder="auto"
+                                className="rounded-md border bg-background px-2 py-1 text-sm font-mono"
+                              />
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>

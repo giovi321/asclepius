@@ -106,9 +106,16 @@ class MergeRequest(BaseModel):
     target_id: int
 
 
+class NewTarget(BaseModel):
+    canonical_code: str
+    canonical_display: str
+
+
 class MergeBatchRequest(BaseModel):
     source_ids: list[int]
-    target_id: int
+    target_id: int | None = None
+    # If set, create a brand-new canonical entry first and merge sources into it.
+    new_target: NewTarget | None = None
 
 
 def _validate_type(norm_type: str) -> dict:
@@ -222,8 +229,25 @@ async def merge_norms_batch(
 ):
     tables = _validate_type(norm_type)
     svc = NormService(db, tables)
-    await svc.merge_batch(body.source_ids, body.target_id)
-    return {"ok": True, "merged": len([s for s in body.source_ids if s != body.target_id])}
+
+    if body.new_target is not None:
+        if not body.new_target.canonical_display.strip():
+            raise HTTPException(status_code=400, detail="canonical_display is required")
+        target_id = await svc.create_entry(
+            canonical_code=body.new_target.canonical_code.strip(),
+            canonical_display=body.new_target.canonical_display.strip(),
+        )
+    elif body.target_id is not None:
+        target_id = body.target_id
+    else:
+        raise HTTPException(status_code=400, detail="target_id or new_target required")
+
+    await svc.merge_batch(body.source_ids, target_id)
+    return {
+        "ok": True,
+        "target_id": target_id,
+        "merged": len([s for s in body.source_ids if s != target_id]),
+    }
 
 
 @router.get("/{norm_type}/{norm_id}/documents")

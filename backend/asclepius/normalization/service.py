@@ -163,6 +163,56 @@ class NormService:
 
         return await self.get_with_aliases(norm_id)
 
+    async def create_entry(self, canonical_code: str, canonical_display: str) -> int:
+        """Create a new canonical entry and return its id.
+
+        For doctors/facilities the extra required columns (`name`, `slug`) are
+        populated from canonical_display / canonical_code so the row matches
+        what _upsert_facility / _upsert_doctor would have inserted. For the
+        generic `norm_*` tables only the canonical pair is stored.
+        """
+        from asclepius.patients.service import slugify
+
+        code = (canonical_code or "").strip() or slugify(canonical_display)
+        display = canonical_display.strip()
+
+        if self.main_table in ("doctors", "facilities"):
+            # Derive / validate slug — must be unique
+            slug = code or slugify(display)
+            # If slug collides, disambiguate with a numeric suffix
+            n = 1
+            base_slug = slug
+            while True:
+                cursor = await self.db.execute(
+                    f"SELECT 1 FROM {self.main_table} WHERE slug = ?", (slug,)
+                )
+                if not await cursor.fetchone():
+                    break
+                n += 1
+                slug = f"{base_slug}-{n}"
+
+            cursor = await self.db.execute(
+                f"INSERT INTO {self.main_table} (name, slug, canonical_code, canonical_display) VALUES (?, ?, ?, ?)",
+                (display, slug, code or slug, display),
+            )
+            new_id = cursor.lastrowid
+            # Seed an alias row so list/count queries behave consistently
+            await self.db.execute(
+                f"INSERT INTO {self.alias_table} ({self.fk_col}, alias, auto_mapped) VALUES (?, ?, 0)",
+                (new_id, display),
+            )
+            await self.db.commit()
+            return new_id
+
+        # Generic norm_* table — canonical pair only
+        cursor = await self.db.execute(
+            f"INSERT INTO {self.main_table} (canonical_code, canonical_display) VALUES (?, ?)",
+            (code, display),
+        )
+        new_id = cursor.lastrowid
+        await self.db.commit()
+        return new_id
+
     async def list_documents(self, norm_id: int) -> list[dict]:
         """Return all documents that reference this norm entry.
 

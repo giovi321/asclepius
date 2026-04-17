@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { FileText, Search, Upload, Pencil, Check, X } from "lucide-react";
+import { FileText, Search, Upload, Pencil, Check, X, ChevronDown } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import type { PipelineStatus } from "@/types";
@@ -35,6 +35,11 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [reprocessOpen, setReprocessOpen] = useState(false);
+  const reprocessRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   const limit = 20;
 
   // Load filter options
@@ -82,6 +87,115 @@ export default function DocumentsPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Clear selection when filters / page / patient change — it'd be wrong to
+  // act on rows the user can no longer see.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setReprocessOpen(false);
+  }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
+
+  // Close reprocess menu on outside click
+  useEffect(() => {
+    if (!reprocessOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (reprocessRef.current && !reprocessRef.current.contains(e.target as Node)) {
+        setReprocessOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [reprocessOpen]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    if (selectedIds.size === documents.length && documents.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(documents.map((d: any) => d.id)));
+    }
+  };
+
+  const reloadDocuments = async () => {
+    const params: Record<string, any> = { limit, offset: page * limit };
+    if (selectedPatient) params.patient_id = selectedPatient.id;
+    if (search) params.q = search;
+    if (typeFilter.length) params.type = typeFilter.join(",");
+    if (statusFilter.length) params.status = statusFilter.join(",");
+    if (specialtyFilter.length) params.specialty = specialtyFilter.join(",");
+    if (doctorFilter.length) params.doctor_id = doctorFilter.join(",");
+    if (facilityFilter.length) params.facility_id = facilityFilter.join(",");
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    const res = await api.get("/documents", { params });
+    setDocuments(res.data.items || []);
+    setTotal(res.data.total || 0);
+  };
+
+  // Run a per-doc async action against every selected id. Collects failures
+  // and surfaces a single toast at the end so a run-through of 20 docs with
+  // two 403s doesn't spray twenty error toasts.
+  const runBulk = async (
+    label: string,
+    perDoc: (id: number) => Promise<void>,
+  ) => {
+    if (selectedIds.size === 0 || bulkBusy) return;
+    setBulkBusy(label);
+    const ids = Array.from(selectedIds);
+    let ok = 0;
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        await perDoc(id);
+        ok += 1;
+      } catch (err: any) {
+        const d = err?.response?.data?.detail || err?.message || "failed";
+        failures.push(`#${id}: ${typeof d === "string" ? d : JSON.stringify(d)}`);
+      }
+    }
+    setBulkBusy(null);
+    setSelectedIds(new Set());
+    setReprocessOpen(false);
+    await reloadDocuments();
+    if (failures.length === 0) {
+      toast({ title: `${label}: ${ok}/${ids.length} done` });
+    } else {
+      toast({
+        title: `${label}: ${ok}/${ids.length} done, ${failures.length} failed`,
+        description: failures.slice(0, 3).join(" • ") + (failures.length > 3 ? ` (+${failures.length - 3} more)` : ""),
+        variant: "error",
+      });
+    }
+  };
+
+  const bulkDelete = async () => {
+    if (!confirm(`Delete ${selectedIds.size} document${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    await runBulk("Delete", (id) => api.delete(`/documents/${id}`).then(() => {}));
+  };
+
+  const bulkReprocess = async (mode: "both" | "ocr" | "llm") => {
+    await runBulk(
+      mode === "both" ? "Reprocess" : `Reprocess (${mode.toUpperCase()})`,
+      (id) => api.post(`/documents/${id}/reprocess`, { mode }).then(() => {}),
+    );
+  };
+
+  const bulkRegenerateFilename = async () => {
+    await runBulk("Regenerate filename", async (id) => {
+      const gen = await api.post(`/documents/${id}/generate-filename`);
+      const suggested = gen.data?.suggested_filename;
+      if (!suggested) throw new Error("No suggestion");
+      await api.post(`/documents/${id}/rename`, { filename: suggested });
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -210,27 +324,91 @@ export default function DocumentsPage() {
         )}
       </div>
 
+      {/* Bulk-actions bar — intentionally subdued. Only visible when rows are selected. */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-dashed bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
+          <span>{selectedIds.size} selected</span>
+          <span className="text-muted-foreground/40">|</span>
+          <button
+            onClick={bulkDelete}
+            disabled={!!bulkBusy}
+            className="hover:text-destructive disabled:opacity-50"
+          >
+            {bulkBusy === "Delete" ? "Deleting..." : "Delete"}
+          </button>
+          <div ref={reprocessRef} className="relative">
+            <button
+              onClick={() => setReprocessOpen((o) => !o)}
+              disabled={!!bulkBusy}
+              className="inline-flex items-center gap-0.5 hover:text-foreground disabled:opacity-50"
+            >
+              {bulkBusy?.startsWith("Reprocess") ? bulkBusy + "..." : "Reprocess"}
+              <ChevronDown className="h-3 w-3" />
+            </button>
+            {reprocessOpen && (
+              <div className="absolute left-0 top-full z-20 mt-1 w-36 rounded-md border bg-background py-1 text-xs shadow-lg">
+                <button onClick={() => bulkReprocess("both")} className="block w-full px-3 py-1 text-left hover:bg-accent">OCR + LLM</button>
+                <button onClick={() => bulkReprocess("ocr")} className="block w-full px-3 py-1 text-left hover:bg-accent">OCR only</button>
+                <button onClick={() => bulkReprocess("llm")} className="block w-full px-3 py-1 text-left hover:bg-accent">LLM only</button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={bulkRegenerateFilename}
+            disabled={!!bulkBusy}
+            className="hover:text-foreground disabled:opacity-50"
+          >
+            {bulkBusy === "Regenerate filename" ? "Renaming..." : "Regenerate filename"}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            disabled={!!bulkBusy}
+            className="ml-auto hover:text-foreground disabled:opacity-50"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border overflow-hidden">
         <table className="w-full text-sm table-fixed">
           <thead className="border-b bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium w-[30%]">File</th>
+              <th className="px-2 py-2 w-8 text-left">
+                <input
+                  type="checkbox"
+                  checked={documents.length > 0 && selectedIds.size === documents.length}
+                  onChange={toggleSelectAllOnPage}
+                  aria-label="Select all on this page"
+                  className="align-middle"
+                />
+              </th>
+              <th className="px-4 py-2 text-left font-medium w-[28%]">File</th>
               <th className="px-4 py-2 text-left font-medium w-[12%]">Type</th>
               <th className="px-4 py-2 text-left font-medium w-[10%]">Date</th>
               <th className="px-4 py-2 text-left font-medium w-[16%]">Patient</th>
-              <th className="px-4 py-2 text-left font-medium w-[20%]">Doctor / Facility</th>
+              <th className="px-4 py-2 text-left font-medium w-[18%]">Doctor / Facility</th>
               <th className="px-4 py-2 text-left font-medium w-[12%]">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
             ) : documents.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
             ) : (
               documents.map((doc: any) => (
-                <tr key={doc.id} className="hover:bg-accent/50">
+                <tr key={doc.id} className={`hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}>
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(doc.id)}
+                      onChange={() => toggleSelect(doc.id)}
+                      aria-label={`Select ${doc.original_filename || doc.id}`}
+                      className="align-middle"
+                    />
+                  </td>
                   <td className="px-4 py-2 overflow-hidden">
                     <InlineRenameCell doc={doc} onRenamed={(updated: any) => {
                       setDocuments((prev: any[]) => prev.map((d: any) => d.id === doc.id ? { ...d, ...updated } : d));

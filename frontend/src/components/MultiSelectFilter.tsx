@@ -24,6 +24,7 @@ export default function MultiSelectFilter({
 }: MultiSelectFilterProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -39,10 +40,17 @@ export default function MultiSelectFilter({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Focus search on open
+  // Focus search and decide alignment on open. If a left-aligned dropdown
+  // would overflow the viewport's right edge, flip it to align with the
+  // button's right side so the panel extends leftward instead.
   useEffect(() => {
-    if (open && searchRef.current) {
-      searchRef.current.focus();
+    if (!open) return;
+    if (searchRef.current) searchRef.current.focus();
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const panelMaxWidth = 300; // matches max-w-[300px] below
+      const viewportWidth = window.innerWidth;
+      setAlignRight(rect.left + panelMaxWidth > viewportWidth - 8);
     }
   }, [open]);
 
@@ -97,7 +105,7 @@ export default function MultiSelectFilter({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-30 rounded-lg border bg-background shadow-xl min-w-[220px] max-w-[300px]">
+        <div className={`absolute top-full mt-1 z-30 rounded-lg border bg-background shadow-xl min-w-[220px] max-w-[300px] ${alignRight ? "right-0" : "left-0"}`}>
           {/* Search box */}
           {searchable && (
             <div className="p-2 border-b">

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
-import { Eye, EyeOff, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
+import { Eye, EyeOff, Pencil, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 
 // ─── Section wrapper ───────────────────────────────────────────
@@ -429,17 +429,14 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
       <span onClick={() => setEditing(true)}>{value}</span>
       <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
         <button onClick={() => setEditing(true)}
-          className="text-muted-foreground text-xs font-normal hover:text-foreground" title="Edit filename">
-          &#x270E;
+          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          title="Edit filename">
+          <Pencil className="h-4 w-4" />
         </button>
         <button onClick={handleGenerate} disabled={generating}
-          className="text-muted-foreground text-xs font-normal hover:text-primary disabled:opacity-50"
+          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-50"
           title="Generate filename from document data">
-          {generating ? (
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
+          <RefreshCw className={`h-4 w-4 ${generating ? "animate-spin" : ""}`} />
         </button>
       </span>
     </h1>

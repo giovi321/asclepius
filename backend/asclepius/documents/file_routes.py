@@ -204,8 +204,22 @@ async def rename_document(
 
     if old_path.exists():
         new_path = old_path.parent / new_name
+        # Auto-disambiguate on collision so bulk "regenerate filename" on related
+        # documents (same doctor/type/date → same AI slug) doesn't fail for every
+        # duplicate. Only kicks in when the target already exists and isn't us.
         if new_path.exists() and new_path != old_path:
-            raise HTTPException(status_code=409, detail="A file with that name already exists")
+            stem = Path(new_name).stem
+            ext_ = Path(new_name).suffix
+            n = 2
+            while True:
+                candidate = old_path.parent / f"{stem}-{n}{ext_}"
+                if not candidate.exists():
+                    new_path = candidate
+                    new_name = candidate.name
+                    break
+                n += 1
+                if n > 999:
+                    raise HTTPException(status_code=409, detail="Could not find a free filename")
         old_path.rename(new_path)
         new_file_path = str(new_path.relative_to(vault_root))
     else:

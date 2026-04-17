@@ -176,8 +176,36 @@ async def generate_filename(
         raise HTTPException(status_code=404, detail="Document not found")
 
     ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
-    doc_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or doc.get("date_received") or ""
-    date_prefix = doc_date.replace("-", "") if doc_date else "00000000"
+
+    # Look for a date across every plausible source. raw_extraction is the last
+    # resort — LLM output that never landed on a dedicated column.
+    doc_date = (
+        doc.get("date_visit")
+        or doc.get("date_issued")
+        or doc.get("doc_date")
+        or doc.get("date_received")
+        or ""
+    )
+    if not doc_date and doc.get("raw_extraction"):
+        import json as _json
+        try:
+            raw = doc["raw_extraction"]
+            if isinstance(raw, str):
+                raw = _json.loads(raw)
+            for k in ("date_visit", "date_issued", "doc_date"):
+                v = raw.get(k) if isinstance(raw, dict) else None
+                if v:
+                    doc_date = v
+                    break
+        except Exception:
+            pass
+
+    # Normalize to YYYYMMDD. Accept strings only; guard against any weirdness.
+    date_prefix = "00000000"
+    if doc_date and isinstance(doc_date, str):
+        digits = re.sub(r"\D", "", doc_date)[:8]
+        if len(digits) == 8:
+            date_prefix = digits
 
     # Use LLM to generate a concise, descriptive name
     from asclepius.pipeline.organizer import generate_ai_filename
@@ -201,5 +229,14 @@ async def generate_filename(
         fallback = doc.get("doc_type") or "document"
         slug = re.sub(r"[^a-z0-9]+", "-", fallback.lower()).strip("-")
 
+    # Strip any date the LLM may have snuck into its slug so we don't end up
+    # with "20240315_20240315-blood-test.pdf".
+    slug = re.sub(r"^\d{4}[-_]?\d{2}[-_]?\d{2}[-_]*", "", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-") or "document"
+
     suggested = f"{date_prefix}_{slug}{ext}"
+    logger.info(
+        "generate_filename doc=%d date_prefix=%s slug=%s suggested=%s",
+        doc_id, date_prefix, slug, suggested,
+    )
     return {"suggested_filename": suggested}

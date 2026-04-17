@@ -50,6 +50,17 @@ All filter parameters support comma-separated multi-values in the API (e.g., `?t
 
 Documents are loaded in pages of 20. Use the Previous/Next controls at the bottom to navigate.
 
+### Bulk Actions
+
+Tick the checkbox on any row (or the header checkbox to select every visible document on the current page). When at least one row is selected, a subdued action bar appears above the table:
+
+- **Delete** -- remove every selected document. One confirm prompt up front.
+- **Reprocess ▾** -- drops a small menu for *OCR + LLM*, *OCR only*, or *LLM only*, matching the single-doc reprocess flow.
+- **Regenerate filename** -- runs AI filename generation on each selected doc and renames the file on disk and in the DB. On collisions (related docs often produce the same AI slug), the rename endpoint auto-disambiguates by appending `-2`, `-3`, … to the stem.
+- **Clear** -- deselect everything.
+
+Each bulk action runs sequentially and reports a single toast at the end: *"Delete: 18/20 done, 2 failed — #3: reason • #7: reason"*. Selection clears automatically when you change filters, page, or patient.
+
 ## Document Detail Page
 
 Click any document to open the detail view with:
@@ -64,9 +75,9 @@ The right panel shows all extracted metadata, all fields are **inline-editable**
 
 - **Document type** -- dropdown selector with all 25+ supported types
 - **Dates** -- document date, date issued, date of visit, date received
-- **Doctor** -- extracted doctor name (linked to doctors table with normalization)
-- **Facility** -- extracted facility name (linked to facilities table with normalization)
-- **Specialty** -- medical specialty
+- **Doctor** -- searchable combobox over the existing doctors list, with a **+ Create new** row when the typed text has no exact match. Selecting an existing entry (or creating one inline) also sets the document's `doctor_id` so it's not a dangling text-only value. Goes through the alias-aware upsert, so if you merged two doctors earlier, typing the old name will correctly resolve to the merged target.
+- **Facility** -- same searchable combobox + inline-create over the facilities list.
+- **Specialty** -- same combobox over existing specialties. Saves as text on the document (specialty IDs are linked later by the extractor).
 - **Summary** -- English summary of the document content
 
 A collapsible **Processing details** section shows technical metadata: OCR engine name, OCR confidence score, and the LLM provider/model used for extraction.

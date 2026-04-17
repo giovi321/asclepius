@@ -37,7 +37,7 @@ flowchart LR
 
 ## Chat History
 
-Chat history is persisted per user and per patient. Previous conversations are loaded when you return to the Chat page. Use **Clear History** to start fresh.
+Chat history is persisted per user and per patient. Previous conversations are loaded when you return to the Chat page. Click **Start new chat** in the header to clear the current conversation — it removes the chat history for the active user/patient pair on the server (`DELETE /api/chat/history`) and empties the visible message list.
 
 ## Custom System Prompt
 

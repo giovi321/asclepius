@@ -74,6 +74,8 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run OCR and/or LLM extraction |
 | `POST` | `/api/documents/{id}/cancel` | Yes | Cancel processing |
 | `POST` | `/api/documents/{id}/edit-with-ai` | Yes | Edit metadata via natural language |
+| `POST` | `/api/documents/{id}/generate-filename` | Yes | Get an AI-suggested `{suggested_filename}` (does not rename) |
+| `POST` | `/api/documents/{id}/rename` | Yes | Rename on disk + DB; auto-disambiguates on collision (`-2`, `-3`, …) |
 | `POST` | `/api/documents/{id}/link` | Yes | Link to another document |
 | `GET` | `/api/documents/{id}/links` | Yes | Get all document links |
 | `DELETE` | `/api/documents/{id}/links/{link_id}` | Yes | Remove a document link |
@@ -97,7 +99,9 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 ### Document Update Fields
 
-`patient_id`, `doc_type`, `doc_date`, `date_issued`, `date_visit`, `doctor_id`, `doctor_name`, `facility_id`, `facility_name`, `specialty_original`, `summary_en`, `event_id`, `notes`, `tags`
+`patient_id`, `doc_type`, `doc_date`, `date_issued`, `date_visit`, `doctor_id`, `doctor_name`, `facility_id`, `facility_name`, `specialty_original`, `summary_en`, `event_id`, `notes`, `tags`, `user_notes`, `original_filename`
+
+When a request sends `doctor_name` or `facility_name` without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically — a name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears both the text and the id.
 
 ### AI Edit Request
 
@@ -205,13 +209,17 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/normalization/{type}` | Yes | List canonical entries |
-| `POST` | `/api/normalization/{type}` | Yes | Create canonical entry |
-| `PATCH` | `/api/normalization/{type}/{id}` | Yes | Update canonical entry |
-| `DELETE` | `/api/normalization/{type}/{id}` | Yes | Delete canonical entry |
+| `GET` | `/api/normalization/{type}` | Yes | List canonical entries (`type`: `lab_tests`, `specialties`, `diagnoses`, `medications`, `doctors`, `facilities`) |
+| `GET` | `/api/normalization/{type}/{id}` | Yes | Get canonical entry + aliases |
+| `PATCH` | `/api/normalization/{type}/{id}` | Yes | Update canonical code / display (409 on code collision) |
+| `DELETE` | `/api/normalization/{type}/{id}` | Yes | Delete canonical entry (nulls FKs on referencing tables) |
+| `GET` | `/api/normalization/{type}/{id}/documents` | Yes | List documents that reference this entry |
 | `POST` | `/api/normalization/{type}/{id}/aliases` | Yes | Add an alias |
 | `DELETE` | `/api/normalization/{type}/aliases/{alias_id}` | Yes | Delete an alias |
-| `POST` | `/api/normalization/{type}/merge` | Yes | Merge two entries |
+| `POST` | `/api/normalization/{type}/{id}/confirm` | Yes | Mark every auto-mapped alias on this entry as reviewed |
+| `POST` | `/api/normalization/{type}/merge` | Yes | Merge one source into a target |
+| `POST` | `/api/normalization/{type}/merge-batch` | Yes | Merge many sources; body takes `target_id` **or** `new_target: {canonical_code, canonical_display}` to create the target inline |
+| `POST` | `/api/normalization/{type}/auto-merge` | Yes | Ask the LLM for merge proposals; returns `{proposals, entries}` without executing anything |
 
 **Types:** `lab_tests`, `specialties`, `diagnoses`, `medications`, `doctors`, `facilities`
 

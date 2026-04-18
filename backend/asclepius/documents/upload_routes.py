@@ -25,9 +25,15 @@ async def upload_document(
     event_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
 ):
-    """Upload a document file to the inbox for processing."""
+    """Upload a document file to the current user's inbox for processing."""
     config = get_config()
-    inbox = Path(config.vault.inbox_path)
+    # Per-user inbox subfolder so the file watcher and file browser naturally
+    # attribute the upload to this user. Admins uploading still end up in
+    # their own user-{id}/ bucket — that's fine, the list filter lets admins
+    # see everything regardless.
+    user_id = int(current_user["id"])
+    inbox_root = Path(config.vault.inbox_path)
+    inbox = inbox_root / f"user-{user_id}"
     inbox.mkdir(parents=True, exist_ok=True)
 
     # Sanitize filename
@@ -68,9 +74,11 @@ async def upload_document(
             # so the pipeline can match by hash
             await db.execute(
                 """INSERT INTO documents
-                   (file_path, original_filename, file_hash, file_size, patient_id, event_id, date_received, status)
-                   VALUES (?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{dest.name}", dest.name, file_hash, file_size, patient_id, event_id),
+                   (file_path, original_filename, file_hash, file_size, patient_id,
+                    event_id, uploaded_by_user_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (f"inbox/user-{user_id}/{dest.name}", dest.name, file_hash, file_size,
+                 patient_id, event_id, user_id),
             )
             await db.commit()
     except Exception as e:

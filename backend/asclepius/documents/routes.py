@@ -139,6 +139,7 @@ async def list_docs(
     return await list_documents(
         db, current_user["id"], patient_id, type, date_from, date_to, status, q, limit, offset,
         specialty=specialty, doctor_id=effective_doctor, facility_id=effective_facility,
+        user_role=current_user.get("role"),
     )
 
 
@@ -152,10 +153,18 @@ async def get_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check access
-    if doc["patient_id"]:
-        role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-        if not role:
+    # Check access. Admins see everything. Non-admins pass if they have
+    # patient-level access OR they uploaded the file themselves; unclassified
+    # docs that legacy-migrated with no uploader stay admin-only.
+    if current_user.get("role") != "admin":
+        has_access = False
+        if doc["patient_id"]:
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            if role:
+                has_access = True
+        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
+            has_access = True
+        if not has_access:
             raise HTTPException(status_code=403, detail="No access")
 
     # Get related data
@@ -272,10 +281,17 @@ async def delete_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check access — admins can always delete, others need patient access
-    if doc["patient_id"] and current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-        if not role or role == "viewer":
+    # Check access — admins can always delete; uploaders can always delete
+    # their own upload; otherwise the caller needs a non-viewer role on the
+    # patient.
+    if current_user.get("role") != "admin":
+        uploader_match = doc.get("uploaded_by_user_id") == current_user["id"]
+        if doc["patient_id"]:
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            if (not role or role == "viewer") and not uploader_match:
+                raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
+        elif not uploader_match:
+            # Unclassified doc and not the uploader → block.
             raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
 
     # If document is being processed, cancel it first
@@ -387,6 +403,7 @@ async def move_doc(
             doc.get("doc_type"), doc["original_filename"],
             event_slug=event_slug,
             summary_slug=summary_slug,
+            uploaded_by_user_id=doc.get("uploaded_by_user_id"),
         )
         new_dest = vault_root / new_relative
         new_dest.parent.mkdir(parents=True, exist_ok=True)

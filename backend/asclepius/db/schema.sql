@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS documents (
     error_message TEXT,  -- stores failure reason when status='failed'
     retry_count INTEGER DEFAULT 0,
     process_at DATETIME,  -- null = process immediately, set = process after this time
+    uploaded_by_user_id INTEGER REFERENCES users(id),  -- who uploaded; null = legacy/unknown
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

@@ -188,6 +188,32 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_canonical_code ON doctors(canonical_code)")
     await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_facilities_canonical_code ON facilities(canonical_code)")
 
+    # Per-user document attribution. Nullable on purpose — legacy rows created
+    # before this column existed stay NULL and are treated as admin-only in
+    # the list handlers.
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    doc_cols = [row[1] for row in await cursor.fetchall()]
+    if "uploaded_by_user_id" not in doc_cols:
+        await db.execute(
+            "ALTER TABLE documents ADD COLUMN uploaded_by_user_id INTEGER REFERENCES users(id)"
+        )
+        # Best-effort backfill: if a document's patient has exactly one
+        # user with access, attribute it to that user. Others stay NULL.
+        await db.execute("""
+            UPDATE documents
+            SET uploaded_by_user_id = (
+                SELECT upa.user_id FROM user_patient_access upa
+                WHERE upa.patient_id = documents.patient_id
+                GROUP BY upa.patient_id
+                HAVING COUNT(*) = 1
+            )
+            WHERE uploaded_by_user_id IS NULL AND patient_id IS NOT NULL
+        """)
+        logger.info("Migration: added uploaded_by_user_id to documents")
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by_user_id)"
+    )
+
     # Auto-confirm aliases that are trivially identical to their parent's canonical
     # display name — there is nothing to review when the alias IS the canonical form.
     # Idempotent.

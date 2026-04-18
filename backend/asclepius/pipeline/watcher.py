@@ -162,10 +162,12 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     observer.start()
     logger.info("File watcher started on %s", inbox_path)
 
-    # Scan for existing files in inbox
-    for f in Path(inbox_path).iterdir():
+    # Scan for existing files in inbox — rglob to reach per-user subfolders
+    # (inbox/user-{id}/…). The watchdog Observer above is already recursive
+    # so new files in those subfolders are picked up automatically.
+    for f in Path(inbox_path).rglob("*"):
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith("."):
-            logger.info("Queuing existing inbox file: %s", f.name)
+            logger.info("Queuing existing inbox file: %s", f.relative_to(inbox_path))
             try:
                 file_size = f.stat().st_size
             except OSError:

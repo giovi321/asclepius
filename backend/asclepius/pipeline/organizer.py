@@ -57,13 +57,15 @@ def build_organized_path(
     original_filename: str,
     event_slug: str | None = None,
     summary_slug: str | None = None,
+    uploaded_by_user_id: int | None = None,
 ) -> str:
     """Build the organized file path.
 
     Format: patients/{slug}/{YYYY}/{event-slug}/{YYYYMMDD}_{summary_slug}.{ext}
     Falls back to doc_type if no summary_slug is provided.
     Date is compact format (20251231). If no event, the event-slug folder is omitted.
-    If no patient, goes to unclassified/
+    If no patient, goes to unclassified/user-{id}/ (or unclassified/ for legacy
+    docs with no uploader) so each user's unclassified queue is isolated.
     """
     ext = Path(original_filename).suffix.lower()
     year = doc_date[:4] if doc_date else "unknown"
@@ -87,8 +89,9 @@ def build_organized_path(
             return f"patients/{patient_slug}/{year}/{event_slug}/{filename}"
         else:
             return f"patients/{patient_slug}/{year}/{filename}"
-    else:
-        return f"unclassified/{filename}"
+    if uploaded_by_user_id:
+        return f"unclassified/user-{uploaded_by_user_id}/{filename}"
+    return f"unclassified/{filename}"
 
 
 def slugify_event(title: str) -> str:

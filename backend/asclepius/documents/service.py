@@ -40,10 +40,27 @@ async def list_documents(
     specialty: str | None = None,
     doctor_id: str | int | None = None,
     facility_id: str | int | None = None,
+    user_role: str | None = None,
 ) -> dict:
-    """List documents with filters. Returns {items, total}."""
+    """List documents with filters. Returns {items, total}.
+
+    Non-admin callers are scoped to documents they can see: either the patient
+    is one they have access to, or they uploaded the file themselves. Admins
+    see everything.
+    """
     conditions = []
     params: list = []
+
+    if user_role != "admin":
+        # Non-admin scope: access via user_patient_access OR it's your upload.
+        # Patients the user has no access to, with a doc they didn't upload,
+        # stay hidden. Legacy docs (uploaded_by_user_id IS NULL) with no
+        # assigned patient are admin-only.
+        conditions.append(
+            "(d.patient_id IN (SELECT patient_id FROM user_patient_access WHERE user_id = ?) "
+            "OR d.uploaded_by_user_id = ?)"
+        )
+        params.extend([user_id, user_id])
 
     if patient_id is not None:
         conditions.append("d.patient_id = ?")

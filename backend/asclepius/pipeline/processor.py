@@ -132,14 +132,43 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         pass
                     hint_path.unlink(missing_ok=True)
 
+            # Infer the uploader from the inbox subfolder segment "user-{id}".
+            # Pre-per-user uploads live directly under inbox/ and stay NULL.
+            hint_user_id: int | None = None
+            try:
+                vault_root = Path(config.vault.root_path).resolve()
+                relative_parts = path.resolve().relative_to(vault_root).parts
+                # relative_parts is ("inbox", "user-3", "foo.pdf") for new uploads
+                for part in relative_parts:
+                    if part.startswith("user-"):
+                        candidate = part[len("user-"):]
+                        if candidate.isdigit():
+                            hint_user_id = int(candidate)
+                            break
+            except (ValueError, OSError):
+                pass
+
+            # Mirror where the file actually lives — preserve the per-user
+            # subfolder so a subsequent reprocess can find it.
+            inbox_rel = f"inbox/user-{hint_user_id}/{path.name}" if hint_user_id else f"inbox/{path.name}"
+
             # Try to INSERT — if file_hash already exists (from upload), it'll be ignored
             await db.execute(
                 """INSERT OR IGNORE INTO documents
                    (file_path, original_filename, file_hash, file_size, page_count,
-                    patient_id, event_id, date_received, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (f"inbox/{path.name}", path.name, file_hash, file_size, page_count, hint_patient_id, hint_event_id),
+                    patient_id, event_id, uploaded_by_user_id, date_received, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
+                (inbox_rel, path.name, file_hash, file_size, page_count,
+                 hint_patient_id, hint_event_id, hint_user_id),
             )
+            # If the row already existed (uploaded via API), make sure the
+            # uploader is stamped on it — older uploads never set this.
+            if hint_user_id is not None:
+                await db.execute(
+                    "UPDATE documents SET uploaded_by_user_id = ? "
+                    "WHERE file_hash = ? AND uploaded_by_user_id IS NULL",
+                    (hint_user_id, file_hash),
+                )
             await db.commit()
 
             # Now SELECT the record (whether just inserted or pre-existing from upload)
@@ -416,7 +445,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             cursor = await db.execute(
                 """SELECT d.patient_id, d.doc_type, d.doc_date, d.date_visit, d.date_issued,
                           d.date_received, d.doctor_id, d.facility_id,
-                          d.event_id, d.summary_en,
+                          d.event_id, d.summary_en, d.uploaded_by_user_id,
                           p.slug as patient_slug,
                           doc.slug as doctor_slug,
                           f.slug as facility_slug,
@@ -475,6 +504,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 path.name,
                 event_slug=event_slug,
                 summary_slug=summary_slug,
+                uploaded_by_user_id=doc["uploaded_by_user_id"] if doc else None,
             )
             final_path = move_file(config, file_path, dest_path)
 

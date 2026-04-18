@@ -28,12 +28,8 @@ export default function DashboardPage() {
       setStats((s) => ({ ...s, total: res.data.total || 0 }));
     });
 
-    api.get("/documents", { params: { status: "pending", limit: 1 } }).then((res) => {
+    api.get("/documents", { params: { status: "pending,processing", limit: 1 } }).then((res) => {
       setStats((s) => ({ ...s, pending: res.data.total || 0 }));
-    });
-
-    api.get("/documents", { params: { status: "processing", limit: 1 } }).then((res) => {
-      setStats((s) => ({ ...s, pending: s.pending + (res.data.total || 0) }));
     });
 
     api.get("/documents", { params: { status: "needs_review", limit: 1 } }).then((res) => {

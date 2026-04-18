@@ -51,6 +51,11 @@ export default function DocumentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
   const [reprocessOpen, setReprocessOpen] = useState(false);
+  const [reprocessMode, setReprocessMode] = useState<"both" | "ocr" | "llm">("both");
+  const [reprocessLlmProvider, setReprocessLlmProvider] = useState("");
+  const [reprocessOcrProvider, setReprocessOcrProvider] = useState("");
+  const [llmProviders, setLlmProviders] = useState<any[]>([]);
+  const [ocrProviders, setOcrProviders] = useState<any[]>([]);
   const reprocessRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -70,6 +75,12 @@ export default function DocumentsPage() {
     }).catch(() => {});
     api.get("/normalization/facilities").then((res: any) => {
       setFacilities(Array.isArray(res.data) ? res.data : []);
+    }).catch(() => {});
+    api.get("/settings/llm-providers").then((res: any) => {
+      setLlmProviders((res.data || []).filter((p: any) => p.enabled));
+    }).catch(() => {});
+    api.get("/settings/ocr-providers").then((res: any) => {
+      setOcrProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});
   }, []);
 
@@ -218,10 +229,14 @@ export default function DocumentsPage() {
     await runBulk("Delete", (id) => api.delete(`/documents/${id}`).then(() => {}));
   };
 
-  const bulkReprocess = async (mode: "both" | "ocr" | "llm") => {
+  const bulkReprocess = async () => {
+    const mode = reprocessMode;
+    const payload: Record<string, any> = { mode };
+    if (reprocessLlmProvider) payload.llm_provider_id = reprocessLlmProvider;
+    if (reprocessOcrProvider) payload.ocr_provider_id = reprocessOcrProvider;
     await runBulk(
       mode === "both" ? "Reprocess" : `Reprocess (${mode.toUpperCase()})`,
-      (id) => api.post(`/documents/${id}/reprocess`, { mode }).then(() => {}),
+      (id) => api.post(`/documents/${id}/reprocess`, payload).then(() => {}),
     );
   };
 
@@ -383,10 +398,71 @@ export default function DocumentsPage() {
               <ChevronDown className="h-3 w-3" />
             </button>
             {reprocessOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-36 rounded-md border bg-background py-1 text-xs shadow-lg">
-                <button onClick={() => bulkReprocess("both")} className="block w-full px-3 py-1 text-left hover:bg-accent">OCR + LLM</button>
-                <button onClick={() => bulkReprocess("ocr")} className="block w-full px-3 py-1 text-left hover:bg-accent">OCR only</button>
-                <button onClick={() => bulkReprocess("llm")} className="block w-full px-3 py-1 text-left hover:bg-accent">LLM only</button>
+              <div className="absolute left-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3 text-foreground">
+                <p className="text-xs font-medium text-muted-foreground">What to reprocess</p>
+                <div className="flex gap-1">
+                  {[
+                    { value: "both", label: "OCR + LLM" },
+                    { value: "ocr", label: "OCR only" },
+                    { value: "llm", label: "LLM only" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setReprocessMode(opt.value as "both" | "ocr" | "llm")}
+                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                        reprocessMode === opt.value
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {reprocessMode !== "llm" && ocrProviders.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
+                    <select
+                      value={reprocessOcrProvider}
+                      onChange={(e) => setReprocessOcrProvider(e.target.value)}
+                      className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                    >
+                      <option value="">Default (highest priority)</option>
+                      {ocrProviders.map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name || p.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {reprocessMode !== "ocr" && llmProviders.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
+                    <select
+                      value={reprocessLlmProvider}
+                      onChange={(e) => setReprocessLlmProvider(e.target.value)}
+                      className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                    >
+                      <option value="">Default (highest priority)</option>
+                      {llmProviders.map((p: any) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name || p.id}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <button
+                  onClick={bulkReprocess}
+                  disabled={!!bulkBusy}
+                  className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  Start Reprocessing ({selectedIds.size})
+                </button>
               </div>
             )}
           </div>

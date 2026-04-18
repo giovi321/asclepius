@@ -11,6 +11,11 @@ services:
       - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
     environment:
       - TZ=${TZ:-Europe/Zurich}
+      # PUID/PGID make the in-container unprivileged user match the host
+      # owner of the bind-mounted ./data and ./vault directories so
+      # SQLite and the pipeline can write. Defaults to 1000:1000.
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - ASCLEPIUS_ENV=${ASCLEPIUS_ENV:-production}
       - ASCLEPIUS_COOKIE_SECURE=${ASCLEPIUS_COOKIE_SECURE:-1}
       - ASCLEPIUS_VAULT_PATH=/data/vault
@@ -20,8 +25,13 @@ services:
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
     restart: unless-stopped
-    read_only: false  # the pipeline writes into /data; tighten with tmpfs if needed
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
+    # The entrypoint starts as root to fix bind-mount ownership, then
+    # drops to the unprivileged ``asclepius`` user via gosu. We therefore
+    # can't use ``cap_drop: ALL`` or ``no-new-privileges`` without also
+    # pre-chowning the host directories; keeping these commented out
+    # gives a friendly out-of-the-box experience. Re-enable after you
+    # ``chown -R 1000:1000 ./data ./vault`` on the host.
+    # security_opt:
+    #   - no-new-privileges:true
+    # cap_drop:
+    #   - ALL

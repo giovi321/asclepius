@@ -129,7 +129,7 @@ async def get_frame(
     study_id: int,
     series_id: int,
     index: int,
-    format: str = Query(default="png", regex="^(png|dicom)$"),
+    format: str = Query(default="png", pattern="^(png|dicom)$"),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):

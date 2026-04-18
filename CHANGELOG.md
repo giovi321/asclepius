@@ -37,7 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without a selected patient.
 - PDF rotation, rename, cancel, reprocess and update endpoints now
   require write access (admin / uploader / editor-or-owner on the patient).
-- Docker image runs as a non-root `asclepius` user.
+- Docker image runs as a non-root `asclepius` user. A small entrypoint
+  (`docker/entrypoint.sh`) starts as root, aligns the in-container
+  UID/GID with `PUID`/`PGID`, repairs ownership of the bind-mounted
+  `/data` tree, then `gosu`-drops to the unprivileged user. Prevents
+  the "attempt to write a readonly database" failure on first run.
 
 ### Removed
 

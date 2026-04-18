@@ -17,8 +17,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 # System dependencies for Tesseract, PDF rendering, DICOM, libmagic.
+# ``gosu`` lets the entrypoint drop privileges cleanly after fixing up
+# ownership of the bind-mounted vault.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tzdata \
+        gosu \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-ita \
@@ -33,8 +36,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user to own /app and /data. Running as UID 1000 keeps
-# the bind-mounted vault easy to manage from the host.
+# Create the default unprivileged user. Its UID/GID can be overridden at
+# runtime via ``PUID`` / ``PGID`` so the bind-mounted vault stays writable
+# regardless of the host user's UID.
 RUN groupadd --system --gid 1000 asclepius \
  && useradd  --system --uid 1000 --gid asclepius --home /app --shell /usr/sbin/nologin asclepius
 
@@ -46,14 +50,20 @@ WORKDIR /app
 COPY backend/ .
 COPY --from=frontend-build /frontend/dist /app/static
 COPY config/ /app/bundled_config/
+COPY docker/entrypoint.sh /usr/local/bin/asclepius-entrypoint
+RUN chmod +x /usr/local/bin/asclepius-entrypoint
 
 RUN pip install --no-cache-dir .
 
-# Create data directories and hand ownership to the unprivileged user.
+# Create data directories owned by the default unprivileged user. These
+# are overridden by bind mounts at runtime; the entrypoint will chown
+# them back to the target user before dropping privileges.
 RUN mkdir -p /data/vault/inbox /data/vault/patients /data/vault/unclassified /data/config \
  && chown -R asclepius:asclepius /app /data
 
-USER asclepius
+# We intentionally do NOT ``USER asclepius`` here — the entrypoint starts
+# as root so it can repair ownership of the bind-mounted vault and then
+# ``gosu`` down to the unprivileged user. See docker/entrypoint.sh.
 
 EXPOSE 8000
 
@@ -61,4 +71,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)" || exit 1
 
+ENTRYPOINT ["/usr/local/bin/asclepius-entrypoint"]
 CMD ["uvicorn", "asclepius.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "120"]

@@ -7,6 +7,7 @@ import aiosqlite
 
 from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
+from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,15 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     )
     medication_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
 
+    # Canonical output language — pulled from app config so every LLM call can
+    # see it without a second round-trip. Providers prepend the directive via
+    # _canonical_language_directive() before the actual prompt.
+    try:
+        from asclepius.config import get_config as _get_config
+        canonical_language = _get_config().llm.canonical_language or "English"
+    except Exception:
+        canonical_language = "English"
+
     return {
         "patient_list": patients,
         "facility_list": facilities,
@@ -65,6 +75,7 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
         "specialty_mappings": specialty_mappings,
         "diagnosis_mappings": diagnosis_mappings,
         "medication_mappings": medication_mappings,
+        "canonical_language": canonical_language,
     }
 
 
@@ -106,6 +117,8 @@ async def _extract_type_specific(
             format_kwargs[placeholder] = _json.dumps(context.get(ctx_key, []), indent=2)
 
     prompt = prompt_template.format(**format_kwargs)
+    # Force outputs into the user-selected canonical language.
+    prompt = _canonical_language_directive(context.get("canonical_language", "English")) + prompt
 
     # Use the LLM's internal generate + parse (works for both Ollama and Claude)
     if hasattr(llm, "_generate"):
@@ -282,6 +295,7 @@ async def classify_and_extract(
                     ocr_text=ocr_text,
                     few_shot_examples=few_shot_str,
                 )
+                formatted = _canonical_language_directive(context.get("canonical_language", "English")) + formatted
                 response_text = await llm._generate(formatted)
                 classification = llm._parse_json(response_text)
                 logger.info("Classification result for doc %d: doc_type=%s, summary=%s, dates=%s/%s/%s, doctor=%s",
@@ -365,6 +379,13 @@ async def extract_and_store(
         )
         await db.commit()
         return extraction
+
+    # Clear any prior child rows for this document so re-extraction overwrites
+    # old data instead of appending duplicates. Both the full pipeline and the
+    # reprocess path funnel through extract_and_store, so doing the cleanup
+    # here makes every extraction idempotent.
+    for _child in ("lab_results", "encounters", "medications", "vaccinations", "invoice_items"):
+        await db.execute(f"DELETE FROM {_child} WHERE document_id = ?", (doc_id,))
 
     # Store raw extraction — use the provider label if available, else fall back to config
     llm_label = getattr(llm, "provider_label", "") or config.llm.provider

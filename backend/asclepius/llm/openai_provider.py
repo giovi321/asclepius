@@ -7,7 +7,7 @@ import re
 import httpx
 
 from asclepius.llm.base import LLMProvider
-from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT
+from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT, canonical_language_directive
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,7 @@ class OpenAIProvider(LLMProvider):
             ocr_text=ocr_text,
             few_shot_examples=context.get("few_shot_examples", ""),
         )
+        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
         response_text = await self._generate(prompt)
         result = self._parse_json(response_text)
         logger.info("OpenAI classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
@@ -50,6 +51,7 @@ class OpenAIProvider(LLMProvider):
             medication_mappings=json.dumps(context.get("medication_mappings", []), indent=2),
             ocr_text=ocr_text,
         )
+        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
         response_text = await self._generate(prompt)
         return self._parse_json(response_text)
 

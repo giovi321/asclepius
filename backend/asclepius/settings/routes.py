@@ -177,6 +177,7 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "has_claude_key": bool(config.llm.claude_api_key),
             "extraction_timeout": config.llm.extraction_timeout,
             "provider_count": len([p for p in config.llm.providers if p.enabled]),
+            "canonical_language": config.llm.canonical_language,
         },
         "ocr": {
             "engine": config.ocr.engine,
@@ -225,6 +226,7 @@ class SettingsUpdate(BaseModel):
     claude_api_key: str | None = None
     claude_model: str | None = None
     extraction_timeout: int | None = None
+    canonical_language: str | None = None
     # OCR
     ocr_engine: str | None = None
     ocr_language: str | None = None
@@ -262,6 +264,7 @@ _SETTINGS_MAP = {
     "claude_api_key": ("llm", "claude_api_key", "llm.claude_api_key"),
     "claude_model": ("llm", "claude_model", "llm.claude_model"),
     "extraction_timeout": ("llm", "extraction_timeout", "llm.extraction_timeout"),
+    "canonical_language": ("llm", "canonical_language", "llm.canonical_language"),
     "ocr_engine": ("ocr", "engine", "ocr.engine"),
     "ocr_language": ("ocr", "language", "ocr.language"),
     "ocr_confidence_threshold": ("ocr", "confidence_threshold", "ocr.confidence_threshold"),

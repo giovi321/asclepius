@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
-import { Save, RotateCcw } from "lucide-react";
+import { Save, RotateCcw, Languages } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+
+// Canonical output languages. Extend freely — the backend accepts any string
+// and embeds it verbatim into the LLM language directive.
+const CANONICAL_LANGUAGES = [
+  "English", "Italian", "German", "French", "Spanish",
+  "Portuguese", "Dutch", "Polish", "Romanian", "Czech",
+];
 
 export default function PromptsTab() {
   const { toast } = useToast();
@@ -11,12 +18,29 @@ export default function PromptsTab() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [canonicalLanguage, setCanonicalLanguage] = useState<string>("English");
+  const [savingLanguage, setSavingLanguage] = useState(false);
 
   const load = () => {
     api.get("/settings/prompts").then((res) => setPrompts(res.data || []));
+    api.get("/settings").then((res) => {
+      setCanonicalLanguage(res.data?.llm?.canonical_language || "English");
+    });
   };
 
   useEffect(() => { load(); }, []);
+
+  const saveLanguage = async (value: string) => {
+    setSavingLanguage(true);
+    try {
+      await api.patch("/settings", { canonical_language: value });
+      setCanonicalLanguage(value);
+      toast({ title: "Canonical language updated", description: `All LLM output will now be in ${value}.` });
+    } catch {
+      toast({ title: "Failed to update canonical language", variant: "error" });
+    }
+    setSavingLanguage(false);
+  };
 
   const handleSave = async (key: string) => {
     setSaving(true);
@@ -45,6 +69,35 @@ export default function PromptsTab() {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-md border p-3 space-y-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Languages className="h-4 w-4 text-primary" />
+          Canonical output language
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Every free-form field produced by the LLM (summaries, canonical names,
+          findings, notes, etc.) will be written in this language, regardless of
+          the document's source language. Codes (ICD-10, LOINC, ISO 4217, etc.)
+          are always kept as-is.
+        </p>
+        <div className="flex items-center gap-2">
+          <select
+            value={canonicalLanguage}
+            onChange={(e) => saveLanguage(e.target.value)}
+            disabled={savingLanguage}
+            className="rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
+          >
+            {CANONICAL_LANGUAGES.includes(canonicalLanguage) ? null : (
+              <option value={canonicalLanguage}>{canonicalLanguage}</option>
+            )}
+            {CANONICAL_LANGUAGES.map((lang) => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+          {savingLanguage && <span className="text-xs text-muted-foreground">Saving…</span>}
+        </div>
+      </div>
+
       <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
         Customize the LLM prompts used for document classification, extraction, chat, and more.
         Prompts use Python format strings with placeholders like {"{ocr_text}"}, {"{patient_list}"}, etc.

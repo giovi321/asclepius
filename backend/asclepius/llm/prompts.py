@@ -1,5 +1,23 @@
 """LLM prompt templates for document extraction and chat."""
 
+
+def canonical_language_directive(language: str | None) -> str:
+    """Prefix directive that forces the LLM to emit free-form text fields in
+    the configured canonical language.
+
+    Prepended by every provider's classify/extract/_generate-driven path so
+    the user's choice applies regardless of which prompt template runs.
+    """
+    if not language:
+        language = "English"
+    return (
+        f"CRITICAL LANGUAGE DIRECTIVE: Write every free-form text field in the "
+        f"JSON output (summaries, canonical names, findings, notes, descriptions, "
+        f"translations, etc.) in {language}. Keep codes (ISO 4217, ICD-10, LOINC, "
+        f"canonical_code values drawn from the provided mappings, language_detected) "
+        f"untouched. Field keys and the JSON schema must remain as specified.\n\n"
+    )
+
 # ---------------------------------------------------------------------------
 # Phase 1: Classification prompt (same for ALL document types)
 # ---------------------------------------------------------------------------

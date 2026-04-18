@@ -153,6 +153,11 @@ class LlmConfig(BaseModel):
     extraction_timeout: int = 120
     # New: ordered provider list
     providers: list[LlmProviderEntry] = []
+    # Canonical output language — every free-form text field produced by the
+    # LLM (summaries, canonical names, findings, notes, etc.) is forced into
+    # this language via a prepended directive on every prompt. Defaults to
+    # English to keep the historical behaviour.
+    canonical_language: str = "English"
 
 
 class PipelineConfig(BaseModel):

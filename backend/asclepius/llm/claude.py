@@ -7,7 +7,7 @@ import re
 from anthropic import AsyncAnthropic
 
 from asclepius.llm.base import LLMProvider
-from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT
+from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT, canonical_language_directive
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class ClaudeProvider(LLMProvider):
             ocr_text=ocr_text,
             few_shot_examples=context.get("few_shot_examples", ""),
         )
+        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
         response = await self.client.messages.create(
             model=self.model,
@@ -49,6 +50,7 @@ class ClaudeProvider(LLMProvider):
             medication_mappings=json.dumps(context.get("medication_mappings", []), indent=2),
             ocr_text=ocr_text,
         )
+        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
         response = await self.client.messages.create(
             model=self.model,

@@ -195,11 +195,12 @@ async def update_lab_result(
     if not row:
         raise HTTPException(status_code=404, detail="Lab result not found")
 
-    role = await check_patient_access(db, current_user["id"], row["patient_id"])
-    if not role:
-        raise HTTPException(status_code=403, detail="No access")
-    if role == "viewer":
-        raise HTTPException(status_code=403, detail="Viewers cannot edit lab results")
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], row["patient_id"])
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+        if role == "viewer":
+            raise HTTPException(status_code=403, detail="Viewers cannot edit lab results")
 
     updates = {}
     for field in body.model_fields_set:
@@ -232,11 +233,12 @@ async def delete_lab_result(
     if not row:
         raise HTTPException(status_code=404, detail="Lab result not found")
 
-    role = await check_patient_access(db, current_user["id"], row["patient_id"])
-    if not role:
-        raise HTTPException(status_code=403, detail="No access")
-    if role == "viewer":
-        raise HTTPException(status_code=403, detail="Viewers cannot delete lab results")
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], row["patient_id"])
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+        if role == "viewer":
+            raise HTTPException(status_code=403, detail="Viewers cannot delete lab results")
 
     await db.execute("DELETE FROM lab_results WHERE id = ?", (result_id,))
     await db.commit()

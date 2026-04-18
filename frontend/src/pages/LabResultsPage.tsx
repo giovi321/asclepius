@@ -77,11 +77,14 @@ export default function LabResultsPage() {
   useEffect(() => { load(); }, [selectedPatient, search]);
 
   // Build the pool of canonical tests present in the current result set —
-  // drives the chart picker.
+  // drives the chart picker. Only count rows that have a `test_date` AND a
+  // numeric `value`, since the trend chart needs both axes to plot a point.
+  // Tests with zero chartable datapoints are dropped entirely.
   const canonicalOptions = useMemo(() => {
     const byCode = new Map<string, { code: string; label: string; count: number }>();
     for (const r of results) {
       if (!r.canonical_code) continue;
+      if (!r.test_date || r.value == null) continue;
       const e = byCode.get(r.canonical_code) || {
         code: r.canonical_code,
         label: r.test_name_canonical || r.canonical_code,

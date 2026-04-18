@@ -14,8 +14,9 @@ Asclepius is a self-hosted application that ingests, OCRs, extracts, organizes, 
 - **OCR + LLM extraction** -- Four OCR engines (Tesseract, Tesseract Remote, LLM Vision, Google Cloud Vision) with LLM-powered structured data extraction
 - **Two-phase extraction** -- Documents are classified first, then extracted with type-specific prompts for higher accuracy
 - **Smart page-level sectioning** -- Large documents (>5 pages) are split into logical sections (lab results, clinical notes, discharge summary, etc.) and extracted individually
+- **Canonical output language** -- Force every LLM-produced field (summaries, canonical names, findings) into the language of your choice, regardless of the document's source language
 - **Medical events** -- Organize documents around medical stories (diagnosis, treatment, surgery) with AI-powered event suggestions
-- **Multi-language** -- Handles documents in English, Italian, German, French, Spanish, and more
+- **Multi-language input** -- Handles documents in English, Italian, German, French, Spanish, and more
 - **Multi-patient** -- Organize records by patient with role-based access control
 - **Lab result tracking** -- Extracted, normalized, with interactive trend visualization
 - **Medical imaging** -- DICOM viewer with windowing, zoom, and slice scrolling

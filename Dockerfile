@@ -19,7 +19,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # System dependencies for Tesseract, PDF rendering, DICOM, libmagic.
 # ``gosu`` lets the entrypoint drop privileges cleanly after fixing up
 # ownership of the bind-mounted vault.
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         tzdata \
         gosu \
         tesseract-ocr \

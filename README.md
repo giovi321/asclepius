@@ -1,43 +1,46 @@
-# Asclepius
+<p align="center">
+  <img src="docs/docs/assets/logo.svg" alt="Asclepius" width="160" />
+</p>
+
+<h1 align="center">Asclepius</h1>
+
+<p align="center">
+  <a href="https://github.com/giovi321/asclepius/actions/workflows/ci.yml"><img src="https://github.com/giovi321/asclepius/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/giovi321/asclepius/actions/workflows/docker.yml"><img src="https://github.com/giovi321/asclepius/actions/workflows/docker.yml/badge.svg" alt="Docker"></a>
+  <a href="https://github.com/giovi321/asclepius/actions/workflows/docs.yml"><img src="https://github.com/giovi321/asclepius/actions/workflows/docs.yml/badge.svg" alt="Docs"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
+  <img src="https://img.shields.io/badge/node-20%2B-green" alt="Node 20+">
+</p>
 
 A self-hosted application to ingest, OCR, extract, organize, and search personal medical records.
 
 Documents go into an inbox folder, the server processes them (OCR + LLM extraction), stores structured metadata in SQLite, organizes files into a patient/year folder hierarchy, and serves a React web UI for browsing, searching, and chatting with your medical history.
 
-## Quick Start
+## Quick Install
+
+**Prerequisites:** Docker + Docker Compose, ~2 GB free disk, and at least one LLM provider (self-hosted Ollama/vLLM or an API key for Claude/OpenAI).
 
 ```bash
-# Copy and edit config
+git clone https://github.com/giovi321/asclepius.git
+cd asclepius
 cp config/settings.example.yaml config/settings.yaml
-# Edit config/settings.yaml with your settings
-
-# Start with Docker Compose
+# edit config/settings.yaml — at minimum configure one LLM provider
 docker compose up -d
 ```
 
-The application will be available at `http://localhost:8070`.
-
-On first launch, a setup wizard guides you through creating your account and first patient.
+Open <http://localhost:8070> — a first-launch setup wizard creates your admin account and first patient. Drop files into the inbox folder to start ingestion.
 
 ## Features
 
-- **Document ingestion**: Drop PDFs, images, or DICOM files into the inbox
-- **OCR**: Multi-provider with priority (Tesseract, LLM Vision, Google Vision, remote Tesseract, Vision Extraction)
-- **Vision Extraction**: Single-step mode where a vision LLM reads and extracts from page images directly
-- **LLM extraction**: Multi-provider with priority and escalation (Ollama, vLLM, Claude, OpenAI)
-- **Canonical output language**: Force every LLM-produced field (summaries, canonical names, findings) into the language of your choice
-- **Multi-patient**: Organize records by patient with access control
-- **Lab results**: Extracted and normalized, with trend tracking
-- **Medical imaging**: DICOM viewer (Cornerstone.js) with windowing, zoom, scroll
-- **RAG chat**: Ask questions about medical history, powered by structured DB queries
-- **Full-text search**: SQLite FTS5 across all document content
-- **Normalization**: Canonical mapping for lab tests, diagnoses, medications, specialties, doctors, and facilities across languages
-- **Multi-language input**: Ingests documents in any language
-- **Timeline view**: Visual chronological timeline with mini-map navigation
-- **Medical events**: Group related documents into medical stories (diagnosis, surgery, treatment, etc.)
-- **Correction-driven learning**: User edits are captured as training signals to improve future extractions
-- **Retrieval-augmented extraction**: Similar previously-processed documents are injected as few-shot examples
-- **Selective reprocessing**: Re-run OCR only, LLM only, or both, with specific provider selection
+- **Ingest** PDFs, images, and DICOM files from an inbox folder
+- **Extract** text and structured fields via multi-provider OCR + LLM (Tesseract, Google Vision, Ollama, vLLM, Claude, OpenAI) with priority-based fallback
+- **Organize** by patient with multi-user access control, medical events, and a chronological timeline
+- **Lab results** normalized across languages, with trend charts
+- **Search + chat** your records with SQLite FTS5 and RAG-powered Q&A
+- **DICOM viewer** with windowing, zoom, and scroll
+- **Learns from your edits** via correction-driven learning and retrieval-augmented extraction
+- **Selective reprocessing** of OCR only, LLM only, or both — with per-document provider choice
 
 ## Tech Stack
 

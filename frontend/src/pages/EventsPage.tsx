@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { Plus, Trash2, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, FileText, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 
 const EVENT_TYPES = [
   "symptom", "diagnosis", "hospitalization", "surgery", "treatment",
@@ -34,6 +34,8 @@ export default function EventsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [eventDetail, setEventDetail] = useState<any>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<any>(null);
   const [newEvent, setNewEvent] = useState({
     title: "", event_type: "other", description: "",
     date_start: "", date_end: "", is_ongoing: false,
@@ -84,10 +86,51 @@ export default function EventsPage() {
   };
 
   const toggleExpand = async (id: number) => {
-    if (expandedId === id) { setExpandedId(null); setEventDetail(null); return; }
+    if (expandedId === id) { setExpandedId(null); setEventDetail(null); setEditingId(null); setEditData(null); return; }
     setExpandedId(id);
+    setEditingId(null);
+    setEditData(null);
     const res = await api.get(`/events/${id}`);
     setEventDetail(res.data);
+  };
+
+  const startEdit = (event: any) => {
+    setEditingId(event.id);
+    setEditData({
+      title: event.title || "",
+      event_type: event.event_type || "other",
+      description: event.description || "",
+      date_start: event.date_start || "",
+      date_end: event.date_end || "",
+      is_ongoing: !!event.is_ongoing,
+      severity: event.severity || "",
+      diagnosis_text: event.diagnosis_text || "",
+      notes: event.notes || "",
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditData(null);
+  };
+
+  const handleUpdate = async () => {
+    if (!editingId || !editData?.title?.trim()) return;
+    const payload = {
+      ...editData,
+      date_start: editData.date_start || null,
+      date_end: editData.date_end || null,
+      severity: editData.severity || null,
+      diagnosis_text: editData.diagnosis_text || null,
+      description: editData.description || null,
+      notes: editData.notes || null,
+    };
+    await api.patch(`/events/${editingId}`, payload);
+    const res = await api.get(`/events/${editingId}`);
+    setEventDetail(res.data);
+    setEditingId(null);
+    setEditData(null);
+    loadEvents();
   };
 
   return (
@@ -181,8 +224,62 @@ export default function EventsPage() {
 
               {expandedId === event.id && eventDetail && (
                 <div className="border-t p-4 space-y-3">
+                  {editingId === event.id && editData ? (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-medium">Edit Event</h4>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input type="text" placeholder="Title" value={editData.title}
+                          onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm" />
+                        <select value={editData.event_type}
+                          onChange={(e) => setEditData({ ...editData, event_type: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm">
+                          {EVENT_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                        </select>
+                        <input type="date" value={editData.date_start}
+                          onChange={(e) => setEditData({ ...editData, date_start: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm" />
+                        <input type="date" value={editData.date_end}
+                          onChange={(e) => setEditData({ ...editData, date_end: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm" />
+                        <input type="text" placeholder="Diagnosis" value={editData.diagnosis_text}
+                          onChange={(e) => setEditData({ ...editData, diagnosis_text: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm" />
+                        <select value={editData.severity}
+                          onChange={(e) => setEditData({ ...editData, severity: e.target.value })}
+                          className="rounded-md border bg-background px-3 py-2 text-sm">
+                          <option value="">Severity...</option>
+                          <option value="mild">Mild</option>
+                          <option value="moderate">Moderate</option>
+                          <option value="severe">Severe</option>
+                          <option value="critical">Critical</option>
+                        </select>
+                      </div>
+                      <textarea placeholder="Description..." value={editData.description}
+                        onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm" rows={2} />
+                      <textarea placeholder="Notes..." value={editData.notes}
+                        onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm" rows={2} />
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={editData.is_ongoing}
+                          onChange={(e) => setEditData({ ...editData, is_ongoing: e.target.checked })} />
+                        Ongoing condition
+                      </label>
+                      <div className="flex gap-2">
+                        <button onClick={handleUpdate}
+                          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">Save</button>
+                        <button onClick={cancelEdit}
+                          className="rounded-md border px-4 py-2 text-sm">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   {eventDetail.description && (
                     <p className="text-sm text-muted-foreground">{eventDetail.description}</p>
+                  )}
+                  {eventDetail.notes && (
+                    <p className="text-xs italic text-muted-foreground whitespace-pre-wrap">{eventDetail.notes}</p>
                   )}
 
                   {/* Linked documents */}
@@ -209,6 +306,10 @@ export default function EventsPage() {
                   </div>
 
                   <div className="flex gap-2">
+                    <button onClick={() => startEdit(event)}
+                      className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent/30">
+                      <Pencil className="h-3 w-3" /> Edit
+                    </button>
                     <button onClick={() => handleDelete(event.id)}
                       className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950">
                       <Trash2 className="h-3 w-3" /> Delete Event
@@ -218,6 +319,8 @@ export default function EventsPage() {
                       <Trash2 className="h-3 w-3" /> Delete Event & Documents
                     </button>
                   </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>

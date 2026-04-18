@@ -156,8 +156,11 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/lab-results` | Yes | List lab results (filterable) |
-| `GET` | `/api/lab-results/trends` | Yes | Get trend data for a specific test |
+| `GET` | `/api/lab-results` | Yes | List lab results. Each row carries `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code` via JOINs. |
+| `GET` | `/api/lab-results/orphans` | Yes | Lab results whose `document_id` no longer points to an existing document. |
+| `GET` | `/api/lab-results/timeline` | Yes | Time-series for a specific test (legacy — superseded by the in-page chart picker). |
+| `PATCH` | `/api/lab-results/{id}` | Yes | Update editable fields (value, unit, reference range, test_date, …). Viewers are blocked. |
+| `DELETE` | `/api/lab-results/{id}` | Yes | Delete a single lab result. |
 
 ### Lab Results Query Parameters
 

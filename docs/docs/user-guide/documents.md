@@ -50,6 +50,14 @@ All filter parameters support comma-separated multi-values in the API (e.g., `?t
 
 Documents are loaded in pages of 20. Use the Previous/Next controls at the bottom to navigate.
 
+### Filter + search persistence
+
+Every active filter — search query, doc type, status, specialty, doctor, facility, date range, and the current page — is mirrored into the URL query string. Open a document, hit browser Back, and you land on the exact same filter state you were in. The URL is also bookmarkable and shareable: `?status=needs_review&type=prescription` is a valid deep-link into the filtered view.
+
+### Access scope
+
+Non-admin users see only documents for patients they have access to, plus any documents they uploaded themselves (even unclassified ones). Admins see everything. Legacy rows that pre-date the per-user attribution column stay admin-only until their `uploaded_by_user_id` is backfilled.
+
 ### Bulk Actions
 
 Tick the checkbox on any row (or the header checkbox to select every visible document on the current page). When at least one row is selected, a subdued action bar appears above the table:

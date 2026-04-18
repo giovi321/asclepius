@@ -6,7 +6,10 @@ The vault is the root directory for all stored files and the SQLite database. It
 
 ```
 vault/
-├── inbox/                              # Drop files here for processing
+├── inbox/
+│   ├── user-1/                         # Per-user dropzones
+│   │   └── my-upload.pdf
+│   └── user-2/
 ├── patients/
 │   ├── giovanni-crapelli/
 │   │   ├── 2023/
@@ -29,9 +32,14 @@ vault/
 │   │       └── 20250110_dr-mueller_prescription.pdf
 │   └── other-patient/
 │       └── ...
-├── unclassified/                       # Docs that couldn't be assigned to a patient
+├── unclassified/
+│   ├── user-1/                         # Per-user unclassified bucket
+│   │   └── 20240501_invoice.pdf
+│   └── user-2/
 └── asclepius.sqlite                    # SQLite database
 ```
+
+`inbox/` and `unclassified/` are split into `user-<id>/` subfolders so each user has their own isolated dropzone. Uploads via `POST /api/documents/upload` land in the caller's subfolder automatically, and documents with no assigned patient are organized under the uploader's subfolder. The file watcher is recursive, so existing files and new drops in any `user-*/` subfolder are picked up. Legacy files still at the flat `inbox/<name>` or `unclassified/<name>` paths continue to work and are visible only to admins.
 
 Documents assigned to a medical event are organized into an event subfolder within the year. Documents without an event remain directly in the year folder.
 
@@ -55,18 +63,19 @@ Examples:
 
 ## Key Rules
 
-1. **Files move once.** From `inbox/` to their final location in `patients/{slug}/{year}/`. After that, the path never changes.
+1. **Files move once.** From `inbox/user-<id>/` to their final location in `patients/{slug}/{year}/`. After that, the path never changes.
 2. **No manual reorganization.** Use the web UI to reassign documents to different patients. The server handles moving the file on disk.
 3. **The database is the source of truth.** File paths are stored in `documents.file_path` relative to the vault root.
 4. **Imaging files preserve DICOM structure.** Series folders contain the original `.dcm` files with their series instance UIDs.
-5. **Unclassified documents** go to `vault/unclassified/` when the pipeline cannot determine the patient.
+5. **Unclassified documents** go to `vault/unclassified/user-<id>/` when the pipeline cannot determine the patient. Legacy rows with no `uploaded_by_user_id` fall back to the flat `unclassified/` directory and remain admin-only.
+6. **Per-user scope.** Non-admin users see only their own patients and their own `inbox/` + `unclassified/` subfolders in the file browser and document lists. Admins always see everything.
 
 ## Patient Slug
 
 Each patient has a URL-safe slug derived from their display name:
 
 - "Giovanni Crapelli" becomes `giovanni-crapelli`
-- The slug is unique and used for the filesystem directory name
+- The slug is globally unique (used for the filesystem directory name and joins). When two users independently create a patient with the same display name, the second gets an auto-disambiguated slug (`mario-rossi`, then `mario-rossi-2`, etc.). `display_name` is allowed to repeat across users — the slug is an internal handle, not something the UI surfaces for editing.
 
 ## File Deduplication
 

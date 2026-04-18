@@ -2,48 +2,51 @@
 
 ## Overview
 
-The Lab Results page shows all extracted lab values for the selected patient. Lab results are automatically extracted from documents classified as `bloodtest` during pipeline processing.
+The Lab Results page shows all extracted lab values for the selected patient. Values are automatically pulled from documents classified as `bloodtest` during pipeline processing, sorted by test date (newest first).
 
-## Features
+## Layout
 
-### Lab Results Table
+### Orphan banner
 
-The main view shows all lab results with:
+If any lab result references a document that has been deleted, a yellow banner appears at the top of the page offering **Review** (lists the orphans in a modal with per-row delete) and **Delete all** (removes them all after a confirmation). Same UX as the "no documents → offer delete" flow in the normalization tab.
 
-- **Test name** (original and normalized canonical name)
-- **Value** (numeric or text)
-- **Unit** of measurement
-- **Reference range** (low and high)
-- **Abnormal flag** (highlighted when the value is outside the reference range)
-- **Test date**
-- **Source document** (click to view the original document)
+### Filter row
 
-### Filtering
+- **Search by test name** — matches both the original extracted name and the canonical display.
+- **Group by test date** — collapsible groups keyed by `(test_date, source document)` so all the results of a single blood-test event stay together. On by default.
 
-Filter lab results by:
+### Trend chart
 
-- **Test name** -- search across both original and canonical names
-- **Date range** -- from/to date
-- **Patient** -- automatically filtered when a patient is selected in the sidebar
+Above the table is a pill row listing every canonical test present in the current result set, with its row count. Click one or more pills to reveal a line chart plotting the values over time, one series per pill. A reference band is drawn from the mode of the first series' reference ranges.
 
-### Trend View
+### Results table
 
-Click on any test name to see a trend chart showing how values have changed over time. The chart displays:
+Columns:
 
-- Historical values plotted on a timeline
-- Reference range shown as a shaded band
-- Abnormal values highlighted
+- **Document** — file icon + filename, linked to the source document page. Shows *"no document"* if the row is orphaned.
+- **Test** — canonical display name (falling back to the original).
+- **Value** — numeric or text; abnormal rows are tinted red.
+- **Unit** / **Reference** / **Date** — as extracted.
+- **Actions** — inline **Edit** turns the row into input fields (test name, value, unit, reference low/high, test date). **Delete** removes the row after a confirmation; the source document is untouched.
 
-This is particularly useful for tracking values like cholesterol, blood glucose, or hemoglobin over multiple tests.
+### OGTT curve ("curva glicemica")
+
+When a group of results on the same document contains at least three parseable glucose time-offset readings, the group's collapsed view renders an OGTT badge and, once expanded, a recharts line chart plotting glucose concentration over minutes from the glucose load. The parser recognizes:
+
+- `T0`, `T+30`, `T-60`, `T 120`
+- `30'`, `60′`, `90'`
+- `30 min`, `60 minutes`, `2 h`, `2 hour`, `1 ora`
+- `basale`, `basal`, `fasting`, `a digiuno`, `pre` (all treated as T0)
+
+A glucose keyword must appear in the same test name (English/Italian/German/OGTT) so a random `T90 HbA1c` row doesn't trigger the curve. WHO/ADA two-hour thresholds (140 mg/dL impaired glucose tolerance, 200 mg/dL diabetes) are drawn as dashed reference lines when the unit is mg/dL.
 
 ## Normalization
 
-Lab test names are normalized to canonical forms using the normalization system. This ensures that the same test is recognized regardless of language or naming convention:
+Lab test names are normalized to canonical forms using the normalization system, so the same test is recognized regardless of language or naming convention:
 
 - "Emoglobina" (Italian), "Haemoglobin" (British English), "Hemoglobin" (American English) all map to the canonical `HEMOGLOBIN`
-- Normalization happens automatically during extraction using the alias tables
 
-See [Normalization](normalization.md) for details on managing canonical names and aliases.
+See [Normalization](normalization.md) for managing canonical names and aliases.
 
 ## Data Model
 
@@ -51,6 +54,8 @@ Each lab result record contains:
 
 | Field | Description |
 |-------|-------------|
+| `document_id` | FK to the source document (NULL if that document has since been deleted — listed as "orphan") |
+| `patient_id` | Denormalized patient ownership |
 | `test_name_original` | Test name as written in the document |
 | `norm_lab_test_id` | Link to the canonical lab test |
 | `value` | Numeric value (if applicable) |
@@ -62,3 +67,13 @@ Each lab result record contains:
 | `sample_type` | Type of sample (blood, urine, etc.) |
 | `panel_name` | Name of the test panel (e.g., "Complete Blood Count") |
 | `test_date` | Date the test was performed |
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/lab-results` | List lab results. Enriches each row with `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code`. Scoped to accessible patients; default limit 500. |
+| `GET` | `/api/lab-results/orphans` | Lab results whose `document_id` no longer points to an existing document. |
+| `GET` | `/api/lab-results/timeline` | Time-series for a single test — historical endpoint used by the old trend view. |
+| `PATCH` | `/api/lab-results/{id}` | Update editable fields. Viewers are blocked. |
+| `DELETE` | `/api/lab-results/{id}` | Delete a single row. |

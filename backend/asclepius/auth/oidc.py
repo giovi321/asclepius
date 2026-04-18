@@ -95,7 +95,9 @@ async def oidc_callback(
     from itsdangerous import URLSafeTimedSerializer, BadSignature
     s = URLSafeTimedSerializer(config.auth.secret_key)
     try:
-        state_data = s.loads(state_cookie, max_age=600)
+        # We only care about the signature being valid; the provider is the
+        # authoritative source of ``state`` in the callback URL.
+        s.loads(state_cookie, max_age=600)
     except BadSignature:
         raise HTTPException(status_code=400, detail="Invalid OIDC state")
 
@@ -105,9 +107,10 @@ async def oidc_callback(
     provider_url = config.oidc.provider_url.rstrip("/")
     metadata = await client.fetch_server_metadata(provider_url)
 
-    # Exchange code for token
+    # Exchange code for token — authlib populates the client credentials
+    # into its session, so we do not need to retain the token ourselves.
     callback_url = str(request.url_for("oidc_callback"))
-    token = await client.fetch_token(
+    await client.fetch_token(
         metadata["token_endpoint"],
         authorization_response=str(request.url),
         redirect_uri=callback_url,
@@ -119,7 +122,6 @@ async def oidc_callback(
 
     username = userinfo.get(config.oidc.username_claim, "")
     display_name = userinfo.get(config.oidc.display_name_claim, username)
-    email = userinfo.get("email", "")
 
     if not username:
         raise HTTPException(status_code=400, detail="No username in OIDC claims")

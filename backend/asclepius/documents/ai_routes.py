@@ -40,7 +40,7 @@ async def edit_document_with_ai(
 
     config = get_config()
     from asclepius.pipeline.processor import get_llm_provider
-    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
+    from asclepius.pipeline.extractor import build_extraction_context
     import json as _json
     import asyncio as _asyncio
 

@@ -12,7 +12,7 @@ import aiosqlite
 from asclepius.config import AppConfig
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
-from asclepius.pipeline.extractor import classify_and_extract, extract_and_store
+from asclepius.pipeline.extractor import classify_and_extract
 from asclepius.pipeline.organizer import build_organized_path, move_file
 
 # Re-export from sub-modules for backward compatibility
@@ -345,7 +345,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     # Run section-level extraction (classify pages, extract per-section)
                     try:
                         section_extraction = await process_with_sections(db, llm, doc_id, file_path, ocr_pages, config)
-                    except Exception as sect_err:
+                    except Exception:
                         logger.exception("Sectioning failed for doc %d, falling back to normal extraction", doc_id)
                         section_extraction = None
 

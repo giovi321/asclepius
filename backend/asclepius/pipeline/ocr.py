@@ -1,7 +1,6 @@
 """OCR processing with Tesseract and optional cloud fallback."""
 
 import base64
-import io
 import json
 import logging
 from pathlib import Path
@@ -11,7 +10,7 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig, OcrProviderEntry, get_active_ocr_provider_config
+from asclepius.config import AppConfig, OcrProviderEntry
 
 logger = logging.getLogger(__name__)
 
@@ -263,8 +262,6 @@ async def _extract_llm_vision(file_path: str, config: AppConfig, provider_entry:
     Renders each page as an image and sends it to the LLM.
     Works with Claude (native vision), OpenAI, or Ollama vision models.
     """
-    import base64
-    import io
 
     path = Path(file_path)
     ext = path.suffix.lower()
@@ -512,7 +509,6 @@ async def _extract_and_classify_vision(
     ext = path.suffix.lower()
 
     from asclepius.pipeline.processor import pipeline_status
-    from asclepius.llm.prompts import CLASSIFICATION_PROMPT
 
     vision_model = provider_entry.llm_model if provider_entry else ""
 

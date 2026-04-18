@@ -1,8 +1,6 @@
 """Pipeline processing tests."""
 
-import json
 import pytest
-import aiosqlite
 
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.organizer import build_organized_path

@@ -79,7 +79,6 @@ async def _extract_type_specific(
     prompt_template = None
     if db_path:
         from asclepius.llm.prompt_manager import get_prompt
-        import asyncio
         custom_key = f"extraction_{doc_type}"
         try:
             custom = await get_prompt(db_path, custom_key)

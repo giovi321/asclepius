@@ -222,10 +222,10 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     labs = await cursor.fetchall()
     if labs:
         parts.append(f"\nRecent lab results ({len(labs)}):")
-        for l in labs:
-            name = l[5] or l[0]
-            flag = " [ABNORMAL]" if l[4] else ""
-            parts.append(f"  - {l[3] or '?'}: {name} = {l[1]} {l[2] or ''}{flag}")
+        for lab in labs:
+            name = lab[5] or lab[0]
+            flag = " [ABNORMAL]" if lab[4] else ""
+            parts.append(f"  - {lab[3] or '?'}: {name} = {lab[1]} {lab[2] or ''}{flag}")
 
     # Current medications
     cursor = await db.execute(

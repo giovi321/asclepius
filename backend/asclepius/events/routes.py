@@ -1,9 +1,8 @@
 """Medical events API routes."""
 
-import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import aiosqlite

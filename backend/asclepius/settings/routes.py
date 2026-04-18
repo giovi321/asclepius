@@ -33,11 +33,11 @@ async def get_logs(
     # Filter by level
     if level:
         levels = level.upper().split(",")
-        logs = [l for l in logs if l["level"] in levels]
+        logs = [entry for entry in logs if entry["level"] in levels]
 
     # Filter by module
     if module:
-        logs = [l for l in logs if module in l["module"]]
+        logs = [entry for entry in logs if module in entry["module"]]
 
     # Return in chronological order (oldest first), limited to most recent entries
     logs = logs[-limit:]
@@ -92,7 +92,6 @@ async def download_backup(
     current_user: dict = Depends(get_current_user),
 ):
     """Download a SQLite backup of the database."""
-    import shutil
     import tempfile
     import sqlite3
     from datetime import datetime

@@ -287,7 +287,7 @@ async def get_relevant_documents(
             s["summary_en"] = d.get("summary_en")
 
         return {"suggestions": suggestions}
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get relevant documents for doc %d", doc_id)
         return {"suggestions": []}
 

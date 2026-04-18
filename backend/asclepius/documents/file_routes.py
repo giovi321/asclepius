@@ -7,7 +7,6 @@ rename target) can never escape the configured vault root.
 
 import logging
 import os
-import shutil
 import tempfile
 from pathlib import Path
 

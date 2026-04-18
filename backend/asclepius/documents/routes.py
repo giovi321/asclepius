@@ -376,7 +376,7 @@ async def move_doc(
     # Move file on disk
     old_file = vault_root / doc["file_path"]
     if old_file.exists():
-        from asclepius.pipeline.organizer import build_organized_path, move_file as mv
+        from asclepius.pipeline.organizer import build_organized_path
 
         # Get doctor/facility slug for path
         doctor_slug = None

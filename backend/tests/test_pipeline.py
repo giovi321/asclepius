@@ -21,7 +21,7 @@ def test_build_organized_path():
     path = build_organized_path(
         config, "giovanni-crapelli", "2024-03-15", "drhouse", "bloodtest", "report.pdf"
     )
-    assert path == "patients/giovanni-crapelli/2024/20240315_drhouse_bloodtest.pdf"
+    assert path == "patients/giovanni-crapelli/2024/20240315_bloodtest.pdf"
 
 
 def test_build_organized_path_unclassified():
@@ -53,7 +53,7 @@ def test_build_organized_path_with_event():
         config, "giovanni-crapelli", "2024-03-15", "drhouse", "bloodtest", "report.pdf",
         event_slug="sleep-apnea-treatment",
     )
-    assert path == "patients/giovanni-crapelli/2024/sleep-apnea-treatment/20240315_drhouse_bloodtest.pdf"
+    assert path == "patients/giovanni-crapelli/2024/sleep-apnea-treatment/20240315_bloodtest.pdf"
 
 
 def test_slugify_event():

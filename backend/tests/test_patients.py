@@ -44,9 +44,15 @@ async def test_update_patient(client):
 
 @pytest.mark.asyncio
 async def test_create_duplicate_slug(client):
-    await client.post("/api/patients", json={"display_name": "Unique Patient"})
-    resp = await client.post("/api/patients", json={"display_name": "Unique Patient"})
-    assert resp.status_code == 409
+    # Two patients may share a display_name; the slug is auto-disambiguated
+    # (unique-patient → unique-patient-2) so both creates succeed.
+    first = await client.post("/api/patients", json={"display_name": "Unique Patient"})
+    second = await client.post("/api/patients", json={"display_name": "Unique Patient"})
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["slug"] == "unique-patient"
+    assert second.json()["slug"] != first.json()["slug"]
+    assert second.json()["slug"].startswith("unique-patient")
 
 
 @pytest.mark.asyncio

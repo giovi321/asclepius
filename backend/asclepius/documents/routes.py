@@ -7,12 +7,13 @@ import logging
 import re
 import shutil
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import aiosqlite
-from asclepius.auth.session import get_current_user
+from asclepius.auth.session import get_current_user, require_role
 from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
@@ -44,22 +45,23 @@ router.include_router(ai_router)
 # ── Pydantic models ──────────────────────────────────────────────
 
 class DocumentUpdate(BaseModel):
+    """Partial update payload. Unset fields are left untouched."""
     patient_id: int | None = None
-    doc_type: str | None = None
-    doc_date: str | None = None
-    date_issued: str | None = None
-    date_visit: str | None = None
+    doc_type: str | None = Field(default=None, max_length=120)
+    doc_date: str | None = Field(default=None, max_length=40)
+    date_issued: str | None = Field(default=None, max_length=40)
+    date_visit: str | None = Field(default=None, max_length=40)
     doctor_id: int | None = None
-    doctor_name: str | None = None
+    doctor_name: str | None = Field(default=None, max_length=200)
     facility_id: int | None = None
-    facility_name: str | None = None
-    specialty_original: str | None = None
-    summary_en: str | None = None
+    facility_name: str | None = Field(default=None, max_length=200)
+    specialty_original: str | None = Field(default=None, max_length=200)
+    summary_en: str | None = Field(default=None, max_length=5000)
     event_id: int | None = None
-    notes: str | None = None
-    tags: str | None = None
-    original_filename: str | None = None
-    user_notes: str | None = None
+    notes: str | None = Field(default=None, max_length=5000)
+    tags: str | None = Field(default=None, max_length=2000)
+    original_filename: str | None = Field(default=None, max_length=255)
+    user_notes: str | None = Field(default=None, max_length=5000)
 
 
 class DocumentMoveRequest(BaseModel):
@@ -67,7 +69,8 @@ class DocumentMoveRequest(BaseModel):
 
 
 class ReprocessRequest(BaseModel):
-    mode: str = "both"  # "ocr", "llm", or "both"
+    # "ocr", "llm", or "both" — enforced via Literal so a typo yields 422.
+    mode: Literal["ocr", "llm", "both"] = "both"
     llm_provider_id: str | None = None  # optional override
     ocr_provider_id: str | None = None  # optional override
 
@@ -76,20 +79,24 @@ class ReprocessRequest(BaseModel):
 
 @router.get("/failed")
 async def list_failed_docs(
-    limit: int = Query(default=50),
-    current_user: dict = Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=500),
+    current_user: dict = Depends(require_role("admin", "editor")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """List failed documents with error messages for the review queue."""
+    """List failed documents with error messages for the review queue.
+
+    Restricted to admins/editors because the failure messages can expose
+    internal paths, provider error strings, or extracted content snippets.
+    """
     return await get_failed_documents(db, limit)
 
 
 @router.post("/retry-all-failed")
 async def retry_all_failed(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Retry all failed documents."""
+    """Retry all failed documents. Admin-only (spawns N pipeline tasks)."""
     import asyncio
     from asclepius.pipeline.processor import reprocess_document
 
@@ -196,12 +203,16 @@ async def get_doc(
 async def update_doc(
     doc_id: int,
     body: DocumentUpdate,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    from asclepius.documents.file_routes import _require_write_access
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
 
     updates = {}
     # Iterate over all fields in the model
@@ -241,6 +252,10 @@ async def update_doc(
     await log_corrections(db, doc_id, updates)
 
     await update_document_fields(db, doc_id, updates)
+    await audit_log(
+        db, current_user["id"], "document.update", "document", doc_id,
+        {"fields": sorted(updates.keys())}, get_client_ip(request),
+    )
     return await get_document(db, doc_id)
 
 
@@ -250,19 +265,17 @@ async def cancel_processing(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Cancel processing of a document."""
+    """Cancel processing of a document. Requires write access."""
+    from asclepius.documents.file_routes import _require_write_access
     from asclepius.pipeline.processor import cancelled_docs
 
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
 
-    # Add to cancelled set — the pipeline checks this between steps
     cancelled_docs.add(doc_id)
-
-    # Update status in DB
     await update_document_status(db, doc_id, "cancelled")
-
     return {"status": "cancelled", "document_id": doc_id}
 
 
@@ -329,6 +342,7 @@ async def delete_doc(
 async def move_doc(
     doc_id: int,
     body: DocumentMoveRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -418,6 +432,11 @@ async def move_doc(
     # Update child records
     await move_child_records(db, doc_id, body.patient_id)
     await db.commit()
+    await audit_log(
+        db, current_user["id"], "document.move", "document", doc_id,
+        {"from_patient_id": doc.get("patient_id"), "to_patient_id": body.patient_id},
+        get_client_ip(request),
+    )
     return await get_document(db, doc_id)
 
 
@@ -430,9 +449,13 @@ async def reprocess_doc(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    """Queue a document for reprocessing. Requires write access."""
+    from asclepius.documents.file_routes import _require_write_access
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
 
     # Mark as pending immediately so the UI reflects the change
     await update_document_status(db, doc_id, "pending")

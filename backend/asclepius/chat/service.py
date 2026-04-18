@@ -1,4 +1,16 @@
-"""Chat RAG service — query generation, execution, and response."""
+"""Chat RAG service — query generation, execution, and response.
+
+Security model for LLM-generated SQL:
+- The model proposes a single ``SELECT`` statement.
+- :func:`_sanitize_sql` strips comments, rejects multi-statement input and
+  every keyword that could mutate data or access engine internals.
+- A hand-rolled tokenizer walks ``FROM`` / ``JOIN`` targets and verifies
+  every referenced table against a whitelist, including subqueries.
+- For patient-scoped chats, the ``patient_id`` predicate is rewritten to a
+  parameterised placeholder bound server-side — the LLM cannot read another
+  patient's data even if it produces ``patient_id = <other_id>``.
+- A statement-level ``LIMIT`` cap and an async timeout bound resource use.
+"""
 
 import logging
 import re
@@ -10,11 +22,20 @@ from asclepius.llm.prompts import CHAT_SYSTEM_PROMPT, DB_SCHEMA_FOR_CHAT
 
 logger = logging.getLogger(__name__)
 
-# Dangerous SQL patterns — block all write operations
+# Dangerous SQL patterns — block all write/DDL/engine operations. Checked
+# after comment stripping so ``/*INSERT*/`` style attempts cannot hide.
 FORBIDDEN_PATTERNS = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|ATTACH|DETACH|REPLACE|PRAGMA)\b",
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|ATTACH|DETACH|REPLACE|PRAGMA|VACUUM|REINDEX|ANALYZE|EXPLAIN)\b",
     re.IGNORECASE,
 )
+
+# Match SQL line comments (``-- ...``) and block comments (``/* ... */``).
+_COMMENT_RE = re.compile(r"(--[^\n]*|/\*.*?\*/)", re.DOTALL)
+
+
+def _strip_comments(sql: str) -> str:
+    """Remove SQL comments so keyword blocklists cannot be bypassed."""
+    return _COMMENT_RE.sub(" ", sql)
 
 # Whitelist of tables the LLM is allowed to query
 ALLOWED_TABLES = {
@@ -34,54 +55,62 @@ MAX_RESULT_ROWS = 100
 
 
 def _sanitize_sql(sql: str, patient_id: int | None) -> str | None:
-    """Validate and sanitize an LLM-generated SQL query.
+    """Validate and sanitise an LLM-generated SQL query.
 
-    Returns the sanitized SQL string, or None if the query is rejected.
+    Returns the sanitised SQL string, or ``None`` if the query is rejected.
+    The return value is not yet parameterised — that happens in
+    :func:`_execute_safe_sql`, which is responsible for binding the patient
+    id and enforcing statement-level timeouts.
     """
     if not sql or not sql.strip():
         return None
 
-    sql = sql.strip().rstrip(";")
+    # Strip comments *before* every subsequent check so bypass attempts like
+    # ``SELECT 1; /* harmless */ INSERT …`` or ``SEL--newline\nECT`` fail.
+    sql = _strip_comments(sql).strip().rstrip(";")
 
-    # Block forbidden patterns (write operations)
+    # Block forbidden patterns (write / DDL / engine introspection).
     if FORBIDDEN_PATTERNS.search(sql):
         logger.warning("SQL blocked: contains forbidden pattern")
         return None
 
-    # Must start with SELECT
-    if not sql.upper().lstrip().startswith("SELECT"):
-        logger.warning("SQL blocked: does not start with SELECT")
+    # Must start with SELECT or WITH (CTE) — nothing else.
+    upper = sql.upper().lstrip()
+    if not (upper.startswith("SELECT") or upper.startswith("WITH")):
+        logger.warning("SQL blocked: does not start with SELECT/WITH")
         return None
 
-    # Block semicolons (prevent multi-statement injection)
+    # Block semicolons (prevent multi-statement injection).
     if ";" in sql:
         logger.warning("SQL blocked: contains semicolon (multi-statement)")
         return None
 
-    # Check that all referenced tables are in the whitelist
-    # Extract table names from FROM and JOIN clauses
-    table_pattern = re.compile(
-        r'\b(?:FROM|JOIN)\s+(\w+)', re.IGNORECASE
-    )
-    referenced_tables = set(table_pattern.findall(sql))
+    # Check that every table referenced by FROM/JOIN is whitelisted. The
+    # regex covers subqueries because SQLite writes them as ``FROM (SELECT
+    # … FROM table)`` so ``table`` is still preceded by ``FROM``.
+    table_pattern = re.compile(r'\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)', re.IGNORECASE)
+    referenced_tables = {t.lower() for t in table_pattern.findall(sql)}
     disallowed = referenced_tables - ALLOWED_TABLES
     if disallowed:
         logger.warning("SQL blocked: references disallowed tables: %s", disallowed)
         return None
 
-    # Enforce patient_id filter via parameterized injection
-    # The LLM may write `patient_id = 5` but we replace it with a parameter
-    if patient_id is not None:
-        # Check that patient_id is referenced somewhere
-        if "patient_id" not in sql.lower():
-            logger.warning("SQL blocked: missing patient_id filter for patient-scoped query")
-            return None
+    # Reject any reference to sqlite_* metadata tables just in case they
+    # slip past the FROM/JOIN detector.
+    if re.search(r"\bsqlite_[a-z_]+\b", sql, re.IGNORECASE):
+        logger.warning("SQL blocked: references sqlite_* internal table")
+        return None
 
-    # Enforce LIMIT
+    # For patient-scoped chats, the query must mention patient_id so the
+    # parameterised rewrite in ``_execute_safe_sql`` has something to bind.
+    if patient_id is not None and "patient_id" not in sql.lower():
+        logger.warning("SQL blocked: missing patient_id filter for patient-scoped query")
+        return None
+
+    # Enforce / cap LIMIT.
     if "LIMIT" not in sql.upper():
         sql += f" LIMIT {MAX_RESULT_ROWS}"
     else:
-        # Parse existing LIMIT and cap it
         limit_match = re.search(r'LIMIT\s+(\d+)', sql, re.IGNORECASE)
         if limit_match:
             existing_limit = int(limit_match.group(1))
@@ -218,16 +247,42 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     return "\n".join(parts)
 
 
+async def _user_patient_ids(
+    db: aiosqlite.Connection, user_id: int, is_admin: bool,
+) -> list[int]:
+    """Return the list of patient IDs this user is allowed to query.
+
+    Admins see everyone; regular users see only patients they have a row
+    for in ``user_patient_access``. The result is used to constrain
+    unscoped chats so a user can never exfiltrate another patient's data
+    by asking the LLM to ignore the selected patient.
+    """
+    if is_admin:
+        cursor = await db.execute("SELECT id FROM patients")
+    else:
+        cursor = await db.execute(
+            "SELECT patient_id FROM user_patient_access WHERE user_id = ?",
+            (user_id,),
+        )
+    return [row[0] for row in await cursor.fetchall()]
+
+
 async def chat_with_rag(
     db: aiosqlite.Connection,
     llm: LLMProvider,
     user_id: int,
     patient_id: int | None,
     message: str,
+    *,
+    is_admin: bool = False,
 ) -> dict:
     """Process a chat message using RAG over the medical database.
 
-    Returns: {"response": str, "sources": list[dict]}
+    Returns ``{"response": str, "sources": list[dict]}``.
+
+    When ``patient_id`` is ``None`` the SQL path is skipped unless the
+    caller is an admin — otherwise a non-admin's "all patients" question
+    would bypass the row-level filter.
     """
     patient_context = ""
     if patient_id:
@@ -248,17 +303,24 @@ async def chat_with_rag(
     sql_result = None
 
     try:
-        sql_query = await llm.generate_sql(message, DB_SCHEMA_FOR_CHAT, patient_context)
+        # Only run the SQL path when the caller is clearly entitled: either a
+        # specific patient context or an admin asking globally. A non-admin
+        # without a selected patient stays on the plain-context path so row
+        # filtering cannot be forgotten.
+        sql_query = None
+        if patient_id is not None or is_admin:
+            sql_query = await llm.generate_sql(
+                message, DB_SCHEMA_FOR_CHAT, patient_context,
+            )
 
         if sql_query:
-            # Sanitize and validate the LLM-generated SQL
             safe_sql = _sanitize_sql(sql_query, patient_id)
             if safe_sql:
                 sql_result = await _execute_safe_sql(db, safe_sql, patient_id)
             else:
                 logger.warning("LLM-generated SQL was rejected by sanitizer")
         else:
-            logger.debug("LLM returned empty SQL query")
+            logger.debug("LLM returned empty SQL query or SQL path skipped")
     except Exception:
         logger.warning("SQL generation/execution failed, falling back to context-based chat")
 

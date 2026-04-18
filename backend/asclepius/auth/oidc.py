@@ -6,6 +6,7 @@ from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 import aiosqlite
+from asclepius.auth.cookies import clear_auth_cookie, set_auth_cookie
 from asclepius.auth.session import COOKIE_NAME, create_session_token, hash_password
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
@@ -65,13 +66,12 @@ async def oidc_login(request: Request):
     state_token = s.dumps({"state": state})
 
     response = Response(status_code=307, headers={"Location": url})
-    response.set_cookie(
-        key="asclepius_oidc_state",
-        value=state_token,
-        httponly=True,
-        samesite="lax",
-        max_age=600,
-        path="/",
+    # Reuse the central cookie helper so Secure/SameSite match the session
+    # cookie exactly (browsers otherwise silently treat mismatched cookies
+    # as separate).
+    set_auth_cookie(
+        response, "asclepius_oidc_state", state_token,
+        config=config, max_age=600,
     )
     return response
 
@@ -163,12 +163,10 @@ async def oidc_callback(
 
     # Redirect to app with session cookie
     response = Response(status_code=307, headers={"Location": "/"})
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=session_token,
-        httponly=True,
-        samesite="lax",
-        path="/",
+    set_auth_cookie(
+        response, COOKIE_NAME, session_token,
+        config=config,
+        max_age=config.auth.session_ttl_hours * 3600,
     )
-    response.delete_cookie(key="asclepius_oidc_state", path="/")
+    clear_auth_cookie(response, "asclepius_oidc_state", config=config)
     return response

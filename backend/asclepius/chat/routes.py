@@ -1,7 +1,7 @@
 """Chat API routes."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
@@ -16,7 +16,7 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     patient_id: int | None = None
-    message: str
+    message: str = Field(min_length=1, max_length=4000)
 
 
 @router.post("")
@@ -34,7 +34,8 @@ async def chat(
     llm = get_llm_provider(config)
 
     result = await chat_with_rag(
-        db, llm, current_user["id"], body.patient_id, body.message
+        db, llm, current_user["id"], body.patient_id, body.message,
+        is_admin=(current_user.get("role") == "admin"),
     )
     return result
 

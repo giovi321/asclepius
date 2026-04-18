@@ -1,16 +1,52 @@
-"""Application configuration loaded from YAML + environment variables."""
+"""Application configuration loaded from YAML + environment variables.
 
+Configuration precedence (lowest → highest):
+
+1. Defaults declared on the pydantic models below.
+2. ``config/settings.yaml`` (or the path in ``ASCLEPIUS_CONFIG_PATH``).
+3. Specific ``ASCLEPIUS_*`` environment variables handled in
+   :func:`load_config`.
+
+The resulting :class:`AppConfig` is cached via ``get_config()``.
+"""
+
+import logging
 import os
+import secrets as _secrets
 from functools import lru_cache
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
+# Well-known placeholder that MUST NOT ship to production. We reject it at
+# startup when running in production mode.
+DEFAULT_SECRET_PLACEHOLDER = "change-me-in-production"
+
 
 class ServerConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8000
+    # "development" or "production". Production enables strict checks
+    # (secret-key validation, Secure cookies, CSRF header requirement).
+    environment: str = "production"
+    # Origins allowed by CORS. Only used in development; in production the
+    # API and frontend are served from the same origin so CORS is disabled.
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://localhost:8070",
+    ]
+    # Max upload size in bytes (default 100 MB).
+    max_upload_bytes: int = 100 * 1024 * 1024
+    # Allowed MIME type prefixes for uploads (detected by python-magic).
+    allowed_upload_mime_prefixes: list[str] = [
+        "application/pdf",
+        "image/",
+        "application/dicom",
+        "application/octet-stream",  # some DICOM files
+    ]
 
 
 class DatabaseConfig(BaseModel):
@@ -25,8 +61,20 @@ class VaultConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    secret_key: str = "change-me-in-production"
+    # HMAC-like signing key for session cookies and OIDC state tokens.
+    # In production this MUST be replaced with a strong random value (see
+    # ``AppConfig.require_secure_defaults``).
+    secret_key: str = DEFAULT_SECRET_PLACEHOLDER
     session_ttl_hours: int = 720
+    # Mark cookies as Secure (HTTPS-only). Auto-enabled in production; can be
+    # overridden for local HTTP testing via ``ASCLEPIUS_COOKIE_SECURE``.
+    cookie_secure: bool = True
+    cookie_samesite: str = "lax"  # "lax" | "strict" | "none"
+    # Minimum password length accepted by the setup wizard / password change.
+    min_password_length: int = 12
+    # Login rate limit: max failed attempts per window per IP+username.
+    login_max_attempts: int = 5
+    login_window_seconds: int = 300
 
 
 class OidcConfig(BaseModel):
@@ -137,8 +185,15 @@ def load_config() -> AppConfig:
     config = AppConfig(**data)
 
     # Environment variable overrides
+    if env := os.environ.get("ASCLEPIUS_ENV"):
+        config.server.environment = env
     if secret := os.environ.get("ASCLEPIUS_SECRET_KEY"):
         config.auth.secret_key = secret
+    if cookie_secure := os.environ.get("ASCLEPIUS_COOKIE_SECURE"):
+        config.auth.cookie_secure = cookie_secure.lower() in ("1", "true", "yes")
+    if cors := os.environ.get("ASCLEPIUS_CORS_ORIGINS"):
+        # Comma-separated list, e.g. "https://app.example.com,https://staging…"
+        config.server.cors_origins = [o.strip() for o in cors.split(",") if o.strip()]
     if vault_path := os.environ.get("ASCLEPIUS_VAULT_PATH"):
         config.vault.root_path = vault_path
         config.vault.inbox_path = f"{vault_path}/inbox"
@@ -156,8 +211,13 @@ def load_config() -> AppConfig:
             config.ocr.google_vision_key = vision_key
             config.ocr.cloud_ocr_enabled = True
 
-    # Migrate legacy flat LLM config → provider list (if list is empty)
+    # Migrate legacy flat LLM / OCR config → provider list. These blocks exist
+    # only to keep pre-0.6 settings.yaml files working; new deployments should
+    # configure ``llm.providers`` / ``ocr.providers`` directly. Plan to delete
+    # this code once 0.7 ships (see CHANGELOG).
+    _used_legacy = False
     if not config.llm.providers:
+        _used_legacy = True
         providers: list[LlmProviderEntry] = []
         # Always add Ollama as default
         providers.append(LlmProviderEntry(
@@ -184,8 +244,9 @@ def load_config() -> AppConfig:
             ))
         config.llm.providers = providers
 
-    # Migrate legacy flat OCR config → provider list (if list is empty)
+    # Migrate legacy flat OCR config → provider list (see deprecation note above)
     if not config.ocr.providers:
+        _used_legacy = True
         ocr_providers: list[OcrProviderEntry] = []
         ocr_providers.append(OcrProviderEntry(
             id="tesseract-default",
@@ -230,6 +291,12 @@ def load_config() -> AppConfig:
             ))
         config.ocr.providers = ocr_providers
 
+    if _used_legacy:
+        logger.warning(
+            "settings.yaml still uses the flat llm/ocr layout; migrate to "
+            "the `providers` list before 0.7 (this auto-migration will be removed).",
+        )
+
     return config
 
 
@@ -258,7 +325,53 @@ def get_active_ocr_provider_config(config: AppConfig, priority: int = 1) -> OcrP
     return None
 
 
+def _validate_production_config(config: AppConfig) -> None:
+    """Refuse to run in production with insecure defaults.
+
+    Checked invariants:
+    - Secret key is not the placeholder and is at least 32 bytes.
+    - Secure cookies are enabled (HTTPS assumed behind a reverse proxy).
+
+    In development we only log warnings so local ``uvicorn --reload`` stays
+    friction-free.
+    """
+    is_prod = config.server.environment.lower() == "production"
+    problems: list[str] = []
+
+    if config.auth.secret_key == DEFAULT_SECRET_PLACEHOLDER:
+        problems.append(
+            "ASCLEPIUS_SECRET_KEY is still the placeholder; generate one with "
+            "`python -c \"import secrets; print(secrets.token_urlsafe(48))\"`."
+        )
+    elif len(config.auth.secret_key) < 32:
+        problems.append("ASCLEPIUS_SECRET_KEY must be at least 32 characters.")
+
+    if is_prod and not config.auth.cookie_secure:
+        problems.append(
+            "cookie_secure is False in production; front the app with HTTPS "
+            "and set ASCLEPIUS_COOKIE_SECURE=1."
+        )
+
+    if problems:
+        msg = "Insecure configuration detected:\n  - " + "\n  - ".join(problems)
+        if is_prod:
+            raise RuntimeError(msg)
+        logger.warning(msg)
+
+
 @lru_cache
 def get_config() -> AppConfig:
-    """Get cached application configuration."""
-    return load_config()
+    """Get cached application configuration.
+
+    Validates the production configuration on first access; a misconfigured
+    production deployment will fail fast here instead of silently signing
+    cookies with a well-known key.
+    """
+    config = load_config()
+    _validate_production_config(config)
+    return config
+
+
+def generate_secret_key() -> str:
+    """Convenience wrapper for generating a fresh secret key."""
+    return _secrets.token_urlsafe(48)

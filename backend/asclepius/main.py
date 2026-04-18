@@ -1,17 +1,28 @@
-"""FastAPI application entry point."""
+"""FastAPI application entry point.
+
+Wires together the lifespan (DB init, pipeline watcher), middleware stack
+(security headers, CSRF, request-size limit, optional CORS), API routers,
+and the frontend SPA fallback.
+"""
 
 import logging
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from asclepius.config import get_config
 from asclepius.db.init import initialize_database
+from asclepius.middleware import (
+    CsrfMiddleware,
+    MaxBodySizeMiddleware,
+    SecurityHeadersMiddleware,
+)
+from asclepius.util.paths import is_within
 
 # In-memory log buffer for the web UI
 from collections import deque
@@ -103,13 +114,26 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:8070"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    config = get_config()
+
+    # Middleware order matters — ASGI executes them in reverse-registration
+    # order, so the *last* added middleware runs first on the way in. We
+    # want: size-cap → CSRF → security headers → app.
+    app.add_middleware(SecurityHeadersMiddleware, config=config)
+    app.add_middleware(CsrfMiddleware)
+    app.add_middleware(MaxBodySizeMiddleware, max_bytes=config.server.max_upload_bytes)
+
+    # CORS is only required when the frontend runs on a different origin
+    # (Vite dev server). In production the SPA is served from the same
+    # origin, so we skip CORS entirely to reduce attack surface.
+    if config.server.environment.lower() != "production" and config.server.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=config.server.cors_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Content-Type", "X-Requested-With"],
+        )
 
     # Health check
     @app.get("/health")
@@ -162,11 +186,19 @@ def create_app() -> FastAPI:
 
         @app.get("/{path:path}")
         async def serve_spa(path: str):
-            """Serve frontend SPA — return index.html for all non-API routes."""
-            file_path = STATIC_DIR / path
-            if file_path.is_file():
-                return FileResponse(str(file_path))
-            return FileResponse(str(STATIC_DIR / "index.html"))
+            """Serve frontend SPA — return index.html for all non-API routes.
+
+            Guards against path traversal: any request that resolves outside
+            ``STATIC_DIR`` (``..`` segments, symlinks pointing out, etc.)
+            falls back to ``index.html`` instead of leaking host files.
+            """
+            file_path = (STATIC_DIR / path)
+            if is_within(STATIC_DIR, file_path) and file_path.is_file():
+                return FileResponse(str(file_path.resolve()))
+            index = STATIC_DIR / "index.html"
+            if not index.exists():
+                return JSONResponse({"detail": "Frontend not built"}, status_code=404)
+            return FileResponse(str(index))
 
     return app
 

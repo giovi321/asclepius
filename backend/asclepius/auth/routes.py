@@ -1,24 +1,28 @@
-"""Authentication API routes."""
+"""Authentication API routes (login / logout / me)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import aiosqlite
+from asclepius.auth import rate_limit
+from asclepius.auth.cookies import clear_auth_cookie, set_auth_cookie
 from asclepius.auth.session import (
     COOKIE_NAME,
     create_session_token,
     get_current_user,
+    validate_session_token,
     verify_password,
 )
 from asclepius.audit.service import audit_log, get_client_ip
+from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
 router = APIRouter()
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=1024)
 
 
 class UserResponse(BaseModel):
@@ -35,25 +39,52 @@ async def login(
     response: Response,
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    """Authenticate with username + password and set the session cookie.
+
+    Failed attempts are rate-limited per ``(client_ip, username)`` pair to
+    blunt credential-stuffing. Successful logins clear the counter.
+    """
+    config = get_config()
+    ip = get_client_ip(request) or "unknown"
+
+    # Check the rate-limit *before* hitting the DB so an attacker cannot use
+    # the endpoint as an oracle for which usernames exist.
+    if not rate_limit.check_and_record(
+        ip, body.username,
+        max_attempts=config.auth.login_max_attempts,
+        window_seconds=config.auth.login_window_seconds,
+        record=False,  # we record only on failure below
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Try again later.",
+        )
+
     cursor = await db.execute(
         "SELECT id, username, password_hash, display_name, role FROM users WHERE username = ?",
         (body.username,),
     )
     user = await cursor.fetchone()
     if not user or not verify_password(body.password, user[2]):
+        # Record the failure so repeated bad attempts eventually 429.
+        rate_limit.check_and_record(
+            ip, body.username,
+            max_attempts=config.auth.login_max_attempts,
+            window_seconds=config.auth.login_window_seconds,
+            record=True,
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    rate_limit.clear(ip, body.username)
+
     token = create_session_token(user[0])
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        path="/",
+    set_auth_cookie(
+        response, COOKIE_NAME, token,
+        config=config,
+        max_age=config.auth.session_ttl_hours * 3600,
     )
 
-    # Audit log
-    await audit_log(db, user[0], "login", ip_address=get_client_ip(request))
+    await audit_log(db, user[0], "login", ip_address=ip)
 
     return UserResponse(id=user[0], username=user[1], display_name=user[3], role=user[4] or "editor")
 
@@ -64,18 +95,27 @@ async def logout(
     response: Response,
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    # Try to get the current user for audit logging
+    """Clear the session cookie and log the event.
+
+    itsdangerous tokens cannot be server-side revoked, so the cookie is
+    merely deleted client-side; the token remains valid until TTL for any
+    attacker who already stole it. Document this trade-off in SECURITY.md.
+    """
+    config = get_config()
     try:
-        from asclepius.auth.session import validate_session_token
         token = request.cookies.get(COOKIE_NAME)
         if token:
             session_data = validate_session_token(token)
             if session_data:
-                await audit_log(db, session_data["user_id"], "logout", ip_address=get_client_ip(request))
+                await audit_log(
+                    db, session_data["user_id"], "logout",
+                    ip_address=get_client_ip(request),
+                )
     except Exception:
+        # Never let audit logging fail the logout.
         pass
 
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    clear_auth_cookie(response, COOKIE_NAME, config=config)
     return {"ok": True}
 
 

@@ -75,6 +75,33 @@ npm install
 npm run dev
 ```
 
+## Contributing
+
+Contributions are welcome! Please read:
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, coding style, PR checklist
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — expected behaviour
+- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability **privately**
+
+Quick starts for contributors:
+
+```bash
+# Backend tests + lint
+cd backend
+pip install -e ".[dev]"
+ruff check .
+pytest
+
+# Frontend type-check + build
+cd frontend
+npm install
+npx tsc --noEmit
+npm run build
+```
+
 ## License
 
-Private — all rights reserved.
+Released under the [MIT License](LICENSE).
+
+This project handles personal health information. Read
+[`SECURITY.md`](SECURITY.md) before deploying to the public internet.

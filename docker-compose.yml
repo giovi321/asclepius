@@ -11,10 +11,17 @@ services:
       - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
     environment:
       - TZ=${TZ:-Europe/Zurich}
+      - ASCLEPIUS_ENV=${ASCLEPIUS_ENV:-production}
+      - ASCLEPIUS_COOKIE_SECURE=${ASCLEPIUS_COOKIE_SECURE:-1}
       - ASCLEPIUS_VAULT_PATH=/data/vault
       - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
       - ASCLEPIUS_DB_PATH=/data/config/asclepius.sqlite
-      - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set — see .env.example}
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
     restart: unless-stopped
+    read_only: false  # the pipeline writes into /data; tighten with tmpfs if needed
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

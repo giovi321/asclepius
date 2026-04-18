@@ -1,12 +1,18 @@
-"""First-start setup wizard API routes (no auth required)."""
+"""First-start setup wizard API routes (no auth required).
+
+These endpoints are only meaningful when the DB contains zero users. After
+the first successful ``/complete`` call the wizard is disabled (guarded
+server-side, not just in the UI).
+"""
 
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import aiosqlite
-from asclepius.auth.session import hash_password, create_session_token, COOKIE_NAME
+from asclepius.auth.cookies import set_auth_cookie
+from asclepius.auth.session import COOKIE_NAME, create_session_token, hash_password
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.patients.service import slugify
@@ -16,20 +22,20 @@ router = APIRouter()
 
 class SetupRequest(BaseModel):
     # Account
-    username: str
-    password: str
-    display_name: str
+    username: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=1024)
+    display_name: str = Field(min_length=0, max_length=200)
     # Patient
-    patient_name: str
-    patient_date_of_birth: str | None = None
-    patient_sex: str | None = None
-    patient_blood_type: str | None = None
-    patient_allergies: str | None = None
-    patient_phone: str | None = None
-    patient_email: str | None = None
-    patient_address: str | None = None
-    patient_insurance_company: str | None = None
-    patient_insurance_number: str | None = None
+    patient_name: str = Field(min_length=0, max_length=200)
+    patient_date_of_birth: str | None = Field(default=None, max_length=40)
+    patient_sex: str | None = Field(default=None, max_length=20)
+    patient_blood_type: str | None = Field(default=None, max_length=20)
+    patient_allergies: str | None = Field(default=None, max_length=1000)
+    patient_phone: str | None = Field(default=None, max_length=100)
+    patient_email: str | None = Field(default=None, max_length=200)
+    patient_address: str | None = Field(default=None, max_length=500)
+    patient_insurance_company: str | None = Field(default=None, max_length=200)
+    patient_insurance_number: str | None = Field(default=None, max_length=100)
 
 
 @router.get("/status")
@@ -52,14 +58,20 @@ async def setup_complete(
     if count > 0:
         raise HTTPException(status_code=400, detail="Setup already completed")
 
+    config = get_config()
     if not body.username.strip() or not body.password.strip():
         raise HTTPException(status_code=400, detail="Username and password are required")
-    if len(body.password) < 4:
-        raise HTTPException(status_code=400, detail="Password must be at least 4 characters")
+    if len(body.password) < config.auth.min_password_length:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {config.auth.min_password_length} characters",
+        )
 
-    # Create user
+    # Create user — the first account is always an admin. This guarantees
+    # that the installer has a working administrative login; subsequent
+    # users are created by an admin via the API with an explicit role.
     cursor = await db.execute(
-        "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
+        "INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'admin')",
         (body.username.strip(), hash_password(body.password), body.display_name.strip() or body.username.strip()),
     )
     user_id = cursor.lastrowid
@@ -70,7 +82,6 @@ async def setup_complete(
         patient_name = body.display_name.strip() or body.username.strip()
 
     slug = slugify(patient_name)
-    config = get_config()
     patient_dir = Path(config.vault.patients_path) / slug
     patient_dir.mkdir(parents=True, exist_ok=True)
 
@@ -101,11 +112,9 @@ async def setup_complete(
         "user_id": user_id,
         "patient_id": patient_id,
     })
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        path="/",
+    set_auth_cookie(
+        response, COOKIE_NAME, token,
+        config=config,
+        max_age=config.auth.session_ttl_hours * 3600,
     )
     return response

@@ -6,7 +6,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_login_success(unauthed_client):
     resp = await unauthed_client.post(
-        "/api/auth/login", json={"username": "admin", "password": "admin"}
+        "/api/auth/login", json={"username": "admin", "password": "admin-password"}
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -25,9 +25,27 @@ async def test_login_wrong_password(unauthed_client):
 @pytest.mark.asyncio
 async def test_login_unknown_user(unauthed_client):
     resp = await unauthed_client.post(
-        "/api/auth/login", json={"username": "nonexistent", "password": "admin"}
+        "/api/auth/login",
+        json={"username": "nonexistent", "password": "admin-password"},
     )
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limited(unauthed_client):
+    """After N failed attempts the endpoint returns 429 for the same key."""
+    # Default config allows 5 attempts per window.
+    for _ in range(5):
+        resp = await unauthed_client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "wrong"},
+        )
+        assert resp.status_code == 401
+    resp = await unauthed_client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "wrong"},
+    )
+    assert resp.status_code == 429
 
 
 @pytest.mark.asyncio

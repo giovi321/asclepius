@@ -9,7 +9,9 @@ import aiosqlite
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
-from asclepius.patients.service import check_patient_access, get_patients_for_user, slugify
+from asclepius.patients.service import (
+    check_patient_access, get_patients_for_user, slugify, unique_patient_slug,
+)
 
 router = APIRouter()
 
@@ -47,7 +49,9 @@ async def list_patients(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    return await get_patients_for_user(db, current_user["id"])
+    return await get_patients_for_user(
+        db, current_user["id"], user_role=current_user.get("role")
+    )
 
 
 @router.get("/{patient_id}")
@@ -90,7 +94,12 @@ async def create_patient(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    slug = slugify(body.display_name)
+    # display_name is what the user sees; slug is an internal handle used for
+    # folder names and joins, and must be globally unique. When two users
+    # independently add "Mario Rossi" we auto-disambiguate the slug so both
+    # succeed; display_name can freely repeat.
+    base = slugify(body.display_name) or "patient"
+    slug = await unique_patient_slug(db, base)
     config = get_config()
 
     # Create patient directory
@@ -116,6 +125,8 @@ async def create_patient(
         )
         await db.commit()
     except aiosqlite.IntegrityError:
+        # Shouldn't happen given unique_patient_slug above, but if there's a
+        # race between two simultaneous creates, surface a clean 409.
         raise HTTPException(status_code=409, detail="Patient slug already exists")
 
     return {

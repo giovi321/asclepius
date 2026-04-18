@@ -79,7 +79,6 @@ npm run dev
 Contributions are welcome! Please read:
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, coding style, PR checklist
-- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — expected behaviour
 - [`SECURITY.md`](SECURITY.md) — how to report a vulnerability **privately**
 
 Quick starts for contributors:

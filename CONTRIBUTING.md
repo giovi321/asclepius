@@ -16,7 +16,6 @@ mechanics of contributing code, docs, tests, and bug reports.
 
 ## Ground rules
 
-- Be respectful — see [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 - Open an issue before starting large changes so we can discuss design.
 - **Do not open public issues for security problems.** See
   [`SECURITY.md`](SECURITY.md).

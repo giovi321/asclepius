@@ -151,6 +151,10 @@ class LlmConfig(BaseModel):
     claude_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
     extraction_timeout: int = 120
+    # Max concurrent LLM requests across all providers. Prevents flooding a
+    # single Ollama/vLLM instance when the pipeline reprocesses multiple
+    # documents in parallel. 1 = fully serialized.
+    max_concurrent_requests: int = 2
     # New: ordered provider list
     providers: list[LlmProviderEntry] = []
     # Canonical output language — every free-form text field produced by the

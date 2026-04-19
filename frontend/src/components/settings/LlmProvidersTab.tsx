@@ -23,6 +23,9 @@ export default function LlmProvidersTab() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const [maxConcurrent, setMaxConcurrent] = useState<number>(2);
+  const [maxConcurrentSaved, setMaxConcurrentSaved] = useState<number>(2);
+  const [savingGlobal, setSavingGlobal] = useState(false);
 
   useEffect(() => {
     api.get("/settings/llm-providers").then((res) => {
@@ -30,7 +33,23 @@ export default function LlmProvidersTab() {
       setProviders(data);
       if (data.length > 0) setExpandedId(data[0].id);
     });
+    api.get("/settings").then((res) => {
+      const v = res.data?.llm?.max_concurrent_requests;
+      if (typeof v === "number") {
+        setMaxConcurrent(v);
+        setMaxConcurrentSaved(v);
+      }
+    });
   }, []);
+
+  const saveGlobal = async () => {
+    setSavingGlobal(true);
+    try {
+      await api.patch("/settings", { llm_max_concurrent_requests: maxConcurrent });
+      setMaxConcurrentSaved(maxConcurrent);
+    } catch { toast({ title: "Failed to save global LLM settings", variant: "error" }); }
+    setSavingGlobal(false);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -87,6 +106,29 @@ export default function LlmProvidersTab() {
         Configure LLM providers for document classification, data extraction, chat, and search.
         Providers are tried in priority order (top = highest priority). If you're not satisfied with a result,
         you can re-process a document with the next provider from the document detail page.
+      </div>
+
+      {/* Global LLM concurrency */}
+      <div className="rounded-lg border p-3">
+        <div className="flex items-end gap-3 max-w-md">
+          <div className="flex-1">
+            <NumberField
+              label="Max concurrent LLM requests"
+              value={maxConcurrent}
+              onChange={(v) => setMaxConcurrent(Math.max(1, v))}
+              min={1} max={16} step={1}
+              description="Limits parallel requests across all LLM providers. Lower this if your Ollama/vLLM instance times out under load (1 = fully serialized)."
+            />
+          </div>
+          <button
+            onClick={saveGlobal}
+            disabled={savingGlobal || maxConcurrent === maxConcurrentSaved}
+            className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+          >
+            {maxConcurrent === maxConcurrentSaved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+            {savingGlobal ? "Saving..." : maxConcurrent === maxConcurrentSaved ? "Saved" : "Save"}
+          </button>
+        </div>
       </div>
 
       {providers.length === 0 && (
@@ -165,7 +207,7 @@ export default function LlmProvidersTab() {
                       type="password" placeholder={p.has_api_key ? "configured (leave blank to keep)" : "Enter API key"} />
                   )}
                   <NumberField label="Timeout (seconds)" value={p.timeout}
-                    onChange={(v) => updateProvider(p.id, { timeout: v })} min={30} max={600} step={10} />
+                    onChange={(v) => updateProvider(p.id, { timeout: v })} min={30} max={1800} step={30} />
 
                   {/* Test connection button */}
                   <div className="pt-2 border-t">

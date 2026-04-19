@@ -36,14 +36,15 @@ export function TextField({ label, value, onChange, placeholder, type = "text", 
   );
 }
 
-export function NumberField({ label, value, onChange, min, max, step }: {
-  label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number;
+export function NumberField({ label, value, onChange, min, max, step, description }: {
+  label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; description?: string;
 }) {
   return (
-    <label className="space-y-1">
+    <label className="space-y-1 block">
       <span className="text-sm font-medium">{label}</span>
       <input type="number" value={value} onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         min={min} max={max} step={step} className="w-full rounded-md border bg-background px-3 py-2 text-sm" />
+      {description && <span className="block text-xs text-muted-foreground">{description}</span>}
     </label>
   );
 }

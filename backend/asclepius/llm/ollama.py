@@ -16,6 +16,24 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 RETRY_BACKOFF = [30, 60, 120]  # seconds
 
+# Module-level semaphore limits concurrent Ollama requests across the whole
+# process. Rebuilt on first use, and again when the configured size changes.
+_semaphore: asyncio.Semaphore | None = None
+_sem_size: int = 0
+
+
+def _get_semaphore() -> asyncio.Semaphore:
+    global _semaphore, _sem_size
+    try:
+        from asclepius.config import get_config
+        size = max(1, int(get_config().llm.max_concurrent_requests))
+    except Exception:
+        size = 2
+    if _semaphore is None or _sem_size != size:
+        _semaphore = asyncio.Semaphore(size)
+        _sem_size = size
+    return _semaphore
+
 
 class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str, model: str, timeout: int = 120):
@@ -60,14 +78,15 @@ class OllamaProvider(LLMProvider):
         ollama_messages.extend(messages)
 
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{self.base_url}/api/chat",
-                json={"model": self.model, "messages": ollama_messages, "stream": False},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("message", {}).get("content", "")
+        async with _get_semaphore():
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(
+                    f"{self.base_url}/api/chat",
+                    json={"model": self.model, "messages": ollama_messages, "stream": False},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("message", {}).get("content", "")
 
     async def generate_sql(self, question: str, schema: str, context: str) -> str:
         prompt = SQL_GENERATION_PROMPT.format(
@@ -96,16 +115,17 @@ class OllamaProvider(LLMProvider):
         last_err = None
         for attempt in range(MAX_RETRIES):
             try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    resp = await client.post(
-                        f"{self.base_url}/api/generate",
-                        json=payload,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    response = data.get("response", "")
-                    logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
-                    return response
+                async with _get_semaphore():
+                    async with httpx.AsyncClient(timeout=timeout) as client:
+                        resp = await client.post(
+                            f"{self.base_url}/api/generate",
+                            json=payload,
+                        )
+                        resp.raise_for_status()
+                        data = resp.json()
+                        response = data.get("response", "")
+                        logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
+                        return response
             except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
                 last_err = e
                 if attempt < MAX_RETRIES - 1:

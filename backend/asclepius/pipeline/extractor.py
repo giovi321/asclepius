@@ -248,6 +248,35 @@ def _salvage_classification(c: dict) -> None:
             c["patient_name"] = patient
 
 
+# Aliases for extraction array keys. Small models (qwen2.5:14b and below)
+# frequently drop the "lab_" / "-es" prefixes/suffixes from the requested
+# schema. We remap anything list-shaped under a known alias into the
+# canonical key, but only if the canonical key is absent or empty.
+_ARRAY_KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "lab_results": ("results", "tests", "lab_tests", "test_results", "labResults", "blood_tests"),
+    "diagnoses": ("diagnosis", "diagnoses_list", "findings"),
+    "medications": ("medication", "drugs", "prescriptions"),
+    "vaccinations": ("vaccination", "vaccines", "immunizations"),
+    "encounters": ("encounter", "visits"),
+    "invoice_items": ("items", "line_items", "invoice_lines"),
+}
+
+
+def _salvage_array_keys(extraction: dict) -> None:
+    """Remap common LLM key-naming drift back onto the canonical keys."""
+    for canonical, aliases in _ARRAY_KEY_ALIASES.items():
+        existing = extraction.get(canonical)
+        if isinstance(existing, list) and existing:
+            continue
+        for alt in aliases:
+            val = extraction.get(alt)
+            if isinstance(val, list) and val:
+                extraction[canonical] = val
+                extraction.pop(alt, None)
+                logger.info("Salvaged LLM key '%s' → '%s' (%d items)", alt, canonical, len(val))
+                break
+
+
 async def classify_and_extract(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -362,6 +391,10 @@ async def extract_and_store(
         extraction = extraction_override
     else:
         extraction = await llm.extract(ocr_text, context)
+
+    # Salvage common key-name drift (e.g. "results" → "lab_results") before we
+    # sanitize types, so the rename doesn't get wiped out.
+    _salvage_array_keys(extraction)
 
     # Sanitize extraction — LLMs sometimes return strings instead of dicts/lists
     for key in ("doctor", "facility", "specialty", "insurance", "encounter", "cost"):

@@ -41,12 +41,23 @@ ocr:
   llm_vision_model: ""  # e.g. "llava:13b" or "llama3.2-vision" (empty = use main llm model)
 
 llm:
-  provider: "ollama"  # ollama or claude
-  ollama_base_url: "http://ollama:11434"
-  ollama_model: "llama3.1"
-  claude_api_key: ""
-  claude_model: "claude-sonnet-4-20250514"
-  extraction_timeout: 120  # seconds
+  extraction_timeout: 120  # seconds — overall extraction call timeout
+  max_concurrent_requests: 2  # how many LLM calls may run in parallel (1 = serialized)
+  max_retries: 3              # retries on ReadTimeout / ConnectError (0 = no retries)
+  retry_backoff_seconds: [30, 60, 120]  # sleep between successive retries
+  canonical_language: "English"
+  # Ordered list of providers — tried in priority order. Edit via the webui
+  # (Settings → Document Analysis → LLM Providers) rather than hand-editing.
+  providers:
+    - id: "ollama-default"
+      type: "ollama"        # ollama | vllm | claude | openai
+      name: "Ollama (Local)"
+      enabled: true
+      priority: 1
+      base_url: "http://ollama:11434"
+      model: "llama3.1"
+      api_key: ""
+      timeout: 120
 
 pipeline:
   watch_enabled: true

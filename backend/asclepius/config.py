@@ -144,18 +144,19 @@ class OcrConfig(BaseModel):
 
 
 class LlmConfig(BaseModel):
-    # Legacy flat fields (kept for backward compatibility during migration)
-    provider: str = "ollama"
-    ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "llama3.1"
-    claude_api_key: str = ""
-    claude_model: str = "claude-sonnet-4-20250514"
     extraction_timeout: int = 120
     # Max concurrent LLM requests across all providers. Prevents flooding a
     # single Ollama/vLLM instance when the pipeline reprocesses multiple
     # documents in parallel. 1 = fully serialized.
     max_concurrent_requests: int = 2
-    # New: ordered provider list
+    # Retry behavior for transient failures (ReadTimeout, ConnectError) on
+    # Ollama. The number of attempts is ``max_retries + 1`` — the first
+    # attempt plus the retries. ``retry_backoff_seconds`` lists the sleep
+    # between successive attempts; if shorter than ``max_retries``, the last
+    # value is reused.
+    max_retries: int = 3
+    retry_backoff_seconds: list[int] = [30, 60, 120]
+    # Ordered provider list — tried in priority order.
     providers: list[LlmProviderEntry] = []
     # Canonical output language — every free-form text field produced by the
     # LLM (summaries, canonical names, findings, notes, etc.) is forced into
@@ -182,6 +183,84 @@ class AppConfig(BaseModel):
     pipeline: PipelineConfig = PipelineConfig()
 
 
+_LEGACY_LLM_KEYS = ("provider", "ollama_base_url", "ollama_model", "claude_api_key", "claude_model")
+
+
+def _migrate_legacy_llm_yaml(data: dict) -> bool:
+    """Convert pre-0.6 flat ``llm.*`` keys into ``llm.providers[]`` in-place.
+
+    Returns True if a migration was performed. Strips legacy keys whether or
+    not they were migrated (they no longer exist on ``LlmConfig``).
+    """
+    llm = data.get("llm")
+    if not isinstance(llm, dict):
+        return False
+    had_legacy = any(k in llm for k in _LEGACY_LLM_KEYS)
+    migrated = False
+    if not llm.get("providers") and had_legacy:
+        provider = llm.get("provider", "ollama")
+        timeout = llm.get("extraction_timeout", 120)
+        providers: list[dict] = [{
+            "id": "ollama-default",
+            "type": "ollama",
+            "name": "Ollama (Local)",
+            "enabled": provider == "ollama",
+            "priority": 1,
+            "base_url": llm.get("ollama_base_url", "http://ollama:11434"),
+            "model": llm.get("ollama_model", "llama3.1"),
+            "timeout": timeout,
+        }]
+        if llm.get("claude_api_key"):
+            providers.append({
+                "id": "claude-default",
+                "type": "claude",
+                "name": "Claude API",
+                "enabled": provider == "claude",
+                "priority": 2,
+                "api_key": llm["claude_api_key"],
+                "model": llm.get("claude_model", "claude-sonnet-4-20250514"),
+                "timeout": timeout,
+            })
+        llm["providers"] = providers
+        migrated = True
+    for k in _LEGACY_LLM_KEYS:
+        llm.pop(k, None)
+    data["llm"] = llm
+    return migrated
+
+
+def _first_enabled_llm(config: "AppConfig") -> LlmProviderEntry | None:
+    enabled = [p for p in config.llm.providers if p.enabled]
+    if enabled:
+        return min(enabled, key=lambda p: p.priority)
+    return config.llm.providers[0] if config.llm.providers else None
+
+
+def _apply_env_ollama_url(config: "AppConfig", url: str) -> None:
+    for p in config.llm.providers:
+        if p.type == "ollama":
+            p.base_url = url
+            return
+    config.llm.providers.append(LlmProviderEntry(
+        id="ollama-env", type="ollama", name="Ollama (Local)",
+        enabled=True, priority=len(config.llm.providers) + 1,
+        base_url=url, model="llama3.1", timeout=config.llm.extraction_timeout,
+    ))
+
+
+def _apply_env_claude_key(config: "AppConfig", key: str) -> None:
+    for p in config.llm.providers:
+        if p.type == "claude":
+            p.api_key = key
+            return
+    config.llm.providers.append(LlmProviderEntry(
+        id="claude-env", type="claude", name="Claude API",
+        enabled=False, priority=len(config.llm.providers) + 1,
+        api_key=key, model="claude-sonnet-4-20250514",
+        timeout=config.llm.extraction_timeout,
+    ))
+
+
 def load_config() -> AppConfig:
     """Load configuration from YAML file with environment variable overrides."""
     config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
@@ -191,7 +270,16 @@ def load_config() -> AppConfig:
         with open(config_path) as f:
             data = yaml.safe_load(f) or {}
 
+    # Pre-validation migration: strip legacy LLM keys before pydantic sees them.
+    migrated_llm = _migrate_legacy_llm_yaml(data)
+
     config = AppConfig(**data)
+
+    if migrated_llm:
+        logger.warning(
+            "settings.yaml used pre-0.6 flat llm.* fields; they were auto-migrated "
+            "to llm.providers[]. Save settings from the webui to persist the new layout.",
+        )
 
     # Environment variable overrides
     if env := os.environ.get("ASCLEPIUS_ENV"):
@@ -211,51 +299,16 @@ def load_config() -> AppConfig:
     if db_path := os.environ.get("ASCLEPIUS_DB_PATH"):
         config.database.path = db_path
     if ollama_url := os.environ.get("ASCLEPIUS_OLLAMA_URL"):
-        config.llm.ollama_base_url = ollama_url
+        _apply_env_ollama_url(config, ollama_url)
     if api_key := os.environ.get("ASCLEPIUS_ANTHROPIC_API_KEY"):
-        if api_key:
-            config.llm.claude_api_key = api_key
+        _apply_env_claude_key(config, api_key)
     if vision_key := os.environ.get("ASCLEPIUS_GOOGLE_VISION_KEY"):
         if vision_key:
             config.ocr.google_vision_key = vision_key
             config.ocr.cloud_ocr_enabled = True
 
-    # Migrate legacy flat LLM / OCR config → provider list. These blocks exist
-    # only to keep pre-0.6 settings.yaml files working; new deployments should
-    # configure ``llm.providers`` / ``ocr.providers`` directly. Plan to delete
-    # this code once 0.7 ships (see CHANGELOG).
-    _used_legacy = False
-    if not config.llm.providers:
-        _used_legacy = True
-        providers: list[LlmProviderEntry] = []
-        # Always add Ollama as default
-        providers.append(LlmProviderEntry(
-            id="ollama-default",
-            type="ollama",
-            name="Ollama (Local)",
-            enabled=(config.llm.provider == "ollama"),
-            priority=1,
-            base_url=config.llm.ollama_base_url,
-            model=config.llm.ollama_model,
-            timeout=config.llm.extraction_timeout,
-        ))
-        # Add Claude if key is set
-        if config.llm.claude_api_key:
-            providers.append(LlmProviderEntry(
-                id="claude-default",
-                type="claude",
-                name="Claude API",
-                enabled=(config.llm.provider == "claude"),
-                priority=2,
-                api_key=config.llm.claude_api_key,
-                model=config.llm.claude_model,
-                timeout=config.llm.extraction_timeout,
-            ))
-        config.llm.providers = providers
-
-    # Migrate legacy flat OCR config → provider list (see deprecation note above)
+    # Migrate legacy flat OCR config → provider list (pre-0.6 settings.yaml).
     if not config.ocr.providers:
-        _used_legacy = True
         ocr_providers: list[OcrProviderEntry] = []
         ocr_providers.append(OcrProviderEntry(
             id="tesseract-default",
@@ -278,16 +331,17 @@ def load_config() -> AppConfig:
                 language=config.ocr.language,
             ))
         if config.ocr.llm_vision_model or config.ocr.engine == "llm_vision":
+            fallback_llm = _first_enabled_llm(config)
             ocr_providers.append(OcrProviderEntry(
                 id="llm-vision-default",
                 type="llm_vision",
                 name="LLM Vision OCR",
                 enabled=(config.ocr.engine == "llm_vision"),
                 priority=3 if config.ocr.remote_url else 2,
-                llm_provider=config.ocr.llm_vision_provider or config.llm.provider,
+                llm_provider=config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama"),
                 llm_model=config.ocr.llm_vision_model,
-                llm_base_url=config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url,
-                llm_api_key=config.llm.claude_api_key if (config.ocr.llm_vision_provider == "claude") else "",
+                llm_base_url=config.ocr.llm_vision_ollama_url or (fallback_llm.base_url if fallback_llm else ""),
+                llm_api_key="",
             ))
         if config.ocr.google_vision_key:
             ocr_providers.append(OcrProviderEntry(
@@ -299,12 +353,6 @@ def load_config() -> AppConfig:
                 google_vision_key=config.ocr.google_vision_key,
             ))
         config.ocr.providers = ocr_providers
-
-    if _used_legacy:
-        logger.warning(
-            "settings.yaml still uses the flat llm/ocr layout; migrate to "
-            "the `providers` list before 0.7 (this auto-migration will be removed).",
-        )
 
     return config
 

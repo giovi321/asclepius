@@ -35,8 +35,8 @@ def is_provider_unreachable(exc: Exception) -> bool:
 def get_llm_provider(config: AppConfig, priority: int = 1):
     """Factory function to get an LLM provider by priority rank.
 
-    Uses the new provider list if available, falls back to legacy flat config.
-    priority=1 returns the highest-priority enabled provider.
+    priority=1 returns the highest-priority enabled provider. Raises
+    ProviderUnreachableError if no enabled provider is configured.
     """
     from asclepius.config import get_active_llm_provider_config
 
@@ -44,21 +44,10 @@ def get_llm_provider(config: AppConfig, priority: int = 1):
     if entry:
         return _build_llm_provider(entry)
 
-    # Fallback to legacy config
-    if config.llm.provider == "claude" and config.llm.claude_api_key:
-        from asclepius.llm.claude import ClaudeProvider
-        return ClaudeProvider(
-            api_key=config.llm.claude_api_key,
-            model=config.llm.claude_model,
-            timeout=config.llm.extraction_timeout,
-        )
-    else:
-        from asclepius.llm.ollama import OllamaProvider
-        return OllamaProvider(
-            base_url=config.llm.ollama_base_url,
-            model=config.llm.ollama_model,
-            timeout=config.llm.extraction_timeout,
-        )
+    raise ProviderUnreachableError(
+        f"No enabled LLM provider at priority rank {priority}. "
+        "Configure at least one provider under Settings → Document Analysis → LLM Providers.",
+    )
 
 
 def _build_llm_provider(entry):

@@ -10,7 +10,7 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig, OcrProviderEntry
+from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm
 
 logger = logging.getLogger(__name__)
 
@@ -409,18 +409,28 @@ async def _llm_vision_page(
     )
 
     # Determine which provider to use for vision
+    fallback_llm = _first_enabled_llm(config)
     if provider_entry:
         vision_provider = provider_entry.llm_provider
     else:
-        vision_provider = config.ocr.llm_vision_provider or config.llm.provider
+        vision_provider = config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama")
 
-    # Get API key from provider entry or fall back to config
-    vision_api_key = (provider_entry.llm_api_key if provider_entry else None) or config.llm.claude_api_key
+    # Get API key from provider entry or fall back to first matching LLM provider
+    vision_api_key = provider_entry.llm_api_key if provider_entry else ""
+    if not vision_api_key and vision_provider in ("claude", "openai"):
+        for p in config.llm.providers:
+            if p.type == vision_provider and p.api_key:
+                vision_api_key = p.api_key
+                break
 
     if vision_provider == "claude" and vision_api_key:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=vision_api_key)
-        model = vision_model or config.llm.claude_model
+        default_claude_model = next(
+            (p.model for p in config.llm.providers if p.type == "claude" and p.enabled),
+            "claude-sonnet-4-20250514",
+        )
+        model = vision_model or default_claude_model
 
         response = await client.messages.create(
             model=model,
@@ -471,11 +481,18 @@ async def _llm_vision_page(
 
     else:
         # Ollama with vision model — can use a different URL than the extraction LLM
-        model = vision_model or config.llm.ollama_model
+        default_ollama = next(
+            (p for p in config.llm.providers if p.type == "ollama" and p.enabled),
+            None,
+        ) or fallback_llm
+        model = vision_model or (default_ollama.model if default_ollama else "llama3.1")
         if provider_entry and provider_entry.llm_base_url:
             ollama_url = provider_entry.llm_base_url.rstrip("/")
         else:
-            ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
+            ollama_url = (
+                config.ocr.llm_vision_ollama_url
+                or (default_ollama.base_url if default_ollama else "http://ollama:11434")
+            ).rstrip("/")
         # Vision OCR needs a generous timeout — processing a single page image can be slow
         read_timeout = max(float(config.llm.extraction_timeout), 300.0)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
@@ -662,17 +679,27 @@ async def _vision_call(
     provider_entry: OcrProviderEntry | None = None,
 ) -> str:
     """Send image + prompt to a vision LLM. Supports Ollama, Claude, OpenAI."""
+    fallback_llm = _first_enabled_llm(config)
     if provider_entry:
         vision_provider = provider_entry.llm_provider
     else:
-        vision_provider = config.ocr.llm_vision_provider or config.llm.provider
+        vision_provider = config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama")
 
-    vision_api_key = (provider_entry.llm_api_key if provider_entry else None) or config.llm.claude_api_key
+    vision_api_key = provider_entry.llm_api_key if provider_entry else ""
+    if not vision_api_key and vision_provider in ("claude", "openai"):
+        for p in config.llm.providers:
+            if p.type == vision_provider and p.api_key:
+                vision_api_key = p.api_key
+                break
 
     if vision_provider == "claude" and vision_api_key:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=vision_api_key)
-        model = vision_model or config.llm.claude_model
+        default_claude_model = next(
+            (p.model for p in config.llm.providers if p.type == "claude" and p.enabled),
+            "claude-sonnet-4-20250514",
+        )
+        model = vision_model or default_claude_model
         response = await client.messages.create(
             model=model, max_tokens=4096,
             messages=[{"role": "user", "content": [
@@ -701,11 +728,18 @@ async def _vision_call(
 
     else:
         # Ollama
-        model = vision_model or config.llm.ollama_model
+        default_ollama = next(
+            (p for p in config.llm.providers if p.type == "ollama" and p.enabled),
+            None,
+        ) or fallback_llm
+        model = vision_model or (default_ollama.model if default_ollama else "llama3.1")
         if provider_entry and provider_entry.llm_base_url:
             ollama_url = provider_entry.llm_base_url.rstrip("/")
         else:
-            ollama_url = (config.ocr.llm_vision_ollama_url or config.llm.ollama_base_url).rstrip("/")
+            ollama_url = (
+                config.ocr.llm_vision_ollama_url
+                or (default_ollama.base_url if default_ollama else "http://ollama:11434")
+            ).rstrip("/")
         read_timeout = max(float(config.llm.extraction_timeout), 300.0)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         logger.info("Vision extraction: model=%s, url=%s", model, ollama_url)

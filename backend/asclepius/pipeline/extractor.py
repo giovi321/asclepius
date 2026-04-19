@@ -387,8 +387,8 @@ async def extract_and_store(
     for _child in ("lab_results", "encounters", "medications", "vaccinations", "invoice_items"):
         await db.execute(f"DELETE FROM {_child} WHERE document_id = ?", (doc_id,))
 
-    # Store raw extraction — use the provider label if available, else fall back to config
-    llm_label = getattr(llm, "provider_label", "") or config.llm.provider
+    # Store raw extraction — use the provider label if available
+    llm_label = getattr(llm, "provider_label", "") or "unknown"
     await db.execute(
         "UPDATE documents SET raw_extraction = ?, llm_provider = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (json.dumps(extraction), llm_label, doc_id),

@@ -24,7 +24,9 @@ export default function LlmProvidersTab() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; message: string }>>({});
   const [maxConcurrent, setMaxConcurrent] = useState<number>(2);
-  const [maxConcurrentSaved, setMaxConcurrentSaved] = useState<number>(2);
+  const [maxRetries, setMaxRetries] = useState<number>(3);
+  const [retryBackoff, setRetryBackoff] = useState<string>("30,60,120");
+  const [globalSaved, setGlobalSaved] = useState<{ concurrent: number; retries: number; backoff: string }>({ concurrent: 2, retries: 3, backoff: "30,60,120" });
   const [savingGlobal, setSavingGlobal] = useState(false);
 
   useEffect(() => {
@@ -34,19 +36,43 @@ export default function LlmProvidersTab() {
       if (data.length > 0) setExpandedId(data[0].id);
     });
     api.get("/settings").then((res) => {
-      const v = res.data?.llm?.max_concurrent_requests;
-      if (typeof v === "number") {
-        setMaxConcurrent(v);
-        setMaxConcurrentSaved(v);
-      }
+      const llm = res.data?.llm || {};
+      const c = typeof llm.max_concurrent_requests === "number" ? llm.max_concurrent_requests : 2;
+      const r = typeof llm.max_retries === "number" ? llm.max_retries : 3;
+      const b = Array.isArray(llm.retry_backoff_seconds) && llm.retry_backoff_seconds.length
+        ? llm.retry_backoff_seconds.join(",")
+        : "30,60,120";
+      setMaxConcurrent(c);
+      setMaxRetries(r);
+      setRetryBackoff(b);
+      setGlobalSaved({ concurrent: c, retries: r, backoff: b });
     });
   }, []);
 
+  const parseBackoff = (s: string): number[] =>
+    s.split(",").map((x) => parseInt(x.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0);
+
+  const globalDirty =
+    maxConcurrent !== globalSaved.concurrent ||
+    maxRetries !== globalSaved.retries ||
+    retryBackoff !== globalSaved.backoff;
+
   const saveGlobal = async () => {
+    const backoffArr = parseBackoff(retryBackoff);
+    if (backoffArr.length === 0) {
+      toast({ title: "Retry backoff must be a comma-separated list of non-negative integers", variant: "error" });
+      return;
+    }
     setSavingGlobal(true);
     try {
-      await api.patch("/settings", { llm_max_concurrent_requests: maxConcurrent });
-      setMaxConcurrentSaved(maxConcurrent);
+      await api.patch("/settings", {
+        llm_max_concurrent_requests: maxConcurrent,
+        llm_max_retries: maxRetries,
+        llm_retry_backoff_seconds: backoffArr,
+      });
+      const normalizedBackoff = backoffArr.join(",");
+      setRetryBackoff(normalizedBackoff);
+      setGlobalSaved({ concurrent: maxConcurrent, retries: maxRetries, backoff: normalizedBackoff });
     } catch { toast({ title: "Failed to save global LLM settings", variant: "error" }); }
     setSavingGlobal(false);
   };
@@ -108,25 +134,46 @@ export default function LlmProvidersTab() {
         you can re-process a document with the next provider from the document detail page.
       </div>
 
-      {/* Global LLM concurrency */}
-      <div className="rounded-lg border p-3">
-        <div className="flex items-end gap-3 max-w-md">
-          <div className="flex-1">
-            <NumberField
-              label="Max concurrent LLM requests"
-              value={maxConcurrent}
-              onChange={(v) => setMaxConcurrent(Math.max(1, v))}
-              min={1} max={16} step={1}
-              description="Limits parallel requests across all LLM providers. Lower this if your Ollama/vLLM instance times out under load (1 = fully serialized)."
+      {/* Global LLM settings: concurrency + retries */}
+      <div className="rounded-lg border p-3 space-y-3">
+        <div className="text-sm font-medium">Global LLM Behavior</div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <NumberField
+            label="Max concurrent requests"
+            value={maxConcurrent}
+            onChange={(v) => setMaxConcurrent(Math.max(1, v))}
+            min={1} max={16} step={1}
+            description="How many LLM calls may run in parallel across all providers. Lower this if your Ollama/vLLM instance times out when several documents process at once (1 = fully serialized)."
+          />
+          <NumberField
+            label="Max retries"
+            value={maxRetries}
+            onChange={(v) => setMaxRetries(Math.max(0, v))}
+            min={0} max={10} step={1}
+            description="How many times to retry a failed Ollama call on ReadTimeout / ConnectError. Total attempts = 1 + retries. Set to 0 to fail fast."
+          />
+          <label className="space-y-1 block">
+            <span className="text-sm font-medium">Retry backoff (seconds)</span>
+            <input
+              type="text"
+              value={retryBackoff}
+              onChange={(e) => setRetryBackoff(e.target.value)}
+              placeholder="30,60,120"
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
-          </div>
+            <span className="block text-xs text-muted-foreground">
+              Comma-separated wait time between successive retry attempts. The last value is reused if there are more retries than entries. Example: "30,60,120" waits 30s before retry 1, 60s before retry 2, 120s before retry 3+.
+            </span>
+          </label>
+        </div>
+        <div className="flex justify-end">
           <button
             onClick={saveGlobal}
-            disabled={savingGlobal || maxConcurrent === maxConcurrentSaved}
+            disabled={savingGlobal || !globalDirty}
             className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
           >
-            {maxConcurrent === maxConcurrentSaved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            {savingGlobal ? "Saving..." : maxConcurrent === maxConcurrentSaved ? "Saved" : "Save"}
+            {!globalDirty ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+            {savingGlobal ? "Saving..." : !globalDirty ? "Saved" : "Save global settings"}
           </button>
         </div>
       </div>

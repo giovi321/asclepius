@@ -12,9 +12,9 @@ from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_
 
 logger = logging.getLogger(__name__)
 
-# Retry settings for transient failures (ReadTimeout, connection errors)
-MAX_RETRIES = 3
-RETRY_BACKOFF = [30, 60, 120]  # seconds
+# Fallback retry settings used only if config lookup fails.
+_DEFAULT_MAX_RETRIES = 3
+_DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 
 # Module-level semaphore limits concurrent Ollama requests across the whole
 # process. Rebuilt on first use, and again when the configured size changes.
@@ -33,6 +33,20 @@ def _get_semaphore() -> asyncio.Semaphore:
         _semaphore = asyncio.Semaphore(size)
         _sem_size = size
     return _semaphore
+
+
+def _get_retry_config() -> tuple[int, list[int]]:
+    """Return (max_retries, backoff_seconds) from config, falling back safely."""
+    try:
+        from asclepius.config import get_config
+        cfg = get_config().llm
+        retries = max(0, int(cfg.max_retries))
+        backoff = [int(x) for x in (cfg.retry_backoff_seconds or []) if int(x) >= 0]
+        if not backoff:
+            backoff = _DEFAULT_RETRY_BACKOFF
+        return retries, backoff
+    except Exception:
+        return _DEFAULT_MAX_RETRIES, _DEFAULT_RETRY_BACKOFF
 
 
 class OllamaProvider(LLMProvider):
@@ -112,8 +126,10 @@ class OllamaProvider(LLMProvider):
         if force_json:
             payload["format"] = "json"
 
+        max_retries, retry_backoff = _get_retry_config()
+        total_attempts = max_retries + 1
         last_err = None
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(total_attempts):
             try:
                 async with _get_semaphore():
                     async with httpx.AsyncClient(timeout=timeout) as client:
@@ -128,17 +144,17 @@ class OllamaProvider(LLMProvider):
                         return response
             except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
                 last_err = e
-                if attempt < MAX_RETRIES - 1:
-                    wait = RETRY_BACKOFF[attempt]
+                if attempt < total_attempts - 1:
+                    wait = retry_backoff[min(attempt, len(retry_backoff) - 1)]
                     logger.warning(
                         "Ollama %s (attempt %d/%d, prompt_len=%d), retrying in %ds...",
-                        type(e).__name__, attempt + 1, MAX_RETRIES, len(prompt), wait,
+                        type(e).__name__, attempt + 1, total_attempts, len(prompt), wait,
                     )
                     await asyncio.sleep(wait)
                 else:
                     logger.error(
                         "Ollama %s after %d attempts (prompt_len=%d)",
-                        type(e).__name__, MAX_RETRIES, len(prompt),
+                        type(e).__name__, total_attempts, len(prompt),
                     )
         raise last_err  # type: ignore[misc]
 

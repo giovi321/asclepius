@@ -12,7 +12,8 @@ async def test_get_settings(client):
     assert "ocr" in data
     assert "pipeline" in data
     assert "vault" in data
-    assert data["llm"]["provider"] in ("ollama", "claude")
+    assert "provider_count" in data["llm"]
+    assert isinstance(data["llm"]["extraction_timeout"], int)
 
 
 @pytest.mark.asyncio

@@ -170,13 +170,10 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
     config = get_config()
     return {
         "llm": {
-            "provider": config.llm.provider,
-            "ollama_base_url": config.llm.ollama_base_url,
-            "ollama_model": config.llm.ollama_model,
-            "claude_model": config.llm.claude_model,
-            "has_claude_key": bool(config.llm.claude_api_key),
             "extraction_timeout": config.llm.extraction_timeout,
             "max_concurrent_requests": config.llm.max_concurrent_requests,
+            "max_retries": config.llm.max_retries,
+            "retry_backoff_seconds": list(config.llm.retry_backoff_seconds),
             "provider_count": len([p for p in config.llm.providers if p.enabled]),
             "canonical_language": config.llm.canonical_language,
         },
@@ -221,13 +218,10 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
 
 class SettingsUpdate(BaseModel):
     # LLM
-    llm_provider: str | None = None
-    ollama_base_url: str | None = None
-    ollama_model: str | None = None
-    claude_api_key: str | None = None
-    claude_model: str | None = None
     extraction_timeout: int | None = None
     llm_max_concurrent_requests: int | None = None
+    llm_max_retries: int | None = None
+    llm_retry_backoff_seconds: list[int] | None = None
     canonical_language: str | None = None
     # OCR
     ocr_engine: str | None = None
@@ -260,13 +254,10 @@ class SettingsUpdate(BaseModel):
 
 # Mapping: API field -> (yaml_section, yaml_key, config_dotpath)
 _SETTINGS_MAP = {
-    "llm_provider": ("llm", "provider", "llm.provider"),
-    "ollama_base_url": ("llm", "ollama_base_url", "llm.ollama_base_url"),
-    "ollama_model": ("llm", "ollama_model", "llm.ollama_model"),
-    "claude_api_key": ("llm", "claude_api_key", "llm.claude_api_key"),
-    "claude_model": ("llm", "claude_model", "llm.claude_model"),
     "extraction_timeout": ("llm", "extraction_timeout", "llm.extraction_timeout"),
     "llm_max_concurrent_requests": ("llm", "max_concurrent_requests", "llm.max_concurrent_requests"),
+    "llm_max_retries": ("llm", "max_retries", "llm.max_retries"),
+    "llm_retry_backoff_seconds": ("llm", "retry_backoff_seconds", "llm.retry_backoff_seconds"),
     "canonical_language": ("llm", "canonical_language", "llm.canonical_language"),
     "ocr_engine": ("ocr", "engine", "ocr.engine"),
     "ocr_language": ("ocr", "language", "ocr.language"),

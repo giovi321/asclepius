@@ -515,6 +515,18 @@ async def extract_and_store(
         for lab in extraction.get("lab_results", []):
             if not isinstance(lab, dict):
                 continue
+            # Per-item key salvage — small models drop the "_original" suffix
+            # and occasionally invent their own keys. Promote common aliases
+            # so we don't hit a NOT NULL violation on test_name_original.
+            if not lab.get("test_name_original"):
+                for alt in ("test_name", "name", "test", "test_name_canonical", "analyte", "parameter"):
+                    v = lab.get(alt)
+                    if isinstance(v, str) and v.strip():
+                        lab["test_name_original"] = v.strip()
+                        break
+            if not lab.get("test_name_original"):
+                logger.warning("Doc %d: skipping lab result with no test name: %s", doc_id, lab)
+                continue
             norm_id = await _resolve_lab_test(db, lab)
             await db.execute(
                 """INSERT INTO lab_results

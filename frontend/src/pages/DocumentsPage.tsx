@@ -230,6 +230,26 @@ export default function DocumentsPage() {
   };
 
   const bulkReprocess = async () => {
+    // Warn on long documents — reprocessing every page through OCR + LLM
+    // can take a while and burn paid-provider tokens.
+    const longDocs = documents
+      .filter((d) => selectedIds.has(d.id))
+      .filter((d) => typeof d.page_count === "number" && d.page_count > 5);
+    if (longDocs.length > 0) {
+      const totalPages = longDocs.reduce((n, d) => n + (d.page_count || 0), 0);
+      const ok = await confirm({
+        title: longDocs.length === 1
+          ? `Reprocess ${longDocs[0].page_count}-page document?`
+          : `Reprocess ${longDocs.length} long documents?`,
+        description: longDocs.length === 1
+          ? `"${longDocs[0].original_filename}" has ${longDocs[0].page_count} pages. Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`
+          : `${longDocs.length} of the selected documents have more than 5 pages (${totalPages} pages total). Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`,
+        confirmText: "Reprocess",
+        cancelText: "Cancel",
+      });
+      if (!ok) return;
+    }
+
     const mode = reprocessMode;
     const payload: Record<string, any> = { mode };
     if (reprocessLlmProvider) payload.llm_provider_id = reprocessLlmProvider;

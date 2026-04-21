@@ -37,6 +37,34 @@ const navItems = [
   { path: "/search", label: "Search", icon: Search },
 ];
 
+// Titles for every top-level route, including the ones that were moved
+// out of the main nav but still exist as pages (Settings, Files).
+const PAGE_TITLES: Record<string, string> = {
+  "/": "Dashboard",
+  "/patients": "Patients",
+  "/documents": "Documents",
+  "/timeline": "Timeline",
+  "/events": "Medical Events",
+  "/unclassified": "Unclassified",
+  "/lab-results": "Lab Results",
+  "/imaging": "Imaging",
+  "/chat": "Chat",
+  "/search": "Search",
+  "/settings": "Settings",
+  "/files": "Files",
+};
+
+function pageTitleFor(pathname: string): string {
+  if (pathname === "/") return PAGE_TITLES["/"];
+  // Longest-prefix match so /settings/analysis/providers still reads
+  // "Settings" rather than falling through.
+  const sorted = Object.keys(PAGE_TITLES)
+    .filter((p) => p !== "/")
+    .sort((a, b) => b.length - a.length);
+  const match = sorted.find((p) => pathname === p || pathname.startsWith(p + "/"));
+  return match ? PAGE_TITLES[match] : "";
+}
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -163,7 +191,10 @@ export default function AppLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="flex-1 min-w-0">
+          <h1 className="text-base font-semibold truncate flex-shrink-0">
+            {pageTitleFor(location.pathname)}
+          </h1>
+          <div className="flex-1 min-w-0 flex justify-end">
             <MetricsStrip />
           </div>
         </header>

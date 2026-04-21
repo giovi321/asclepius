@@ -94,6 +94,22 @@ export default function DocumentDetailPage() {
   }, [showReprocessMenu]);
 
   const handleReprocess = async () => {
+    // Long documents are expensive to reprocess (every page hits OCR + LLM
+    // again). Give the user a chance to back out — but only when triggered
+    // from the menu; the pipeline's own initial processing after upload
+    // skips this branch entirely because it doesn't go through the UI.
+    const pageCount = typeof doc?.page_count === "number" ? doc.page_count : 0;
+    if (pageCount > 5) {
+      const ok = await confirm({
+        title: `Reprocess ${pageCount}-page document?`,
+        description:
+          `This document has ${pageCount} pages. Reprocessing will run OCR and the LLM on every page, which can take a while and consume tokens if you're on a paid provider. Continue?`,
+        confirmText: "Reprocess",
+        cancelText: "Cancel",
+      });
+      if (!ok) return;
+    }
+
     setShowReprocessMenu(false);
     await api.post(`/documents/${id}/reprocess`, {
       mode: reprocessMode,

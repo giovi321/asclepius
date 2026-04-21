@@ -64,7 +64,7 @@ export default function MetricsStrip() {
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap min-w-0">
+    <div className="flex items-center justify-end gap-2 overflow-x-auto whitespace-nowrap min-w-0 max-w-full">
       {chips.map((c, i) => {
         const Icon = c.icon;
         // Flip popover to the right edge for the last chip so it doesn't

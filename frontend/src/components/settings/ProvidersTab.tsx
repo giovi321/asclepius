@@ -200,19 +200,26 @@ function CredentialDialog({ initial, onSave, onClose }: CredDialogProps) {
   );
 }
 
-// ─── Attach-model inline form ────────────────────────────────────
+// ─── Add / edit model inline form ────────────────────────────────
 
-interface AddModelFormProps {
+interface ModelFormProps {
   cred: Credential;
-  onSubmit: (kind: ModelKind, model: string, timeout: number) => Promise<void>;
+  /** When present, the form is in edit mode: kind is locked, the fields
+   * are pre-populated, and the submit button says "Save". */
+  initial?: AttachedModel;
+  onSubmit: (kind: ModelKind, name: string, model: string, timeout: number) => Promise<void>;
   onCancel: () => void;
 }
 
-function AddModelForm({ cred, onSubmit, onCancel }: AddModelFormProps) {
+function ModelForm({ cred, initial, onSubmit, onCancel }: ModelFormProps) {
   const kinds = allowedKindsFor(cred.type);
-  const [kind, setKind] = useState<ModelKind>(kinds[0]);
-  const [model, setModel] = useState("");
-  const [timeout, setTimeout] = useState(kind === "vision" ? 600 : 120);
+  const isEdit = !!initial;
+  const [kind, setKind] = useState<ModelKind>(initial ? initial.kind : kinds[0]);
+  const [name, setName] = useState(initial?.name || "");
+  const [model, setModel] = useState(initial?.model || "");
+  const [timeout, setTimeout] = useState(
+    initial?.timeout || (kind === "vision" ? 600 : 120),
+  );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -223,9 +230,9 @@ function AddModelForm({ cred, onSubmit, onCancel }: AddModelFormProps) {
     if (needsModelField && !model.trim()) { setErr("Model name is required"); return; }
     setSaving(true);
     try {
-      await onSubmit(kind, model.trim(), timeout);
+      await onSubmit(kind, name.trim() || model.trim() || cred.name, model.trim(), timeout);
     } catch (e: any) {
-      setErr(e?.response?.data?.detail || e?.message || "Failed to add model");
+      setErr(e?.response?.data?.detail || e?.message || "Failed to save model");
     } finally {
       setSaving(false);
     }
@@ -234,18 +241,26 @@ function AddModelForm({ cred, onSubmit, onCancel }: AddModelFormProps) {
   return (
     <div className="rounded-md border border-dashed p-3 space-y-2 bg-muted/30">
       <div className="flex items-center gap-2 flex-wrap">
-        {kinds.length > 1 ? (
-          <select value={kind} onChange={(e) => setKind(e.target.value as ModelKind)}
+        {isEdit || kinds.length === 1 ? (
+          <span className="rounded-md bg-muted px-2 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+            {kind}
+          </span>
+        ) : (
+          <select value={kind}
+            onChange={(e) => {
+              const k = e.target.value as ModelKind;
+              setKind(k);
+              setTimeout(k === "vision" ? 600 : 120);
+            }}
             className="rounded-md border bg-background px-2 py-1 text-sm">
             {kinds.includes("llm") && <option value="llm">LLM</option>}
             {kinds.includes("vision") && <option value="vision">Vision</option>}
             {kinds.includes("ocr") && <option value="ocr">OCR</option>}
           </select>
-        ) : (
-          <span className="rounded-md bg-muted px-2 py-1 text-xs uppercase tracking-wide text-muted-foreground">
-            {kinds[0]}
-          </span>
         )}
+        <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+          placeholder="Display name (optional)"
+          className="flex-1 min-w-[140px] rounded-md border bg-background px-2 py-1 text-sm" />
         {needsModelField && (
           <input type="text" value={model} onChange={(e) => setModel(e.target.value)}
             placeholder={kind === "vision" ? "e.g. qwen2.5-vl" : kind === "ocr" ? "e.g. llava-vision" : "e.g. llama3.1"}
@@ -257,7 +272,7 @@ function AddModelForm({ cred, onSubmit, onCancel }: AddModelFormProps) {
           className="w-20 rounded-md border bg-background px-2 py-1 text-sm" />
         <button onClick={submit} disabled={saving}
           className="rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {saving ? "Adding…" : "Add"}
+          {saving ? (isEdit ? "Saving…" : "Adding…") : (isEdit ? "Save" : "Add")}
         </button>
         <button onClick={onCancel}
           className="rounded-md border px-3 py-1 text-xs hover:bg-accent">
@@ -281,7 +296,11 @@ export default function ProvidersTab() {
   const [ocr, setOcr] = useState<OcrProvider[]>([]);
   const [editingCred, setEditingCred] = useState<Partial<Credential> | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // credential id
+  // key = `${kind}-${entry_id}` — identifies which model row is being edited.
+  const [editingModelKey, setEditingModelKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const modelKey = (m: AttachedModel) => `${m.kind}-${m.entry_id}`;
 
   const reloadAll = async () => {
     try {
@@ -366,17 +385,18 @@ export default function ProvidersTab() {
   };
 
   // ── Attached model CRUD (updates the right *-providers list) ─
-  const addModel = async (cred: Credential, kind: ModelKind, model: string, timeout: number) => {
+  const addModel = async (cred: Credential, kind: ModelKind, name: string, model: string, timeout: number) => {
+    const displayName = name || model || cred.name;
     if (kind === "llm") {
       const entry: LlmProvider = {
-        id: `llm-${Date.now()}`, type: cred.type, name: model || cred.name,
+        id: `llm-${Date.now()}`, type: cred.type, name: displayName,
         enabled: true, priority: llm.length + 1, credential_id: cred.id,
         base_url: "", model, api_key: "", timeout,
       };
       await api.put("/settings/llm-providers", [...llm, entry]);
     } else if (kind === "vision") {
       const entry: VisionLlmProvider = {
-        id: `vision-${Date.now()}`, type: cred.type, name: model || cred.name,
+        id: `vision-${Date.now()}`, type: cred.type, name: displayName,
         enabled: true, priority: vision.length + 1, credential_id: cred.id,
         base_url: "", model, api_key: "", timeout,
       };
@@ -387,7 +407,7 @@ export default function ProvidersTab() {
         : cred.type === "tesseract_remote" ? "tesseract_remote"
         : "llm_vision";
       const entry: OcrProvider = {
-        id: `ocr-${Date.now()}`, type: ocrType, name: model || cred.name,
+        id: `ocr-${Date.now()}`, type: ocrType, name: displayName,
         enabled: true, priority: ocr.length + 1, credential_id: cred.id,
         language: "eng", remote_url: "", remote_api_key: "",
         llm_provider: (cred.type === "ollama" || cred.type === "vllm" || cred.type === "claude" || cred.type === "openai") ? cred.type : "ollama",
@@ -399,6 +419,35 @@ export default function ProvidersTab() {
     }
     await reloadAll();
     setAddingTo(null);
+  };
+
+  const editModel = async (m: AttachedModel, name: string, model: string, timeout: number) => {
+    const displayName = name || model || "Model";
+    if (m.kind === "llm") {
+      const next = llm.map((p) =>
+        p.id === m.entry_id ? { ...p, name: displayName, model, timeout } : p,
+      );
+      await api.put("/settings/llm-providers", next);
+    } else if (m.kind === "vision") {
+      const next = vision.map((p) =>
+        p.id === m.entry_id ? { ...p, name: displayName, model, timeout } : p,
+      );
+      await api.put("/settings/vision-providers", next);
+    } else {
+      const next = ocr.map((p) => {
+        if (p.id !== m.entry_id) return p;
+        // For llm_vision keep llm_model in sync; for other OCR types ignore
+        // the model field since it's not meaningful.
+        return {
+          ...p,
+          name: displayName,
+          llm_model: p.type === "llm_vision" ? model : p.llm_model,
+        };
+      });
+      await api.put("/settings/ocr-providers", next);
+    }
+    await reloadAll();
+    setEditingModelKey(null);
   };
 
   const removeModel = async (m: AttachedModel) => {
@@ -489,13 +538,21 @@ export default function ProvidersTab() {
                   </div>
                 )}
                 {models.map((m) => {
+                  const key = modelKey(m);
+                  if (editingModelKey === key) {
+                    return (
+                      <ModelForm key={key} cred={c} initial={m}
+                        onSubmit={(_kind, name, model, timeout) => editModel(m, name, model, timeout)}
+                        onCancel={() => setEditingModelKey(null)} />
+                    );
+                  }
                   const KindIcon = m.kind === "vision" ? Eye : m.kind === "ocr" ? ScanText : Brain;
                   const kindClass =
                     m.kind === "vision" ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300"
                     : m.kind === "ocr" ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300"
                     : "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300";
                   return (
-                    <div key={`${m.kind}-${m.entry_id}`}
+                    <div key={key}
                       className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 ${m.enabled ? "" : "opacity-60"}`}>
                       <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${kindClass}`}>
                         <KindIcon className="h-3 w-3" />
@@ -510,6 +567,11 @@ export default function ProvidersTab() {
                         className={`rounded-md p-1 ${m.enabled ? "text-green-600" : "text-muted-foreground"} hover:bg-accent`}>
                         {m.enabled ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
                       </button>
+                      <button onClick={() => { setEditingModelKey(key); setAddingTo(null); }}
+                        title="Edit model"
+                        className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       <button onClick={() => removeModel(m)}
                         className="rounded-md p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -519,11 +581,11 @@ export default function ProvidersTab() {
                 })}
 
                 {addingTo === c.id ? (
-                  <AddModelForm cred={c}
-                    onSubmit={(kind, model, timeout) => addModel(c, kind, model, timeout)}
+                  <ModelForm cred={c}
+                    onSubmit={(kind, name, model, timeout) => addModel(c, kind, name, model, timeout)}
                     onCancel={() => setAddingTo(null)} />
                 ) : (
-                  <button onClick={() => setAddingTo(c.id)}
+                  <button onClick={() => { setAddingTo(c.id); setEditingModelKey(null); }}
                     className="inline-flex items-center gap-1 rounded-md border border-dashed px-3 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
                     <Plus className="h-3.5 w-3.5" /> Add model
                   </button>

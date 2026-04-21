@@ -13,6 +13,36 @@ Which flow runs for a **new upload** is controlled by `pipeline.default_flow` (S
 
 All provider configuration is done from **Settings** > **Document Analysis** in the web UI.
 
+## Recommended Stack
+
+If you're setting up Asclepius for the first time and want a good default, here's the stack we recommend. It works well on a single workstation with ~12 GB of VRAM and gives strong results across Italian/English medical documents.
+
+### Local (self-hosted, via Ollama)
+
+| Role           | Model                              | Ollama tag                                |
+|----------------|------------------------------------|-------------------------------------------|
+| OCR            | Chandra OCR                        | `fredrezones55/chandra-ocr-2`             |
+| Text LLM       | Qwen 2.5                           | `qwen2.5`                                 |
+| Vision-LLM     | Qwen 2.5-VL 7B                     | `qwen2.5vl:7b`                            |
+
+This trio runs comfortably on a **12 GB VRAM** GPU and the extraction quality is already quite good — enough that most users won't need to reach for a cloud model. Pull them with:
+
+```bash
+ollama pull fredrezones55/chandra-ocr-2
+ollama pull qwen2.5
+ollama pull qwen2.5vl:7b
+```
+
+Wire them up under **Settings → Document Analysis**:
+
+- **OCR Providers:** add an *LLM Vision* provider pointing at `fredrezones55/chandra-ocr-2`.
+- **LLM Providers:** add an *Ollama* provider using `qwen2.5`.
+- **Vision-LLM Providers:** add an *Ollama* provider using `qwen2.5vl:7b`.
+
+### Cloud (Anthropic)
+
+If you'd rather use a hosted model — or want a fallback for documents the local models struggle with — **Claude Haiku** yields good results both as the **text LLM** and as the **Vision-LLM**. It's fast, cheap, and handles the single-step image-to-JSON Vision-LLM flow cleanly. Configure it once as a Claude provider under LLM Providers and again under Vision-LLM Providers, then either set it as the primary or drop it to priority 2 as an escalation target behind the local stack.
+
 ## LLM Providers
 
 LLM providers handle document classification, data extraction, chat, and search.

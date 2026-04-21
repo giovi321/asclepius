@@ -10,7 +10,13 @@ import {
   ChevronDown,
   Search,
   RefreshCw,
+  Home,
 } from "lucide-react";
+
+// Folders that are part of the app's own plumbing — never useful to a user
+// browsing their vault. Matched only at the top level so a patient-named
+// folder that happens to collide wouldn't be hidden.
+const ROOT_HIDDEN_FOLDERS = new Set(["config"]);
 
 interface TreeNode {
   name: string;
@@ -185,10 +191,21 @@ export default function FileBrowserPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
+      {/* Filter + Refresh on the same row at the top */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Filter files..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm"
+          />
+        </div>
         <button
           onClick={() => fetchTree(breadcrumb.length > 0 ? breadcrumb.join("/") : undefined)}
-          className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-1.5"
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent flex items-center gap-1.5 flex-shrink-0"
         >
           <RefreshCw className="h-4 w-4" />
           Refresh
@@ -199,9 +216,11 @@ export default function FileBrowserPage() {
       <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
         <button
           onClick={() => navigateToBreadcrumb(-1)}
-          className="hover:text-foreground hover:underline"
+          title="Go to vault root"
+          aria-label="Vault root"
+          className="rounded-md p-1 hover:text-foreground hover:bg-accent"
         >
-          Vault
+          <Home className="h-3.5 w-3.5" />
         </button>
         {breadcrumb.map((part, i) => (
           <span key={i} className="flex items-center gap-1">
@@ -214,18 +233,6 @@ export default function FileBrowserPage() {
             </button>
           </span>
         ))}
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder="Filter files..."
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm"
-        />
       </div>
 
       {/* Delete confirmation */}
@@ -266,25 +273,33 @@ export default function FileBrowserPage() {
           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
         </div>
       ) : tree ? (
-        <div className="rounded-lg border bg-card">
-          <div className="p-2">
-            {tree.children.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No files found in vault
-              </p>
-            ) : (
-              tree.children.map((child) => (
-                <TreeItem
-                  key={child.path}
-                  node={child}
-                  depth={0}
-                  filter={filter}
-                  onDelete={(path, name) => setConfirmDelete({ path, name })}
-                />
-              ))
-            )}
-          </div>
-        </div>
+        (() => {
+          // Hide the app's plumbing folders from the root view only.
+          const visibleChildren = breadcrumb.length === 0
+            ? tree.children.filter((c) => !(c.type === "dir" && ROOT_HIDDEN_FOLDERS.has(c.name)))
+            : tree.children;
+          return (
+            <div className="rounded-lg border bg-card">
+              <div className="p-2">
+                {visibleChildren.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No files found in vault
+                  </p>
+                ) : (
+                  visibleChildren.map((child) => (
+                    <TreeItem
+                      key={child.path}
+                      node={child}
+                      depth={0}
+                      filter={filter}
+                      onDelete={(path, name) => setConfirmDelete({ path, name })}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })()
       ) : null}
     </div>
   );

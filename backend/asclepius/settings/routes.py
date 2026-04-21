@@ -678,12 +678,13 @@ async def test_vision_provider(
 
     try:
         # Vision encoders (especially Ollama's qwen2.5-vl / llama3.2-vision) reject
-        # images below a few dozen pixels per side. Use a 256×256 white JPEG so the
-        # preprocessor has something to tile.
+        # images below a few dozen pixels per side AND require dimensions to be
+        # multiples of the patch grid (28 for qwen2.5-vl). 280×280 = 10×10 patches
+        # is a safe probe for every supported backend.
         import io as _io
         import base64 as _b64
         from PIL import Image as _Image
-        img = _Image.new("RGB", (256, 256), "white")
+        img = _Image.new("RGB", (280, 280), "white")
         buf = _io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
         b64 = _b64.b64encode(buf.getvalue()).decode("utf-8")

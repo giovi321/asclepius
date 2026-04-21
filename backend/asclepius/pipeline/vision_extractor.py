@@ -25,6 +25,25 @@ logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 4_500_000  # Stay under Claude's 5MB limit
 
+# Qwen2.5-VL uses 28x28 patches and Ollama's vision encoder blows up with
+# GGML_ASSERT(a->ne[2] * 4 == b->ne[0]) when width/height aren't multiples of
+# 28. Llama3.2-vision uses 14x14 patches — 28 is a multiple of 14, so a single
+# alignment value works for both. Other backends (Claude, OpenAI) don't care
+# but are unaffected by the crop.
+VISION_PATCH_ALIGN = 28
+
+
+def _align_to_patch_grid(img: "Image.Image") -> "Image.Image":
+    """Crop the bottom/right edge so each dimension is a multiple of VISION_PATCH_ALIGN."""
+    w = (img.width // VISION_PATCH_ALIGN) * VISION_PATCH_ALIGN
+    h = (img.height // VISION_PATCH_ALIGN) * VISION_PATCH_ALIGN
+    # Guard: never crop below one patch per side — fall back to whatever we have.
+    if w < VISION_PATCH_ALIGN or h < VISION_PATCH_ALIGN:
+        return img
+    if w == img.width and h == img.height:
+        return img
+    return img.crop((0, 0, w, h))
+
 
 async def _get_extraction_prompt(config: AppConfig) -> str:
     """Resolve the vision extraction prompt — honors user overrides via prompt_manager
@@ -54,13 +73,19 @@ def _render_page_for_vision(page) -> str:
 
 
 def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
-    """Compress an image to JPEG base64, resizing if needed to stay under limit."""
+    """Compress an image to JPEG base64, resizing if needed to stay under limit.
+
+    The final dimensions are cropped to multiples of ``VISION_PATCH_ALIGN`` so
+    Ollama's qwen2.5-vl / llama3.2-vision encoders don't hit a GGML assertion.
+    """
     max_dim = 2000
     if img.width > max_dim or img.height > max_dim:
         img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
     if img.mode != "RGB":
         img = img.convert("RGB")
+
+    img = _align_to_patch_grid(img)
 
     for q in [quality, 70, 50]:
         buf = io.BytesIO()
@@ -69,8 +94,9 @@ def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
         if len(data) <= MAX_IMAGE_BYTES:
             return base64.b64encode(data).decode("utf-8")
 
-    buf = io.BytesIO()
     img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+    img = _align_to_patch_grid(img)
+    buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=40)
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 

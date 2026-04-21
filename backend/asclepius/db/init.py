@@ -147,6 +147,48 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.commit()
         logger.info("Migration: added sources column to chat_history")
 
+    # Sweep existing doctor names: strip honorific titles (Dr., Dott.ssa,
+    # Prof., etc.) so stored names hold the raw person-name only. The sweep
+    # is idempotent — re-running the migration against already-cleaned rows
+    # produces no writes. Applied to doctors.name, doctors.canonical_display,
+    # and the denormalised documents.doctor_name column.
+    from asclepius.pipeline.extractor import strip_doctor_title, normalize_name
+    cursor = await db.execute("SELECT id, name, canonical_display FROM doctors")
+    _doc_updates = 0
+    for r in await cursor.fetchall():
+        doc_id, cur_name, cur_canonical = r[0], r[1] or "", r[2]
+        new_name = normalize_name(strip_doctor_title(cur_name))
+        new_canonical = (
+            normalize_name(strip_doctor_title(cur_canonical))
+            if cur_canonical else cur_canonical
+        )
+        if new_name != cur_name or new_canonical != cur_canonical:
+            await db.execute(
+                "UPDATE doctors SET name = ?, canonical_display = ? WHERE id = ?",
+                (new_name, new_canonical, doc_id),
+            )
+            _doc_updates += 1
+
+    cursor = await db.execute(
+        "SELECT id, doctor_name FROM documents WHERE doctor_name IS NOT NULL AND doctor_name <> ''"
+    )
+    _denorm_updates = 0
+    for r in await cursor.fetchall():
+        new_name = normalize_name(strip_doctor_title(r[1]))
+        if new_name != r[1]:
+            await db.execute(
+                "UPDATE documents SET doctor_name = ? WHERE id = ?",
+                (new_name, r[0]),
+            )
+            _denorm_updates += 1
+
+    if _doc_updates or _denorm_updates:
+        await db.commit()
+        logger.info(
+            "Migration: stripped titles from %d doctor rows and %d document.doctor_name values",
+            _doc_updates, _denorm_updates,
+        )
+
     # Add unique constraint on document_links to prevent exact duplicates
     # First deduplicate any existing rows, keeping the oldest
     await db.execute("""

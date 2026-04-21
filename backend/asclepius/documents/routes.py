@@ -234,10 +234,15 @@ async def update_doc(
     # corresponding id, resolve (or create) the canonical entry so the document
     # keeps a proper FK instead of a dangling text-only value. Goes through the
     # alias-aware _upsert_* helpers so merges stay sticky.
-    from asclepius.pipeline.extractor import _upsert_doctor, _upsert_facility
+    from asclepius.pipeline.extractor import (
+        _upsert_doctor, _upsert_facility, strip_doctor_title, normalize_name,
+    )
     if "doctor_name" in updates and "doctor_id" not in updates:
         name = (updates["doctor_name"] or "").strip()
         if name:
+            # Strip honorific titles before we store the user-supplied name —
+            # the DB should hold the raw person-name only.
+            updates["doctor_name"] = normalize_name(strip_doctor_title(name))
             updates["doctor_id"] = await _upsert_doctor(db, {"name": name})
         else:
             updates["doctor_id"] = None

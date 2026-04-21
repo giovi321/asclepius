@@ -620,7 +620,7 @@ async def extract_and_store(
     doctor_data = extraction.get("doctor", {})
     if doctor_data.get("name"):
         doctor_id = await _upsert_doctor(db, doctor_data, facility_id)
-        doctor_name_text = normalize_name(doctor_data["name"])
+        doctor_name_text = normalize_name(strip_doctor_title(doctor_data["name"]))
         await db.execute(
             "UPDATE documents SET doctor_id = ?, doctor_name = ? WHERE id = ?",
             (doctor_id, doctor_name_text, doc_id),
@@ -753,6 +753,49 @@ async def extract_and_store(
     return extraction
 
 
+# Honorific / title tokens to strip from doctor names before storing them.
+# We want the raw person-name in the database — the display layer can add
+# "Dr." back if it wants. Covers the English + Italian + German titles we
+# see most often in the documents we parse.
+_DOCTOR_TITLE_TOKENS = {
+    "dr", "dr.", "dr.ssa", "drssa",
+    "doctor", "doctors",
+    "dott", "dott.", "dott.ssa", "dottssa", "dott.essa", "dottessa",
+    "dottore", "dottoressa",
+    "prof", "prof.", "professor", "professore", "professoressa",
+    "med", "med.",
+    "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "mme", "mme.",
+    "md", "md.", "m.d.", "m.d",
+    "phd", "ph.d", "ph.d.",
+    "dds", "dds.",
+    "pharm", "pharm.", "pharma",
+    "ing", "ing.",
+    "sig", "sig.", "sig.ra", "sig.ra.", "sig.na", "sig.na.",
+}
+
+
+def strip_doctor_title(name: str) -> str:
+    """Remove leading / trailing honorific titles from a doctor's name.
+
+    Handles stacked prefixes ("Prof. Dr. med. Hans Müller") and trailing
+    post-nominals ("Anna Rossi MD"). Returns the input unchanged if it
+    contains no recognised titles, so the function is idempotent and safe
+    to call twice.
+    """
+    if not name or not name.strip():
+        return name
+    tokens = name.split()
+    while tokens and tokens[0].lower().rstrip(",") in _DOCTOR_TITLE_TOKENS:
+        tokens.pop(0)
+    while tokens and tokens[-1].lower().rstrip(",") in _DOCTOR_TITLE_TOKENS:
+        tokens.pop()
+    # Trim any leftover punctuation from the token that used to precede a
+    # trailing title (e.g. "Anna Rossi, MD" → "Anna Rossi" not "Anna Rossi,").
+    if tokens:
+        tokens[-1] = tokens[-1].rstrip(",.;")
+    return " ".join(tokens)
+
+
 def normalize_name(name: str) -> str:
     """Normalize doctor/facility name capitalization.
 
@@ -882,7 +925,7 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
     """Insert or get existing doctor."""
     from asclepius.patients.service import slugify
 
-    name = normalize_name(doctor_data["name"])
+    name = normalize_name(strip_doctor_title(doctor_data["name"]))
     slug = slugify(name)
 
     cursor = await db.execute("SELECT id FROM doctors WHERE slug = ?", (slug,))

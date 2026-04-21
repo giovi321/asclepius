@@ -127,15 +127,15 @@ async def edit_document_with_ai(
         doctor_name_str = doctor_data
         doctor_data = None
     if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
-        from asclepius.pipeline.extractor import _upsert_doctor
+        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
         doctor_id = await _upsert_doctor(db, doctor_data)
         updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = doctor_data["name"]
+        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_data["name"]))
     elif doctor_name_str:
-        from asclepius.pipeline.extractor import _upsert_doctor
+        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
         doctor_id = await _upsert_doctor(db, {"name": doctor_name_str})
         updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = doctor_name_str
+        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_name_str))
 
     # Handle facility change
     facility_data = changes.get("facility")

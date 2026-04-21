@@ -210,7 +210,7 @@ export default function EventsPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{event.title}</span>
                     <span className="rounded-full bg-muted px-2 py-0.5 text-[10px]">{event.event_type.replace(/_/g, " ")}</span>
-                    {event.is_ongoing && <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-600">ongoing</span>}
+                    {!!event.is_ongoing && <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-600">ongoing</span>}
                     {event.severity && <span className="text-[10px] text-muted-foreground">{event.severity}</span>}
                   </div>
                   <div className="flex gap-3 text-xs text-muted-foreground mt-0.5">

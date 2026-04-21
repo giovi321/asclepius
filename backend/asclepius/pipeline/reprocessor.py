@@ -177,6 +177,11 @@ async def reprocess_document(
             if "error" in extraction:
                 raw_resp = extraction.get("raw_response", "")
                 error_detail = extraction.get("error", "Extraction failed")
+                if extraction.get("_truncation_suspected"):
+                    error_detail = (
+                        f"{error_detail} (response length {extraction.get('_response_length')} chars — "
+                        f"likely hit the output-token cap; raise llm.extraction_max_output_tokens)"
+                    )
                 if raw_resp:
                     error_detail = f"{error_detail}\n\nRaw LLM response:\n{raw_resp}"
                 logger.error("LLM extraction error for doc %d: %s", doc_id, error_detail[:500])
@@ -187,6 +192,12 @@ async def reprocess_document(
                 )
                 await db.commit()
                 return extraction
+            if extraction.get("_truncated"):
+                logger.warning(
+                    "Doc %d: LLM response was truncated; kept partial extraction. "
+                    "Consider raising llm.extraction_max_output_tokens.",
+                    doc_id,
+                )
 
             # Validate meaningful content
             _has_content = any([

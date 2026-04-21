@@ -9,6 +9,7 @@ import re
 import httpx
 
 from asclepius.llm.base import LLMProvider
+from asclepius.llm.json_utils import get_output_token_caps, parse_llm_json
 from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT, canonical_language_directive
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,9 @@ class OllamaProvider(LLMProvider):
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
-        response_text = await self._generate(prompt)
-        result = self._parse_json(response_text)
+        _, classification_cap = get_output_token_caps()
+        response_text = await self._generate(prompt, max_output_tokens=classification_cap)
+        result = parse_llm_json(response_text, max_output_tokens=classification_cap)
         logger.info("Ollama classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
         return result
 
@@ -92,19 +94,26 @@ class OllamaProvider(LLMProvider):
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
-        response_text = await self._generate(prompt)
-        return self._parse_json(response_text)
+        extraction_cap, _ = get_output_token_caps()
+        response_text = await self._generate(prompt, max_output_tokens=extraction_cap)
+        return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         ollama_messages = [{"role": "system", "content": system_prompt}]
         ollama_messages.extend(messages)
 
+        extraction_cap, _ = get_output_token_caps()
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         async with _get_semaphore():
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     f"{self.base_url}/api/chat",
-                    json={"model": self.model, "messages": ollama_messages, "stream": False},
+                    json={
+                        "model": self.model,
+                        "messages": ollama_messages,
+                        "stream": False,
+                        "options": {"num_predict": extraction_cap},
+                    },
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -117,7 +126,7 @@ class OllamaProvider(LLMProvider):
         # SQL output is a ```sql``` code block, not JSON — Ollama's
         # ``format=json`` mode would coerce the reply into an empty ``{}``
         # and the sanitizer would reject every chat question.
-        response_text = await self._generate(prompt, force_json=False)
+        response_text = await self._generate(prompt, force_json=False, max_output_tokens=1024)
         # Extract SQL from response
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         if sql_match:
@@ -132,7 +141,13 @@ class OllamaProvider(LLMProvider):
             return select_match.group(1).strip()
         return response_text.strip()
 
-    async def _generate(self, prompt: str, force_json: bool = True, timeout_override: float | None = None) -> str:
+    async def _generate(
+        self,
+        prompt: str,
+        force_json: bool = True,
+        timeout_override: float | None = None,
+        max_output_tokens: int | None = None,
+    ) -> str:
         read_timeout = timeout_override or float(self.timeout)
         logger.debug("Ollama _generate: model=%s, prompt_len=%d, url=%s, timeout=%.0fs",
                       self.model, len(prompt), self.base_url, read_timeout)
@@ -140,6 +155,9 @@ class OllamaProvider(LLMProvider):
         payload = {"model": self.model, "prompt": prompt, "stream": False}
         if force_json:
             payload["format"] = "json"
+        if max_output_tokens is None:
+            max_output_tokens, _ = get_output_token_caps()
+        payload["options"] = {"num_predict": int(max_output_tokens)}
 
         max_retries, retry_backoff = _get_retry_config(self)
         total_attempts = max_retries + 1
@@ -175,36 +193,5 @@ class OllamaProvider(LLMProvider):
 
     @staticmethod
     def _parse_json(text: str) -> dict:
-        """Parse JSON from LLM response, handling common formatting issues."""
-        # Try direct parse
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
-
-        # Try to find JSON block
-        json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-
-        # Try to find JSON object
-        brace_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if brace_match:
-            raw = brace_match.group(0)
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                pass
-            # Fix common LLM JSON issues: trailing commas, single quotes
-            fixed = re.sub(r",\s*([}\]])", r"\1", raw)  # trailing commas
-            fixed = re.sub(r"'", '"', fixed)  # single quotes to double
-            try:
-                return json.loads(fixed)
-            except json.JSONDecodeError:
-                pass
-
-        logger.warning("Failed to parse JSON from LLM response: %s", text[:200])
-        return {"error": "Failed to parse extraction", "raw_response": text[:500]}
+        """Kept for backward compatibility; delegates to the shared parser."""
+        return parse_llm_json(text)

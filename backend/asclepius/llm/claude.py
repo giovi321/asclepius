@@ -7,6 +7,7 @@ import re
 from anthropic import AsyncAnthropic
 
 from asclepius.llm.base import LLMProvider
+from asclepius.llm.json_utils import get_output_token_caps, parse_llm_json
 from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT, canonical_language_directive
 
 logger = logging.getLogger(__name__)
@@ -29,13 +30,14 @@ class ClaudeProvider(LLMProvider):
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
+        _, classification_cap = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=2048,
+            max_tokens=classification_cap,
             messages=[{"role": "user", "content": prompt}],
         )
         response_text = response.content[0].text
-        result = self._parse_json(response_text)
+        result = parse_llm_json(response_text, max_output_tokens=classification_cap)
         logger.info("Claude classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
         return result
 
@@ -52,18 +54,20 @@ class ClaudeProvider(LLMProvider):
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
 
+        extraction_cap, _ = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=4096,
+            max_tokens=extraction_cap,
             messages=[{"role": "user", "content": prompt}],
         )
         response_text = response.content[0].text
-        return self._parse_json(response_text)
+        return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
+        extraction_cap, _ = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=4096,
+            max_tokens=extraction_cap,
             system=system_prompt,
             messages=messages,
         )
@@ -93,30 +97,15 @@ class ClaudeProvider(LLMProvider):
 
     async def _generate(self, prompt: str, force_json: bool = True, timeout_override: float | None = None) -> str:
         """Generate raw text response from a prompt."""
+        extraction_cap, _ = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=4096,
+            max_tokens=extraction_cap,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.content[0].text
 
     @staticmethod
     def _parse_json(text: str) -> dict:
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
-        json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        brace_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if brace_match:
-            try:
-                return json.loads(brace_match.group(0))
-            except json.JSONDecodeError:
-                pass
-        logger.warning("Failed to parse JSON from Claude response")
-        return {"error": "Failed to parse extraction", "raw_response": text[:500]}
+        """Kept for backward compatibility; delegates to the shared parser."""
+        return parse_llm_json(text)

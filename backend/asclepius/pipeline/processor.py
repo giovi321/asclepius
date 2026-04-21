@@ -462,16 +462,22 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
 
             if "error" in extraction:
+                err_msg = extraction.get("error", "Extraction failed")
+                if extraction.get("_truncation_suspected"):
+                    err_msg = (
+                        f"{err_msg} (response length {extraction.get('_response_length')} chars — "
+                        f"likely hit the output-token cap; raise llm.extraction_max_output_tokens)"
+                    )
                 pipeline_status["total_errors"] += 1
                 pipeline_status["recent_errors"].append({
                     "file": path.name,
-                    "error": extraction.get("error", "Unknown"),
+                    "error": err_msg,
                 })
                 pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
                 await db.execute(
                     """UPDATE documents SET status = 'failed', error_message = ?,
                        updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
-                    (extraction.get("error", "Extraction failed")[:2000], doc_id),
+                    (err_msg[:2000], doc_id),
                 )
                 await db.commit()
                 return

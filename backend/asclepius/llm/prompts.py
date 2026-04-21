@@ -699,6 +699,36 @@ OCR text:
 EXTRACTION_PROMPT = EXTRACTION_PROMPT_LEGACY
 
 
+def chunk_context_preamble(
+    chunk_index: int,
+    total_chunks: int,
+    page_start: int,
+    page_end: int,
+    total_pages: int,
+    overlaps_previous: bool,
+) -> str:
+    """Prefix for the extraction prompt when a document is processed in chunks.
+
+    Tells the LLM which page range it is looking at, warns that the first
+    page may have been part of the previous chunk (because we overlap by a
+    full page to keep tables straddling a page boundary intact), and asks
+    it not to fabricate continuation rows at the chunk edges.
+    """
+    overlap_note = (
+        f"\n- The first page in this chunk (page {page_start}) was ALSO the last page of the "
+        f"previous chunk; you may see rows you've already extracted. Extract them anyway — "
+        f"the caller deduplicates by row identity (e.g. test_name_original)."
+        if overlaps_previous
+        else ""
+    )
+    return (
+        f"CHUNK CONTEXT: This is chunk {chunk_index} of {total_chunks}, covering pages "
+        f"{page_start}-{page_end} of {total_pages}.{overlap_note}\n"
+        f"- If a row appears cut off at the very top or very bottom of the chunk and you "
+        f"cannot see the full row, SKIP it. Do not fabricate missing fields.\n\n"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Page classification prompt (for multi-page document sectioning)
 # ---------------------------------------------------------------------------

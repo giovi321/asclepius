@@ -223,6 +223,14 @@ class LlmConfig(BaseModel):
     # single Ollama/vLLM instance when the pipeline reprocesses multiple
     # documents in parallel. 1 = fully serialized.
     max_concurrent_requests: int = 2
+    # Max output tokens for the extraction call. Lab panels with 20+ results
+    # routinely exceed the old hard-coded 4k ceiling and the LLM truncates
+    # mid-JSON. 16k covers typical panels with headroom; raise further in
+    # settings.yaml if outlier documents hit the ceiling.
+    extraction_max_output_tokens: int = 16384
+    # Max output tokens for the classification call. Classification output
+    # is small (doc_type, patient, dates, summary), so 4k is generous.
+    classification_max_output_tokens: int = 4096
     # Retry behavior for transient failures (ReadTimeout, ConnectError) on
     # Ollama. The number of attempts is ``max_retries + 1`` — the first
     # attempt plus the retries. ``retry_backoff_seconds`` lists the sleep

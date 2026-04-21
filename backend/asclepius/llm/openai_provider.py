@@ -7,6 +7,7 @@ import re
 import httpx
 
 from asclepius.llm.base import LLMProvider
+from asclepius.llm.json_utils import get_output_token_caps, parse_llm_json
 from asclepius.llm.prompts import CLASSIFICATION_PROMPT, EXTRACTION_PROMPT, SQL_GENERATION_PROMPT, canonical_language_directive
 
 logger = logging.getLogger(__name__)
@@ -35,8 +36,9 @@ class OpenAIProvider(LLMProvider):
             few_shot_examples=context.get("few_shot_examples", ""),
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-        response_text = await self._generate(prompt)
-        result = self._parse_json(response_text)
+        _, classification_cap = get_output_token_caps()
+        response_text = await self._generate(prompt, max_output_tokens=classification_cap)
+        result = parse_llm_json(response_text, max_output_tokens=classification_cap)
         logger.info("OpenAI classify result: doc_type=%s, patient=%s", result.get("doc_type"), result.get("patient_name"))
         return result
 
@@ -52,19 +54,21 @@ class OpenAIProvider(LLMProvider):
             ocr_text=ocr_text,
         )
         prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-        response_text = await self._generate(prompt)
-        return self._parse_json(response_text)
+        extraction_cap, _ = get_output_token_caps()
+        response_text = await self._generate(prompt, max_output_tokens=extraction_cap)
+        return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
     async def chat(self, messages: list[dict], system_prompt: str) -> str:
         all_messages = [{"role": "system", "content": system_prompt}]
         all_messages.extend(messages)
+        extraction_cap, _ = get_output_token_caps()
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
-                json={"model": self.model, "messages": all_messages},
+                json={"model": self.model, "messages": all_messages, "max_tokens": extraction_cap},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -74,7 +78,7 @@ class OpenAIProvider(LLMProvider):
         prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
         # SQL output is a ```sql``` code block — don't ask the provider to
         # coerce it into JSON (vLLM and compatible backends honour the flag).
-        response_text = await self._generate(prompt, force_json=False)
+        response_text = await self._generate(prompt, force_json=False, max_output_tokens=1024)
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         if sql_match:
             return sql_match.group(1).strip()
@@ -86,16 +90,26 @@ class OpenAIProvider(LLMProvider):
             return select_match.group(1).strip()
         return response_text.strip()
 
-    async def _generate(self, prompt: str, force_json: bool = True, timeout_override: float | None = None) -> str:
+    async def _generate(
+        self,
+        prompt: str,
+        force_json: bool = True,
+        timeout_override: float | None = None,
+        max_output_tokens: int | None = None,
+    ) -> str:
         import asyncio
 
         read_timeout = timeout_override or float(self.timeout)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
+        if max_output_tokens is None:
+            max_output_tokens, _ = get_output_token_caps()
+
         payload: dict = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": int(max_output_tokens),
         }
         if force_json:
             payload["response_format"] = {"type": "json_object"}
@@ -127,28 +141,5 @@ class OpenAIProvider(LLMProvider):
 
     @staticmethod
     def _parse_json(text: str) -> dict:
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass
-        json_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        brace_match = re.search(r"\{.*\}", text, re.DOTALL)
-        if brace_match:
-            raw = brace_match.group(0)
-            try:
-                return json.loads(raw)
-            except json.JSONDecodeError:
-                pass
-            fixed = re.sub(r",\s*([}\]])", r"\1", raw)
-            fixed = re.sub(r"'", '"', fixed)
-            try:
-                return json.loads(fixed)
-            except json.JSONDecodeError:
-                pass
-        logger.warning("Failed to parse JSON from OpenAI response: %s", text[:200])
-        return {"error": "Failed to parse extraction", "raw_response": text[:500]}
+        """Kept for backward compatibility; delegates to the shared parser."""
+        return parse_llm_json(text)

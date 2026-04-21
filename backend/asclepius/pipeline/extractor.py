@@ -521,13 +521,30 @@ async def extract_and_store(
             extraction[key] = []
 
     if "error" in extraction:
-        logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))
+        if extraction.get("_truncation_suspected"):
+            logger.error(
+                "LLM extraction failed for doc %d (TRUNCATION SUSPECTED, response_len=%s): %s — "
+                "raise llm.extraction_max_output_tokens in settings.yaml.",
+                doc_id, extraction.get("_response_length"), extraction.get("error"),
+            )
+        else:
+            logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))
         await db.execute(
             "UPDATE documents SET status = 'failed', raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (json.dumps(extraction), doc_id),
         )
         await db.commit()
         return extraction
+    if extraction.get("_truncated"):
+        logger.warning(
+            "Doc %d: LLM response was truncated; kept partial extraction "
+            "(%d lab_results, %d medications, %d diagnoses). "
+            "Consider raising llm.extraction_max_output_tokens.",
+            doc_id,
+            len(extraction.get("lab_results") or []),
+            len(extraction.get("medications") or []),
+            len(extraction.get("diagnoses") or []),
+        )
 
     # Clear any prior child rows for this document so re-extraction overwrites
     # old data instead of appending duplicates. Both the full pipeline and the

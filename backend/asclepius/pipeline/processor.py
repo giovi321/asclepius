@@ -293,13 +293,27 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing_step"] = "llm_extraction"
                 from asclepius.pipeline.extractor import (
                     extract_and_store, _salvage_classification, _normalize_doc_type,
+                    _extract_type_specific, build_extraction_context,
                 )
                 _salvage_classification(vision_result)
-                vision_result["doc_type"] = _normalize_doc_type(vision_result.get("doc_type", "other"))
-                # A text LLM is still needed downstream (AI filename, type-specific
-                # DB inserts). Pick the default one; pipeline can still complete
-                # with a no-op LLM because extract_and_store honors the override.
+                doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
+                vision_result["doc_type"] = doc_type
                 llm = get_llm_provider(config)
+                # Vision handled classification + universal fields (Phase 1).
+                # Still run Phase 2 type-specific extraction on the vision OCR
+                # text to capture lab_results / medications / diagnoses / etc.
+                try:
+                    context = await build_extraction_context(db)
+                    type_extraction = await _extract_type_specific(
+                        llm, ocr_text, doc_type, context, db_path=config.database.path,
+                    )
+                    if type_extraction:
+                        vision_result = {**vision_result, **type_extraction}
+                except Exception:
+                    logger.warning(
+                        "Phase 2 type-specific extraction failed for doc %d (non-fatal)",
+                        doc_id, exc_info=True,
+                    )
                 extraction = await extract_and_store(
                     db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
                 )

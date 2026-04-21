@@ -244,6 +244,7 @@ async def _reprocess_vision_llm(
     from asclepius.pipeline.vision_extractor import extract_with_vision
     from asclepius.pipeline.extractor import (
         extract_and_store, _salvage_classification, _normalize_doc_type,
+        _extract_type_specific, build_extraction_context,
     )
 
     async with aiosqlite.connect(config.database.path) as db:
@@ -322,9 +323,25 @@ async def _reprocess_vision_llm(
                 return {"error": "Vision-LLM produced no content"}
 
             _salvage_classification(vision_result)
-            vision_result["doc_type"] = _normalize_doc_type(vision_result.get("doc_type", "other"))
+            doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
+            vision_result["doc_type"] = doc_type
 
             llm = get_llm_provider(config)
+            # Phase 2 — vision only handles classification + universal fields,
+            # run type-specific extraction on the vision-produced OCR text to
+            # capture lab_results / medications / diagnoses / etc.
+            try:
+                context = await build_extraction_context(db)
+                type_extraction = await _extract_type_specific(
+                    llm, ocr_text, doc_type, context, db_path=config.database.path,
+                )
+                if type_extraction:
+                    vision_result = {**vision_result, **type_extraction}
+            except Exception:
+                logger.warning(
+                    "Phase 2 type-specific extraction failed for doc %d (non-fatal)",
+                    doc_id, exc_info=True,
+                )
             extraction = await extract_and_store(
                 db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
             )

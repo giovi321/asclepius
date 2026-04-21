@@ -497,19 +497,18 @@ export default function DocumentsPage() {
                   className="align-middle"
                 />
               </th>
-              <th className="px-4 py-2 text-left font-medium w-[28%]">File</th>
-              <th className="px-4 py-2 text-left font-medium w-[12%]">Type</th>
-              <th className="px-4 py-2 text-left font-medium w-[10%]">Date</th>
-              <th className="px-4 py-2 text-left font-medium w-[16%]">Patient</th>
-              <th className="px-4 py-2 text-left font-medium w-[18%]">Doctor / Facility</th>
-              <th className="px-4 py-2 text-left font-medium w-[12%]">Status</th>
+              <th className="px-4 py-2 text-left font-medium w-[30%]">File</th>
+              <th className="px-4 py-2 text-left font-medium w-[14%]">Type</th>
+              <th className="px-4 py-2 text-left font-medium w-[12%]">Date</th>
+              <th className="px-4 py-2 text-left font-medium w-[22%]">Doctor / Facility</th>
+              <th className="px-4 py-2 text-left font-medium w-[22%]">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
             ) : documents.length === 0 ? (
-              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
+              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
             ) : (
               documents.map((doc: any) => (
                 <tr key={doc.id} className={`hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}>
@@ -529,10 +528,9 @@ export default function DocumentsPage() {
                   </td>
                   <td className="px-4 py-2 text-muted-foreground truncate" title={formatDocType(doc.doc_type)}>{formatDocType(doc.doc_type)}</td>
                   <td className="px-4 py-2 text-muted-foreground truncate">{getBestDate(doc) || "—"}</td>
-                  <td className="px-4 py-2 truncate" title={doc.patient_name || "Unclassified"}>{doc.patient_name || <span className="text-yellow-600">Unclassified</span>}</td>
                   <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || doc.facility_name || ""}>{doc.doctor_name || doc.facility_name || "—"}</td>
                   <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
+                    <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
                       {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
                         && pipeline?.processing_pages && pipeline?.processing_page_current != null
                         ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`

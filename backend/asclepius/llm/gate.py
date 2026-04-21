@@ -1,14 +1,17 @@
-"""Per-credential concurrency gate for all LLM/Vision calls.
+"""Per-credential concurrency gate for all LLM/Vision/OCR calls.
 
-Every LLM / Vision call is wrapped in :func:`credential_slot`, which
+Every LLM / Vision / OCR call is wrapped in :func:`credential_slot`, which
 acquires a semaphore keyed by ``credential_id`` — i.e. per *connection*,
-not per model. This matches how the backing resource actually behaves:
+not per model. That matches how the backing resource actually behaves:
 one Ollama server has a fixed parallelism limit regardless of which
 model happens to be loaded.
 
-The snapshot keeps the currently-running model name as a label so the UI
-can still show "llama3.1 running on Home Ollama", even though the queue
-itself is shared across all models on that credential.
+Counters and labels are keyed one level finer, on
+``(credential_id, kind)``. Three simultaneous calls on the same Ollama
+credential — say an LLM extraction, an LLM-vision OCR page, and a
+Vision-LLM extraction — produce three separate rows in the snapshot
+(and therefore three separate chips in the UI), even though they all
+contend for the same semaphore's slots.
 """
 
 from __future__ import annotations
@@ -22,24 +25,19 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+# Concurrency cap: one semaphore per credential_id. All kinds share it.
 _SEMS: dict[str, asyncio.Semaphore] = {}
 _CAPS: dict[str, int] = {}
-# Active in-flight and waiting counters per credential.
-_STATS: dict[str, dict] = {}
-# Human-readable labels per credential.
-_LABELS: dict[str, dict] = {}
-# Currently in-flight models per credential — a Counter so two simultaneous
-# calls to the same model are reflected correctly.
-_ACTIVE_MODELS: dict[str, Counter] = {}
+
+# Counters + labels keyed per (credential_id, kind) so LLM / Vision / OCR
+# can run on the same credential without stepping on each other's chip.
+_STATS: dict[tuple[str, str], dict] = {}
+_LABELS: dict[tuple[str, str], dict] = {}
+_ACTIVE_MODELS: dict[tuple[str, str], Counter] = {}
 
 
-def _ensure_slot(credential_id: str, cap: int, *,
-                 kind: str = "llm", credential_name: str = "") -> None:
-    """Make sure a semaphore exists for this credential with at least
-    ``cap`` slots. Grows upwards; never shrinks at runtime (the worst case
-    of a slight over-allocation until restart is preferable to the race
-    conditions shrinking would introduce mid-flight).
-    """
+def _ensure_sem(credential_id: str, cap: int) -> None:
+    """Create or grow the per-credential semaphore."""
     key = credential_id or ""
     current_cap = _CAPS.get(key, 0)
     if cap > current_cap:
@@ -48,9 +46,16 @@ def _ensure_slot(credential_id: str, cap: int, *,
     elif key not in _SEMS:
         _SEMS[key] = asyncio.Semaphore(cap)
         _CAPS[key] = cap
-    _STATS.setdefault(key, {"in_flight": 0, "waiting": 0})
-    _ACTIVE_MODELS.setdefault(key, Counter())
-    _LABELS[key] = {
+
+
+def _ensure_counters(credential_id: str, kind: str, *,
+                     credential_name: str = "") -> None:
+    """Create the per-(credential, kind) stats + label entries if missing,
+    and refresh the stored label so renames propagate."""
+    sub = (credential_id or "", kind or "")
+    _STATS.setdefault(sub, {"in_flight": 0, "waiting": 0})
+    _ACTIVE_MODELS.setdefault(sub, Counter())
+    _LABELS[sub] = {
         "kind": kind,
         "credential_id": credential_id or "",
         "credential_name": credential_name or "",
@@ -59,13 +64,15 @@ def _ensure_slot(credential_id: str, cap: int, *,
 
 def register_credential(credential_id: str, cap: int, *,
                         kind: str = "llm", credential_name: str = "") -> None:
-    """Register a credential with the gate so its cap is visible even when
-    no call is currently in flight. Safe to call repeatedly — acts as an
-    upsert."""
-    first = (credential_id or "") not in _SEMS
-    _ensure_slot(credential_id, max(1, cap),
-                 kind=kind, credential_name=credential_name)
-    if first:
+    """Register a (credential, kind) pair with the gate so its cap is
+    visible even when no call is currently in flight. Safe to call
+    repeatedly — acts as an upsert."""
+    cap = max(1, cap)
+    first_sem = (credential_id or "") not in _SEMS
+    first_counters = (credential_id or "", kind or "") not in _STATS
+    _ensure_sem(credential_id, cap)
+    _ensure_counters(credential_id, kind, credential_name=credential_name)
+    if first_sem or first_counters:
         logger.info(
             "gate.register: credential=%s name=%s kind=%s cap=%d",
             credential_id, credential_name, kind, cap,
@@ -77,29 +84,27 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
                           model: str = "",
                           kind: str = "llm",
                           credential_name: str = ""):
-    """Acquire a slot on ``credential_id``. ``cap`` is only honoured on
-    first sight or to grow the cap — use :func:`register_credential` when
-    configuration changes so the number is picked up promptly.
+    """Acquire a slot on ``credential_id`` (all kinds share the cap).
 
-    On any exit (return, exception, cancellation) the in_flight counter,
-    active-model counter, and semaphore are all released. All the
-    per-acquire bookkeeping lives inside a single try/finally so there is
-    no window where a counter can be leaked.
+    Counters are tracked per ``(credential_id, kind)`` so a caller
+    setting ``kind="ocr"`` is reported separately from ``kind="llm"``
+    even when they share the same credential and therefore the same
+    semaphore.
     """
-    _ensure_slot(credential_id, max(1, cap),
-                 kind=kind, credential_name=credential_name)
-    key = credential_id or ""
-    sem = _SEMS[key]
-    stats = _STATS[key]
-    active = _ACTIVE_MODELS[key]
+    cap = max(1, cap)
+    _ensure_sem(credential_id, cap)
+    _ensure_counters(credential_id, kind, credential_name=credential_name)
+
+    cred_key = credential_id or ""
+    sub_key = (cred_key, kind or "")
+    sem = _SEMS[cred_key]
+    stats = _STATS[sub_key]
+    active = _ACTIVE_MODELS[sub_key]
     stats["waiting"] = stats.get("waiting", 0) + 1
     acquired = False
     try:
         await sem.acquire()
         acquired = True
-        # Everything that mutates stats/active lives inside the try below
-        # so a single finally block owns cleanup — no leak window between
-        # the increment and the yield.
         try:
             stats["waiting"] = max(0, stats["waiting"] - 1)
             stats["in_flight"] = stats.get("in_flight", 0) + 1
@@ -118,42 +123,44 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
                     active.pop(model, None)
             sem.release()
             logger.info(
-                "gate.exit: credential=%s model=%s in_flight=%d waiting=%d",
-                credential_id, model, stats["in_flight"], stats["waiting"],
+                "gate.exit: credential=%s kind=%s model=%s in_flight=%d waiting=%d",
+                credential_id, kind, model, stats["in_flight"], stats["waiting"],
             )
     except BaseException:
-        # Only fired when we never entered the inner try (cancellation
-        # during sem.acquire()). No slot held; just undo the waiting bump.
         if not acquired:
             stats["waiting"] = max(0, stats["waiting"] - 1)
         raise
 
 
 def snapshot(*, include_idle: bool = False) -> list[dict]:
-    """Return one row per active credential. When ``include_idle`` is False
-    (default), only credentials with in-flight or waiting requests show up.
+    """Return one row per active (credential, kind). When
+    ``include_idle`` is False (default), only rows with in-flight or
+    waiting requests are reported.
 
-    Each row includes the list of models currently in flight so the UI can
-    render ``Home Ollama · llama3.1 + qwen2.5 · 2/4``.
+    Every row's ``cap`` is the credential's shared semaphore size — so
+    if three kinds run on the same credential with cap=2, every row
+    shows ``cap=2`` and the UI can reason about them independently while
+    still telling the user the physical limit they share.
     """
     out = []
-    for key, stats in _STATS.items():
+    for sub_key, stats in _STATS.items():
         in_flight = stats.get("in_flight", 0)
         waiting = stats.get("waiting", 0)
         if not include_idle and in_flight == 0 and waiting == 0:
             continue
-        label = _LABELS.get(key, {})
-        active = _ACTIVE_MODELS.get(key, Counter())
+        cred_id, _kind = sub_key
+        label = _LABELS.get(sub_key, {})
+        active = _ACTIVE_MODELS.get(sub_key, Counter())
         models = sorted(active.keys())
         out.append({
             "kind": label.get("kind", "llm"),
-            "credential_id": label.get("credential_id", key),
+            "credential_id": label.get("credential_id", cred_id),
             "credential_name": label.get("credential_name", ""),
             "models": models,
             "model": models[0] if models else "",
             "in_flight": in_flight,
             "waiting": waiting,
-            "cap": _CAPS.get(key, 0),
+            "cap": _CAPS.get(cred_id, 0),
         })
     return out
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import {
   Eye, Plus, Trash2, Save, Check, Power,
-  ChevronUp, ChevronDown, X, Zap, Loader2,
+  ChevronUp, ChevronDown, X, Zap, Loader2, Info,
 } from "lucide-react";
 import { TextField, NumberField, SelectField } from "./SettingsFormHelpers";
 import type { VisionLlmProvider } from "@/types";
@@ -180,7 +180,23 @@ export default function VisionLlmProvidersTab() {
             description="Retries per page on transient failures (timeouts, rate limits)."
           />
           <label className="space-y-1 block">
-            <span className="text-sm font-medium">Retry backoff (seconds)</span>
+            <span className="flex items-center gap-1 text-sm font-medium">
+              Retry backoff (seconds)
+              <span
+                className="text-muted-foreground hover:text-foreground cursor-help"
+                title={
+                  "Wait time between successive retry attempts after a transient vision-call failure " +
+                  "(timeout, connection error, rate-limit / HTTP 429).\n\n" +
+                  "Format: comma-separated non-negative integers, one value per retry. " +
+                  "The first value is the wait before retry 1, the second before retry 2, and so on.\n\n" +
+                  "If the list is shorter than 'Max retries', the last value is reused for remaining attempts. " +
+                  "If it is longer, extra values are ignored.\n\n" +
+                  "Example: 30,60,120 → waits 30s before retry 1, 60s before retry 2, 120s before retry 3+."
+                }
+              >
+                <Info className="h-3.5 w-3.5" />
+              </span>
+            </span>
             <input
               type="text"
               value={retryBackoff}
@@ -189,7 +205,7 @@ export default function VisionLlmProvidersTab() {
               className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             />
             <span className="block text-xs text-muted-foreground">
-              Wait times between successive retry attempts.
+              Comma-separated seconds, e.g. <code>30,60,120</code>. Hover the info icon for details.
             </span>
           </label>
           <NumberField

@@ -277,6 +277,107 @@ def _salvage_array_keys(extraction: dict) -> None:
                 break
 
 
+_LAB_MISSING_SENTINELS = {"", "*", "-", "—", "–", "n/a", "na", "null", "none", "*/*"}
+
+
+def _is_missing(val) -> bool:
+    """True if the LLM emitted a placeholder meaning 'no value'."""
+    if val is None:
+        return True
+    if isinstance(val, str):
+        return val.strip().lower() in _LAB_MISSING_SENTINELS
+    return False
+
+
+def _parse_reference_range(raw: str) -> tuple[float | None, float | None]:
+    """Parse strings like '[12 - 43]', '0.5–2.1', '< 5', '* - *' → (low, high).
+
+    Returns (None, None) when neither bound is a real number.
+    """
+    if not isinstance(raw, str):
+        return None, None
+    s = raw.strip().strip("[]()").strip()
+    if not s:
+        return None, None
+    # Normalize dash variants (en/em/minus) into ASCII "-"
+    for ch in ("–", "—", "−"):
+        s = s.replace(ch, "-")
+    low_s, high_s = None, None
+    if s.startswith("<"):
+        high_s = s[1:].strip().lstrip("=").strip()
+    elif s.startswith(">"):
+        low_s = s[1:].strip().lstrip("=").strip()
+    elif "-" in s:
+        parts = s.split("-", 1)
+        low_s, high_s = parts[0].strip(), parts[1].strip()
+
+    def _coerce(x):
+        if x is None or _is_missing(x):
+            return None
+        try:
+            return float(x.replace(",", "."))
+        except (ValueError, AttributeError):
+            return None
+
+    return _coerce(low_s), _coerce(high_s)
+
+
+def _normalize_lab_row(lab: dict) -> None:
+    """Make a single LLM-produced lab_results item match our schema.
+
+    Small models drift on key names (``analysis`` instead of ``test_name_original``,
+    ``result`` instead of ``value``) and embed abnormal markers like ``*`` into
+    the unit field. Rewrite the row in place so the caller doesn't have to
+    duplicate the logic.
+    """
+    # 1. Test name — support more aliases including 'analysis' / 'exam' / 'item'.
+    if not lab.get("test_name_original"):
+        for alt in ("test_name", "name", "test", "test_name_canonical",
+                    "analyte", "parameter", "analysis", "exam", "item", "label"):
+            v = lab.get(alt)
+            if isinstance(v, str) and v.strip():
+                lab["test_name_original"] = v.strip()
+                break
+
+    # 2. Value — 'result' / 'measurement' / 'observed_value' etc.
+    if lab.get("value") is None and not lab.get("value_text"):
+        raw_val = None
+        for alt in ("result", "measurement", "observed_value", "observed", "reading", "quantity"):
+            if alt in lab:
+                raw_val = lab[alt]
+                break
+        if not _is_missing(raw_val):
+            if isinstance(raw_val, (int, float)):
+                lab["value"] = float(raw_val)
+            elif isinstance(raw_val, str):
+                s = raw_val.strip().replace(",", ".")
+                try:
+                    lab["value"] = float(s)
+                except ValueError:
+                    lab["value_text"] = raw_val.strip()
+
+    # 3. Reference range — accept a single 'reference_range' string.
+    if lab.get("reference_range_low") is None and lab.get("reference_range_high") is None:
+        raw_range = lab.get("reference_range") or lab.get("range") or lab.get("ref_range")
+        low, high = _parse_reference_range(raw_range) if raw_range else (None, None)
+        if low is not None:
+            lab["reference_range_low"] = low
+        if high is not None:
+            lab["reference_range_high"] = high
+
+    # 4. Unit — some models prepend '*' as an abnormal marker (e.g. '* U/L').
+    #    Strip it and treat it as an abnormal hint if is_abnormal wasn't set.
+    unit = lab.get("unit")
+    if isinstance(unit, str):
+        stripped = unit.strip()
+        if stripped.startswith("*"):
+            lab["unit"] = stripped.lstrip("*").strip() or None
+            if lab.get("is_abnormal") is None:
+                lab["is_abnormal"] = True
+        elif _is_missing(stripped):
+            lab["unit"] = None
+
+
 async def classify_and_extract(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -515,15 +616,10 @@ async def extract_and_store(
         for lab in extraction.get("lab_results", []):
             if not isinstance(lab, dict):
                 continue
-            # Per-item key salvage — small models drop the "_original" suffix
-            # and occasionally invent their own keys. Promote common aliases
-            # so we don't hit a NOT NULL violation on test_name_original.
-            if not lab.get("test_name_original"):
-                for alt in ("test_name", "name", "test", "test_name_canonical", "analyte", "parameter"):
-                    v = lab.get(alt)
-                    if isinstance(v, str) and v.strip():
-                        lab["test_name_original"] = v.strip()
-                        break
+            # Per-item schema drift salvage — promote aliases, parse combined
+            # reference-range strings, unwrap '*' placeholders. See
+            # _normalize_lab_row for the full list of heuristics.
+            _normalize_lab_row(lab)
             if not lab.get("test_name_original"):
                 logger.warning("Doc %d: skipping lab result with no test name: %s", doc_id, lab)
                 continue

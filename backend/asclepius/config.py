@@ -376,6 +376,22 @@ def _new_credential_id() -> str:
     return f"cred-{_uuid.uuid4().hex[:12]}"
 
 
+# Types that don't meaningfully use a base_url. Claude and Google Vision
+# always hit their provider's fixed endpoint; an OpenAI credential may
+# optionally override the base but normally uses the default OpenAI URL.
+# We normalise the stored base_url to "" for these so the UI doesn't show
+# a nonsensical URL (e.g. the default "http://ollama:11434" that bleeds
+# through from LlmProviderEntry's default when the user left it untouched).
+_BASELESS_CREDENTIAL_TYPES = {"claude", "google_vision"}
+
+
+def _normalise_base_url(cred_type: str, base_url: str) -> str:
+    """Strip a base_url that doesn't apply to the credential type."""
+    if cred_type in _BASELESS_CREDENTIAL_TYPES:
+        return ""
+    return base_url or ""
+
+
 def _ensure_credential(
     credentials: list[CredentialEntry], cred_type: str, base_url: str, api_key: str,
     *, suggested_name: str = "",
@@ -390,7 +406,8 @@ def _ensure_credential(
     # Local tesseract (no remote URL, no API key) doesn't need a credential.
     if cred_type in ("tesseract",) and not base_url and not api_key:
         return None
-    key = (cred_type or "", base_url or "", api_key or "")
+    clean_url = _normalise_base_url(cred_type, base_url)
+    key = (cred_type or "", clean_url, api_key or "")
     for c in credentials:
         if (c.type, c.base_url, c.api_key) == key:
             return c
@@ -399,7 +416,7 @@ def _ensure_credential(
     name = suggested_name or f"Auto-imported {cred_type}" + (f" {existing_of_type + 1}" if existing_of_type else "")
     entry = CredentialEntry(
         id=_new_credential_id(), name=name, type=cred_type or "ollama",
-        base_url=base_url, api_key=api_key,
+        base_url=clean_url, api_key=api_key,
     )
     credentials.append(entry)
     return entry
@@ -416,6 +433,17 @@ def _migrate_credentials(config: AppConfig) -> bool:
     """
     credentials = list(config.credentials)
     changed = False
+
+    # Scrub stale base_urls off existing credentials that don't meaningfully
+    # use one (Claude, Google Vision). Early versions of the migration
+    # carried over LlmProviderEntry.base_url's default "http://ollama:11434"
+    # even for Claude entries, producing "Sonnet · claude · http://ollama…"
+    # rows that confused the UI.
+    for c in credentials:
+        clean = _normalise_base_url(c.type, c.base_url)
+        if clean != c.base_url:
+            c.base_url = clean
+            changed = True
 
     # LLM providers
     for p in config.llm.providers:

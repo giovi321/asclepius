@@ -136,12 +136,18 @@ export default function LlmProvidersTab() {
         you can re-process a document with the next provider from the document detail page.
       </div>
 
-      {/* Global LLM settings: retries (concurrency is per-model now) */}
+      {/* Global LLM settings: retries (concurrency is per-credential now) */}
       <div className="rounded-lg border p-3 space-y-3">
-        <div className="text-sm font-medium">Global LLM Retry Behavior</div>
-        <div className="text-xs text-muted-foreground">
-          Concurrency is now per-model — set it on each entry below. These retries apply
-          to transient ReadTimeout / ConnectError failures inside a single call.
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-medium">Global LLM Retry Behavior</div>
+          <button
+            onClick={saveGlobal}
+            disabled={savingGlobal || !globalDirty}
+            className="flex items-center gap-2 rounded-md border px-3 py-1 text-sm hover:bg-accent disabled:opacity-50"
+          >
+            {!globalDirty ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+            {savingGlobal ? "Saving..." : !globalDirty ? "Saved" : "Save retry settings"}
+          </button>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           <NumberField
@@ -164,16 +170,6 @@ export default function LlmProvidersTab() {
               Comma-separated wait between attempts. Last value reused.
             </span>
           </label>
-        </div>
-        <div className="flex justify-end">
-          <button
-            onClick={saveGlobal}
-            disabled={savingGlobal || !globalDirty}
-            className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-          >
-            {!globalDirty ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            {savingGlobal ? "Saving..." : !globalDirty ? "Saved" : "Save retry settings"}
-          </button>
         </div>
       </div>
 

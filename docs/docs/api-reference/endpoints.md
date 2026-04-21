@@ -117,15 +117,17 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 {
   "mode": "both",
   "llm_provider_id": "claude-1",
-  "ocr_provider_id": "tesseract-1"
+  "ocr_provider_id": "tesseract-1",
+  "vision_provider_id": null
 }
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `mode` | string | `"both"` | `"ocr"` (OCR only), `"llm"` (LLM only), or `"both"` |
-| `llm_provider_id` | string | null | Specific LLM provider ID (null = default highest-priority) |
-| `ocr_provider_id` | string | null | Specific OCR provider ID (null = default highest-priority) |
+| `mode` | string | `"both"` | `"ocr"` (OCR only), `"llm"` (LLM only), `"both"` (OCR+LLM), or `"vision_llm"` (single-step Vision-LLM flow) |
+| `llm_provider_id` | string | null | Specific LLM provider ID (null = default highest-priority). Used when `mode` is `llm` or `both`. |
+| `ocr_provider_id` | string | null | Specific OCR provider ID (null = default highest-priority). Used when `mode` is `ocr` or `both`. |
+| `vision_provider_id` | string | null | Specific Vision-LLM provider ID (null = default highest-priority). Used when `mode` is `vision_llm`. |
 
 ### Document Link Types
 
@@ -264,20 +266,38 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `PUT` | `/api/settings/llm-providers` | Yes | Update LLM providers |
 | `GET` | `/api/settings/ocr-providers` | Yes | List OCR providers |
 | `PUT` | `/api/settings/ocr-providers` | Yes | Update OCR providers |
+| `GET` | `/api/settings/vision-providers` | Yes | List Vision-LLM providers |
+| `PUT` | `/api/settings/vision-providers` | Yes | Update Vision-LLM providers |
 | `POST` | `/api/settings/test-llm-provider` | Yes | Test an LLM provider connection |
 | `POST` | `/api/settings/test-ocr-provider` | Yes | Test an OCR provider connection |
+| `POST` | `/api/settings/test-vision-provider` | Yes | Test a Vision-LLM provider with a tiny image round-trip |
+
+All three test endpoints accept the same request body:
+
+```json
+{ "provider_id": "claude-1" }                // test a persisted provider by id
+{ "provider": { "id": "ollama-x", "type": "ollama", ... } }   // test an inline, possibly unsaved entry
+```
+
+The inline `provider` form is what the UI uses so the **Test Connection** button works with unsaved edits. Secret fields (`api_key`, `remote_api_key`, etc.) left blank are merged from the saved entry with the same `id` if one exists.
 
 ### Settings Update Fields
 
-**LLM:** `llm_provider`, `ollama_base_url`, `ollama_model`, `claude_api_key`, `claude_model`, `extraction_timeout`
+Sent to `PATCH /api/settings`. Any subset of these may be included in a single request.
 
-**OCR:** `ocr_engine`, `ocr_language`, `ocr_confidence_threshold`, `cloud_ocr_enabled`, `ocr_remote_url`, `ocr_remote_api_key`, `llm_vision_provider`, `llm_vision_model`, `llm_vision_ollama_url`, `google_vision_key`
+**LLM:** `extraction_timeout`, `llm_max_concurrent_requests`, `llm_max_retries`, `llm_retry_backoff_seconds`, `canonical_language`
 
-**Pipeline:** `pipeline_watch_enabled`, `pipeline_poll_interval`, `pipeline_retry_interval`, `pipeline_max_retries`
+**OCR (legacy flat fields — kept for the auto-migration path):** `ocr_engine`, `ocr_language`, `ocr_confidence_threshold`, `cloud_ocr_enabled`, `ocr_remote_url`, `ocr_remote_api_key`, `llm_vision_provider`, `llm_vision_model`, `llm_vision_ollama_url`, `google_vision_key`
+
+**Vision-LLM:** `vision_extraction_timeout`, `vision_max_concurrent_requests`, `vision_max_retries`, `vision_retry_backoff_seconds`
+
+**Pipeline:** `pipeline_watch_enabled`, `pipeline_poll_interval`, `pipeline_retry_interval`, `pipeline_max_retries`, `pipeline_default_flow` (`"ocr_llm"` or `"vision_llm"`)
 
 **Auth:** `session_ttl_hours`
 
 **OIDC:** `oidc_enabled`, `oidc_provider_url`, `oidc_client_id`, `oidc_client_secret`, `oidc_scopes`, `oidc_auto_create_user`, `oidc_username_claim`, `oidc_display_name_claim`
+
+For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`), use the dedicated `PUT /api/settings/{type}-providers` endpoints — each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
 
 ## Prompts
 
@@ -287,7 +307,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `PUT` | `/api/settings/prompts/{key}` | Yes | Update a prompt |
 | `DELETE` | `/api/settings/prompts/{key}` | Yes | Reset prompt to default |
 
-**Prompt keys:** `classification`, `extraction_bloodtest`, `extraction_specialist_report`, `extraction_prescription`, `extraction_invoice`, `extraction_discharge`, `extraction_radiology`, `extraction_vaccination`, `document_edit`, `sql_generation`, `chat_system`, `link_suggestion`, `page_classification`
+**Prompt keys:** `classification`, `vision_extraction`, `extraction_bloodtest`, `extraction_specialist_report`, `extraction_prescription`, `extraction_invoice`, `extraction_discharge`, `extraction_radiology`, `extraction_vaccination`, `document_edit`, `sql_generation`, `chat_system`, `link_suggestion`, `page_classification`
 
 ## Backup
 

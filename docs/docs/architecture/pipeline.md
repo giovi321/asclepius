@@ -13,8 +13,14 @@ flowchart TD
     E -->|Yes| F[Skip - already processed]
     E -->|No| G[Create document record]
     G --> H[Read patient hint file]
-    H --> I[OCR]
+    H --> FLOW{pipeline.default_flow}
 
+    FLOW -->|vision_llm| VX[Vision-LLM: image -> OCR + classification in one call]
+    VX --> V2{Result produced?}
+    V2 -->|No| P[Mark needs_review]
+    V2 -->|Yes| X[Store extracted data]
+
+    FLOW -->|ocr_llm| I[OCR]
     I --> J{OCR engine?}
     J -->|tesseract| K[Local Tesseract]
     J -->|tesseract_remote| L[Remote Tesseract Server]
@@ -22,7 +28,7 @@ flowchart TD
     J -->|google_vision| N[Google Cloud Vision]
 
     K & L & M & N --> O{Text extracted?}
-    O -->|No| P[Mark needs_review]
+    O -->|No| P
     O -->|Yes| Q{Document > 5 pages?}
 
     Q -->|Yes| R[Smart Page Sectioning]
@@ -36,12 +42,14 @@ flowchart TD
     U --> V
 
     V --> W[Phase 2: Type-specific extraction]
-    W --> X[Store extracted data]
+    W --> X
     X --> Y[Organize file]
     Y --> Z[Done]
 
     C --> Z
 ```
+
+`pipeline.default_flow` controls which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page can override the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM).
 
 ## File Watcher
 
@@ -107,21 +115,23 @@ The `provider_name` stored in the database is the user-configured display name (
 
 Uses the Google Cloud Vision API for OCR. Requires an API key.
 
-### Vision Extraction (Single-Step)
+## Vision-LLM Flow (alternative to OCR + LLM)
 
-A fundamentally different approach that **skips the OCR→LLM two-step pipeline** entirely. Instead, page images are sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model reads the document AND returns structured classification JSON in one pass.
+When `pipeline.default_flow` is `vision_llm` — or the Reprocess menu is set to **Vision-LLM** — the pipeline takes a different path that **skips the OCR and the LLM-classification steps** entirely. Each page image is sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model returns a single JSON document containing both `ocr_text` and all classification/universal fields (doc_type, dates, doctor, facility, summary).
 
-1. Render each PDF page as a JPEG image
-2. Send image + classification prompt to a vision LLM (e.g., `qwen2.5-vl:7b`)
-3. Model returns JSON containing both `ocr_text` (for search/storage) and all classification fields (doc_type, dates, doctor, facility, summary)
-4. The pipeline **skips the LLM extraction phase** since extraction is already done
-5. Supports Ollama, Claude, and OpenAI vision providers
+1. Iterate `vision.providers[]` in priority order — fall through to the next provider on failure.
+2. For each PDF page (or the single image), render to JPEG and send to the chosen provider (Ollama / Claude / OpenAI).
+3. Parse the JSON response; merge extractions across pages (first non-null value per key wins).
+4. Persist `ocr_text` + set `ocr_engine = vision_llm:<provider name>` on the document.
+5. Call `extract_and_store` with the merged result as the override — skips both OCR and the classification LLM call; type-specific extraction is still run if the prompt registry has a matching prompt.
 
-**Advantages:** One model call instead of two (faster, no model swapping), the model sees visual layout cues (bold headers, table grids, letterhead positioning, signatures) that OCR strips away.
+Retries on transient failures (ReadTimeout, ConnectError, HTTP 429) are controlled by `vision.max_retries` and `vision.retry_backoff_seconds`.
 
-**Best for:** Documents where OCR quality is poor, or when running on limited VRAM where two large models can't coexist.
+**Advantages:** single model pull, no model swapping, and the model sees visual layout cues (bold headers, table grids, letterhead positioning, signatures) that OCR strips away.
 
-**Recommended model:** `qwen2.5-vl:7b` (~6 GB VRAM) via Ollama.
+**Best for:** Documents where OCR quality is poor, or when you'd rather not maintain separate OCR + text-LLM stacks.
+
+**Recommended local model:** `qwen2.5vl:7b` (~6 GB VRAM) on Ollama. See [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the full size-vs-VRAM matrix.
 
 ## Two-Phase Extraction
 

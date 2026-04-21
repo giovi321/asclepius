@@ -25,6 +25,9 @@ frontend/dist/
 *.swo
 *~
 
+# Local agent / assistant tooling (never commit)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db

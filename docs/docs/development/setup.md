@@ -39,7 +39,7 @@ pip install -e ".[dev]"
 ```bash
 # Create config
 cp config/settings.example.yaml config/settings.yaml
-# Edit settings.yaml - point ollama_base_url to your local Ollama
+# Edit settings.yaml - configure at least one entry in llm.providers (and, if using the Vision-LLM flow, vision.providers)
 
 # Create vault directories
 mkdir -p vault/inbox vault/patients vault/unclassified

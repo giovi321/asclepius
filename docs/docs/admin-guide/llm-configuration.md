@@ -1,8 +1,15 @@
-# LLM & OCR Configuration
+# LLM, OCR & Vision-LLM Configuration
 
 ## Overview
 
-Asclepius uses a **multi-provider priority system** for both LLM and OCR. You can configure multiple providers, enable/disable them, and set their priority order. The pipeline always uses the highest-priority enabled provider. If you're not satisfied with a result, you can re-process a document using the next provider in the priority list from the document detail page.
+Asclepius supports two extraction flows and uses a **multi-provider priority system** for each one. For any flow, you configure one or more providers and set their order; the pipeline uses the highest-priority enabled provider and falls through to the next on failure.
+
+The two flows are:
+
+- **OCR + LLM** — extract text with an OCR engine, then send the text to a language model for classification and structured extraction. Uses `ocr.providers` + `llm.providers`.
+- **Vision-LLM** — send page images straight to a vision-capable LLM that returns both the transcribed text and the structured extraction in a single call. Uses `vision.providers`.
+
+Which flow runs for a **new upload** is controlled by `pipeline.default_flow` (Settings → Pipeline). On an **existing document** you can pick any flow on a per-document basis from the Reprocess menu (OCR+LLM, OCR only, LLM only, or Vision-LLM).
 
 All provider configuration is done from **Settings** > **Document Analysis** in the web UI.
 
@@ -103,9 +110,11 @@ OCR providers extract text from scanned documents and images.
 |----------|------|-------------|
 | **Tesseract (Local)** | `tesseract` | Local Tesseract OCR. Free, no network needed. |
 | **Tesseract (Remote)** | `tesseract_remote` | Remote Tesseract server via HTTP API. |
-| **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR. Best quality. |
-| **Vision Extraction** | `vision_extraction` | Single-step: vision LLM reads and extracts in one pass. No separate OCR or extraction LLM needed. |
+| **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR only — the text then flows into the normal LLM extraction step. |
 | **Google Cloud Vision** | `google_vision` | Google Cloud Vision API. |
+
+!!! note "Single-step vision extraction moved"
+    The old `vision_extraction` OCR provider type has been promoted to its own flow. See [Vision-LLM Providers](#vision-llm-providers) below. Existing `vision_extraction` OCR entries are auto-migrated into `vision.providers[]` at startup.
 
 ### LLM Vision OCR
 
@@ -127,27 +136,6 @@ For the highest OCR quality, use **Chandra OCR** as the vision model:
 2. Add an LLM Vision OCR provider
 3. Set Vision LLM Provider to **Ollama**
 4. Set Vision Model to `fredrezones55/chandra-ocr-2`
-
-### Vision Extraction (Single-Step)
-
-Vision Extraction is a different approach that **combines OCR and classification into one step**. Instead of OCR→text→LLM, it sends page images directly to a vision LLM which reads the document AND returns structured data in one pass.
-
-This is useful when:
-
-- You have limited VRAM (one model instead of two)
-- OCR quality is poor and the LLM can do better by seeing the actual document
-- You want faster processing (one model call instead of two with model swapping)
-
-#### Setup
-
-1. Pull a vision model: `ollama pull qwen2.5vl:7b`
-2. Go to **Settings** > **Document Analysis** > **OCR Providers**
-3. Click **Add Provider** > **Vision Extraction**
-4. Set Vision LLM Provider to **Ollama**
-5. Set Vision Model to `qwen2.5vl:7b`
-6. Set priority (e.g., priority 1, with Chandra→qwen as priority 2 fallback)
-
-Chandra produces structured HTML output that significantly improves downstream extraction accuracy.
 
 ### YAML Configuration
 
@@ -171,15 +159,92 @@ ocr:
       llm_base_url: "http://ollama:11434"
 ```
 
+## Vision-LLM Providers
+
+Vision-LLM is an **alternative to the OCR + text-LLM flow**. Instead of running OCR and then passing the resulting text to a language model, each page image is sent directly to a vision-capable LLM that returns both the transcription and the structured extraction in a single call.
+
+This is useful when:
+
+- Your OCR engine struggles with dense tables, handwriting, or complex layouts.
+- You want to run a single model end-to-end (one pull, one GPU footprint).
+- You prefer to send images rather than the output of a lossy OCR step.
+
+### Supported Provider Types
+
+| Provider | Type | Notes |
+|----------|------|-------|
+| **Claude** | `claude` | Anthropic Claude with native vision |
+| **OpenAI** | `openai` | GPT-4o / GPT-4 vision |
+| **Ollama** | `ollama` | Local vision model (e.g. `qwen2.5vl:7b`, `llama3.2-vision`, `minicpm-v`) |
+
+### Adding a Vision Provider
+
+1. Pull a vision model (example for Ollama): `ollama pull qwen2.5vl:7b`.
+2. Go to **Settings** > **Document Analysis** > **Vision-LLM Providers**.
+3. Click **Add Provider** and pick the type.
+4. Fill in Model, Base URL (Ollama/OpenAI), and API key (Claude/OpenAI).
+5. Click **Test Connection** — a trivial image round-trip confirms the wiring.
+6. Use the arrow buttons to set priority and **Save Changes**.
+
+### Turning on the Vision-LLM flow
+
+Vision providers alone don't change what new uploads do. To switch the default:
+
+1. Go to **Settings** > **Pipeline**.
+2. Set **Default Processing Flow** to **Vision-LLM**.
+
+Per-document override stays available in the document detail page's Reprocess menu (OCR+LLM, OCR only, LLM only, Vision-LLM).
+
+### Custom prompt
+
+The vision prompt is editable under **Settings** > **Document Analysis** > **Prompts** with key `vision_extraction`. Keep the JSON schema intact — the pipeline parses the response into `ocr_text` plus classification fields.
+
+### YAML Configuration
+
+```yaml
+vision:
+  extraction_timeout: 600            # Per-page timeout (seconds)
+  max_concurrent_requests: 2         # Parallel vision calls across providers
+  max_retries: 3                     # Retries on transient failures
+  retry_backoff_seconds: [30, 60, 120]
+  providers:
+    - id: "qwen25vl-1"
+      type: "ollama"
+      name: "Qwen2.5-VL"
+      enabled: true
+      priority: 1
+      base_url: "http://ollama:11434"
+      model: "qwen2.5vl:7b"
+      timeout: 600
+    - id: "claude-vision-1"
+      type: "claude"
+      name: "Claude (vision fallback)"
+      enabled: false
+      priority: 2
+      api_key: "sk-ant-..."
+      model: "claude-sonnet-4-20250514"
+      timeout: 600
+```
+
+### Recommended local models
+
+| VRAM       | Ollama tag          | Notes                                  |
+|------------|---------------------|----------------------------------------|
+| ≥ 48 GB    | `qwen2.5vl:72b`     | Best quality, slow on consumer hardware |
+| 24 GB      | `qwen2.5vl:32b`     | Best quality / VRAM trade-off          |
+| 12–16 GB   | `qwen2.5vl:7b`      | Recommended default                    |
+| 8 GB       | `qwen2.5vl:3b`      | Only for clean typed documents         |
+
+`qwen2.5:14b` is **text-only** — there is no 14B vision variant. `minicpm-v` (8B) is a solid alternative to `qwen2.5vl:7b` when OCR on noisy scans matters more than strict JSON adherence. Avoid `llama3.2-vision` for dense tables and strict JSON output.
+
 ## Extraction Timeout
 
-Each provider has its own timeout setting (default: 120 seconds). Increase this for:
+Each provider has its own timeout setting.
 
-- Very large documents (70+ pages)
-- Slow inference servers
-- Large models
+- LLM providers default to 120 seconds.
+- Vision providers default to 600 seconds (vision calls are slow).
 
-Vision OCR automatically uses a minimum timeout of 300 seconds regardless of the configured value.
+Increase the provider timeout for very large documents, slow inference servers, or large models. For LLM-vision OCR the effective timeout is never lower than 300 seconds regardless of the configured value.
 
 ## Custom Prompts
 
@@ -190,6 +255,7 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | Key | Description |
 |-----|-------------|
 | `classification` | Phase 1: Document classification and basic metadata extraction |
+| `vision_extraction` | Vision-LLM flow: single-step image → OCR + classification + metadata |
 | `extraction_bloodtest` | Phase 2: Extract lab results from blood test documents |
 | `extraction_specialist_report` | Phase 2: Extract diagnoses, encounters, medications |
 | `extraction_prescription` | Phase 2: Extract medications from prescriptions |
@@ -232,4 +298,10 @@ This means extraction quality improves progressively as you correct more documen
 
 ## Backward Compatibility
 
-If you have an existing `settings.yaml` with the old flat `llm:` / `ocr:` config format (without `providers:` lists), Asclepius automatically migrates it to the new multi-provider format on startup. Your existing settings are preserved as provider entries.
+Asclepius auto-migrates older layouts on startup:
+
+- **Flat `llm.*` fields** (`provider`, `ollama_base_url`, `ollama_model`, `claude_api_key`, `claude_model`) are folded into `llm.providers[]`.
+- **Flat `ocr.*` fields** (`engine`, `remote_url`, `llm_vision_*`, `google_vision_key`) are folded into `ocr.providers[]`.
+- **OCR entries of type `vision_extraction`** are moved into `vision.providers[]` and dropped from the OCR list — the single-step flow is now a first-class sibling of OCR.
+
+All three migrations are transparent and the settings file is rewritten on first run so subsequent starts are clean.

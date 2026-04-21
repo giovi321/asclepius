@@ -263,7 +263,7 @@ export default function LlmProvidersTab() {
                         setTestingId(p.id);
                         setTestResults((r) => { const copy = { ...r }; delete copy[p.id]; return copy; });
                         try {
-                          const res = await api.post("/settings/test-llm-provider", { provider_id: p.id });
+                          const res = await api.post("/settings/test-llm-provider", { provider: p });
                           setTestResults((r) => ({
                             ...r,
                             [p.id]: res.data.ok

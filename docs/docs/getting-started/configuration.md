@@ -34,54 +34,28 @@ oidc:
   display_name_claim: "name"           # OIDC claim for display name
 
 ocr:
-  engine: "tesseract"         # tesseract, tesseract_remote, llm_vision, google_vision
+  # Global defaults (used when no provider-level override is set)
   language: "eng"              # Tesseract language codes, + separated
-  confidence_threshold: 0.7   # Below this, document marked as needs_review
-  remote_url: ""              # URL for remote Tesseract server
-  remote_api_key: ""          # API key for remote Tesseract server
-  cloud_ocr_enabled: false    # Enable Google Cloud Vision fallback
-  google_vision_key: ""       # Google Cloud Vision API key
-  # LLM Vision OCR (when engine = llm_vision)
-  llm_vision_provider: ""     # 'ollama' or 'claude' (empty = use main llm.provider)
-  llm_vision_model: ""        # e.g. 'llava:13b', 'llama3.2-vision' (empty = use main llm model)
-  llm_vision_ollama_url: ""   # Ollama URL for vision model (empty = use llm.ollama_base_url)
+  confidence_threshold: 0.7    # Below this, document marked as needs_review
+  # Ordered provider list — tried in priority order for the OCR+LLM flow.
+  providers:
+    - id: "tesseract-1"
+      type: "tesseract"        # tesseract | tesseract_remote | llm_vision | google_vision
+      name: "Tesseract"
+      enabled: true
+      priority: 1
+      language: "eng+ita+deu"
 
 llm:
-  provider: "ollama"          # "ollama" or "claude"
-  ollama_base_url: "http://ollama:11434"
-  ollama_model: "llama3.1"
-  claude_api_key: ""
-  claude_model: "claude-sonnet-4-20250514"
-  extraction_timeout: 120     # Seconds before LLM call times out
-
-pipeline:
-  watch_enabled: true          # Auto-process files dropped in inbox
-  poll_interval_seconds: 5     # How often to check for new files
-  retry_interval_seconds: 300  # Wait before retrying failed extractions
-  max_retries: 3               # Max retry attempts for failed documents
-```
-
-## LLM & OCR Providers
-
-Asclepius uses a **multi-provider priority system**. You can configure multiple LLM and OCR providers, enable/disable each one, and set their priority order. The pipeline uses the highest-priority enabled provider. You can escalate to the next provider from the document detail page if results are unsatisfactory.
-
-**Supported LLM providers:** Ollama, vLLM, Claude API, OpenAI API
-
-**Supported OCR providers:** Tesseract (local), Tesseract (remote), LLM Vision, Google Cloud Vision
-
-All providers are configured from the web UI: **Settings** > **Document Analysis** > **LLM Providers** / **OCR Providers**.
-
-See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full details, YAML examples, and recommended models.
-
-### Quick Setup
-
-The simplest configuration: one Ollama instance for both LLM and OCR.
-
-```yaml
-llm:
+  extraction_timeout: 120          # Per-provider timeout (seconds)
+  max_concurrent_requests: 2       # Parallel LLM calls across providers
+  max_retries: 3                   # Retries on transient failures
+  retry_backoff_seconds: [30, 60, 120]  # Wait between successive retries
+  canonical_language: "English"    # Language for LLM-authored free-form text
+  # Ordered provider list — tried in priority order.
   providers:
     - id: "ollama-1"
-      type: "ollama"
+      type: "ollama"           # ollama | vllm | claude | openai
       name: "Ollama"
       enabled: true
       priority: 1
@@ -89,19 +63,60 @@ llm:
       model: "llama3.1"
       timeout: 120
 
-ocr:
+vision:
+  # Alternative to OCR + text-LLM: sends page images to a vision LLM that
+  # returns both OCR text and structured extraction in one call.
+  extraction_timeout: 600
+  max_concurrent_requests: 2
+  max_retries: 3
+  retry_backoff_seconds: [30, 60, 120]
   providers:
-    - id: "tesseract-1"
-      type: "tesseract"
-      name: "Tesseract"
+    - id: "qwen25vl-1"
+      type: "ollama"           # ollama | claude | openai
+      name: "Qwen2.5-VL (local)"
       enabled: true
       priority: 1
-      language: "eng+ita+deu"
+      base_url: "http://ollama:11434"
+      model: "qwen2.5vl:7b"
+      timeout: 600
+
+pipeline:
+  watch_enabled: true                # Auto-process files dropped in inbox
+  poll_interval_seconds: 5           # How often to check for new files
+  retry_interval_seconds: 300        # Wait before retrying failed extractions
+  max_retries: 3                     # Max retry attempts for failed documents
+  default_flow: "ocr_llm"            # "ocr_llm" or "vision_llm" — which path new uploads use
 ```
 
-### Legacy Configuration
+## Providers and processing flows
 
-The old flat `llm.provider` / `ocr.engine` format still works. Asclepius auto-migrates it to the new provider list on startup.
+Asclepius has two mutually exclusive extraction flows:
+
+- **OCR + LLM** (`pipeline.default_flow: "ocr_llm"`): extract text with an OCR engine, then send the text to a language model for classification and structured extraction.
+- **Vision-LLM** (`pipeline.default_flow: "vision_llm"`): send page images directly to a vision-capable LLM that returns both the transcribed text and the structured extraction in a single call.
+
+Each flow has its own priority-ordered provider list:
+
+| Flow          | Config section  | Supported types                                              | UI location                                                      |
+|---------------|-----------------|--------------------------------------------------------------|------------------------------------------------------------------|
+| OCR           | `ocr.providers` | `tesseract`, `tesseract_remote`, `llm_vision`, `google_vision` | Settings → Document Analysis → **OCR Providers**                 |
+| Text LLM      | `llm.providers` | `ollama`, `vllm`, `claude`, `openai`                          | Settings → Document Analysis → **LLM Providers**                 |
+| Vision LLM    | `vision.providers` | `ollama`, `claude`, `openai`                                | Settings → Document Analysis → **Vision-LLM Providers**          |
+
+The pipeline tries providers in priority order; on failure it falls through to the next enabled one. A per-document override is available from the document detail page.
+
+`pipeline.default_flow` only affects **new uploads**. Existing documents can be reprocessed with any of four modes (OCR+LLM, OCR only, LLM only, Vision-LLM) from the document detail page.
+
+See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full details, YAML examples, and recommended models.
+
+### Legacy configuration
+
+Older settings files used flat `llm.provider` / `ocr.engine` fields and a `vision_extraction` OCR provider type. Asclepius auto-migrates these at startup:
+
+- Flat `llm.*` keys are folded into `llm.providers[]`.
+- Any OCR provider entry with `type: vision_extraction` is moved into `vision.providers[]`.
+
+The migrated file is re-written to disk on first run.
 
 ## OCR Languages
 
@@ -153,11 +168,13 @@ These environment variables override `settings.yaml` values:
 | Variable | Overrides |
 |----------|-----------|
 | `ASCLEPIUS_SECRET_KEY` | `auth.secret_key` |
-| `ASCLEPIUS_VAULT_PATH` | `vault.root_path` and all sub-paths + `database.path` |
-| `ASCLEPIUS_DATA_PATH` | Separate path for database and config data |
+| `ASCLEPIUS_ENV` | `server.environment` (`development` or `production`) |
+| `ASCLEPIUS_COOKIE_SECURE` | `auth.cookie_secure` (truthy value enables Secure cookies) |
+| `ASCLEPIUS_CORS_ORIGINS` | `server.cors_origins` (comma-separated list) |
+| `ASCLEPIUS_VAULT_PATH` | `vault.root_path` and all sub-paths |
 | `ASCLEPIUS_DB_PATH` | `database.path` |
-| `ASCLEPIUS_OLLAMA_URL` | `llm.ollama_base_url` |
-| `ASCLEPIUS_ANTHROPIC_API_KEY` | `llm.claude_api_key` |
+| `ASCLEPIUS_OLLAMA_URL` | `base_url` on the first `llm.providers` entry of type `ollama` (creates one if none exists) |
+| `ASCLEPIUS_ANTHROPIC_API_KEY` | `api_key` on the first `llm.providers` entry of type `claude` (creates one if none exists) |
 | `ASCLEPIUS_GOOGLE_VISION_KEY` | `ocr.google_vision_key` (also enables `cloud_ocr_enabled`) |
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` (default: `config/settings.yaml`) |
 | `TZ` | Container timezone (default: `Europe/Zurich`) |

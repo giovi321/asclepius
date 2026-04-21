@@ -34,13 +34,16 @@ Open <http://localhost:8070> — a first-launch setup wizard creates your admin 
 ## Features
 
 - **Ingest** PDFs, images, and DICOM files from an inbox folder
-- **Extract** text and structured fields via multi-provider OCR + LLM (Tesseract, Google Vision, Ollama, vLLM, Claude, OpenAI) with priority-based fallback
+- **Two extraction flows**, selectable per install and per document:
+  - **OCR + LLM** — Tesseract / Google Vision / LLM Vision OCR, then Ollama / vLLM / Claude / OpenAI for extraction
+  - **Vision-LLM** — single-step vision model (Qwen2.5-VL, Claude, GPT-4o, …) that OCRs and extracts in one call
+- **Priority-based fallback** across every provider list (OCR, LLM, Vision-LLM)
 - **Organize** by patient with multi-user access control, medical events, and a chronological timeline
 - **Lab results** normalized across languages, with trend charts
 - **Search + chat** your records with SQLite FTS5 and RAG-powered Q&A
 - **DICOM viewer** with windowing, zoom, and scroll
 - **Learns from your edits** via correction-driven learning and retrieval-augmented extraction
-- **Selective reprocessing** of OCR only, LLM only, or both — with per-document provider choice
+- **Selective reprocessing** — OCR only, LLM only, OCR+LLM, or Vision-LLM — with per-document provider choice
 
 ## Tech Stack
 
@@ -51,6 +54,7 @@ Open <http://localhost:8070> — a first-launch setup wizard creates your admin 
 | Database | SQLite (via aiosqlite) |
 | OCR | Tesseract 5, LLM Vision, Google Vision |
 | LLM | Ollama, vLLM, Claude API, OpenAI API |
+| Vision-LLM | Ollama (Qwen2.5-VL, MiniCPM-V, …), Claude vision, GPT-4o |
 | DICOM | pydicom + Cornerstone.js |
 | Deployment | Docker Compose |
 

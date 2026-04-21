@@ -56,17 +56,23 @@ TZ=Europe/Zurich
 
 ### Connecting to Ollama
 
-If you run Ollama on the same machine as Asclepius, point `llm.ollama_base_url` to it:
+If you run Ollama on the same machine as Asclepius, add an Ollama entry to `llm.providers`:
 
 ```yaml
 llm:
-  provider: "ollama"
-  ollama_base_url: "http://host.docker.internal:11434"  # Docker Desktop
-  # ollama_base_url: "http://192.168.1.100:11434"       # Or use the host IP
-  ollama_model: "llama3.1"
+  providers:
+    - id: "ollama-1"
+      type: "ollama"
+      name: "Ollama (Local)"
+      enabled: true
+      priority: 1
+      base_url: "http://host.docker.internal:11434"  # Docker Desktop
+      # base_url: "http://192.168.1.100:11434"       # Or use the host IP
+      model: "llama3.1"
+      timeout: 120
 ```
 
-If Ollama runs on a different machine, use that machine's IP or hostname.
+If Ollama runs on a different machine, use that machine's IP or hostname. The same `base_url` / `model` fields are used for `vision.providers` entries — see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
 
 ### Volume Mounts
 

@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 
+import httpx
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -546,7 +547,40 @@ async def update_vision_providers(
 # --- Provider testing ---
 
 class TestProviderRequest(BaseModel):
-    provider_id: str
+    """Test-connection request.
+
+    Either pass ``provider_id`` (tests the persisted entry with that id) or
+    pass ``provider`` (an inline, possibly-unsaved entry). When both are set
+    the inline entry wins — this lets the UI test pending edits before the
+    user clicks Save.
+    """
+    provider_id: str | None = None
+    provider: dict | None = None
+
+
+def _resolve_test_entry(body: TestProviderRequest, saved_providers, entry_cls, *, preserve_secret_fields: tuple[str, ...]) -> object:
+    """Resolve which provider entry to test.
+
+    If the request carries an inline ``provider``, build an entry from it,
+    merging in secret fields from the matching saved entry when the inline
+    value is blank. Otherwise look up the saved entry by id.
+    """
+    if body.provider is not None:
+        raw = dict(body.provider)
+        pid = raw.get("id")
+        if pid:
+            existing = next((p for p in saved_providers if p.id == pid), None)
+            if existing is not None:
+                for field in preserve_secret_fields:
+                    if not raw.get(field):
+                        raw[field] = getattr(existing, field, "")
+        return entry_cls(**raw)
+    if body.provider_id:
+        entry = next((p for p in saved_providers if p.id == body.provider_id), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Provider not found")
+        return entry
+    raise HTTPException(status_code=400, detail="Either provider_id or provider must be supplied")
 
 
 @router.post("/test-llm-provider")
@@ -556,9 +590,8 @@ async def test_llm_provider(
 ):
     """Test connectivity to an LLM provider by sending a tiny prompt."""
     config = get_config()
-    entry = next((p for p in config.llm.providers if p.id == body.provider_id), None)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Provider not found")
+    entry = _resolve_test_entry(body, config.llm.providers, LlmProviderEntry,
+                                preserve_secret_fields=("api_key",))
 
     try:
         from asclepius.pipeline.processor import _build_llm_provider
@@ -576,9 +609,10 @@ async def test_ocr_provider(
 ):
     """Test connectivity to an OCR provider."""
     config = get_config()
-    entry = next((p for p in config.ocr.providers if p.id == body.provider_id), None)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Provider not found")
+    entry = _resolve_test_entry(
+        body, config.ocr.providers, OcrProviderEntry,
+        preserve_secret_fields=("remote_api_key", "llm_api_key", "google_vision_key"),
+    )
 
     try:
         if entry.type == "tesseract":
@@ -591,7 +625,6 @@ async def test_ocr_provider(
             return {"ok": True, "detail": f"Tesseract {version}"}
 
         elif entry.type == "tesseract_remote":
-            import httpx
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.get(entry.remote_url.rstrip("/") + "/")
                 return {"ok": True, "detail": f"Remote OCR reachable (HTTP {resp.status_code})"}
@@ -616,7 +649,6 @@ async def test_ocr_provider(
         elif entry.type == "google_vision":
             if not entry.google_vision_key:
                 return {"ok": False, "error": "No Google Vision API key configured"}
-            import httpx
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(
                     f"https://vision.googleapis.com/v1/images:annotate?key={entry.google_vision_key}",
@@ -641,23 +673,32 @@ async def test_vision_provider(
 ):
     """Test connectivity to a Vision-LLM provider with a trivial prompt."""
     config = get_config()
-    entry = next((p for p in config.vision.providers if p.id == body.provider_id), None)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Provider not found")
+    entry = _resolve_test_entry(body, config.vision.providers, VisionLlmProviderEntry,
+                                preserve_secret_fields=("api_key",))
 
     try:
-        # Build a tiny white JPEG so every backend round-trips end-to-end.
+        # Vision encoders (especially Ollama's qwen2.5-vl / llama3.2-vision) reject
+        # images below a few dozen pixels per side. Use a 256×256 white JPEG so the
+        # preprocessor has something to tile.
         import io as _io
         import base64 as _b64
         from PIL import Image as _Image
-        img = _Image.new("RGB", (8, 8), "white")
+        img = _Image.new("RGB", (256, 256), "white")
         buf = _io.BytesIO()
-        img.save(buf, format="JPEG")
+        img.save(buf, format="JPEG", quality=85)
         b64 = _b64.b64encode(buf.getvalue()).decode("utf-8")
 
         from asclepius.pipeline.vision_extractor import _vision_call
-        response = await _vision_call(b64, "Reply with exactly: OK", entry)
+        # force_json=False — the test prompt returns plain text, not JSON.
+        response = await _vision_call(b64, "Reply with exactly: OK", entry, force_json=False)
         return {"ok": True, "detail": response.strip()[:200]}
+    except httpx.HTTPStatusError as e:
+        body = ""
+        try:
+            body = e.response.text[:500]
+        except Exception:
+            pass
+        return {"ok": False, "error": f"HTTP {e.response.status_code}: {body or str(e)}"}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
 

@@ -59,8 +59,31 @@ llm:
       api_key: ""
       timeout: 120
 
+# Vision-LLM flow — alternative to OCR + text-LLM. Each page image is sent to
+# a vision-capable model that returns OCR text AND structured extraction in
+# one call. Switch on via pipeline.default_flow = "vision_llm" or via the
+# per-document Reprocess menu.
+vision:
+  extraction_timeout: 600             # per-page vision call timeout (seconds)
+  max_concurrent_requests: 2
+  max_retries: 3
+  retry_backoff_seconds: [30, 60, 120]
+  providers: []                       # e.g. Qwen2.5-VL on Ollama, Claude vision, GPT-4o
+  # Example — uncomment and adjust to enable:
+  # providers:
+  #   - id: "qwen25vl-1"
+  #     type: "ollama"                # ollama | claude | openai
+  #     name: "Qwen2.5-VL"
+  #     enabled: true
+  #     priority: 1
+  #     base_url: "http://ollama:11434"
+  #     model: "qwen2.5vl:7b"
+  #     api_key: ""
+  #     timeout: 600
+
 pipeline:
   watch_enabled: true
   poll_interval_seconds: 5
-  retry_interval_seconds: 300  # retry failed LLM extractions
+  retry_interval_seconds: 300         # retry failed LLM extractions
   max_retries: 3
+  default_flow: "ocr_llm"             # "ocr_llm" or "vision_llm" — applied to new uploads

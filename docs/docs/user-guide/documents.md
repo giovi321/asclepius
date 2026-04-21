@@ -144,18 +144,20 @@ Assign the document to a medical event, or use **Suggest Event** for AI-powered 
 Click the **Reprocess** dropdown button to re-run processing on a document. A popover lets you choose:
 
 - **What to reprocess:**
-    - **OCR + LLM** -- full reprocess (re-extract text and re-run LLM analysis)
-    - **OCR only** -- re-extract text without re-running LLM
-    - **LLM only** -- re-run LLM analysis using existing OCR text
-- **OCR Provider** (when OCR is included) -- select which OCR provider to use by name, or leave as default (highest priority)
-- **LLM Provider** (when LLM is included) -- select which LLM provider to use by name, or leave as default (highest priority)
+    - **OCR + LLM** -- full OCR+LLM reprocess (re-extract text and re-run classification/extraction)
+    - **OCR only** -- re-extract text without re-running the LLM
+    - **LLM only** -- re-run LLM extraction using the existing OCR text
+    - **Vision-LLM** -- run the single-step Vision-LLM flow instead of OCR+LLM
+- **OCR Provider** (when OCR is included) -- pick a specific OCR provider, or leave as default (highest priority)
+- **LLM Provider** (when LLM is included) -- pick a specific LLM provider, or leave as default (highest priority)
+- **Vision-LLM Provider** (Vision-LLM mode only) -- pick a specific vision provider, or leave as default (highest priority)
 
-When reprocessing with LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, ensuring a clean slate rather than stale data persisting.
+When reprocessing with LLM or Vision-LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, ensuring a clean slate rather than stale data persisting.
 
 This is useful for:
 
-- Trying a different OCR engine (e.g., switching from Tesseract to Chandra for better quality)
-- Re-running extraction with a more capable LLM model
+- Trying a different OCR engine or moving a document onto the Vision-LLM flow
+- Re-running extraction with a more capable model
 - Fixing documents that were marked "done" with empty results
 
 ## Cancelling Processing

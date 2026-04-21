@@ -103,8 +103,13 @@ def _parse_vision_extraction(raw: str) -> dict | None:
 
 async def _vision_call(
     b64_image: str, prompt: str, provider: VisionLlmProviderEntry,
+    *, force_json: bool = True,
 ) -> str:
-    """Send an image + prompt to a single vision provider and return raw text."""
+    """Send an image + prompt to a single vision provider and return raw text.
+
+    ``force_json`` only affects the Ollama backend (sets ``format: "json"``).
+    Disable it for health-check calls where the expected reply is plain text.
+    """
     if provider.type == "claude":
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=provider.api_key)
@@ -141,11 +146,13 @@ async def _vision_call(
     timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
     model = provider.model or "llama3.2-vision"
     logger.info("Vision extraction (ollama): model=%s, url=%s", model, ollama_url)
+    payload: dict = {
+        "model": model, "prompt": prompt, "images": [b64_image], "stream": False,
+    }
+    if force_json:
+        payload["format"] = "json"
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(
-            f"{ollama_url}/api/generate",
-            json={"model": model, "prompt": prompt, "images": [b64_image], "stream": False, "format": "json"},
-        )
+        resp = await client.post(f"{ollama_url}/api/generate", json=payload)
         resp.raise_for_status()
         return resp.json().get("response", "")
 

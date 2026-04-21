@@ -663,12 +663,6 @@ export default function NormalizationTab() {
                   </td>
                   <td className="px-3 py-1.5 whitespace-nowrap w-px" onClick={(e: any) => e.stopPropagation()}>
                     <div className="flex gap-1.5">
-                      {item.unreviewed_count > 0 && (
-                        <button onClick={() => handleConfirmAll(item.id)}
-                          className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1">
-                          <Check className="h-3 w-3" /> Confirm
-                        </button>
-                      )}
                       <button onClick={() => handleViewDocuments(item.id, item.canonical_display || item.name || `#${item.id}`)}
                         className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
                         title="Show documents that reference this entry">
@@ -805,7 +799,25 @@ export default function NormalizationTab() {
 
                         {/* Aliases list */}
                         <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Aliases ({detail.aliases?.length || 0})</h4>
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-sm font-medium">
+                              Aliases ({detail.aliases?.length || 0})
+                              {item.unreviewed_count > 0 && (
+                                <span className="ml-2 rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 text-[10px] font-medium text-yellow-700 dark:text-yellow-400">
+                                  {item.unreviewed_count} unreviewed
+                                </span>
+                              )}
+                            </h4>
+                            {item.unreviewed_count > 0 && (
+                              <button
+                                onClick={() => handleConfirmAll(item.id)}
+                                className="flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+                                title="Accept every auto-mapped alias listed below as correct"
+                              >
+                                <Check className="h-3 w-3" /> Confirm all
+                              </button>
+                            )}
+                          </div>
                           {detail.aliases?.length > 0 ? (
                             <div className="rounded-md border divide-y max-h-[300px] overflow-y-auto">
                               {detail.aliases.map((a: any) => (

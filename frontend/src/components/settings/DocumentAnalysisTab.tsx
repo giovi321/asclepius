@@ -42,7 +42,7 @@ export default function DocumentAnalysisTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-6 border-b text-sm overflow-x-auto">
+      <div className="flex gap-6 border-b text-sm overflow-x-auto overflow-y-hidden">
         {SUB_TABS.map((t) => (
           <button
             key={t.key}

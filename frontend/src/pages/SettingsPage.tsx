@@ -45,7 +45,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex border-b overflow-x-auto">
+      <div className="flex border-b overflow-x-auto overflow-y-hidden">
         {TABS.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.key;

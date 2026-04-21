@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import GeneralLlmTab from "./GeneralLlmTab";
+import CredentialsTab from "./CredentialsTab";
 import LlmProvidersTab from "./LlmProvidersTab";
 import OcrProvidersTab from "./OcrProvidersTab";
 import VisionLlmProvidersTab from "./VisionLlmProvidersTab";
@@ -8,6 +9,7 @@ import NormalizationTab from "./NormalizationTab";
 
 const SUB_TABS = [
   { key: "general", label: "General" },
+  { key: "credentials", label: "Credentials" },
   { key: "llm", label: "LLM Providers" },
   { key: "ocr", label: "OCR Providers" },
   { key: "vision", label: "Vision-LLM Providers" },
@@ -53,6 +55,7 @@ export default function DocumentAnalysisTab() {
       </div>
 
       {subTab === "general" && <GeneralLlmTab />}
+      {subTab === "credentials" && <CredentialsTab />}
       {subTab === "llm" && <LlmProvidersTab />}
       {subTab === "ocr" && <OcrProvidersTab />}
       {subTab === "vision" && <VisionLlmProvidersTab />}

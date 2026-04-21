@@ -25,14 +25,18 @@ export default function MetricsStrip() {
     });
   }
 
-  // Per-(credential, model) LLM + Vision queues.
+  // Per-credential LLM + Vision queues. Shows the model(s) currently in
+  // flight so the user can still see "which model is running" even though
+  // the queue itself is shared per credential.
   for (const q of status.llm_queues || []) {
+    const modelsLabel = q.models && q.models.length > 0 ? q.models.join(", ") : q.model || "";
     const queued = q.waiting > 0 ? ` · ⏳${q.waiting}` : "";
+    const shortName = q.credential_name || q.credential_id;
     chips.push({
-      key: `${q.kind}-${q.credential_id}-${q.model}`,
+      key: `${q.kind}-${q.credential_id}`,
       icon: q.kind === "vision" ? Eye : Brain,
-      label: `${q.model} ${q.in_flight}/${q.cap}${queued}`,
-      tooltip: `${q.kind === "vision" ? "Vision" : "LLM"} · ${q.credential_name || q.credential_id} / ${q.model} — ${q.in_flight} in flight, ${q.waiting} waiting, cap ${q.cap}`,
+      label: `${shortName}${modelsLabel ? " · " + modelsLabel : ""} ${q.in_flight}/${q.cap}${queued}`,
+      tooltip: `${q.kind === "vision" ? "Vision" : "LLM"} · ${shortName}${modelsLabel ? " (" + modelsLabel + ")" : ""} — ${q.in_flight} concurrent, ${q.waiting} waiting, cap ${q.cap}`,
       colorClass:
         q.kind === "vision"
           ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"

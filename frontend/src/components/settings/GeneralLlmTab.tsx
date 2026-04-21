@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { Save, Check, AlertTriangle } from "lucide-react";
 import { TextField, NumberField } from "./SettingsFormHelpers";
@@ -16,7 +17,6 @@ export default function GeneralLlmTab() {
     type: "ollama",
     model: "",
     timeout: 120,
-    max_concurrent: 2,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -100,20 +100,19 @@ export default function GeneralLlmTab() {
         />
 
         <NumberField
-          label="Max parallel requests"
-          value={settings.max_concurrent}
-          onChange={(v) => setSettings((s) => ({ ...s, max_concurrent: Math.max(1, v) }))}
-          min={1} max={32} step={1}
-          description="How many general-LLM requests may run at once. Requests beyond this queue and show up in the top bar."
-        />
-
-        <NumberField
           label="Timeout (seconds)"
           value={settings.timeout}
           onChange={(v) => setSettings((s) => ({ ...s, timeout: Math.max(10, v) }))}
           min={10} max={1800} step={30}
           description="Per-call timeout."
         />
+
+        {chosenCred && (
+          <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+            Max concurrent requests: <strong>{chosenCred.max_concurrent}</strong>
+            {" — "}set on the credential <Link to="/settings/analysis/credentials" className="underline">{chosenCred.name}</Link>.
+          </div>
+        )}
 
         <div className="flex items-center justify-end pt-2">
           <button

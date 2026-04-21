@@ -635,7 +635,8 @@ async def update_credentials(
 
 @router.get("/general-llm")
 async def get_general_llm(current_user: dict = Depends(get_current_user)):
-    """Return the general (non-pipeline) LLM configuration."""
+    """Return the general (non-pipeline) LLM configuration. Concurrency
+    comes from the referenced credential."""
     config = get_config()
     g = config.llm.general
     return {
@@ -643,7 +644,6 @@ async def get_general_llm(current_user: dict = Depends(get_current_user)):
         "type": g.type,
         "model": g.model,
         "timeout": g.timeout,
-        "max_concurrent": g.max_concurrent,
         "configured": bool(g.credential_id and g.model),
     }
 
@@ -653,7 +653,6 @@ class GeneralLlmUpdate(BaseModel):
     type: str = "ollama"
     model: str = ""
     timeout: int = 120
-    max_concurrent: int = 2
 
 
 @router.put("/general-llm")

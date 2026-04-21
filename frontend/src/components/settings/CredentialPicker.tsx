@@ -31,7 +31,7 @@ export default function CredentialPicker({
       <span className="text-sm font-medium flex items-center justify-between">
         {label}
         <Link
-          to="/settings/credentials"
+          to="/settings/analysis/credentials"
           className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1"
           title="Manage credentials"
         >
@@ -52,7 +52,7 @@ export default function CredentialPicker({
       </select>
       {empty && (
         <span className="block text-xs text-amber-600 dark:text-amber-500">
-          No matching credentials. <Link to="/settings/credentials" className="underline">Add one</Link>{allowedTypes ? ` of type ${allowedTypes.join(" / ")}` : ""}.
+          No matching credentials. <Link to="/settings/analysis/credentials" className="underline">Add one</Link>{allowedTypes ? ` of type ${allowedTypes.join(" / ")}` : ""}.
         </span>
       )}
       {description && (

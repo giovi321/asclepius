@@ -32,6 +32,9 @@ function EditDialog({ initial, onSave, onClose }: EditDialogProps) {
   const [type, setType] = useState(initial.type || "ollama");
   const [baseUrl, setBaseUrl] = useState(initial.base_url || "");
   const [apiKey, setApiKey] = useState("");
+  const [maxConcurrent, setMaxConcurrent] = useState(
+    typeof initial.max_concurrent === "number" ? initial.max_concurrent : 2,
+  );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -51,6 +54,7 @@ function EditDialog({ initial, onSave, onClose }: EditDialogProps) {
         base_url: baseUrl.trim(),
         // Empty api_key means "keep existing" to the backend.
         api_key: apiKey,
+        max_concurrent: Math.max(1, maxConcurrent),
       });
       onClose();
     } catch (e: any) {
@@ -127,6 +131,25 @@ function EditDialog({ initial, onSave, onClose }: EditDialogProps) {
             />
           </label>
         )}
+
+        <label className="space-y-1 block">
+          <span className="text-sm font-medium">Max concurrent requests</span>
+          <input
+            type="number"
+            min={1}
+            max={64}
+            step={1}
+            value={maxConcurrent}
+            onChange={(e) => setMaxConcurrent(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+          />
+          <span className="block text-xs text-muted-foreground">
+            How many requests can run at once against this connection. All
+            models sharing this credential share the same queue, so this is
+            the physical-resource concurrency limit (e.g. your Ollama
+            server's configured parallelism).
+          </span>
+        </label>
 
         {err && (
           <div className="rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-3 py-2 text-sm">
@@ -245,6 +268,8 @@ export default function CredentialsTab() {
                     {c.base_url || <span className="italic opacity-60">no base URL</span>}
                     {" · "}
                     {c.has_api_key ? "API key: ••••••••" : "API key: —"}
+                    {" · "}
+                    max {c.max_concurrent} concurrent
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     Used by: {refs.llm} LLM · {refs.vision} Vision · {refs.ocr} OCR

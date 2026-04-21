@@ -112,7 +112,6 @@ export default function VisionLlmProvidersTab() {
       model: "",
       api_key: "",
       timeout: 600,
-      max_concurrent: 2,
     };
     setProviders([...providers, entry]);
     setExpandedId(newId);
@@ -249,9 +248,11 @@ export default function VisionLlmProvidersTab() {
                   </div>
                 </div>
 
-                <span className="text-xs text-muted-foreground" title="Max concurrent requests for this (credential, model) tuple">
-                  cap {p.max_concurrent || 2}
-                </span>
+                {cred && (
+                  <span className="text-xs text-muted-foreground" title="Max concurrent requests — set on the credential">
+                    cap {cred.max_concurrent}
+                  </span>
+                )}
 
                 <button onClick={() => updateProvider(p.id, { enabled: !p.enabled })}
                   className={`rounded-md p-1.5 transition-colors ${p.enabled ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : "text-muted-foreground hover:bg-accent"}`}
@@ -282,11 +283,6 @@ export default function VisionLlmProvidersTab() {
                   />
                   <TextField label="Model" value={p.model} onChange={(v) => updateProvider(p.id, { model: v })}
                     placeholder={`e.g. ${DEFAULT_MODELS[effectiveType] || ""}`} />
-                  <NumberField label="Max concurrent" value={p.max_concurrent || 2}
-                    onChange={(v) => updateProvider(p.id, { max_concurrent: Math.max(1, v) })}
-                    min={1} max={32} step={1}
-                    description="Parallel vision calls for this (credential, model) tuple."
-                  />
                   <NumberField label="Timeout (seconds)" value={p.timeout}
                     onChange={(v) => updateProvider(p.id, { timeout: v })} min={30} max={1800} step={30} />
 

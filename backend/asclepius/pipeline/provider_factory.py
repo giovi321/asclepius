@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from asclepius.config import AppConfig, LlmProviderEntry, resolve_credential
-from asclepius.llm.gate import model_slot, register_model
+from asclepius.llm.gate import credential_slot, register_credential
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +56,13 @@ def get_llm_provider(config: AppConfig, priority: int = 1):
     )
 
 
-def _resolve_entry_connection(entry) -> tuple[str, str, str, str]:
-    """Return ``(type, base_url, api_key, credential_name)`` for a provider entry.
+def _resolve_entry_connection(entry) -> tuple[str, str, str, str, int]:
+    """Return ``(type, base_url, api_key, credential_name, max_concurrent)``.
 
     If ``entry.credential_id`` points at a known credential, its fields win;
     otherwise the entry's inline fields are used (legacy pre-credentials
     config, or new entries that haven't been pointed at a credential yet).
+    ``max_concurrent`` comes from the credential or defaults to 2.
     """
     cred = None
     cred_id = getattr(entry, "credential_id", "") or ""
@@ -72,9 +73,9 @@ def _resolve_entry_connection(entry) -> tuple[str, str, str, str]:
         except Exception:
             cred = None
     if cred is not None:
-        return cred.type, cred.base_url, cred.api_key, cred.name
-    # Fall back to legacy inline fields.
-    return entry.type, entry.base_url, entry.api_key, ""
+        return cred.type, cred.base_url, cred.api_key, cred.name, max(1, int(cred.max_concurrent or 2))
+    # Fall back to legacy inline fields. Cap defaults to 2.
+    return entry.type, entry.base_url, entry.api_key, "", 2
 
 
 def _build_llm_provider(entry):
@@ -82,9 +83,10 @@ def _build_llm_provider(entry):
 
     When ``entry.credential_id`` is set, base_url / api_key / type are
     resolved from the referenced credential. Inline fields still work for
-    entries that haven't been migrated yet.
+    entries that haven't been migrated yet. The concurrency cap is read
+    from the credential.
     """
-    eff_type, eff_base_url, eff_api_key, cred_name = _resolve_entry_connection(entry)
+    eff_type, eff_base_url, eff_api_key, cred_name, eff_cap = _resolve_entry_connection(entry)
     label = f"{entry.name} / {entry.model}" if entry.name else f"{eff_type} / {entry.model}"
 
     if eff_type == "claude":
@@ -114,23 +116,21 @@ def _build_llm_provider(entry):
         )
 
     provider.provider_label = label
-    # Stash the gate key so call helpers can register the model without
-    # needing to re-resolve the credential.
+    # Gate state. Key by credential_id (one queue per physical connection).
     provider._gate_credential_id = getattr(entry, "credential_id", "") or eff_type
     provider._gate_credential_name = cred_name or entry.name or eff_type
     provider._gate_model = entry.model
-    provider._gate_cap = max(1, int(getattr(entry, "max_concurrent", 2) or 2))
+    provider._gate_cap = eff_cap
 
-    # Register this model with the gate up-front so the UI can see cap=N
-    # even when no call is currently in flight (useful after config reload).
-    register_model(
-        provider._gate_credential_id, provider._gate_model, provider._gate_cap,
+    # Register this credential with the gate up-front so the UI can see
+    # cap=N even when no call is currently in flight.
+    register_credential(
+        provider._gate_credential_id, provider._gate_cap,
         kind="llm", credential_name=provider._gate_credential_name,
     )
 
-    # Wrap every LLM-facing async method so each acquisition goes through
-    # the per-model semaphore. This keeps the counter honest without
-    # requiring every existing callsite to be updated.
+    # Wrap every LLM-facing async method so each call acquires the
+    # credential's semaphore automatically.
     for method_name in ("chat", "extract", "_generate"):
         orig = getattr(provider, method_name, None)
         if orig is None:
@@ -141,12 +141,12 @@ def _build_llm_provider(entry):
 
 
 def _wrap_method_with_gate(provider, orig):
-    """Return an async wrapper that acquires the model slot before
+    """Return an async wrapper that acquires the credential slot before
     delegating to the original method."""
     async def wrapper(*args, **kwargs):
-        async with model_slot(
-            provider._gate_credential_id, provider._gate_model,
-            provider._gate_cap,
+        async with credential_slot(
+            provider._gate_credential_id, provider._gate_cap,
+            model=provider._gate_model,
             kind="llm", credential_name=provider._gate_credential_name,
         ):
             return await orig(*args, **kwargs)
@@ -169,6 +169,7 @@ def _build_general_llm_provider(config: AppConfig):
         return None
 
     # Synthesise an LlmProviderEntry so we can reuse _build_llm_provider.
+    # Concurrency cap comes from the credential, not from the general slot.
     entry = LlmProviderEntry(
         id="general",
         type=g.type,
@@ -178,7 +179,6 @@ def _build_general_llm_provider(config: AppConfig):
         credential_id=g.credential_id,
         model=g.model,
         timeout=g.timeout or 120,
-        max_concurrent=max(1, g.max_concurrent or 2),
     )
     return _build_llm_provider(entry)
 

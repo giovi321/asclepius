@@ -119,6 +119,7 @@ export interface Credential {
   type: CredentialType | string;
   base_url: string;
   api_key: string;
+  max_concurrent: number;
   has_api_key?: boolean;
   references?: {
     llm: number;
@@ -140,7 +141,6 @@ export interface LlmProvider {
   model: string;
   api_key: string;
   timeout: number;
-  max_concurrent?: number;
   has_api_key?: boolean;
 }
 
@@ -176,7 +176,6 @@ export interface VisionLlmProvider {
   model: string;
   api_key: string;
   timeout: number;
-  max_concurrent?: number;
   has_api_key?: boolean;
 }
 
@@ -185,7 +184,6 @@ export interface GeneralLlmSettings {
   type: string;
   model: string;
   timeout: number;
-  max_concurrent: number;
   configured?: boolean;
 }
 
@@ -193,6 +191,7 @@ export interface LlmQueueSnapshot {
   kind: "llm" | "vision";
   credential_id: string;
   credential_name: string;
+  models: string[];
   model: string;
   in_flight: number;
   waiting: number;

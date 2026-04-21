@@ -99,6 +99,11 @@ class CredentialEntry(BaseModel):
     models on the same Ollama server, or several models on the same OpenAI
     account). Edit the credential once and every referencing entry picks up
     the change.
+
+    ``max_concurrent`` is the concurrency cap for this connection — all
+    models sharing this credential share the same queue, matching how the
+    physical resource actually behaves (one Ollama server has a fixed
+    parallelism limit regardless of which model is loaded).
     """
     id: str = ""
     name: str = ""
@@ -106,6 +111,7 @@ class CredentialEntry(BaseModel):
     type: str = "ollama"
     base_url: str = ""
     api_key: str = ""
+    max_concurrent: int = 2
 
 
 class OcrProviderEntry(BaseModel):
@@ -142,15 +148,13 @@ class LlmProviderEntry(BaseModel):
     name: str = ""
     enabled: bool = True
     priority: int = 1
-    # Shared connection — when set, base_url/api_key are derived from it.
+    # Shared connection — when set, base_url/api_key are derived from it and
+    # the concurrency cap comes from the credential's ``max_concurrent``.
     credential_id: str = ""
     base_url: str = "http://ollama:11434"
     model: str = "llama3.1"
     api_key: str = ""
     timeout: int = 120
-    # Max concurrent requests to THIS (credential, model) tuple. The gate
-    # takes the max across entries referencing the same physical model.
-    max_concurrent: int = 2
 
 
 class VisionLlmProviderEntry(BaseModel):
@@ -170,7 +174,6 @@ class VisionLlmProviderEntry(BaseModel):
     model: str = ""
     api_key: str = ""
     timeout: int = 600
-    max_concurrent: int = 2
 
 
 class GeneralLlmConfig(BaseModel):
@@ -178,13 +181,12 @@ class GeneralLlmConfig(BaseModel):
 
     Covers chat, auto-merge, auto-rename, link suggestion, event extraction,
     and document-edit AI. When ``credential_id`` is empty, those endpoints
-    return 503.
+    return 503. The concurrency cap comes from the credential.
     """
     credential_id: str = ""
     type: str = "ollama"  # same vocabulary as LlmProviderEntry.type
     model: str = ""
     timeout: int = 120
-    max_concurrent: int = 2
 
 
 class OcrConfig(BaseModel):
@@ -477,9 +479,6 @@ def _migrate_credentials(config: AppConfig) -> bool:
                 config.llm.general.type = first.type
                 config.llm.general.model = first.model
                 config.llm.general.timeout = first.timeout
-                config.llm.general.max_concurrent = max(
-                    2, getattr(first, "max_concurrent", 2) or 2,
-                )
                 changed = True
 
     if changed or credentials != config.credentials:

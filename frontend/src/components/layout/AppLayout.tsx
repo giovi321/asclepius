@@ -35,8 +35,6 @@ const navItems = [
   { path: "/imaging", label: "Imaging", icon: Image },
   { path: "/chat", label: "Chat", icon: MessageCircle },
   { path: "/search", label: "Search", icon: Search },
-  { path: "/settings", label: "Settings", icon: Settings },
-  { path: "/files", label: "Files", icon: FolderTree },
 ];
 
 export default function AppLayout() {
@@ -44,6 +42,9 @@ export default function AppLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
+
+  const settingsActive = location.pathname.startsWith("/settings");
+  const filesActive = location.pathname.startsWith("/files");
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -88,35 +89,65 @@ export default function AppLayout() {
           })}
         </nav>
 
-        {/* Patient selector + user row with theme toggle + logout */}
+        {/* Footer: patient + icon row + github */}
         <div className="p-3 space-y-2">
           {sidebarOpen && <PatientSelector />}
-          <div className="flex items-center justify-between gap-2">
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground min-w-0"
-              title="Logout"
+
+          {/* Icon row: Settings, Files, Theme, Logout — labels live in tooltips */}
+          <div className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "flex-col"}`}>
+            <Link
+              to="/settings"
+              title="Settings"
+              aria-label="Settings"
+              className={`rounded-md p-2 transition-colors ${
+                settingsActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
             >
-              <LogOut className="h-4 w-4 flex-shrink-0" />
-              {sidebarOpen && <span className="text-xs truncate">{user?.display_name || user?.username}</span>}
-            </button>
+              <Settings className="h-4 w-4" />
+            </Link>
+            <Link
+              to="/files"
+              title="Files"
+              aria-label="Files"
+              className={`rounded-md p-2 transition-colors ${
+                filesActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              <FolderTree className="h-4 w-4" />
+            </Link>
             <button
               onClick={toggleTheme}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground flex-shrink-0"
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-          </div>
-          {sidebarOpen && (
-            <a
-              href="https://github.com/giovi321/asclepius"
-              target="_blank"
-              rel="noreferrer"
-              className="block text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            <button
+              onClick={logout}
+              title={`Logout (${user?.display_name || user?.username || ""})`}
+              aria-label="Logout"
+              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
             >
-              Asclepius v{packageJson.version}
-            </a>
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+
+          {sidebarOpen && (
+            <div className="pt-1 text-center">
+              <a
+                href="https://github.com/giovi321/asclepius"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              >
+                Asclepius v{packageJson.version}
+              </a>
+            </div>
           )}
         </div>
       </aside>

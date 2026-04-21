@@ -1,43 +1,140 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePatient } from "@/contexts/PatientContext";
 import api from "@/api/client";
+import { User, Users as UsersIcon, Check, ChevronsUpDown, Search, X } from "lucide-react";
+import type { Patient } from "@/types";
+
+type PatientRow = Patient;
 
 export default function PatientSelector() {
   const { selectedPatient, setSelectedPatient } = usePatient();
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<PatientRow[]>([]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.get("/patients").then((res) => {
-      setPatients(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
-  }, []);
-
-  // Re-fetch when component mounts (catches new patients created elsewhere)
-  useEffect(() => {
-    const interval = setInterval(() => {
+    const load = () => {
       api.get("/patients").then((res) => {
         setPatients(Array.isArray(res.data) ? res.data : []);
       }).catch(() => {});
-    }, 10000); // refresh every 10s
+    };
+    load();
+    const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
+
+  const filtered = query.trim()
+    ? patients.filter((p) =>
+        p.display_name.toLowerCase().includes(query.toLowerCase()) ||
+        (p.slug || "").toLowerCase().includes(query.toLowerCase()),
+      )
+    : patients;
+
+  const pick = (p: PatientRow | null) => {
+    setSelectedPatient(p);
+    setOpen(false);
+  };
+
   return (
-    <select
-      className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
-      value={selectedPatient?.id || ""}
-      onChange={(e) => {
-        const id = Number(e.target.value);
-        const patient = patients.find((p) => p.id === id);
-        setSelectedPatient(patient || null);
-      }}
-    >
-      <option value="">All patients</option>
-      {patients.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.display_name}
-        </option>
-      ))}
-    </select>
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent transition-colors"
+      >
+        {selectedPatient ? (
+          <>
+            <User className="h-4 w-4 text-primary flex-shrink-0" />
+            <span className="flex-1 min-w-0 truncate text-left font-medium">
+              {selectedPatient.display_name}
+            </span>
+          </>
+        ) : (
+          <>
+            <UsersIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="flex-1 min-w-0 truncate text-left text-muted-foreground">
+              All patients
+            </span>
+          </>
+        )}
+        <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 bottom-full mb-1.5 w-full min-w-[240px] rounded-lg border bg-popover shadow-xl overflow-hidden z-30">
+          <div className="relative border-b px-2 py-1.5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search patients…"
+              className="w-full rounded-md bg-transparent pl-7 pr-6 py-1 text-sm focus:outline-none"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-[320px] overflow-y-auto py-1">
+            <button
+              onClick={() => pick(null)}
+              className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-accent ${!selectedPatient ? "bg-accent/50" : ""}`}
+            >
+              <UsersIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="flex-1">All patients</span>
+              {!selectedPatient && <Check className="h-3.5 w-3.5 text-primary" />}
+            </button>
+
+            {filtered.length === 0 && query && (
+              <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                No patients match "{query}"
+              </div>
+            )}
+
+            {filtered.map((p) => {
+              const isActive = selectedPatient?.id === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => pick(p)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-accent ${isActive ? "bg-accent/50" : ""}`}
+                >
+                  <User className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                  <span className="flex-1 truncate">{p.display_name}</span>
+                  {isActive && <Check className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

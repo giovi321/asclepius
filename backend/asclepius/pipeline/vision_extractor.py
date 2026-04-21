@@ -149,11 +149,21 @@ async def _vision_call(
     payload: dict = {
         "model": model, "prompt": prompt, "images": [b64_image], "stream": False,
     }
-    if force_json:
-        payload["format"] = "json"
+    # Note: we intentionally do NOT set {"format": "json"} for Ollama. On
+    # qwen2.5-vl / llama3.2-vision the constrained-grammar sampler interacts
+    # badly with the vision pipeline and frequently returns HTTP 500. The
+    # prompt asks for strict JSON, and ``_parse_vision_extraction`` already
+    # tolerates fenced code blocks or surrounding prose, so the constraint
+    # buys us nothing here. ``force_json`` is kept for API compatibility.
+    _ = force_json
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(f"{ollama_url}/api/generate", json=payload)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            body = resp.text[:500]
+            raise httpx.HTTPStatusError(
+                f"Ollama {resp.status_code} from {ollama_url}: {body}",
+                request=resp.request, response=resp,
+            )
         return resp.json().get("response", "")
 
 
@@ -161,7 +171,12 @@ async def _vision_call_with_retry(
     b64_image: str, prompt: str, provider: VisionLlmProviderEntry,
     max_retries: int, backoff: list[int],
 ) -> str:
-    """Call the vision LLM with retry + backoff on transient failures."""
+    """Call the vision LLM with retry + backoff on transient failures.
+
+    Transient = connect/read timeouts, connection errors, rate limits (429),
+    and server errors (HTTP 5xx — Ollama's vision pipeline can return 500
+    on a flaky page but succeed on a retry).
+    """
     attempts = max(max_retries, 0) + 1
     for attempt in range(attempts):
         try:
@@ -173,6 +188,16 @@ async def _vision_call_with_retry(
             logger.warning("Vision %s (attempt %d/%d), retrying in %ds",
                            type(e).__name__, attempt + 1, attempts, wait)
             await asyncio.sleep(wait)
+        except httpx.HTTPStatusError as e:
+            status = e.response.status_code if e.response is not None else 0
+            is_transient = status == 429 or status >= 500
+            if is_transient and attempt < attempts - 1:
+                wait = backoff[min(attempt, len(backoff) - 1)] if backoff else 30
+                logger.warning("Vision HTTP %d (attempt %d/%d), retrying in %ds: %s",
+                               status, attempt + 1, attempts, wait, str(e)[:300])
+                await asyncio.sleep(wait)
+                continue
+            raise
         except Exception as e:
             msg = str(e)
             if ("rate_limit" in msg or "429" in msg) and attempt < attempts - 1:

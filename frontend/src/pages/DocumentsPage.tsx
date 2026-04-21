@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { FileText, Search, Upload, Pencil, Check, X, ChevronDown } from "lucide-react";
+import { FileText, Search, Upload, Pencil, Check, X, ChevronDown, Columns3 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import type { PipelineStatus } from "@/types";
@@ -15,6 +15,48 @@ const DOC_TYPES = [
   "insurance_claim", "referral", "discharge", "specialist_report",
   "radiology_report", "surgical_report", "vaccination", "other",
 ];
+
+// ─── Column config ────────────────────────────────────────────────
+//
+// The File column is always visible — it's the primary identifier. Everything
+// else is toggleable via the Columns popover and the user's choice is
+// persisted in localStorage.
+type ColumnKey = "type" | "date" | "doctor" | "facility" | "patient" | "specialty" | "status";
+interface ColumnDef {
+  key: ColumnKey;
+  label: string;
+  defaultVisible: boolean;
+  width: string;  // CSS width used in the colgroup
+}
+const COLUMNS: ColumnDef[] = [
+  { key: "type",      label: "Type",      defaultVisible: true,  width: "14%" },
+  { key: "date",      label: "Date",      defaultVisible: true,  width: "12%" },
+  { key: "facility",  label: "Facility",  defaultVisible: true,  width: "22%" },
+  { key: "doctor",    label: "Doctor",    defaultVisible: false, width: "16%" },
+  { key: "patient",   label: "Patient",   defaultVisible: false, width: "14%" },
+  { key: "specialty", label: "Specialty", defaultVisible: false, width: "14%" },
+  { key: "status",    label: "Status",    defaultVisible: true,  width: "16%" },
+];
+const COLUMN_STORAGE_KEY = "asclepius_documents_columns";
+
+function loadVisibleColumns(): Set<ColumnKey> {
+  try {
+    const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        // Filter against the current column list so a stale key from an
+        // older build doesn't linger.
+        const valid = new Set<ColumnKey>();
+        for (const k of arr) {
+          if (COLUMNS.some((c) => c.key === k)) valid.add(k as ColumnKey);
+        }
+        if (valid.size > 0) return valid;
+      }
+    }
+  } catch { /* fall through */ }
+  return new Set(COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key));
+}
 
 // Read URL params once at mount-time so every filter starts seeded from the
 // URL. We never re-sync on external URL changes; the component is the source
@@ -57,9 +99,35 @@ export default function DocumentsPage() {
   const [llmProviders, setLlmProviders] = useState<any[]>([]);
   const [ocrProviders, setOcrProviders] = useState<any[]>([]);
   const reprocessRef = useRef<HTMLDivElement>(null);
+  const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(() => loadVisibleColumns());
+  const [colsOpen, setColsOpen] = useState(false);
+  const colsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const confirm = useConfirm();
   const limit = 20;
+
+  // Persist column choice.
+  useEffect(() => {
+    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(Array.from(visibleCols)));
+  }, [visibleCols]);
+
+  // Close columns popover on outside click.
+  useEffect(() => {
+    if (!colsOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (colsRef.current && !colsRef.current.contains(e.target as Node)) {
+        setColsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [colsOpen]);
+
+  const orderedVisibleColumns = useMemo(
+    () => COLUMNS.filter((c) => visibleCols.has(c.key)),
+    [visibleCols],
+  );
+  const tableColSpan = 2 + orderedVisibleColumns.length; // checkbox + File + dynamic
 
   // Load filter options
   const [specialties, setSpecialties] = useState<any[]>([]);
@@ -271,17 +339,6 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Documents</h1>
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-        >
-          <Upload className="h-4 w-4" />
-          Upload
-        </button>
-      </div>
-
       {showUpload && (
         <FileUpload onUploadComplete={() => {
           setPage(0);
@@ -373,6 +430,61 @@ export default function DocumentsPage() {
           selected={facilityFilter}
           onChange={(v: string[]) => { setFacilityFilter(v); setPage(0); }}
         />
+
+        <div ref={colsRef} className="relative ml-auto">
+          <button
+            onClick={() => setColsOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
+            title="Show/hide columns"
+          >
+            <Columns3 className="h-4 w-4" />
+            Columns
+            <ChevronDown className="h-3 w-3" />
+          </button>
+          {colsOpen && (
+            <div className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border bg-background shadow-xl p-2">
+              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Visible columns
+              </div>
+              {COLUMNS.map((c) => (
+                <label
+                  key={c.key}
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={visibleCols.has(c.key)}
+                    onChange={() => {
+                      setVisibleCols((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(c.key)) next.delete(c.key);
+                        else next.add(c.key);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span>{c.label}</span>
+                </label>
+              ))}
+              <div className="mt-1 border-t pt-1">
+                <button
+                  onClick={() => setVisibleCols(new Set(COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key)))}
+                  className="w-full rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => setShowUpload(!showUpload)}
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+        >
+          <Upload className="h-4 w-4" />
+          Upload
+        </button>
       </div>
 
       {/* Date range + clear */}
@@ -519,9 +631,16 @@ export default function DocumentsPage() {
       {/* Table */}
       <div className="rounded-lg border overflow-hidden">
         <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col style={{ width: "32px" }} />
+            <col />
+            {orderedVisibleColumns.map((c) => (
+              <col key={c.key} style={{ width: c.width }} />
+            ))}
+          </colgroup>
           <thead className="border-b bg-muted/50">
             <tr>
-              <th className="px-2 py-2 w-8 text-left">
+              <th className="px-2 py-2 text-left">
                 <input
                   type="checkbox"
                   checked={documents.length > 0 && selectedIds.size === documents.length}
@@ -530,18 +649,17 @@ export default function DocumentsPage() {
                   className="align-middle"
                 />
               </th>
-              <th className="px-4 py-2 text-left font-medium w-[30%]">File</th>
-              <th className="px-4 py-2 text-left font-medium w-[14%]">Type</th>
-              <th className="px-4 py-2 text-left font-medium w-[12%]">Date</th>
-              <th className="px-4 py-2 text-left font-medium w-[22%]">Doctor / Facility</th>
-              <th className="px-4 py-2 text-left font-medium w-[22%]">Status</th>
+              <th className="px-4 py-2 text-left font-medium">File</th>
+              {orderedVisibleColumns.map((c) => (
+                <th key={c.key} className="px-4 py-2 text-left font-medium">{c.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={tableColSpan} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
             ) : documents.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
+              <tr><td colSpan={tableColSpan} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
             ) : (
               documents.map((doc: any) => (
                 <tr key={doc.id} className={`hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}>
@@ -559,17 +677,39 @@ export default function DocumentsPage() {
                       setDocuments((prev: any[]) => prev.map((d: any) => d.id === doc.id ? { ...d, ...updated } : d));
                     }} />
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground truncate" title={formatDocType(doc.doc_type)}>{formatDocType(doc.doc_type)}</td>
-                  <td className="px-4 py-2 text-muted-foreground truncate">{getBestDate(doc) || "—"}</td>
-                  <td className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || doc.facility_name || ""}>{doc.doctor_name || doc.facility_name || "—"}</td>
-                  <td className="px-4 py-2">
-                    <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
-                      {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
-                        && pipeline?.processing_pages && pipeline?.processing_page_current != null
-                        ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`
-                        : doc.status}
-                    </span>
-                  </td>
+                  {orderedVisibleColumns.map((c) => {
+                    if (c.key === "type") {
+                      const t = formatDocType(doc.doc_type);
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={t}>{t}</td>;
+                    }
+                    if (c.key === "date") {
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate">{getBestDate(doc) || "—"}</td>;
+                    }
+                    if (c.key === "doctor") {
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || ""}>{doc.doctor_name || "—"}</td>;
+                    }
+                    if (c.key === "facility") {
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.facility_name || ""}>{doc.facility_name || "—"}</td>;
+                    }
+                    if (c.key === "patient") {
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.patient_name || ""}>{doc.patient_name || "—"}</td>;
+                    }
+                    if (c.key === "specialty") {
+                      const s = doc.specialty_original || "";
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={s}>{s || "—"}</td>;
+                    }
+                    // status
+                    return (
+                      <td key={c.key} className="px-4 py-2">
+                        <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
+                          {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
+                            && pipeline?.processing_pages && pipeline?.processing_page_current != null
+                            ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`
+                            : doc.status}
+                        </span>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))
             )}

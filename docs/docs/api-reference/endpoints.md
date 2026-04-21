@@ -24,14 +24,7 @@ All endpoints require authentication unless noted. Base prefix: `/api`
   "display_name": "Giovanni Crapelli",
   "patient_name": "Giovanni Crapelli",
   "patient_date_of_birth": "1990-01-15",
-  "patient_sex": "M",
-  "patient_blood_type": "A+",
-  "patient_allergies": "Penicillin",
-  "patient_phone": "+41 79 123 4567",
-  "patient_email": "giovanni@example.com",
-  "patient_address": "Via Roma 1, Lugano",
-  "patient_insurance_company": "CSS",
-  "patient_insurance_number": "1234567"
+  "patient_sex": "M"
 }
 ```
 
@@ -58,7 +51,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `PATCH` | `/api/patients/{id}` | Yes | Update patient fields |
 | `DELETE` | `/api/patients/{id}` | Yes | Delete a patient |
 
-**Patient fields:** `display_name`, `date_of_birth`, `sex`, `blood_type`, `allergies`, `notes`, `phone`, `email`, `address`, `insurance_company`, `insurance_number`
+**Patient fields:** `display_name`, `date_of_birth`, `sex` — only fields that feed the LLM extraction context are stored.
 
 ## Documents
 

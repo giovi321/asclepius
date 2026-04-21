@@ -14,9 +14,24 @@ logger = logging.getLogger(__name__)
 
 async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     """Build context dict for LLM extraction prompt."""
-    # Get known patients
-    cursor = await db.execute("SELECT id, slug, display_name FROM patients")
-    patients = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
+    # Get known patients. DOB + sex are included so the extractor can
+    # disambiguate the right patient on multi-name documents and so
+    # type-specific prompts (lab ranges, medication doses) see the context
+    # they'd normally depend on. The rest of the patient profile is not
+    # useful to the LLM and intentionally not stored.
+    cursor = await db.execute(
+        "SELECT id, slug, display_name, date_of_birth, sex FROM patients"
+    )
+    patients = [
+        {
+            "id": r[0],
+            "slug": r[1],
+            "name": r[2],
+            "date_of_birth": r[3],
+            "sex": r[4],
+        }
+        for r in await cursor.fetchall()
+    ]
 
     # Get known facilities
     cursor = await db.execute("SELECT id, slug, name FROM facilities")

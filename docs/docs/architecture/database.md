@@ -63,14 +63,6 @@ erDiagram
         text display_name
         date date_of_birth
         text sex
-        text blood_type
-        text allergies
-        text notes
-        text phone
-        text email
-        text address
-        text insurance_company
-        text insurance_number
     }
 
     user_patient_access {
@@ -312,7 +304,7 @@ erDiagram
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts with bcrypt password hashes |
-| `patients` | Patient demographics (name, DOB, sex, blood type, allergies, contact, insurance) |
+| `patients` | Patient demographics — deliberately minimal (name, DOB, sex) since only those fields are passed to the LLM for extraction |
 | `user_patient_access` | Maps users to patients with role (`owner` or `viewer`) |
 | `documents` | Central document records with metadata, OCR text, and extraction results |
 

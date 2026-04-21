@@ -23,13 +23,6 @@ export default function SetupWizardPage() {
   const [patientName, setPatientName] = useState("");
   const [patientDob, setPatientDob] = useState("");
   const [patientSex, setPatientSex] = useState("");
-  const [patientBloodType, setPatientBloodType] = useState("");
-  const [patientAllergies, setPatientAllergies] = useState("");
-  const [patientPhone, setPatientPhone] = useState("");
-  const [patientEmail, setPatientEmail] = useState("");
-  const [patientAddress, setPatientAddress] = useState("");
-  const [patientInsuranceCompany, setPatientInsuranceCompany] = useState("");
-  const [patientInsuranceNumber, setPatientInsuranceNumber] = useState("");
 
   const goToPatient = () => {
     setError("");
@@ -53,13 +46,6 @@ export default function SetupWizardPage() {
         patient_name: patientName.trim() || displayName.trim() || username.trim(),
         patient_date_of_birth: patientDob || null,
         patient_sex: patientSex || null,
-        patient_blood_type: patientBloodType || null,
-        patient_allergies: patientAllergies || null,
-        patient_phone: patientPhone || null,
-        patient_email: patientEmail || null,
-        patient_address: patientAddress || null,
-        patient_insurance_company: patientInsuranceCompany || null,
-        patient_insurance_number: patientInsuranceNumber || null,
       });
       setStep("done");
     } catch (err: any) {
@@ -201,54 +187,6 @@ export default function SetupWizardPage() {
                   <option value="F">Female</option>
                   <option value="O">Other</option>
                 </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Blood Type</label>
-                <select value={patientBloodType} onChange={(e) => setPatientBloodType(e.target.value)} className={inputClass}>
-                  <option value="">—</option>
-                  {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bt) => (
-                    <option key={bt} value={bt}>{bt}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Phone</label>
-                <input type="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)}
-                  className={inputClass} />
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>Email</label>
-              <input type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)}
-                className={inputClass} />
-            </div>
-
-            <div>
-              <label className={labelClass}>Address</label>
-              <input type="text" value={patientAddress} onChange={(e) => setPatientAddress(e.target.value)}
-                className={inputClass} />
-            </div>
-
-            <div>
-              <label className={labelClass}>Allergies</label>
-              <input type="text" value={patientAllergies} onChange={(e) => setPatientAllergies(e.target.value)}
-                className={inputClass} placeholder="e.g. Penicillin, Latex" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Insurance Company</label>
-                <input type="text" value={patientInsuranceCompany} onChange={(e) => setPatientInsuranceCompany(e.target.value)}
-                  className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Insurance Number</label>
-                <input type="text" value={patientInsuranceNumber} onChange={(e) => setPatientInsuranceNumber(e.target.value)}
-                  className={inputClass} />
               </div>
             </div>
 

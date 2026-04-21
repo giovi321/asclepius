@@ -163,11 +163,8 @@ async def _execute_safe_sql(
 
 async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> str:
     """Build a context string with patient summary data."""
-    # Patient info
     cursor = await db.execute(
-        """SELECT display_name, date_of_birth, sex, blood_type, allergies,
-                  insurance_company, insurance_number
-           FROM patients WHERE id = ?""",
+        "SELECT display_name, date_of_birth, sex FROM patients WHERE id = ?",
         (patient_id,),
     )
     patient = await cursor.fetchone()
@@ -179,12 +176,6 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
         parts.append(f"Date of birth: {patient[1]}")
     if patient[2]:
         parts.append(f"Sex: {patient[2]}")
-    if patient[3]:
-        parts.append(f"Blood type: {patient[3]}")
-    if patient[4]:
-        parts.append(f"Allergies: {patient[4]}")
-    if patient[5]:
-        parts.append(f"Insurance: {patient[5]} ({patient[6] or 'N/A'})")
 
     # Recent documents
     cursor = await db.execute(

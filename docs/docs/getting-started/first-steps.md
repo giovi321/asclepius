@@ -7,7 +7,7 @@ This guide walks you through the basic workflow after installation.
 On the very first launch — when no users exist in the database — Asclepius shows a **setup wizard** that walks you through:
 
 1. **Create your admin account** — choose a username, password, and display name
-2. **Create your first patient** — the patient name is pre-filled from your display name, but you can change it and fill in all details (date of birth, sex, blood type, allergies, contact info, insurance)
+2. **Create your first patient** — the patient name is pre-filled from your display name; you can also set date of birth and sex, which the LLM uses when extracting data from your documents
 3. **Done** — you are automatically logged in and redirected to the dashboard
 
 !!! info "The wizard only appears once"

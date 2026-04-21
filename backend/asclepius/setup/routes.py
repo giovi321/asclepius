@@ -25,17 +25,11 @@ class SetupRequest(BaseModel):
     username: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=1, max_length=1024)
     display_name: str = Field(min_length=0, max_length=200)
-    # Patient
+    # Patient — kept minimal since DOB + sex are the only fields that feed
+    # downstream LLM extraction; see schema.sql for the patients columns.
     patient_name: str = Field(min_length=0, max_length=200)
     patient_date_of_birth: str | None = Field(default=None, max_length=40)
     patient_sex: str | None = Field(default=None, max_length=20)
-    patient_blood_type: str | None = Field(default=None, max_length=20)
-    patient_allergies: str | None = Field(default=None, max_length=1000)
-    patient_phone: str | None = Field(default=None, max_length=100)
-    patient_email: str | None = Field(default=None, max_length=200)
-    patient_address: str | None = Field(default=None, max_length=500)
-    patient_insurance_company: str | None = Field(default=None, max_length=200)
-    patient_insurance_number: str | None = Field(default=None, max_length=100)
 
 
 @router.get("/status")
@@ -87,14 +81,9 @@ async def setup_complete(
     patient_dir.mkdir(parents=True, exist_ok=True)
 
     cursor = await db.execute(
-        """INSERT INTO patients (slug, display_name, date_of_birth, sex, blood_type,
-                                allergies, phone, email, address,
-                                insurance_company, insurance_number)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (slug, patient_name, body.patient_date_of_birth, body.patient_sex,
-         body.patient_blood_type, body.patient_allergies, body.patient_phone,
-         body.patient_email, body.patient_address,
-         body.patient_insurance_company, body.patient_insurance_number),
+        """INSERT INTO patients (slug, display_name, date_of_birth, sex)
+           VALUES (?, ?, ?, ?)""",
+        (slug, patient_name, body.patient_date_of_birth, body.patient_sex),
     )
     patient_id = cursor.lastrowid
 

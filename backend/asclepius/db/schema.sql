@@ -16,14 +16,6 @@ CREATE TABLE IF NOT EXISTS patients (
     display_name TEXT NOT NULL,
     date_of_birth DATE,
     sex TEXT,  -- 'M', 'F', 'O'
-    blood_type TEXT,
-    allergies TEXT,
-    notes TEXT,
-    phone TEXT,
-    email TEXT,
-    address TEXT,
-    insurance_company TEXT,
-    insurance_number TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -91,7 +91,7 @@ The default `docker-compose.yml` mounts two directories:
 1. Open [http://localhost:8070](http://localhost:8070)
 2. On first launch (no users in the database), a **setup wizard** appears
 3. Create your admin account (username, password, display name)
-4. Create your first patient profile — pre-filled with your display name, but fully editable (date of birth, sex, blood type, allergies, contact info, insurance)
+4. Create your first patient profile — pre-filled with your display name, with optional date of birth and sex
 5. After completing the wizard, you are automatically logged in and redirected to the dashboard
 
 !!! info "The wizard only appears once"

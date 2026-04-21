@@ -20,28 +20,12 @@ class PatientCreate(BaseModel):
     display_name: str
     date_of_birth: str | None = None
     sex: str | None = None
-    blood_type: str | None = None
-    allergies: str | None = None
-    notes: str | None = None
-    phone: str | None = None
-    email: str | None = None
-    address: str | None = None
-    insurance_company: str | None = None
-    insurance_number: str | None = None
 
 
 class PatientUpdate(BaseModel):
     display_name: str | None = None
     date_of_birth: str | None = None
     sex: str | None = None
-    blood_type: str | None = None
-    allergies: str | None = None
-    notes: str | None = None
-    phone: str | None = None
-    email: str | None = None
-    address: str | None = None
-    insurance_company: str | None = None
-    insurance_number: str | None = None
 
 
 @router.get("")
@@ -61,15 +45,15 @@ async def get_patient(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Get a single patient's details."""
-    if current_user.get("role") != "admin":
+    if current_user.get("role") == "admin":
+        role = "admin"
+    else:
         role = await check_patient_access(db, current_user["id"], patient_id)
         if not role:
             raise HTTPException(status_code=403, detail="No access to this patient")
 
     cursor = await db.execute(
-        """SELECT id, slug, display_name, date_of_birth, sex, blood_type,
-                  allergies, notes, phone, email, address,
-                  insurance_company, insurance_number, created_at
+        """SELECT id, slug, display_name, date_of_birth, sex, created_at
            FROM patients WHERE id = ?""",
         (patient_id,),
     )
@@ -109,13 +93,9 @@ async def create_patient(
 
     try:
         cursor = await db.execute(
-            """INSERT INTO patients (slug, display_name, date_of_birth, sex, blood_type,
-                                    allergies, notes, phone, email, address,
-                                    insurance_company, insurance_number)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (slug, body.display_name, body.date_of_birth, body.sex, body.blood_type,
-             body.allergies, body.notes, body.phone, body.email, body.address,
-             body.insurance_company, body.insurance_number),
+            """INSERT INTO patients (slug, display_name, date_of_birth, sex)
+               VALUES (?, ?, ?, ?)""",
+            (slug, body.display_name, body.date_of_birth, body.sex),
         )
         patient_id = cursor.lastrowid
 
@@ -154,10 +134,7 @@ async def update_patient(
             raise HTTPException(status_code=403, detail="Only owners can edit patient info")
 
     updates = {}
-    for field in [
-        "display_name", "date_of_birth", "sex", "blood_type", "allergies",
-        "notes", "phone", "email", "address", "insurance_company", "insurance_number",
-    ]:
+    for field in ("display_name", "date_of_birth", "sex"):
         value = getattr(body, field, None)
         if value is not None:
             updates[field] = value
@@ -171,9 +148,7 @@ async def update_patient(
     await db.commit()
 
     cursor = await db.execute(
-        """SELECT id, slug, display_name, date_of_birth, sex, blood_type,
-                  allergies, notes, phone, email, address,
-                  insurance_company, insurance_number
+        """SELECT id, slug, display_name, date_of_birth, sex
            FROM patients WHERE id = ?""",
         (patient_id,),
     )

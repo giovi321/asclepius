@@ -118,6 +118,25 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
     await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(revoked_at, expires_at)")
 
+    # Prune the patient profile down to fields that actually serve either the
+    # LLM (name, DOB, sex) or the user's internal bookkeeping (slug, created).
+    # Blood type / allergies / contact info / insurance were dead weight —
+    # never passed to the LLM for extraction and not needed by any view.
+    cursor = await db.execute("PRAGMA table_info(patients)")
+    patient_cols = [row[1] for row in await cursor.fetchall()]
+    _dropped = 0
+    for col in (
+        "blood_type", "allergies", "notes",
+        "phone", "email", "address",
+        "insurance_company", "insurance_number",
+    ):
+        if col in patient_cols:
+            await db.execute(f"ALTER TABLE patients DROP COLUMN {col}")
+            _dropped += 1
+    if _dropped:
+        await db.commit()
+        logger.info("Migration: dropped %d legacy columns from patients", _dropped)
+
     # Add unique constraint on document_links to prevent exact duplicates
     # First deduplicate any existing rows, keeping the oldest
     await db.execute("""

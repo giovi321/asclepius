@@ -10,14 +10,6 @@ interface Patient {
   display_name: string;
   date_of_birth?: string;
   sex?: string;
-  blood_type?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  allergies?: string;
-  notes?: string;
-  insurance_provider?: string;
-  insurance_policy_number?: string;
 }
 
 export default function PatientsPage() {
@@ -97,14 +89,6 @@ export default function PatientsPage() {
         display_name: newPatient.display_name?.trim(),
         date_of_birth: newPatient.date_of_birth || null,
         sex: newPatient.sex || null,
-        blood_type: newPatient.blood_type || null,
-        phone: newPatient.phone || null,
-        email: newPatient.email || null,
-        address: newPatient.address || null,
-        allergies: newPatient.allergies || null,
-        notes: newPatient.notes || null,
-        insurance_provider: newPatient.insurance_provider || null,
-        insurance_policy_number: newPatient.insurance_policy_number || null,
       });
       setNewPatient({});
       setShowCreate(false);
@@ -132,7 +116,7 @@ export default function PatientsPage() {
       {showCreate && (
         <div className="rounded-lg border p-4 space-y-4">
           <h3 className="font-medium">Create New Patient</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1">
               <span className="text-sm font-medium">Full Name *</span>
               <input
@@ -165,83 +149,6 @@ export default function PatientsPage() {
                 <option value="O">Other</option>
               </select>
             </label>
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Blood Type</span>
-              <select
-                value={newPatient.blood_type || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, blood_type: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              >
-                <option value="">--</option>
-                {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bt) => (
-                  <option key={bt} value={bt}>{bt}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Phone</span>
-              <input
-                type="tel"
-                value={newPatient.phone || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Email</span>
-              <input
-                type="email"
-                value={newPatient.email || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, email: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-              <span className="text-sm font-medium">Address</span>
-              <input
-                type="text"
-                value={newPatient.address || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, address: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-              <span className="text-sm font-medium">Allergies</span>
-              <input
-                type="text"
-                value={newPatient.allergies || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                placeholder="Comma separated"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Insurance Provider</span>
-              <input
-                type="text"
-                value={newPatient.insurance_provider || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, insurance_provider: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Insurance Policy #</span>
-              <input
-                type="text"
-                value={newPatient.insurance_policy_number || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, insurance_policy_number: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-              <span className="text-sm font-medium">Notes</span>
-              <textarea
-                value={newPatient.notes || ""}
-                onChange={(e) => setNewPatient({ ...newPatient, notes: e.target.value })}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                rows={2}
-              />
-            </label>
           </div>
           <div className="flex gap-2">
             <button
@@ -271,17 +178,14 @@ export default function PatientsPage() {
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Date of Birth</th>
               <th className="px-4 py-2 text-left font-medium">Sex</th>
-              <th className="px-4 py-2 text-left font-medium">Blood Type</th>
-              <th className="px-4 py-2 text-left font-medium">Phone</th>
-              <th className="px-4 py-2 text-left font-medium">Email</th>
               <th className="px-4 py-2 text-left font-medium"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
             ) : patients.length === 0 ? (
-              <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No patients found</td></tr>
+              <tr><td colSpan={4} className="p-4 text-center text-muted-foreground">No patients found</td></tr>
             ) : (
               patients.map((patient) => (
                 <PatientRow
@@ -329,9 +233,6 @@ function PatientRow({
         <td className="px-4 py-2 font-medium">{patient.display_name}</td>
         <td className="px-4 py-2 text-muted-foreground">{patient.date_of_birth || "--"}</td>
         <td className="px-4 py-2 text-muted-foreground">{patient.sex || "--"}</td>
-        <td className="px-4 py-2 text-muted-foreground">{patient.blood_type || "--"}</td>
-        <td className="px-4 py-2 text-muted-foreground">{patient.phone || "--"}</td>
-        <td className="px-4 py-2 text-muted-foreground">{patient.email || "--"}</td>
         <td className="px-4 py-2">
           <div className="flex items-center gap-1">
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -340,8 +241,8 @@ function PatientRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={7} className="bg-muted/20 px-4 py-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 max-w-4xl">
+          <td colSpan={4} className="bg-muted/20 px-4 py-4">
+            <div className="grid gap-3 sm:grid-cols-3 max-w-4xl">
               <label className="space-y-1">
                 <span className="text-sm font-medium">Full Name</span>
                 <input
@@ -372,83 +273,6 @@ function PatientRow({
                   <option value="F">Female</option>
                   <option value="O">Other</option>
                 </select>
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium">Blood Type</span>
-                <select
-                  value={editData.blood_type || ""}
-                  onChange={(e) => onEditChange({ ...editData, blood_type: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">--</option>
-                  {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bt) => (
-                    <option key={bt} value={bt}>{bt}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium">Phone</span>
-                <input
-                  type="tel"
-                  value={editData.phone || ""}
-                  onChange={(e) => onEditChange({ ...editData, phone: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium">Email</span>
-                <input
-                  type="email"
-                  value={editData.email || ""}
-                  onChange={(e) => onEditChange({ ...editData, email: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-                <span className="text-sm font-medium">Address</span>
-                <input
-                  type="text"
-                  value={editData.address || ""}
-                  onChange={(e) => onEditChange({ ...editData, address: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-                <span className="text-sm font-medium">Allergies</span>
-                <input
-                  type="text"
-                  value={editData.allergies || ""}
-                  onChange={(e) => onEditChange({ ...editData, allergies: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  placeholder="Comma separated"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium">Insurance Provider</span>
-                <input
-                  type="text"
-                  value={editData.insurance_provider || ""}
-                  onChange={(e) => onEditChange({ ...editData, insurance_provider: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="text-sm font-medium">Insurance Policy #</span>
-                <input
-                  type="text"
-                  value={editData.insurance_policy_number || ""}
-                  onChange={(e) => onEditChange({ ...editData, insurance_policy_number: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="space-y-1 sm:col-span-2 lg:col-span-3">
-                <span className="text-sm font-medium">Notes</span>
-                <textarea
-                  value={editData.notes || ""}
-                  onChange={(e) => onEditChange({ ...editData, notes: e.target.value })}
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                  rows={2}
-                />
               </label>
             </div>
             <div className="mt-4 flex gap-2">

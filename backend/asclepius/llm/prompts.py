@@ -803,7 +803,7 @@ When answering questions:
 DB_SCHEMA_FOR_CHAT = """
 Tables:
 - documents(id, patient_id, file_path, original_filename, doc_type, doc_date, doctor_id, facility_id, date_issued, date_visit, date_received, summary_en, summary_original, norm_specialty_id, specialty_original, insurance_company, insurance_policy, notes, tags, ocr_text, raw_extraction, status)
-- patients(id, slug, display_name, date_of_birth, sex, blood_type, allergies, notes, phone, email, address, insurance_company, insurance_number)
+- patients(id, slug, display_name, date_of_birth, sex)
 - facilities(id, name, slug, type, address, city, country, phone, email, website)
 - doctors(id, name, slug, title, norm_specialty_id, specialty_original, facility_id, phone, email)
 - document_links(id, source_document_id, target_document_id, link_type)

@@ -216,12 +216,13 @@ async def update_doc(
     await _require_write_access(db, current_user, doc)
 
     updates = {}
-    # Iterate over all fields in the model
+    # ``model_fields_set`` only contains fields the client explicitly sent, so
+    # a None there is intentional (user clicked Clear). Accept it as a null
+    # write rather than silently dropping the field — that's the difference
+    # between PATCH semantics and "update with non-empty fields only".
     for field_name in body.model_fields_set:
         value = getattr(body, field_name)
-        if value is None:
-            continue
-        if field_name == "patient_id":
+        if field_name == "patient_id" and value is not None:
             role = await check_patient_access(db, current_user["id"], value)
             if not role:
                 raise HTTPException(status_code=403, detail="No access to target patient")
@@ -252,6 +253,15 @@ async def update_doc(
             updates["facility_id"] = await _upsert_facility(db, {"name": name})
         else:
             updates["facility_id"] = None
+
+    # Clearing the free-text specialty should also drop its normalized FK;
+    # otherwise the normalization page and detail view disagree (empty text
+    # vs. a still-linked canonical entry).
+    if "specialty_original" in updates:
+        raw_specialty = updates["specialty_original"]
+        if raw_specialty is None or not str(raw_specialty).strip():
+            updates["specialty_original"] = None
+            updates["norm_specialty_id"] = None
 
     # Log corrections before applying updates (compares against raw_extraction)
     from asclepius.documents.corrections import log_corrections

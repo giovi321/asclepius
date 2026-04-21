@@ -7,16 +7,25 @@ import aiosqlite
 
 
 async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
-    """Get a single document by ID."""
+    """Get a single document by ID.
+
+    Resolves the specialty's canonical display through ``norm_specialties``
+    so the detail page shows the normalized, properly-capitalized name
+    rather than whatever raw text the LLM extracted.
+    """
     cursor = await db.execute(
         """SELECT d.*,
                   p.display_name as patient_name, p.slug as patient_slug,
                   COALESCE(d.doctor_name, doc.name) as doctor_name,
-                  COALESCE(d.facility_name, f.name) as facility_name
+                  COALESCE(d.facility_name, f.name) as facility_name,
+                  ns.canonical_display as specialty_canonical_display,
+                  ns.canonical_code as specialty_canonical_code,
+                  COALESCE(ns.canonical_display, d.specialty_original) as specialty_display
            FROM documents d
            LEFT JOIN patients p ON d.patient_id = p.id
            LEFT JOIN doctors doc ON d.doctor_id = doc.id
            LEFT JOIN facilities f ON d.facility_id = f.id
+           LEFT JOIN norm_specialties ns ON d.norm_specialty_id = ns.id
            WHERE d.id = ?""",
         (doc_id,),
     )
@@ -169,12 +178,16 @@ async def list_documents(
                      p.display_name as patient_name,
                      COALESCE(d.doctor_name, doc.name) as doctor_name,
                      COALESCE(d.facility_name, f.name) as facility_name,
+                     ns.canonical_display as specialty_canonical_display,
+                     ns.canonical_code as specialty_canonical_code,
+                     COALESCE(ns.canonical_display, d.specialty_original) as specialty_display,
                      me.title as event_title,
                      me.event_type as event_type,
                      me.color as event_color"""
     joins = """LEFT JOIN patients p ON d.patient_id = p.id
                LEFT JOIN doctors doc ON d.doctor_id = doc.id
                LEFT JOIN facilities f ON d.facility_id = f.id
+               LEFT JOIN norm_specialties ns ON d.norm_specialty_id = ns.id
                LEFT JOIN medical_events me ON d.event_id = me.id"""
 
     query = f"""SELECT {select_cols}

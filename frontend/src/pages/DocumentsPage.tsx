@@ -375,7 +375,7 @@ export default function DocumentsPage() {
             className="rounded-md border bg-background px-3 py-2 text-sm"
           />
         </label>
-        {(dateFrom || dateTo || typeFilter.length || statusFilter.length || specialtyFilter.length || doctorFilter.length || facilityFilter.length) && (
+        {(dateFrom || dateTo || typeFilter.length > 0 || statusFilter.length > 0 || specialtyFilter.length > 0 || doctorFilter.length > 0 || facilityFilter.length > 0) && (
           <button
             onClick={() => {
               setDateFrom(""); setDateTo(""); setTypeFilter([]);

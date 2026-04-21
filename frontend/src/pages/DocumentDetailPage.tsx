@@ -472,7 +472,7 @@ export default function DocumentDetailPage() {
             <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableCombobox label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} normType="doctors" />
             <EditableCombobox label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} normType="facilities" />
-            <EditableCombobox label="Specialty" value={doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} normType="specialties" />
+            <EditableCombobox label="Specialty" value={doc.specialty_display || doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} normType="specialties" />
             <InfoRow label="Language" value={doc.language_source} />
             {(doc.ocr_engine || doc.ocr_confidence != null || doc.llm_provider) && (
               <TechnicalDetails

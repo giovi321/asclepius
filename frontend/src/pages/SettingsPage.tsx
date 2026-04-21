@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Users, Shield, Workflow, Download, ScrollText, FileSearch, KeyRound,
 } from "lucide-react";
@@ -21,26 +21,40 @@ const TABS = [
 ] as const;
 
 type TabKey = typeof TABS[number]["key"];
+const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
+const DEFAULT_TAB: TabKey = "analysis";
+
+function isTabKey(v: string | undefined): v is TabKey {
+  return !!v && (TAB_KEYS as readonly string[]).includes(v);
+}
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>("analysis");
+  // URL-driven active tab so refresh / copy-paste / back-nav all land on the
+  // correct page. Unknown or missing slug collapses to the default.
+  const { tab } = useParams<{ tab?: string }>();
+  const navigate = useNavigate();
+  const activeTab: TabKey = isTabKey(tab) ? tab : DEFAULT_TAB;
+
+  const setActiveTab = (key: TabKey) => {
+    navigate(`/settings/${key}`, { replace: false });
+  };
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <div className="flex flex-wrap gap-1.5 rounded-lg border p-1.5 overflow-x-auto">
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
+        {TABS.map((t) => {
+          const Icon = t.icon;
           return (
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
               className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === tab.key ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground"
+                activeTab === t.key ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground"
               }`}
             >
               <Icon className="h-4 w-4" />
-              {tab.label}
+              {t.label}
             </button>
           );
         })}
@@ -56,4 +70,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-

@@ -112,18 +112,24 @@ export default function DocumentsPage() {
 
   const toggleSort = (key: SortKey) => {
     setPage(0);
-    setSortBy((prev) => {
-      if (prev !== key) {
-        // New column: default to desc for dates / status, asc for text.
-        setSortOrder(
-          key === "date" || key === "date_added" || key === "status" ? "desc" : "asc",
-        );
-        return key;
-      }
-      // Same column: asc → desc → unsorted (default ordering resumes).
-      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
-      return sortOrder === "desc" ? null : prev;
-    });
+    // Natural direction per column. Date/status feel most useful newest-first;
+    // text columns feel most useful A→Z.
+    const naturalDesc = key === "date" || key === "date_added" || key === "status";
+    const naturalOrder: "asc" | "desc" = naturalDesc ? "desc" : "asc";
+
+    if (sortBy !== key) {
+      // New column → sort by it in its natural direction.
+      setSortBy(key);
+      setSortOrder(naturalOrder);
+      return;
+    }
+    // Same column: natural → flipped → cleared.
+    if (sortOrder === naturalOrder) {
+      setSortOrder(naturalOrder === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortBy(null);
+    setSortOrder(naturalOrder);
   };
 
   const sortArrow = (key: SortKey) => {

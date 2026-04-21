@@ -62,8 +62,14 @@ def register_credential(credential_id: str, cap: int, *,
     """Register a credential with the gate so its cap is visible even when
     no call is currently in flight. Safe to call repeatedly — acts as an
     upsert."""
+    first = (credential_id or "") not in _SEMS
     _ensure_slot(credential_id, max(1, cap),
                  kind=kind, credential_name=credential_name)
+    if first:
+        logger.info(
+            "gate.register: credential=%s name=%s kind=%s cap=%d",
+            credential_id, credential_name, kind, cap,
+        )
 
 
 @contextlib.asynccontextmanager
@@ -99,6 +105,10 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
             stats["in_flight"] = stats.get("in_flight", 0) + 1
             if model:
                 active[model] += 1
+            logger.info(
+                "gate.enter: credential=%s kind=%s model=%s in_flight=%d waiting=%d",
+                credential_id, kind, model, stats["in_flight"], stats["waiting"],
+            )
             yield
         finally:
             stats["in_flight"] = max(0, stats["in_flight"] - 1)
@@ -107,6 +117,10 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
                 if active[model] <= 0:
                     active.pop(model, None)
             sem.release()
+            logger.info(
+                "gate.exit: credential=%s model=%s in_flight=%d waiting=%d",
+                credential_id, model, stats["in_flight"], stats["waiting"],
+            )
     except BaseException:
         # Only fired when we never entered the inner try (cancellation
         # during sem.acquire()). No slot held; just undo the waiting bump.

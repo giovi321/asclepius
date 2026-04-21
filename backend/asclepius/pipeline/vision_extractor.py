@@ -25,12 +25,31 @@ logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 4_500_000  # Stay under Claude's 5MB limit
 
-# Qwen2.5-VL uses 28x28 patches and Ollama's vision encoder blows up with
-# GGML_ASSERT(a->ne[2] * 4 == b->ne[0]) when width/height aren't multiples of
-# 28. Llama3.2-vision uses 14x14 patches — 28 is a multiple of 14, so a single
-# alignment value works for both. Other backends (Claude, OpenAI) don't care
-# but are unaffected by the crop.
+# Qwen2.5-VL uses 14x14 patches with a 2x2 spatial merger, so the model
+# requires each dimension to be a multiple of 28 AND the resulting patch count
+# per dimension to be even. If these constraints aren't met, Ollama's vision
+# encoder crashes with ``GGML_ASSERT(a->ne[2] * 4 == b->ne[0])``.
+# Llama3.2-vision uses 14x14 patches without the 2x2 merger, so 28-alignment
+# is strictly more than it needs and causes no harm.
 VISION_PATCH_ALIGN = 28
+
+# Qwen2.5-VL's default ``max_pixels`` is ``28*28*1280 ≈ 1,003,520``. Images
+# exceeding it get internally downscaled by Ollama to odd dimensions that no
+# longer satisfy the patch-merger shape check, which is where the GGML_ASSERT
+# fires. Scale images below this cap before we hand them off, so we control
+# the final dimensions instead of the server.
+MAX_VISION_PIXELS = 1_003_520
+
+
+def _resize_for_vision_limits(img: "Image.Image") -> "Image.Image":
+    """Scale down so total pixels stay under ``MAX_VISION_PIXELS``."""
+    pixels = img.width * img.height
+    if pixels <= MAX_VISION_PIXELS:
+        return img
+    scale = (MAX_VISION_PIXELS / pixels) ** 0.5
+    new_w = max(VISION_PATCH_ALIGN, int(img.width * scale))
+    new_h = max(VISION_PATCH_ALIGN, int(img.height * scale))
+    return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
 
 def _align_to_patch_grid(img: "Image.Image") -> "Image.Image":
@@ -59,32 +78,27 @@ async def _get_extraction_prompt(config: AppConfig) -> str:
 # ── Image rendering helpers ──────────────────────────────────────
 
 def _render_page_for_vision(page) -> str:
-    """Render a PDF page to a base64 JPEG, sized to stay under the API limit."""
-    for dpi in [150, 100, 72]:
-        pix = page.get_pixmap(dpi=dpi)
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        b64 = _compress_image_for_vision(img)
-        raw_size = len(base64.b64decode(b64))
-        if raw_size <= MAX_IMAGE_BYTES:
-            return b64
-    pix = page.get_pixmap(dpi=50)
+    """Render a PDF page to a base64 JPEG sized to satisfy both the byte and
+    pixel budgets enforced in ``_compress_image_for_vision``.
+    """
+    pix = page.get_pixmap(dpi=150)
     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    return _compress_image_for_vision(img, quality=60)
+    return _compress_image_for_vision(img)
 
 
 def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
-    """Compress an image to JPEG base64, resizing if needed to stay under limit.
+    """Compress an image to JPEG base64, resizing if needed to stay under limits.
 
-    The final dimensions are cropped to multiples of ``VISION_PATCH_ALIGN`` so
-    Ollama's qwen2.5-vl / llama3.2-vision encoders don't hit a GGML assertion.
+    Two constraints:
+    - Total pixels stay under ``MAX_VISION_PIXELS`` (the vision model's cap)
+      so the server doesn't downscale and produce unaligned dimensions.
+    - Final dimensions are multiples of ``VISION_PATCH_ALIGN`` so qwen2.5-vl's
+      patch-merger matmul shape check passes.
     """
-    max_dim = 2000
-    if img.width > max_dim or img.height > max_dim:
-        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-
     if img.mode != "RGB":
         img = img.convert("RGB")
 
+    img = _resize_for_vision_limits(img)
     img = _align_to_patch_grid(img)
 
     for q in [quality, 70, 50]:
@@ -94,10 +108,13 @@ def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
         if len(data) <= MAX_IMAGE_BYTES:
             return base64.b64encode(data).decode("utf-8")
 
-    img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
-    img = _align_to_patch_grid(img)
+    # Fallback: halve the dimensions and try again. Never exceed a patch grid.
+    halved = img.resize((max(VISION_PATCH_ALIGN, img.width // 2),
+                         max(VISION_PATCH_ALIGN, img.height // 2)),
+                        Image.Resampling.LANCZOS)
+    halved = _align_to_patch_grid(halved)
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=40)
+    halved.save(buf, format="JPEG", quality=40)
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 

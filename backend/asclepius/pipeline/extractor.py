@@ -879,13 +879,31 @@ async def _match_patient(db: aiosqlite.Connection, name: str | None) -> int | No
 
 
 async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int:
-    """Insert or get existing facility."""
+    """Insert or get existing facility.
+
+    Looks up by slug, canonical_code, case-insensitive name, and alias in
+    that order. canonical_code has a UNIQUE index, so an INSERT that didn't
+    find a matching slug but collides on canonical_code (possible after a
+    merge or a manual rename) would 500 instead of reusing the existing
+    row. Covering all four lookup paths avoids that.
+    """
     from asclepius.patients.service import slugify
 
     name = normalize_name(facility_data["name"])
     slug = slugify(name)
 
-    cursor = await db.execute("SELECT id FROM facilities WHERE slug = ?", (slug,))
+    cursor = await db.execute(
+        "SELECT id FROM facilities WHERE slug = ? OR canonical_code = ?",
+        (slug, slug),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    cursor = await db.execute(
+        "SELECT id FROM facilities WHERE name = ? COLLATE NOCASE LIMIT 1",
+        (name,),
+    )
     row = await cursor.fetchone()
     if row:
         return row[0]
@@ -900,16 +918,29 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
     if row:
         return row[0]
 
-    cursor = await db.execute(
-        """INSERT INTO facilities (name, slug, canonical_code, canonical_display, type, address, city, country, phone)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (name, slug, slug, name,
-         facility_data.get("type"),
-         facility_data.get("address"),
-         facility_data.get("city"),
-         facility_data.get("country"),
-         facility_data.get("phone")),
-    )
+    try:
+        cursor = await db.execute(
+            """INSERT INTO facilities (name, slug, canonical_code, canonical_display, type, address, city, country, phone)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name, slug, slug, name,
+             facility_data.get("type"),
+             facility_data.get("address"),
+             facility_data.get("city"),
+             facility_data.get("country"),
+             facility_data.get("phone")),
+        )
+    except aiosqlite.IntegrityError:
+        # canonical_code or slug collision slipped past the lookup above —
+        # recover by returning the row that owns the conflicting identifier
+        # rather than surfacing a 500.
+        cursor = await db.execute(
+            "SELECT id FROM facilities WHERE slug = ? OR canonical_code = ? LIMIT 1",
+            (slug, slug),
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+        raise
     facility_id = cursor.lastrowid
     # Seed the initial alias with the extracted name. Because the alias is the
     # canonical form we just created, mark it already reviewed — there is no
@@ -922,13 +953,29 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
 
 
 async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_id: int | None = None) -> int:
-    """Insert or get existing doctor."""
+    """Insert or get existing doctor.
+
+    See ``_upsert_facility`` — same reasoning: cover slug, canonical_code,
+    case-insensitive name, and alias lookups before insert, and recover
+    from a UNIQUE(canonical_code) collision by returning the owning row.
+    """
     from asclepius.patients.service import slugify
 
     name = normalize_name(strip_doctor_title(doctor_data["name"]))
     slug = slugify(name)
 
-    cursor = await db.execute("SELECT id FROM doctors WHERE slug = ?", (slug,))
+    cursor = await db.execute(
+        "SELECT id FROM doctors WHERE slug = ? OR canonical_code = ?",
+        (slug, slug),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    cursor = await db.execute(
+        "SELECT id FROM doctors WHERE name = ? COLLATE NOCASE LIMIT 1",
+        (name,),
+    )
     row = await cursor.fetchone()
     if row:
         return row[0]
@@ -948,15 +995,25 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
     if doctor_data.get("specialty_canonical"):
         norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
 
-    cursor = await db.execute(
-        """INSERT INTO doctors (name, slug, canonical_code, canonical_display, title, norm_specialty_id, specialty_original, facility_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (name, slug, slug, name,
-         doctor_data.get("title"),
-         norm_spec_id,
-         doctor_data.get("specialty_original"),
-         facility_id),
-    )
+    try:
+        cursor = await db.execute(
+            """INSERT INTO doctors (name, slug, canonical_code, canonical_display, title, norm_specialty_id, specialty_original, facility_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name, slug, slug, name,
+             doctor_data.get("title"),
+             norm_spec_id,
+             doctor_data.get("specialty_original"),
+             facility_id),
+        )
+    except aiosqlite.IntegrityError:
+        cursor = await db.execute(
+            "SELECT id FROM doctors WHERE slug = ? OR canonical_code = ? LIMIT 1",
+            (slug, slug),
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+        raise
     doctor_id = cursor.lastrowid
     # Seed the initial alias with the extracted name (already-reviewed — it's the
     # canonical form, not a normalization guess).

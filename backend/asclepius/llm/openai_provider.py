@@ -72,11 +72,16 @@ class OpenAIProvider(LLMProvider):
 
     async def generate_sql(self, question: str, schema: str, context: str) -> str:
         prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
-        response_text = await self._generate(prompt)
+        # SQL output is a ```sql``` code block — don't ask the provider to
+        # coerce it into JSON (vLLM and compatible backends honour the flag).
+        response_text = await self._generate(prompt, force_json=False)
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         if sql_match:
             return sql_match.group(1).strip()
-        select_match = re.search(r"(SELECT\s+.*?;)", response_text, re.DOTALL | re.IGNORECASE)
+        select_match = re.search(
+            r"((?:WITH|SELECT)\s+.*?)(?:;|```|$)",
+            response_text, re.DOTALL | re.IGNORECASE,
+        )
         if select_match:
             return select_match.group(1).strip()
         return response_text.strip()

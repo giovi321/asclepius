@@ -83,7 +83,10 @@ class ClaudeProvider(LLMProvider):
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         if sql_match:
             return sql_match.group(1).strip()
-        select_match = re.search(r"(SELECT\s+.*?;)", response_text, re.DOTALL | re.IGNORECASE)
+        select_match = re.search(
+            r"((?:WITH|SELECT)\s+.*?)(?:;|```|$)",
+            response_text, re.DOTALL | re.IGNORECASE,
+        )
         if select_match:
             return select_match.group(1).strip()
         return response_text.strip()

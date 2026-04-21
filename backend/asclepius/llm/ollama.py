@@ -106,13 +106,20 @@ class OllamaProvider(LLMProvider):
         prompt = SQL_GENERATION_PROMPT.format(
             schema=schema, context=context, question=question
         )
-        response_text = await self._generate(prompt)
+        # SQL output is a ```sql``` code block, not JSON — Ollama's
+        # ``format=json`` mode would coerce the reply into an empty ``{}``
+        # and the sanitizer would reject every chat question.
+        response_text = await self._generate(prompt, force_json=False)
         # Extract SQL from response
         sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
         if sql_match:
             return sql_match.group(1).strip()
-        # Try to find a SELECT statement
-        select_match = re.search(r"(SELECT\s+.*?;)", response_text, re.DOTALL | re.IGNORECASE)
+        # Try to find a SELECT statement; ``;`` is optional because the
+        # sanitizer strips it and the model sometimes omits it.
+        select_match = re.search(
+            r"((?:WITH|SELECT)\s+.*?)(?:;|```|$)",
+            response_text, re.DOTALL | re.IGNORECASE,
+        )
         if select_match:
             return select_match.group(1).strip()
         return response_text.strip()

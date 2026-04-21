@@ -358,7 +358,7 @@ export default function VisionLlmProvidersTab() {
             <Plus className="h-4 w-4" /> Add Provider
           </button>
           {showAddMenu && (
-            <div className="absolute left-0 bottom-full mb-1 z-20 rounded-lg border bg-popover p-1.5 shadow-lg min-w-[240px]">
+            <div className="absolute left-0 bottom-full mb-1 z-20 rounded-lg border bg-background p-1.5 shadow-xl min-w-[240px]">
               {VISION_TYPES.map((t) => (
                 <button
                   key={t.value}

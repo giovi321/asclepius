@@ -100,6 +100,24 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     """)
     await db.execute("CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id)")
 
+    # Server-side sessions — lets admins list and revoke live logins.
+    # session_id is a random 256-bit token stored in the user's signed cookie;
+    # the row is the source of truth for whether the session is still valid.
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at DATETIME NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            revoked_at DATETIME
+        )
+    """)
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
+    await db.execute("CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(revoked_at, expires_at)")
+
     # Add unique constraint on document_links to prevent exact duplicates
     # First deduplicate any existing rows, keeping the oldest
     await db.execute("""

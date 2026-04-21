@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 import aiosqlite
 from asclepius.auth.cookies import clear_auth_cookie, set_auth_cookie
-from asclepius.auth.session import COOKIE_NAME, create_session_token, hash_password
+from asclepius.auth.session import COOKIE_NAME, create_session, hash_password
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
@@ -161,7 +161,7 @@ async def oidc_callback(
             await db.commit()
 
     # Create session
-    session_token = create_session_token(user_id)
+    session_token = await create_session(db, user_id, request)
 
     # Redirect to app with session cookie
     response = Response(status_code=307, headers={"Location": "/"})

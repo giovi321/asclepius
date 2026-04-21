@@ -75,6 +75,7 @@ nav:
     - Normalization: user-guide/normalization.md
   - Admin Guide:
     - User Management: admin-guide/user-management.md
+    - Session Management: admin-guide/session-management.md
     - LLM Configuration: admin-guide/llm-configuration.md
     - Backup & Restore: admin-guide/backup-restore.md
   - API Reference:

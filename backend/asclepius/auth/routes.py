@@ -8,9 +8,9 @@ from asclepius.auth import rate_limit
 from asclepius.auth.cookies import clear_auth_cookie, set_auth_cookie
 from asclepius.auth.session import (
     COOKIE_NAME,
-    create_session_token,
+    create_session,
     get_current_user,
-    validate_session_token,
+    revoke_session,
     verify_password,
 )
 from asclepius.audit.service import audit_log, get_client_ip
@@ -77,7 +77,7 @@ async def login(
 
     rate_limit.clear(ip, body.username)
 
-    token = create_session_token(user[0])
+    token = await create_session(db, user[0], request)
     set_auth_cookie(
         response, COOKIE_NAME, token,
         config=config,
@@ -95,24 +95,28 @@ async def logout(
     response: Response,
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Clear the session cookie and log the event.
+    """Revoke the current session server-side and clear the cookie."""
+    from asclepius.auth.session import _unpack_token
 
-    itsdangerous tokens cannot be server-side revoked, so the cookie is
-    merely deleted client-side; the token remains valid until TTL for any
-    attacker who already stole it. Document this trade-off in SECURITY.md.
-    """
     config = get_config()
     try:
         token = request.cookies.get(COOKIE_NAME)
         if token:
-            session_data = validate_session_token(token)
-            if session_data:
-                await audit_log(
-                    db, session_data["user_id"], "logout",
-                    ip_address=get_client_ip(request),
+            sid = _unpack_token(token)
+            if sid:
+                # Look up user_id for the audit entry before revocation.
+                cursor = await db.execute(
+                    "SELECT user_id FROM sessions WHERE session_id = ?", (sid,),
                 )
+                row = await cursor.fetchone()
+                await revoke_session(db, sid)
+                if row:
+                    await audit_log(
+                        db, row[0], "logout",
+                        ip_address=get_client_ip(request),
+                    )
     except Exception:
-        # Never let audit logging fail the logout.
+        # Never let audit logging or revocation fail the cookie clear.
         pass
 
     clear_auth_cookie(response, COOKIE_NAME, config=config)
@@ -153,4 +157,6 @@ async def me(
         ]
         patients.extend(extra)
 
-    return {**current_user, "patients": patients}
+    # Drop the internal marker before sending the user record to the client.
+    payload = {k: v for k, v in current_user.items() if not k.startswith("_")}
+    return {**payload, "patients": patients}

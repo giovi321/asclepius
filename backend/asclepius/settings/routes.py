@@ -862,3 +862,66 @@ async def revoke_access(
     await audit_log(db, current_user["id"], "access.revoke", "user", user_id,
                     {"patient_id": patient_id}, get_client_ip(request))
     return {"ok": True}
+
+
+# --- Sessions (admin) ---
+
+@router.get("/sessions")
+async def list_sessions(
+    include_revoked: bool = Query(default=False),
+    current_user: dict = Depends(require_role("admin")),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """List server-side sessions with user + activity details.
+
+    By default shows only sessions that are still usable (not revoked, not
+    expired). Pass ``include_revoked=true`` to include the rest for audit.
+    """
+    where = ""
+    if not include_revoked:
+        where = "WHERE s.revoked_at IS NULL AND s.expires_at > datetime('now')"
+    cursor = await db.execute(
+        f"""SELECT s.session_id, s.user_id, u.username, u.display_name, u.role,
+                   s.created_at, s.last_active_at, s.expires_at,
+                   s.ip_address, s.user_agent, s.revoked_at
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            {where}
+            ORDER BY s.last_active_at DESC"""
+    )
+    items = []
+    for r in await cursor.fetchall():
+        d = dict(r)
+        d["is_current"] = (r["session_id"] == current_user.get("_session_id"))
+        items.append(d)
+    return {"items": items}
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_session_endpoint(
+    session_id: str,
+    request: Request,
+    current_user: dict = Depends(require_role("admin")),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Revoke a session. The owner of that session is effectively logged out
+    on their next request."""
+    from asclepius.auth.session import revoke_session as _revoke
+
+    cursor = await db.execute(
+        "SELECT user_id, revoked_at FROM sessions WHERE session_id = ?",
+        (session_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if row[1] is not None:
+        return {"ok": True, "already_revoked": True}
+
+    await _revoke(db, session_id)
+    await audit_log(
+        db, current_user["id"], "session.revoke", "session", None,
+        {"target_user_id": row[0], "self": session_id == current_user.get("_session_id")},
+        get_client_ip(request),
+    )
+    return {"ok": True}

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import {
-  Users, Shield, Workflow, Download, ScrollText, FileSearch,
+  Users, Shield, Workflow, Download, ScrollText, FileSearch, KeyRound,
 } from "lucide-react";
 import DocumentAnalysisTab from "@/components/settings/DocumentAnalysisTab";
 import PipelineTab from "@/components/settings/PipelineTab";
 import OidcTab from "@/components/settings/OidcTab";
 import UsersTab from "@/components/settings/UsersTab";
+import SessionsTab from "@/components/settings/SessionsTab";
 import BackupTab from "@/components/settings/BackupTab";
 import LogsTab from "@/components/settings/LogsTab";
 
@@ -14,6 +15,7 @@ const TABS = [
   { key: "pipeline", label: "Pipeline", icon: Workflow },
   { key: "oidc", label: "OIDC / SSO", icon: Shield },
   { key: "users", label: "Users", icon: Users },
+  { key: "sessions", label: "Sessions", icon: KeyRound },
   { key: "backup", label: "Backup", icon: Download },
   { key: "logs", label: "Logs", icon: ScrollText },
 ] as const;
@@ -48,6 +50,7 @@ export default function SettingsPage() {
       {activeTab === "pipeline" && <PipelineTab />}
       {activeTab === "oidc" && <OidcTab />}
       {activeTab === "users" && <UsersTab />}
+      {activeTab === "sessions" && <SessionsTab />}
       {activeTab === "logs" && <LogsTab />}
       {activeTab === "backup" && <BackupTab />}
     </div>

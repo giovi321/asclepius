@@ -36,7 +36,7 @@ On success, a signed session cookie (`asclepius_session`) is set with:
 - `samesite: lax` -- CSRF protection
 - `path: /`
 
-The cookie contains a signed token (via itsdangerous `URLSafeTimedSerializer`) with the user ID. The session is valid for `auth.session_ttl_hours` (default: 720 hours / 30 days).
+The cookie carries a signed opaque **session id** (via itsdangerous `URLSafeTimedSerializer`). The session id maps to a row in the `sessions` table that stores the owning user, IP, User-Agent, `last_active_at`, and `expires_at`. Admins can list and revoke active sessions from **Settings → Sessions** or via the endpoints below. The session is valid for `auth.session_ttl_hours` (default: 720 hours / 30 days) unless revoked earlier.
 
 ### Logout
 
@@ -44,7 +44,7 @@ The cookie contains a signed token (via itsdangerous `URLSafeTimedSerializer`) w
 POST /api/auth/logout
 ```
 
-Deletes the session cookie.
+Revokes the current session server-side (sets `revoked_at = now` on its `sessions` row) and clears the cookie. A stolen cookie is invalidated immediately.
 
 ### Get Current User
 
@@ -123,10 +123,53 @@ After authentication, access to patient data is controlled by the `user_patient_
 - All document and patient endpoints check access before returning data
 - Users without access to a patient receive a `403 Forbidden` response
 
+## Session Management (admin)
+
+Admins can enumerate and revoke every active session.
+
+### List sessions
+
+```
+GET /api/settings/sessions?include_revoked=false
+```
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "session_id": "abc...",
+      "user_id": 1,
+      "username": "admin",
+      "display_name": "Admin",
+      "role": "admin",
+      "created_at": "2026-04-21T09:12:03",
+      "last_active_at": "2026-04-21T14:47:18",
+      "expires_at": "2026-05-21T09:12:03",
+      "ip_address": "192.168.1.42",
+      "user_agent": "Mozilla/5.0 ...",
+      "revoked_at": null,
+      "is_current": true
+    }
+  ]
+}
+```
+
+By default only non-revoked, non-expired sessions are returned. Pass `include_revoked=true` to include historical rows for audit.
+
+### Revoke a session
+
+```
+DELETE /api/settings/sessions/{session_id}
+```
+
+Marks the session revoked. The owning user is signed out on their next request. Revoking your own session returns `200` and the frontend redirects to login. An audit-log entry is written under the action `session.revoke`.
+
 ## Error Responses
 
 | Status | Meaning |
 |--------|---------|
-| `401 Unauthorized` | No valid session cookie, or session expired |
+| `401 Unauthorized` | No valid session cookie, session expired, or session revoked |
 | `403 Forbidden` | Authenticated but no access to the requested patient |
 | `409 Conflict` | Username already exists (when creating users) |

@@ -7,12 +7,12 @@ server-side, not just in the UI).
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import aiosqlite
 from asclepius.auth.cookies import set_auth_cookie
-from asclepius.auth.session import COOKIE_NAME, create_session_token, hash_password
+from asclepius.auth.session import COOKIE_NAME, create_session, hash_password
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.patients.service import slugify
@@ -49,6 +49,7 @@ async def setup_status(db: aiosqlite.Connection = Depends(get_db)):
 @router.post("/complete")
 async def setup_complete(
     body: SetupRequest,
+    request: Request,
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Create the first admin user and first patient."""
@@ -106,7 +107,7 @@ async def setup_complete(
 
     # Create session token so user is auto-logged in
     from fastapi.responses import JSONResponse
-    token = create_session_token(user_id)
+    token = await create_session(db, user_id, request)
     response = JSONResponse(content={
         "ok": True,
         "user_id": user_id,

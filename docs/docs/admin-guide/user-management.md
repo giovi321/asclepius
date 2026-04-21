@@ -14,7 +14,7 @@ The wizard automatically logs you in after completion. It only appears once.
 Asclepius uses session-based authentication:
 
 - Passwords are hashed with **bcrypt**
-- Sessions are stored as **signed cookies** (via itsdangerous)
+- Sessions are **server-side** — the cookie carries a signed session id that maps to a row in the `sessions` table. See [Session Management](session-management.md) for listing and revoking active logins.
 - Session lifetime is configurable via `auth.session_ttl_hours` (default: 720 hours / 30 days)
 
 ## Managing Users

@@ -1,11 +1,14 @@
 """Pipeline status and control API routes."""
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, Request
 
 from asclepius.auth.session import get_current_user, require_role
 from asclepius.config import get_config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -45,8 +48,15 @@ async def get_pipeline_status(request: Request, current_user: dict = Depends(get
 
 def _resolve_model_display_name(config, kind: str, credential_id: str, raw_model: str) -> str:
     """Return the user-chosen ``name`` for a (credential, model) tuple in the
-    given kind's provider list, or ``""`` if no entry matches."""
-    if not credential_id or not raw_model:
+    given kind's provider list, or ``""`` if no entry matches.
+
+    Falls back through progressively looser matches so edge cases — legacy
+    entries without a ``credential_id``, synthetic ``legacy-vision-*``
+    credential ids registered by the OCR wrapper, or unusual
+    configurations — still land on the user's friendly name whenever a
+    single entry unambiguously owns the raw model string.
+    """
+    if not raw_model:
         return ""
     if kind == "llm":
         candidates = config.llm.providers
@@ -61,9 +71,26 @@ def _resolve_model_display_name(config, kind: str, credential_id: str, raw_model
         key = "llm_model"
     else:
         return ""
+
+    # 1. Strict match: same credential + same raw model.
     for p in candidates:
         if p.credential_id == credential_id and getattr(p, key, "") == raw_model:
-            return p.name or ""
+            if p.name:
+                return p.name
+
+    # 2. Loose match on model alone — handles (a) OCR entries registered
+    #    under a synthetic "legacy-vision-*" credential id because the
+    #    entry had no credential_id set, and (b) configs where the OCR
+    #    entry's credential_id drifted from the actual credential in use.
+    named = [p for p in candidates if getattr(p, key, "") == raw_model and p.name]
+    if len(named) == 1:
+        return named[0].name
+
+    if len(named) == 0:
+        logger.debug(
+            "display-name lookup miss: kind=%s credential=%s model=%s",
+            kind, credential_id, raw_model,
+        )
     return ""
 
 

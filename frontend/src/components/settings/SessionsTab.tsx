@@ -42,17 +42,34 @@ function describeUserAgent(ua: string | null): { label: string; icon: typeof Mon
   return { label: os ? `${browser} on ${os}` : browser, icon };
 }
 
-function formatRelative(iso: string): string {
+function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  const min = Math.round(s / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(s / 3600);
+  if (hr < 24) {
+    const m = Math.round((s - hr * 3600) / 60);
+    return m > 0 ? `${hr}h ${m}m` : `${hr}h`;
+  }
+  const days = Math.floor(s / 86400);
+  const remHr = Math.round((s - days * 86400) / 3600);
+  if (days < 7 && remHr > 0) return `${days}d ${remHr}h`;
+  return `${days}d`;
+}
+
+function formatPast(iso: string): string {
   const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  const delta = Date.now() - d.getTime();
-  const sec = Math.round(delta / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.round(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.round(min / 60);
-  if (hr < 48) return `${hr}h ago`;
-  const days = Math.round(hr / 24);
-  return `${days}d ago`;
+  const delta = (Date.now() - d.getTime()) / 1000;
+  if (delta < 0) return "just now";
+  return `${formatDuration(delta)} ago`;
+}
+
+function formatFuture(iso: string): string {
+  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+  const delta = (d.getTime() - Date.now()) / 1000;
+  if (delta <= 0) return "expired";
+  return `in ${formatDuration(delta)}`;
 }
 
 function formatAbsolute(iso: string): string {
@@ -210,13 +227,13 @@ export default function SessionsTab() {
                     </td>
                     <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{s.ip_address || "—"}</td>
                     <td className="px-3 py-1.5 text-muted-foreground" title={formatAbsolute(s.last_active_at)}>
-                      {formatRelative(s.last_active_at)}
+                      {formatPast(s.last_active_at)}
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground" title={formatAbsolute(s.created_at)}>
-                      {formatRelative(s.created_at)}
+                      {formatPast(s.created_at)}
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground" title={formatAbsolute(s.expires_at)}>
-                      {formatRelative(s.expires_at).replace(" ago", "")}
+                      {formatFuture(s.expires_at)}
                     </td>
                     <td className="px-3 py-1.5">
                       {isRevoked ? (

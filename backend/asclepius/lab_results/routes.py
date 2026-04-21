@@ -29,6 +29,21 @@ class LabResultUpdate(BaseModel):
     norm_lab_test_id: int | None = None
 
 
+class LabResultCreate(BaseModel):
+    document_id: int
+    test_name_original: str
+    value: float | None = None
+    value_text: str | None = None
+    unit: str | None = None
+    reference_range_low: float | None = None
+    reference_range_high: float | None = None
+    is_abnormal: bool | None = None
+    sample_type: str | None = None
+    panel_name: str | None = None
+    test_date: str | None = None
+    norm_lab_test_id: int | None = None
+
+
 # Whitelist columns the PATCH may touch — everything below maps 1:1 to a real
 # column on lab_results. Keeps the f-string UPDATE safe.
 _EDITABLE = {
@@ -182,6 +197,62 @@ async def lab_timeline(
     )
     rows = await cursor.fetchall()
     return {"data": [dict(r) for r in rows]}
+
+
+@router.post("")
+async def create_lab_result(
+    body: LabResultCreate,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Create a lab result tied to a document.
+
+    Patient is derived from the document so the caller can't attach a lab row
+    to another patient's document. The document must already have a patient.
+    """
+    cursor = await db.execute(
+        "SELECT patient_id FROM documents WHERE id = ?", (body.document_id,)
+    )
+    doc = await cursor.fetchone()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    patient_id = doc["patient_id"]
+    if not patient_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Document has no patient assigned — set the patient before adding lab results",
+        )
+
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+        if role == "viewer":
+            raise HTTPException(status_code=403, detail="Viewers cannot create lab results")
+
+    test_name = (body.test_name_original or "").strip()
+    if not test_name:
+        raise HTTPException(status_code=400, detail="test_name_original is required")
+
+    try:
+        cursor = await db.execute(
+            """INSERT INTO lab_results
+               (document_id, patient_id, test_name_original, norm_lab_test_id,
+                value, value_text, unit, reference_range_low, reference_range_high,
+                is_abnormal, sample_type, panel_name, test_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (body.document_id, patient_id, test_name, body.norm_lab_test_id,
+             body.value, body.value_text, body.unit,
+             body.reference_range_low, body.reference_range_high,
+             body.is_abnormal, body.sample_type, body.panel_name,
+             body.test_date),
+        )
+        await db.commit()
+    except Exception as e:
+        logger.exception("Failed to create lab result on doc %d", body.document_id)
+        raise HTTPException(status_code=500, detail=f"Create failed: {e}") from e
+
+    return await _get_lab_result(db, cursor.lastrowid)
 
 
 @router.patch("/{result_id}")

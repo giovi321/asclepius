@@ -231,9 +231,22 @@ async def get_related_records(
     """Get related records from a child table."""
     if table not in _VALID_RELATED_TABLES:
         raise ValueError(f"Invalid related table: {table}")
-    cursor = await db.execute(
-        f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,)
-    )
+    if table == "lab_results":
+        cursor = await db.execute(
+            """SELECT lr.*,
+                      nlt.canonical_display AS test_name_canonical,
+                      nlt.canonical_code,
+                      nlt.unit_preferred
+               FROM lab_results lr
+               LEFT JOIN norm_lab_tests nlt ON lr.norm_lab_test_id = nlt.id
+               WHERE lr.document_id = ?
+               ORDER BY lr.id""",
+            (doc_id,),
+        )
+    else:
+        cursor = await db.execute(
+            f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,)
+        )
     return [dict(r) for r in await cursor.fetchall()]
 
 

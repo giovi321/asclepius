@@ -44,6 +44,9 @@ export default function LabResultsPage() {
   const [search, setSearch] = useState("");
   const [groupByDate, setGroupByDate] = useState(true);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [chartSearch, setChartSearch] = useState("");
+  const [showAllTests, setShowAllTests] = useState(false);
   const [showOrphans, setShowOrphans] = useState(false);
   const [orphanBusy, setOrphanBusy] = useState<number | "all" | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -96,6 +99,33 @@ export default function LabResultsPage() {
     }
     return [...byCode.values()].sort((a, b) => b.count - a.count);
   }, [results]);
+
+  // Subsequence fuzzy match: every char of the query must appear in order in
+  // the candidate. Lightweight, no extra dep — and good enough to find
+  // "hdl" inside "HDL Cholesterol" or "tsh" inside "TSH (Thyroid-...)".
+  const fuzzyMatch = (query: string, text: string): boolean => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    const t = text.toLowerCase();
+    if (t.includes(q)) return true; // fast path, also ranks exact substrings
+    let qi = 0;
+    for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+      if (t[ti] === q[qi]) qi += 1;
+    }
+    return qi === q.length;
+  };
+
+  const filteredChartOptions = useMemo(() => {
+    const q = chartSearch.trim();
+    if (!q && !showAllTests) return [];
+    if (!q) return canonicalOptions;
+    return canonicalOptions.filter((o) => fuzzyMatch(q, o.label) || fuzzyMatch(q, o.code));
+  }, [canonicalOptions, chartSearch, showAllTests]);
+
+  const selectedOptions = useMemo(
+    () => canonicalOptions.filter((o) => selectedCodes.includes(o.code)),
+    [canonicalOptions, selectedCodes],
+  );
 
   // Group by (test_date, document_id) when grouping is on. Falls back to the
   // source document's date when the lab row itself has no test_date — otherwise
@@ -298,39 +328,102 @@ export default function LabResultsPage() {
 
       {/* Chart picker + chart */}
       {canonicalOptions.length > 0 && (
-        <div className="rounded-lg border p-3 space-y-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
+        <div className="rounded-lg border">
+          <button
+            onClick={() => setChartOpen((v) => !v)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-accent/40"
+          >
+            {chartOpen ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             <LineChartIcon className="h-4 w-4 text-primary" />
-            Trend chart — pick one or more tests
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {canonicalOptions.map((opt) => {
-              const on = selectedCodes.includes(opt.code);
-              return (
-                <button
-                  key={opt.code}
-                  onClick={() => toggleCode(opt.code)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
-                    on
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "hover:bg-accent"
-                  }`}
-                >
-                  {opt.label}
-                  <span className="ml-1 opacity-70">({opt.count})</span>
-                </button>
-              );
-            })}
+            <span>Trend chart</span>
             {selectedCodes.length > 0 && (
-              <button
-                onClick={() => setSelectedCodes([])}
-                className="rounded-full px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                clear
-              </button>
+              <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                {selectedCodes.length} selected
+              </span>
             )}
-          </div>
-          {selectedCodes.length > 0 && <LabTrendChart rows={results} selectedCodes={selectedCodes} />}
+            <span className="ml-auto text-xs text-muted-foreground">
+              {canonicalOptions.length} test{canonicalOptions.length === 1 ? "" : "s"} available
+            </span>
+          </button>
+          {chartOpen && (
+            <div className="border-t p-3 space-y-3">
+              {/* Selected chips */}
+              {selectedOptions.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedOptions.map((opt) => (
+                    <span
+                      key={opt.code}
+                      className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-0.5 text-xs text-primary"
+                    >
+                      {opt.label}
+                      <button
+                        onClick={() => toggleCode(opt.code)}
+                        className="rounded-full hover:bg-primary/20"
+                        title="Remove"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    onClick={() => setSelectedCodes([])}
+                    className="rounded-full px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    clear all
+                  </button>
+                </div>
+              )}
+
+              {/* Search */}
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={chartSearch}
+                    onChange={(e) => setChartSearch(e.target.value)}
+                    placeholder="Search lab tests..."
+                    className="w-full rounded-md border bg-background py-1.5 pl-7 pr-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <button
+                  onClick={() => setShowAllTests((v) => !v)}
+                  className="whitespace-nowrap rounded-md border px-2.5 py-1.5 text-xs hover:bg-accent"
+                >
+                  {showAllTests ? "Hide list" : "Show all"}
+                </button>
+              </div>
+
+              {/* Results list */}
+              {filteredChartOptions.length > 0 && (
+                <div className="max-h-60 overflow-y-auto rounded-md border">
+                  {filteredChartOptions.map((opt) => {
+                    const on = selectedCodes.includes(opt.code);
+                    return (
+                      <button
+                        key={opt.code}
+                        onClick={() => toggleCode(opt.code)}
+                        className={`flex w-full items-center justify-between gap-2 border-b px-3 py-1.5 text-left text-sm last:border-b-0 hover:bg-accent/60 ${on ? "bg-primary/5" : ""}`}
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          {on && <Check className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
+                          <span className={`truncate ${on ? "font-medium text-primary" : ""}`}>{opt.label}</span>
+                        </span>
+                        <span className="flex-shrink-0 text-xs text-muted-foreground">{opt.count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {chartSearch.trim() && filteredChartOptions.length === 0 && (
+                <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
+                  No tests match "{chartSearch}".
+                </div>
+              )}
+
+              {selectedCodes.length > 0 && <LabTrendChart rows={results} selectedCodes={selectedCodes} />}
+            </div>
+          )}
         </div>
       )}
 

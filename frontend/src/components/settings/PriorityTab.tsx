@@ -1,0 +1,291 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import api from "@/api/client";
+import {
+  Brain, Eye, ScanText, ChevronUp, ChevronDown, Save, Check, Sparkles,
+  Power, AlertTriangle,
+} from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
+import type { Credential, LlmProvider, OcrProvider, VisionLlmProvider, GeneralLlmSettings } from "@/types";
+
+// ─── Generic priority section ─────────────────────────────────────
+
+type AnyEntry = {
+  id: string;
+  name?: string;
+  model?: string;
+  enabled: boolean;
+  priority: number;
+  credential_id?: string;
+  type?: string;
+};
+
+interface SectionProps<T extends AnyEntry> {
+  title: string;
+  icon: any;
+  items: T[];
+  credentials: Credential[];
+  describe: (item: T) => string;  // secondary line (e.g. model name)
+  onReorder: (next: T[]) => Promise<void>;
+  onToggle: (id: string) => Promise<void>;
+  emptyMessage: string;
+}
+
+function PrioritySection<T extends AnyEntry>({
+  title, icon: Icon, items, credentials, describe, onReorder, onToggle, emptyMessage,
+}: SectionProps<T>) {
+  const move = async (idx: number, dir: "up" | "down") => {
+    const copy = [...items];
+    const swap = dir === "up" ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= copy.length) return;
+    [copy[idx], copy[swap]] = [copy[swap], copy[idx]];
+    const rePriority = copy.map((p, i) => ({ ...p, priority: i + 1 }));
+    await onReorder(rePriority);
+  };
+
+  return (
+    <div className="rounded-lg border">
+      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs text-muted-foreground">
+          ({items.filter((i) => i.enabled).length}/{items.length} enabled)
+        </span>
+      </div>
+      <div className="p-2 space-y-1">
+        {items.length === 0 && (
+          <div className="text-xs text-muted-foreground italic px-2 py-3 text-center">
+            {emptyMessage}
+          </div>
+        )}
+        {items.map((p, idx) => {
+          const cred = credentials.find((c) => c.id === p.credential_id);
+          return (
+            <div key={p.id}
+              className={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${p.enabled ? "" : "opacity-60"}`}>
+              <div className="flex flex-col gap-0.5">
+                <button onClick={() => move(idx, "up")} disabled={idx === 0}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button onClick={() => move(idx, "down")} disabled={idx === items.length - 1}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5">
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <span className="flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-primary text-[11px] font-bold flex-shrink-0">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="truncate font-medium">{p.name || p.model || "Untitled"}</span>
+                  {cred && (
+                    <span className="text-xs text-muted-foreground truncate">via {cred.name}</span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">{describe(p)}</div>
+              </div>
+              <button onClick={() => onToggle(p.id)}
+                title={p.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+                className={`rounded-md p-1.5 transition-colors ${p.enabled ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : "text-muted-foreground hover:bg-accent"}`}>
+                <Power className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── General LLM card ─────────────────────────────────────────────
+
+const GENERAL_ALLOWED_CRED_TYPES = ["ollama", "vllm", "claude", "openai"];
+
+function GeneralLlmCard({ credentials }: { credentials: Credential[] }) {
+  const { toast } = useToast();
+  const [settings, setSettings] = useState<GeneralLlmSettings>({
+    credential_id: "", type: "ollama", model: "", timeout: 120,
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings/general-llm").then((res) => {
+      if (res.data) setSettings((s) => ({ ...s, ...res.data }));
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await api.put("/settings/general-llm", settings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: any) {
+      toast({
+        title: "Failed to save General LLM",
+        description: e?.response?.data?.detail || e?.message || "",
+        variant: "error",
+      });
+    }
+    setSaving(false);
+  };
+
+  const filteredCreds = credentials.filter((c) => GENERAL_ALLOWED_CRED_TYPES.includes(c.type));
+  const chosen = credentials.find((c) => c.id === settings.credential_id);
+  const isConfigured = !!settings.credential_id && !!settings.model;
+
+  return (
+    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">General LLM</span>
+        <span className="text-xs text-muted-foreground">
+          — used for chat, auto-merge, auto-rename, link suggestions, event extraction, document-edit AI
+        </span>
+      </div>
+
+      {!isConfigured && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-2 text-xs text-amber-800 dark:text-amber-200">
+          <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+          <span>
+            Not configured — those features will return 503 until you pick a provider and model.
+          </span>
+        </div>
+      )}
+
+      <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto] items-end">
+        <label className="space-y-1 block">
+          <span className="text-xs font-medium">Provider</span>
+          <select value={settings.credential_id}
+            onChange={(e) => {
+              const chosen = credentials.find((c) => c.id === e.target.value);
+              setSettings((s) => ({ ...s, credential_id: e.target.value, type: chosen?.type || s.type }));
+            }}
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm">
+            <option value="">— pick a provider —</option>
+            {filteredCreds.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1 block">
+          <span className="text-xs font-medium">Model</span>
+          <input type="text" value={settings.model}
+            onChange={(e) => setSettings((s) => ({ ...s, model: e.target.value }))}
+            placeholder={
+              chosen?.type === "ollama" ? "e.g. llama3.1" :
+              chosen?.type === "claude" ? "e.g. claude-sonnet-4-20250514" :
+              chosen?.type === "openai" ? "e.g. gpt-4o" : "Model name"
+            }
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" />
+        </label>
+        <button onClick={save} disabled={saving}
+          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap">
+          {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+          {saved ? "Saved" : saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
+      {chosen && (
+        <div className="text-xs text-muted-foreground">
+          Inherits <strong>{chosen.max_concurrent}</strong> concurrent requests /{" "}
+          <strong>{chosen.max_retries}</strong> retries from provider{" "}
+          <Link to="/settings/analysis/providers" className="underline">{chosen.name}</Link>.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main tab ─────────────────────────────────────────────────────
+
+export default function PriorityTab() {
+  const { toast } = useToast();
+  const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [llm, setLlm] = useState<LlmProvider[]>([]);
+  const [vision, setVision] = useState<VisionLlmProvider[]>([]);
+  const [ocr, setOcr] = useState<OcrProvider[]>([]);
+
+  const reloadAll = async () => {
+    try {
+      const [c, l, v, o] = await Promise.all([
+        api.get("/settings/credentials"),
+        api.get("/settings/llm-providers"),
+        api.get("/settings/vision-providers"),
+        api.get("/settings/ocr-providers"),
+      ]);
+      setCredentials(Array.isArray(c.data) ? c.data : []);
+      setLlm(asSorted(l.data));
+      setVision(asSorted(v.data));
+      setOcr(asSorted(o.data));
+    } catch {
+      toast({ title: "Failed to load routing", variant: "error" });
+    }
+  };
+  useEffect(() => { reloadAll(); }, []);
+
+  const persistLlm = async (next: LlmProvider[]) => {
+    await api.put("/settings/llm-providers", next);
+    await reloadAll();
+  };
+  const persistVision = async (next: VisionLlmProvider[]) => {
+    await api.put("/settings/vision-providers", next);
+    await reloadAll();
+  };
+  const persistOcr = async (next: OcrProvider[]) => {
+    await api.put("/settings/ocr-providers", next);
+    await reloadAll();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+        <strong>Priority</strong> controls which model is tried first for each
+        task. Providers are defined under{" "}
+        <Link to="/settings/analysis/providers" className="underline">Providers</Link>.
+      </div>
+
+      <GeneralLlmCard credentials={credentials} />
+
+      <PrioritySection
+        title="LLM priority (document extraction, classification)"
+        icon={Brain}
+        items={llm}
+        credentials={credentials}
+        describe={(p) => p.model || ""}
+        onReorder={persistLlm}
+        onToggle={async (id) => persistLlm(llm.map((p) => p.id === id ? { ...p, enabled: !p.enabled } : p))}
+        emptyMessage="No LLM models — add one under Providers."
+      />
+
+      <PrioritySection
+        title="Vision-LLM priority (single-pass page extraction)"
+        icon={Eye}
+        items={vision}
+        credentials={credentials}
+        describe={(p) => p.model || ""}
+        onReorder={persistVision}
+        onToggle={async (id) => persistVision(vision.map((p) => p.id === id ? { ...p, enabled: !p.enabled } : p))}
+        emptyMessage="No Vision-LLM models configured."
+      />
+
+      <PrioritySection
+        title="OCR priority"
+        icon={ScanText}
+        items={ocr}
+        credentials={credentials}
+        describe={(p) => p.type === "llm_vision" ? `llm_vision · ${p.llm_model || ""}` : p.type}
+        onReorder={persistOcr}
+        onToggle={async (id) => persistOcr(ocr.map((p) => p.id === id ? { ...p, enabled: !p.enabled } : p))}
+        emptyMessage="No OCR engines configured."
+      />
+    </div>
+  );
+}
+
+function asSorted<T extends AnyEntry>(data: unknown): T[] {
+  if (!Array.isArray(data)) return [];
+  return ([...data] as T[]).sort((a, b) => (a.priority || 0) - (b.priority || 0));
+}

@@ -112,6 +112,12 @@ class CredentialEntry(BaseModel):
     base_url: str = ""
     api_key: str = ""
     max_concurrent: int = 2
+    # Retry policy for transient failures (timeouts, connection errors).
+    # Moved from the global LlmConfig / VisionConfig so different endpoints
+    # can have different policies (Claude's 429 behaviour ≠ Ollama's
+    # timeouts).
+    max_retries: int = 3
+    retry_backoff_seconds: list[int] = [30, 60, 120]
 
 
 class OcrProviderEntry(BaseModel):
@@ -443,6 +449,25 @@ def _migrate_credentials(config: AppConfig) -> bool:
         clean = _normalise_base_url(c.type, c.base_url)
         if clean != c.base_url:
             c.base_url = clean
+            changed = True
+
+    # Seed retry settings from the legacy global on first pass. Once a
+    # credential has a non-default retry policy (or the global was modified
+    # to differ from the default), this copy doesn't overwrite it.
+    global_retries = int(getattr(config.llm, "max_retries", 3) or 3)
+    global_backoff = list(getattr(config.llm, "retry_backoff_seconds", []) or [])
+    if not global_backoff:
+        global_backoff = [30, 60, 120]
+    for c in credentials:
+        # Skip credentials that have already been explicitly tuned (i.e.
+        # anything other than the model default of 3 / [30,60,120]).
+        pristine = (
+            c.max_retries == 3
+            and list(c.retry_backoff_seconds) == [30, 60, 120]
+        )
+        if pristine and (global_retries != 3 or global_backoff != [30, 60, 120]):
+            c.max_retries = global_retries
+            c.retry_backoff_seconds = list(global_backoff)
             changed = True
 
     # LLM providers

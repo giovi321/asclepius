@@ -56,13 +56,13 @@ def get_llm_provider(config: AppConfig, priority: int = 1):
     )
 
 
-def _resolve_entry_connection(entry) -> tuple[str, str, str, str, int]:
-    """Return ``(type, base_url, api_key, credential_name, max_concurrent)``.
+def _resolve_entry_connection(entry) -> tuple[str, str, str, str, int, int, list[int]]:
+    """Return ``(type, base_url, api_key, credential_name, max_concurrent,
+    max_retries, retry_backoff_seconds)``.
 
     If ``entry.credential_id`` points at a known credential, its fields win;
     otherwise the entry's inline fields are used (legacy pre-credentials
     config, or new entries that haven't been pointed at a credential yet).
-    ``max_concurrent`` comes from the credential or defaults to 2.
     """
     cred = None
     cred_id = getattr(entry, "credential_id", "") or ""
@@ -73,9 +73,15 @@ def _resolve_entry_connection(entry) -> tuple[str, str, str, str, int]:
         except Exception:
             cred = None
     if cred is not None:
-        return cred.type, cred.base_url, cred.api_key, cred.name, max(1, int(cred.max_concurrent or 2))
-    # Fall back to legacy inline fields. Cap defaults to 2.
-    return entry.type, entry.base_url, entry.api_key, "", 2
+        backoff = list(cred.retry_backoff_seconds) if cred.retry_backoff_seconds else [30, 60, 120]
+        return (
+            cred.type, cred.base_url, cred.api_key, cred.name,
+            max(1, int(cred.max_concurrent or 2)),
+            max(0, int(cred.max_retries or 0)),
+            backoff,
+        )
+    # Fall back to legacy inline fields. Retry defaults mirror LlmConfig.
+    return entry.type, entry.base_url, entry.api_key, "", 2, 3, [30, 60, 120]
 
 
 def _build_llm_provider(entry):
@@ -86,7 +92,10 @@ def _build_llm_provider(entry):
     entries that haven't been migrated yet. The concurrency cap is read
     from the credential.
     """
-    eff_type, eff_base_url, eff_api_key, cred_name, eff_cap = _resolve_entry_connection(entry)
+    (
+        eff_type, eff_base_url, eff_api_key, cred_name,
+        eff_cap, eff_max_retries, eff_backoff,
+    ) = _resolve_entry_connection(entry)
     label = f"{entry.name} / {entry.model}" if entry.name else f"{eff_type} / {entry.model}"
 
     if eff_type == "claude":
@@ -121,6 +130,9 @@ def _build_llm_provider(entry):
     provider._gate_credential_name = cred_name or entry.name or eff_type
     provider._gate_model = entry.model
     provider._gate_cap = eff_cap
+    # Retry policy — consumed by provider methods (e.g. ollama._generate).
+    provider._retry_max = eff_max_retries
+    provider._retry_backoff = list(eff_backoff)
 
     # Register this credential with the gate up-front so the UI can see
     # cap=N even when no call is currently in flight.

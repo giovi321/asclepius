@@ -144,25 +144,30 @@ def _parse_vision_extraction(raw: str) -> dict | None:
 
 # ── Concurrency guard ────────────────────────────────────────────
 
-# Per-loop semaphores — the FastAPI server and the pipeline worker thread
-# run on different event loops, so a single module-level Semaphore can't
-# be shared (would raise "bound to a different event loop" on the second
-# loop's first await). Index by id(loop) instead.
-_vision_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
+# Concurrency is gated per-credential by asclepius.llm.gate. When a vision
+# provider entry references a credential, the credential's ``max_concurrent``
+# sets the cap; legacy entries without a credential fall back to the
+# process-wide ``vision.max_concurrent_requests`` via a synthetic id so
+# they still queue sensibly and show up in the top-bar metrics strip.
 
 
-def _get_vision_semaphore() -> asyncio.Semaphore:
+def _resolve_vision_gate_key(
+    provider: VisionLlmProviderEntry, config,
+) -> tuple[str, str, int]:
+    """Return ``(credential_id, credential_name, cap)`` for a vision
+    provider entry, honouring its credential when set."""
+    from asclepius.config import resolve_credential
+    cred_id = getattr(provider, "credential_id", "") or ""
+    cred = resolve_credential(config, cred_id) if cred_id else None
+    if cred is not None:
+        return cred.id, cred.name or cred.type, max(1, int(cred.max_concurrent or 2))
+    synthetic_id = f"legacy-vision-{provider.id or 'default'}"
+    name = provider.name or "Vision (legacy)"
     try:
-        from asclepius.config import get_config
-        size = max(1, int(get_config().vision.max_concurrent_requests))
+        cap = max(1, int(config.vision.max_concurrent_requests or 2))
     except Exception:
-        size = 2
-    loop_id = id(asyncio.get_running_loop())
-    entry = _vision_sem_by_loop.get(loop_id)
-    if entry is None or entry[1] != size:
-        entry = (asyncio.Semaphore(size), size)
-        _vision_sem_by_loop[loop_id] = entry
-    return entry[0]
+        cap = 2
+    return synthetic_id, name, cap
 
 
 # ── Single vision call per provider ──────────────────────────────
@@ -176,9 +181,17 @@ async def _vision_call(
     ``force_json`` only affects the Ollama backend (sets ``format: "json"``).
     Disable it for health-check calls where the expected reply is plain text.
     """
-    if provider.type == "claude":
+    # Resolve credential (if referenced) — its base_url/api_key/type win
+    # over the entry's legacy inline fields.
+    from asclepius.config import get_config, resolve_credential
+    cred = resolve_credential(get_config(), getattr(provider, "credential_id", "") or "")
+    eff_type = cred.type if cred is not None else provider.type
+    eff_base_url = (cred.base_url if cred is not None and cred.base_url else provider.base_url) or ""
+    eff_api_key = cred.api_key if cred is not None and cred.api_key else provider.api_key
+
+    if eff_type == "claude":
         from anthropic import AsyncAnthropic
-        client = AsyncAnthropic(api_key=provider.api_key)
+        client = AsyncAnthropic(api_key=eff_api_key)
         model = provider.model or "claude-sonnet-4-20250514"
         response = await client.messages.create(
             model=model, max_tokens=4096,
@@ -189,11 +202,11 @@ async def _vision_call(
         )
         return response.content[0].text
 
-    if provider.type == "openai":
-        base_url = (provider.base_url or "https://api.openai.com/v1").rstrip("/")
+    if eff_type == "openai":
+        base_url = (eff_base_url or "https://api.openai.com/v1").rstrip("/")
         read_timeout = max(float(provider.timeout), 300.0)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
-        headers = {"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {eff_api_key}", "Content-Type": "application/json"}
         model = provider.model or "gpt-4o"
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
@@ -207,7 +220,7 @@ async def _vision_call(
             return resp.json()["choices"][0]["message"]["content"]
 
     # ollama
-    ollama_url = (provider.base_url or "http://ollama:11434").rstrip("/")
+    ollama_url = (eff_base_url or "http://ollama:11434").rstrip("/")
     read_timeout = max(float(provider.timeout), 300.0)
     timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
     model = provider.model or "llama3.2-vision"
@@ -243,10 +256,19 @@ async def _vision_call_with_retry(
     and server errors (HTTP 5xx — Ollama's vision pipeline can return 500
     on a flaky page but succeed on a retry).
     """
+    from asclepius.config import get_config
+    from asclepius.llm.gate import credential_slot, register_credential
+
+    cred_id, cred_name, cap = _resolve_vision_gate_key(provider, get_config())
+    register_credential(cred_id, cap, kind="vision", credential_name=cred_name)
+
     attempts = max(max_retries, 0) + 1
     for attempt in range(attempts):
         try:
-            async with _get_vision_semaphore():
+            async with credential_slot(
+                cred_id, cap, model=provider.model or "",
+                kind="vision", credential_name=cred_name,
+            ):
                 return await _vision_call(b64_image, prompt, provider)
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
             if attempt >= attempts - 1:

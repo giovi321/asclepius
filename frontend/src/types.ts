@@ -120,6 +120,8 @@ export interface Credential {
   base_url: string;
   api_key: string;
   max_concurrent: number;
+  max_retries: number;
+  retry_backoff_seconds: number[];
   has_api_key?: boolean;
   references?: {
     llm: number;

@@ -1,6 +1,5 @@
 """OCR processing with Tesseract and optional cloud fallback."""
 
-import asyncio
 import base64
 import logging
 from pathlib import Path
@@ -10,31 +9,32 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm
+from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm, resolve_credential
+from asclepius.llm.gate import credential_slot, register_credential
 
 logger = logging.getLogger(__name__)
 
 
-# Per-loop semaphores limit concurrent vision-OCR page calls. One entry per
-# running event loop: the FastAPI server has one, the pipeline worker thread
-# (pipeline/watcher.py) runs another via ``asyncio.new_event_loop()``. A
-# single module-level Semaphore is illegal to reuse across loops — awaiting
-# it from the wrong loop raises "bound to a different event loop".
-_vision_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
+def _resolve_vision_gate_key(
+    provider_entry: OcrProviderEntry | None, config: AppConfig,
+) -> tuple[str, str, int]:
+    """Return ``(credential_id, credential_name, cap)`` for an LLM-vision
+    OCR request.
 
-
-def _get_vision_semaphore() -> asyncio.Semaphore:
-    try:
-        from asclepius.config import get_config
-        size = max(1, int(get_config().ocr.max_concurrent_vision_requests))
-    except Exception:
-        size = 1
-    loop_id = id(asyncio.get_running_loop())
-    entry = _vision_sem_by_loop.get(loop_id)
-    if entry is None or entry[1] != size:
-        entry = (asyncio.Semaphore(size), size)
-        _vision_sem_by_loop[loop_id] = entry
-    return entry[0]
+    When the provider entry points at a configured credential, the gate
+    keys off the credential's id and honours its ``max_concurrent`` cap.
+    Legacy entries with no credential fall back to a synthetic id that
+    respects the process-wide ``ocr.max_concurrent_vision_requests``
+    setting so they still queue sensibly.
+    """
+    cred_id = getattr(provider_entry, "credential_id", "") or "" if provider_entry else ""
+    cred = resolve_credential(config, cred_id) if cred_id else None
+    if cred is not None:
+        return cred.id, cred.name or cred.type, max(1, int(cred.max_concurrent or 1))
+    synthetic_id = f"legacy-vision-{getattr(provider_entry, 'id', 'default') or 'default'}"
+    name = (getattr(provider_entry, "name", "") or "Vision (legacy)") if provider_entry else "Vision (legacy)"
+    cap = max(1, int(config.ocr.max_concurrent_vision_requests or 1))
+    return synthetic_id, name, cap
 
 
 async def extract_text(
@@ -369,14 +369,20 @@ async def _llm_vision_page_with_retry(
 ) -> str:
     """Call _llm_vision_page with retry + backoff for rate limits and timeouts.
 
-    The actual HTTP request is gated by a process-wide semaphore
-    (``ocr.max_concurrent_vision_requests``) so concurrent reprocesses don't
-    all hit the inference server at once.
+    The actual HTTP request is gated by the per-credential semaphore in
+    ``asclepius.llm.gate`` so the vision request shows up as a chip in the
+    UI and respects the credential's ``max_concurrent`` setting. Legacy
+    entries without a credential fall back to ``ocr.max_concurrent_vision_requests``.
     """
     import asyncio as _asyncio
 
+    cred_id, cred_name, cap = _resolve_vision_gate_key(provider_entry, config)
+    register_credential(cred_id, cap, kind="vision", credential_name=cred_name)
+
     async def _call() -> str:
-        async with _get_vision_semaphore():
+        async with credential_slot(
+            cred_id, cap, model=vision_model or "", kind="vision", credential_name=cred_name,
+        ):
             return await _llm_vision_page(
                 b64_image, config, vision_model, provider_entry=provider_entry,
             )
@@ -433,15 +439,29 @@ async def _llm_vision_page(
         "Do not translate, summarize, or interpret — just transcribe everything you see."
     )
 
-    # Determine which provider to use for vision
+    # Determine which provider to use for vision. When the OCR entry
+    # references a credential, prefer the credential's type / base_url /
+    # api_key — they're the canonical source. Fall back to the entry's
+    # legacy inline fields for unmigrated configs.
     fallback_llm = _first_enabled_llm(config)
-    if provider_entry:
+    cred = (
+        resolve_credential(config, getattr(provider_entry, "credential_id", "") or "")
+        if provider_entry else None
+    )
+
+    if cred is not None:
+        vision_provider = cred.type
+    elif provider_entry:
         vision_provider = provider_entry.llm_provider
     else:
         vision_provider = config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama")
 
-    # Get API key from provider entry or fall back to first matching LLM provider
-    vision_api_key = provider_entry.llm_api_key if provider_entry else ""
+    # Get API key from credential, provider entry, or fall back to the
+    # first matching LLM provider.
+    if cred is not None:
+        vision_api_key = cred.api_key
+    else:
+        vision_api_key = provider_entry.llm_api_key if provider_entry else ""
     if not vision_api_key and vision_provider in ("claude", "openai"):
         for p in config.llm.providers:
             if p.type == vision_provider and p.api_key:
@@ -480,7 +500,12 @@ async def _llm_vision_page(
     elif vision_provider == "openai" and vision_api_key:
         # OpenAI vision (GPT-4o etc.)
         model = vision_model or "gpt-4o"
-        base_url = (provider_entry.llm_base_url if provider_entry and provider_entry.llm_base_url else "https://api.openai.com/v1").rstrip("/")
+        if cred is not None and cred.base_url:
+            base_url = cred.base_url.rstrip("/")
+        elif provider_entry and provider_entry.llm_base_url:
+            base_url = provider_entry.llm_base_url.rstrip("/")
+        else:
+            base_url = "https://api.openai.com/v1"
         read_timeout = max(float(config.llm.extraction_timeout), 300.0)
         timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         headers = {"Authorization": f"Bearer {vision_api_key}", "Content-Type": "application/json"}
@@ -511,7 +536,9 @@ async def _llm_vision_page(
             None,
         ) or fallback_llm
         model = vision_model or (default_ollama.model if default_ollama else "llama3.1")
-        if provider_entry and provider_entry.llm_base_url:
+        if cred is not None and cred.base_url:
+            ollama_url = cred.base_url.rstrip("/")
+        elif provider_entry and provider_entry.llm_base_url:
             ollama_url = provider_entry.llm_base_url.rstrip("/")
         else:
             ollama_url = (

@@ -581,6 +581,10 @@ async def get_credentials(current_user: dict = Depends(get_current_user)):
         else:
             entry["has_api_key"] = False
         entry["references"] = _count_credential_references(config, c.id)
+        # model_dump returns the list as-is; make sure we send a sane
+        # default even if the YAML happens to have it empty.
+        if not entry.get("retry_backoff_seconds"):
+            entry["retry_backoff_seconds"] = [30, 60, 120]
         out.append(entry)
     return out
 

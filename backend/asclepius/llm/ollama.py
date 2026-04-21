@@ -33,8 +33,18 @@ def _get_semaphore():
     return _noop_lock()
 
 
-def _get_retry_config() -> tuple[int, list[int]]:
-    """Return (max_retries, backoff_seconds) from config, falling back safely."""
+def _get_retry_config(provider=None) -> tuple[int, list[int]]:
+    """Return (max_retries, backoff_seconds) for this request.
+
+    Prefer the per-provider policy set at build time in
+    ``pipeline.provider_factory._build_llm_provider``; fall back to the
+    legacy global LLM config; fall back again to the hard-coded defaults.
+    """
+    if provider is not None:
+        retries = getattr(provider, "_retry_max", None)
+        backoff = getattr(provider, "_retry_backoff", None)
+        if retries is not None and backoff:
+            return max(0, int(retries)), [int(x) for x in backoff if int(x) >= 0] or _DEFAULT_RETRY_BACKOFF
     try:
         from asclepius.config import get_config
         cfg = get_config().llm
@@ -131,7 +141,7 @@ class OllamaProvider(LLMProvider):
         if force_json:
             payload["format"] = "json"
 
-        max_retries, retry_backoff = _get_retry_config()
+        max_retries, retry_backoff = _get_retry_config(self)
         total_attempts = max_retries + 1
         last_err = None
         for attempt in range(total_attempts):

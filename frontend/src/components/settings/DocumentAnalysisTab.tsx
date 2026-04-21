@@ -1,36 +1,40 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import GeneralLlmTab from "./GeneralLlmTab";
-import CredentialsTab from "./CredentialsTab";
-import LlmProvidersTab from "./LlmProvidersTab";
-import OcrProvidersTab from "./OcrProvidersTab";
-import VisionLlmProvidersTab from "./VisionLlmProvidersTab";
+import ProvidersTab from "./ProvidersTab";
+import PriorityTab from "./PriorityTab";
 import PromptsTab from "./PromptsTab";
 import NormalizationTab from "./NormalizationTab";
 
 const SUB_TABS = [
-  { key: "general", label: "General" },
-  { key: "credentials", label: "Credentials" },
-  { key: "llm", label: "LLM Providers" },
-  { key: "ocr", label: "OCR Providers" },
-  { key: "vision", label: "Vision-LLM Providers" },
+  { key: "providers", label: "Providers" },
+  { key: "priority", label: "Priority" },
   { key: "prompts", label: "Prompts" },
   { key: "normalization", label: "Normalization" },
 ] as const;
 
 type SubTab = typeof SUB_TABS[number]["key"];
 const SUB_KEYS: readonly SubTab[] = SUB_TABS.map((t) => t.key);
-const DEFAULT_SUB: SubTab = "general";
+const DEFAULT_SUB: SubTab = "providers";
 
 function isSubTab(v: string | undefined): v is SubTab {
   return !!v && (SUB_KEYS as readonly string[]).includes(v);
 }
+
+// Legacy slug → current slug so bookmarks / deep links survive the rename.
+const LEGACY_SLUG_REWRITES: Record<string, SubTab> = {
+  general: "priority",
+  credentials: "providers",
+  llm: "priority",
+  ocr: "priority",
+  vision: "priority",
+};
 
 export default function DocumentAnalysisTab() {
   const location = useLocation();
   const navigate = useNavigate();
   const segments = location.pathname.split("/").filter(Boolean); // ['settings', 'analysis', subtab?, ...]
   const slug = segments[2];
-  const subTab: SubTab = isSubTab(slug) ? slug : DEFAULT_SUB;
+  const rewritten = slug && LEGACY_SLUG_REWRITES[slug];
+  const subTab: SubTab = rewritten || (isSubTab(slug) ? slug : DEFAULT_SUB);
 
   const setSubTab = (key: SubTab) => {
     navigate(`/settings/analysis/${key}`, { replace: false });
@@ -54,11 +58,8 @@ export default function DocumentAnalysisTab() {
         ))}
       </div>
 
-      {subTab === "general" && <GeneralLlmTab />}
-      {subTab === "credentials" && <CredentialsTab />}
-      {subTab === "llm" && <LlmProvidersTab />}
-      {subTab === "ocr" && <OcrProvidersTab />}
-      {subTab === "vision" && <VisionLlmProvidersTab />}
+      {subTab === "providers" && <ProvidersTab />}
+      {subTab === "priority" && <PriorityTab />}
       {subTab === "prompts" && <PromptsTab />}
       {subTab === "normalization" && <NormalizationTab />}
     </div>

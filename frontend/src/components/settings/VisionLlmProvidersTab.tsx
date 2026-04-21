@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import {
   Eye, Plus, Trash2, Save, Check, Power,
@@ -34,6 +34,19 @@ export default function VisionLlmProvidersTab() {
   const [extractionTimeout, setExtractionTimeout] = useState<number>(600);
   const [globalSaved, setGlobalSaved] = useState<{ concurrent: number; retries: number; backoff: string; timeout: number }>({ concurrent: 2, retries: 3, backoff: "30,60,120", timeout: 600 });
   const [savingGlobal, setSavingGlobal] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showAddMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showAddMenu]);
 
   useEffect(() => {
     api.get("/settings/vision-providers").then((res) => {
@@ -321,19 +334,27 @@ export default function VisionLlmProvidersTab() {
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="relative group">
-          <button className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">
+        <div ref={addMenuRef} className="relative">
+          <button
+            onClick={() => setShowAddMenu((v) => !v)}
+            className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
             <Plus className="h-4 w-4" /> Add Provider
           </button>
-          <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 rounded-lg border bg-popover p-1.5 shadow-lg min-w-[200px]">
-            {VISION_TYPES.map((t) => (
-              <button key={t.value} onClick={() => addProvider(t.value)}
-                className="flex flex-col w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors">
-                <span className="text-sm font-medium">{t.label}</span>
-                <span className="text-xs text-muted-foreground">{t.description}</span>
-              </button>
-            ))}
-          </div>
+          {showAddMenu && (
+            <div className="absolute left-0 bottom-full mb-1 z-20 rounded-lg border bg-popover p-1.5 shadow-lg min-w-[240px]">
+              {VISION_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => { addProvider(t.value); setShowAddMenu(false); }}
+                  className="flex flex-col w-full rounded-md px-3 py-2 text-left hover:bg-accent transition-colors"
+                >
+                  <span className="text-sm font-medium">{t.label}</span>
+                  <span className="text-xs text-muted-foreground">{t.description}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <button onClick={save} disabled={saving}

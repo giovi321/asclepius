@@ -39,6 +39,9 @@ ocr:
   # For Ollama: set llm_vision_model to a vision model (e.g. "llava", "llama3.2-vision")
   # For Claude: uses Claude's native vision capability
   llm_vision_model: ""  # e.g. "llava:13b" or "llama3.2-vision" (empty = use main llm model)
+  # Serialise vision-OCR requests to avoid queue-induced read timeouts on
+  # Ollama. Default 1 = one page at a time (safest for self-hosted Ollama).
+  max_concurrent_vision_requests: 1
 
 llm:
   extraction_timeout: 120  # seconds — overall extraction call timeout

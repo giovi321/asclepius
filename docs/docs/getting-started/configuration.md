@@ -37,6 +37,7 @@ ocr:
   # Global defaults (used when no provider-level override is set)
   language: "eng"              # Tesseract language codes, + separated
   confidence_threshold: 0.7    # Below this, document marked as needs_review
+  max_concurrent_vision_requests: 1  # Serialise vision-OCR page calls (see note below)
   # Ordered provider list — tried in priority order for the OCR+LLM flow.
   providers:
     - id: "tesseract-1"
@@ -108,6 +109,17 @@ The pipeline tries providers in priority order; on failure it falls through to t
 `pipeline.default_flow` only affects **new uploads**. Existing documents can be reprocessed with any of four modes (OCR+LLM, OCR only, LLM only, Vision-LLM) from the document detail page.
 
 See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full details, YAML examples, and recommended models.
+
+### Vision concurrency caps
+
+Two independent semaphores gate how many simultaneous image-based requests the process will fire:
+
+| Setting | Purpose | Default |
+|--|--|--|
+| `ocr.max_concurrent_vision_requests` | OCR+LLM flow — vision-OCR page calls | `1` |
+| `vision.max_concurrent_requests` | Vision-LLM flow — end-to-end page calls | `2` |
+
+Self-hosted Ollama processes one vision inference at a time per model, so running several reprocesses in parallel queues requests at the server and the 120s HTTP read-timeout starts firing. Keep both caps low (1–2) when everything lives on a single Ollama box; raise them for multi-GPU setups or hosted providers (Claude, OpenAI) that scale horizontally.
 
 ### Legacy configuration
 

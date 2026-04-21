@@ -243,6 +243,7 @@ class SettingsUpdate(BaseModel):
     llm_vision_model: str | None = None
     llm_vision_ollama_url: str | None = None
     google_vision_key: str | None = None
+    ocr_max_concurrent_vision_requests: int | None = None
     # Pipeline
     pipeline_watch_enabled: bool | None = None
     pipeline_poll_interval: int | None = None
@@ -284,6 +285,9 @@ _SETTINGS_MAP = {
     "llm_vision_model": ("ocr", "llm_vision_model", "ocr.llm_vision_model"),
     "llm_vision_ollama_url": ("ocr", "llm_vision_ollama_url", "ocr.llm_vision_ollama_url"),
     "google_vision_key": ("ocr", "google_vision_key", "ocr.google_vision_key"),
+    "ocr_max_concurrent_vision_requests": (
+        "ocr", "max_concurrent_vision_requests", "ocr.max_concurrent_vision_requests",
+    ),
     "pipeline_watch_enabled": ("pipeline", "watch_enabled", "pipeline.watch_enabled"),
     "pipeline_poll_interval": ("pipeline", "poll_interval_seconds", "pipeline.poll_interval_seconds"),
     "pipeline_retry_interval": ("pipeline", "retry_interval_seconds", "pipeline.retry_interval_seconds"),

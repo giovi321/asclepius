@@ -1,5 +1,6 @@
 """OCR processing with Tesseract and optional cloud fallback."""
 
+import asyncio
 import base64
 import logging
 from pathlib import Path
@@ -12,6 +13,28 @@ from PIL import Image
 from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm
 
 logger = logging.getLogger(__name__)
+
+
+# Module-level semaphore limits concurrent vision-OCR page calls across the
+# whole process. Ollama / OpenAI vision endpoints typically process one
+# image at a time per model, so letting parallel reprocesses each fire a
+# request just builds an implicit queue at the inference server and trips
+# the read timeout. Serialising locally keeps timeouts meaningful.
+_vision_semaphore: asyncio.Semaphore | None = None
+_vision_sem_size: int = 0
+
+
+def _get_vision_semaphore() -> asyncio.Semaphore:
+    global _vision_semaphore, _vision_sem_size
+    try:
+        from asclepius.config import get_config
+        size = max(1, int(get_config().ocr.max_concurrent_vision_requests))
+    except Exception:
+        size = 1
+    if _vision_semaphore is None or _vision_sem_size != size:
+        _vision_semaphore = asyncio.Semaphore(size)
+        _vision_sem_size = size
+    return _vision_semaphore
 
 
 async def extract_text(
@@ -344,12 +367,23 @@ async def _llm_vision_page_with_retry(
     b64_image: str, config: AppConfig, vision_model: str,
     max_retries: int = 3, provider_entry: OcrProviderEntry | None = None,
 ) -> str:
-    """Call _llm_vision_page with retry + backoff for rate limits and timeouts."""
+    """Call _llm_vision_page with retry + backoff for rate limits and timeouts.
+
+    The actual HTTP request is gated by a process-wide semaphore
+    (``ocr.max_concurrent_vision_requests``) so concurrent reprocesses don't
+    all hit the inference server at once.
+    """
     import asyncio as _asyncio
+
+    async def _call() -> str:
+        async with _get_vision_semaphore():
+            return await _llm_vision_page(
+                b64_image, config, vision_model, provider_entry=provider_entry,
+            )
 
     for attempt in range(max_retries):
         try:
-            return await _llm_vision_page(b64_image, config, vision_model, provider_entry=provider_entry)
+            return await _call()
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
             wait = 30 * (attempt + 1)  # 30s, 60s, 90s
             logger.warning(
@@ -379,7 +413,7 @@ async def _llm_vision_page_with_retry(
                 else:
                     raise
     # Final attempt without catching
-    return await _llm_vision_page(b64_image, config, vision_model, provider_entry=provider_entry)
+    return await _call()
 
 
 async def _llm_vision_page(

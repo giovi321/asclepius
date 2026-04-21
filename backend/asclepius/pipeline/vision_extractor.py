@@ -142,6 +142,28 @@ def _parse_vision_extraction(raw: str) -> dict | None:
     return None
 
 
+# ── Concurrency guard ────────────────────────────────────────────
+
+# Module-level semaphore — limits concurrent Vision-LLM calls process-wide
+# so parallel reprocesses don't all pile onto the same Ollama / OpenAI
+# vision endpoint. Size comes from ``vision.max_concurrent_requests``.
+_vision_semaphore: asyncio.Semaphore | None = None
+_vision_sem_size: int = 0
+
+
+def _get_vision_semaphore() -> asyncio.Semaphore:
+    global _vision_semaphore, _vision_sem_size
+    try:
+        from asclepius.config import get_config
+        size = max(1, int(get_config().vision.max_concurrent_requests))
+    except Exception:
+        size = 2
+    if _vision_semaphore is None or _vision_sem_size != size:
+        _vision_semaphore = asyncio.Semaphore(size)
+        _vision_sem_size = size
+    return _vision_semaphore
+
+
 # ── Single vision call per provider ──────────────────────────────
 
 async def _vision_call(
@@ -223,7 +245,8 @@ async def _vision_call_with_retry(
     attempts = max(max_retries, 0) + 1
     for attempt in range(attempts):
         try:
-            return await _vision_call(b64_image, prompt, provider)
+            async with _get_vision_semaphore():
+                return await _vision_call(b64_image, prompt, provider)
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
             if attempt >= attempts - 1:
                 raise

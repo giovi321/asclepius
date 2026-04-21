@@ -157,6 +157,12 @@ class OcrConfig(BaseModel):
     llm_vision_provider: str = ""
     llm_vision_model: str = ""
     llm_vision_ollama_url: str = ""
+    # Max concurrent vision-OCR page requests across the whole process. The
+    # backing Ollama / OpenAI server typically runs one vision inference at
+    # a time per model, so firing parallel reprocesses just builds a queue
+    # that trips read timeouts — serialise locally instead.
+    # ``1`` = fully serialised (default, safest for self-hosted Ollama).
+    max_concurrent_vision_requests: int = 1
     # New: ordered provider list
     providers: list[OcrProviderEntry] = []
 

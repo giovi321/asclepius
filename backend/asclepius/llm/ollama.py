@@ -16,23 +16,26 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 
-# Module-level semaphore limits concurrent Ollama requests across the whole
-# process. Rebuilt on first use, and again when the configured size changes.
-_semaphore: asyncio.Semaphore | None = None
-_sem_size: int = 0
+# Per-loop semaphores limit concurrent Ollama requests. The pipeline worker
+# thread (pipeline/watcher.py) runs its own event loop, separate from the
+# FastAPI server's — a single module-level Semaphore reused across both
+# would raise "bound to a different event loop" on the second loop's first
+# await. Key by id(loop) so each loop gets its own instance.
+_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
 
 
 def _get_semaphore() -> asyncio.Semaphore:
-    global _semaphore, _sem_size
     try:
         from asclepius.config import get_config
         size = max(1, int(get_config().llm.max_concurrent_requests))
     except Exception:
         size = 2
-    if _semaphore is None or _sem_size != size:
-        _semaphore = asyncio.Semaphore(size)
-        _sem_size = size
-    return _semaphore
+    loop_id = id(asyncio.get_running_loop())
+    entry = _sem_by_loop.get(loop_id)
+    if entry is None or entry[1] != size:
+        entry = (asyncio.Semaphore(size), size)
+        _sem_by_loop[loop_id] = entry
+    return entry[0]
 
 
 def _get_retry_config() -> tuple[int, list[int]]:

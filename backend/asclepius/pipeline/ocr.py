@@ -15,26 +15,26 @@ from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm
 logger = logging.getLogger(__name__)
 
 
-# Module-level semaphore limits concurrent vision-OCR page calls across the
-# whole process. Ollama / OpenAI vision endpoints typically process one
-# image at a time per model, so letting parallel reprocesses each fire a
-# request just builds an implicit queue at the inference server and trips
-# the read timeout. Serialising locally keeps timeouts meaningful.
-_vision_semaphore: asyncio.Semaphore | None = None
-_vision_sem_size: int = 0
+# Per-loop semaphores limit concurrent vision-OCR page calls. One entry per
+# running event loop: the FastAPI server has one, the pipeline worker thread
+# (pipeline/watcher.py) runs another via ``asyncio.new_event_loop()``. A
+# single module-level Semaphore is illegal to reuse across loops — awaiting
+# it from the wrong loop raises "bound to a different event loop".
+_vision_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
 
 
 def _get_vision_semaphore() -> asyncio.Semaphore:
-    global _vision_semaphore, _vision_sem_size
     try:
         from asclepius.config import get_config
         size = max(1, int(get_config().ocr.max_concurrent_vision_requests))
     except Exception:
         size = 1
-    if _vision_semaphore is None or _vision_sem_size != size:
-        _vision_semaphore = asyncio.Semaphore(size)
-        _vision_sem_size = size
-    return _vision_semaphore
+    loop_id = id(asyncio.get_running_loop())
+    entry = _vision_sem_by_loop.get(loop_id)
+    if entry is None or entry[1] != size:
+        entry = (asyncio.Semaphore(size), size)
+        _vision_sem_by_loop[loop_id] = entry
+    return entry[0]
 
 
 async def extract_text(

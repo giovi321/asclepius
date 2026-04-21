@@ -144,24 +144,25 @@ def _parse_vision_extraction(raw: str) -> dict | None:
 
 # ── Concurrency guard ────────────────────────────────────────────
 
-# Module-level semaphore — limits concurrent Vision-LLM calls process-wide
-# so parallel reprocesses don't all pile onto the same Ollama / OpenAI
-# vision endpoint. Size comes from ``vision.max_concurrent_requests``.
-_vision_semaphore: asyncio.Semaphore | None = None
-_vision_sem_size: int = 0
+# Per-loop semaphores — the FastAPI server and the pipeline worker thread
+# run on different event loops, so a single module-level Semaphore can't
+# be shared (would raise "bound to a different event loop" on the second
+# loop's first await). Index by id(loop) instead.
+_vision_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
 
 
 def _get_vision_semaphore() -> asyncio.Semaphore:
-    global _vision_semaphore, _vision_sem_size
     try:
         from asclepius.config import get_config
         size = max(1, int(get_config().vision.max_concurrent_requests))
     except Exception:
         size = 2
-    if _vision_semaphore is None or _vision_sem_size != size:
-        _vision_semaphore = asyncio.Semaphore(size)
-        _vision_sem_size = size
-    return _vision_semaphore
+    loop_id = id(asyncio.get_running_loop())
+    entry = _vision_sem_by_loop.get(loop_id)
+    if entry is None or entry[1] != size:
+        entry = (asyncio.Semaphore(size), size)
+        _vision_sem_by_loop[loop_id] = entry
+    return entry[0]
 
 
 # ── Single vision call per provider ──────────────────────────────

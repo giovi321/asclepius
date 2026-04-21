@@ -317,15 +317,28 @@ async def auto_merge_proposals(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Ask the configured LLM to propose merge groups. Does NOT execute any merge."""
+    """Ask the configured General LLM to propose merge groups. Does NOT execute any merge."""
+    from asclepius.pipeline.provider_factory import (
+        _build_general_llm_provider,
+        ProviderUnreachableError,
+    )
+
     tables = _validate_type(norm_type)
     config = get_config()
-    llm = get_llm_provider(config)
-    return await suggest_merges(
-        db=db,
-        llm=llm,
-        main_table=tables["main"],
-        alias_table=tables["aliases"],
-        fk_col=tables["fk"],
-        norm_type_label=norm_type.replace("_", " "),
-    )
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
+    try:
+        return await suggest_merges(
+            db=db,
+            llm=llm,
+            main_table=tables["main"],
+            alias_table=tables["aliases"],
+            fk_col=tables["fk"],
+            norm_type_label=norm_type.replace("_", " "),
+        )
+    except ProviderUnreachableError as e:
+        raise HTTPException(status_code=503, detail=str(e))

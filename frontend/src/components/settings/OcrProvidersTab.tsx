@@ -5,7 +5,8 @@ import {
   ChevronUp, ChevronDown, X, Zap, Loader2,
 } from "lucide-react";
 import { TextField, NumberField, SelectField } from "./SettingsFormHelpers";
-import type { OcrProvider } from "@/types";
+import CredentialPicker from "./CredentialPicker";
+import type { OcrProvider, Credential } from "@/types";
 import { useToast } from "@/contexts/ToastContext";
 
 export const OCR_TYPES = [
@@ -25,6 +26,7 @@ const LLM_VISION_PROVIDERS = [
 export default function OcrProvidersTab() {
   const { toast } = useToast();
   const [providers, setProviders] = useState<OcrProvider[]>([]);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -50,7 +52,18 @@ export default function OcrProvidersTab() {
       setProviders(data);
       if (data.length > 0) setExpandedId(data[0].id);
     });
+    api.get("/settings/credentials").then((res) => {
+      setCredentials(Array.isArray(res.data) ? res.data : []);
+    });
   }, []);
+
+  // Filter credentials the UI can offer for this OCR row's type.
+  const credTypesFor = (ocrType: string): string[] | undefined => {
+    if (ocrType === "tesseract_remote") return ["tesseract_remote"];
+    if (ocrType === "google_vision") return ["google_vision"];
+    if (ocrType === "llm_vision" || ocrType === "vision_extraction") return ["ollama", "claude", "openai", "vllm"];
+    return undefined;
+  };
 
   const save = async () => {
     setSaving(true);
@@ -169,6 +182,24 @@ export default function OcrProvidersTab() {
                 <div className="border-t px-4 py-3 grid gap-3 max-w-lg">
                   <TextField label="Display Name" value={p.name} onChange={(v) => updateProvider(p.id, { name: v })} />
 
+                  {/* Credential picker for types that need one */}
+                  {credTypesFor(p.type) && (
+                    <CredentialPicker
+                      value={p.credential_id || ""}
+                      onChange={(id) => {
+                        const chosen = credentials.find((c) => c.id === id);
+                        const patch: Partial<OcrProvider> = { credential_id: id };
+                        if (chosen && (p.type === "llm_vision" || p.type === "vision_extraction")) {
+                          patch.llm_provider = chosen.type;
+                        }
+                        updateProvider(p.id, patch);
+                      }}
+                      credentials={credentials}
+                      allowedTypes={credTypesFor(p.type)}
+                      description="Sets the base URL + API key for this entry. Edit credentials in the Credentials tab."
+                    />
+                  )}
+
                   {/* Common: language for Tesseract-type engines */}
                   {(p.type === "tesseract" || p.type === "tesseract_remote") && (
                     <>
@@ -180,18 +211,7 @@ export default function OcrProvidersTab() {
                     </>
                   )}
 
-                  {/* Remote Tesseract */}
-                  {p.type === "tesseract_remote" && (
-                    <>
-                      <TextField label="Remote Server URL" value={p.remote_url}
-                        onChange={(v) => updateProvider(p.id, { remote_url: v })} placeholder="http://ocr-server:8080/ocr" />
-                      <TextField label="API Key" value={p.remote_api_key}
-                        onChange={(v) => updateProvider(p.id, { remote_api_key: v })} type="password"
-                        placeholder={p.has_remote_api_key ? "configured" : "Not set"} />
-                    </>
-                  )}
-
-                  {/* LLM Vision */}
+                  {/* LLM Vision — type still relevant for model selection */}
                   {(p.type === "llm_vision" || p.type === "vision_extraction") && (
                     <>
                       <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-700 dark:text-blue-300">
@@ -205,24 +225,7 @@ export default function OcrProvidersTab() {
                       <TextField label="Vision Model" value={p.llm_model}
                         onChange={(v) => updateProvider(p.id, { llm_model: v })}
                         placeholder={p.llm_provider === "ollama" ? "e.g. llava" : p.llm_provider === "claude" ? "e.g. claude-sonnet-4-20250514" : "e.g. gpt-4o"} />
-                      {(p.llm_provider === "ollama") && (
-                        <TextField label="Ollama URL" value={p.llm_base_url}
-                          onChange={(v) => updateProvider(p.id, { llm_base_url: v })}
-                          placeholder="http://ollama:11434" description="Leave empty to use the same URL as the extraction LLM" />
-                      )}
-                      {(p.llm_provider === "claude" || p.llm_provider === "openai") && (
-                        <TextField label="API Key" value={p.llm_api_key}
-                          onChange={(v) => updateProvider(p.id, { llm_api_key: v })} type="password"
-                          placeholder={p.has_llm_api_key ? "configured" : "Enter API key"} />
-                      )}
                     </>
-                  )}
-
-                  {/* Google Vision */}
-                  {p.type === "google_vision" && (
-                    <TextField label="Google Vision API Key" value={p.google_vision_key}
-                      onChange={(v) => updateProvider(p.id, { google_vision_key: v })} type="password"
-                      placeholder={p.has_google_vision_key ? "configured" : "Enter API key"} />
                   )}
 
                   {/* Test connection button */}

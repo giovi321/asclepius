@@ -11,7 +11,15 @@ from pydantic import BaseModel
 import aiosqlite
 from asclepius.auth.session import get_current_user, hash_password, require_role
 from asclepius.audit.service import audit_log, get_client_ip
-from asclepius.config import get_config, LlmProviderEntry, OcrProviderEntry, VisionLlmProviderEntry
+from asclepius.config import (
+    get_config,
+    CredentialEntry,
+    GeneralLlmConfig,
+    LlmProviderEntry,
+    OcrProviderEntry,
+    VisionLlmProviderEntry,
+    _new_credential_id,
+)
 from asclepius.db.connection import get_db
 
 router = APIRouter()
@@ -546,6 +554,133 @@ async def update_vision_providers(
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
 
     return {"status": "saved", "count": len(new_providers)}
+
+
+# --- Credentials ---
+
+def _count_credential_references(config, credential_id: str) -> dict:
+    """Count how many LLM / Vision / OCR entries reference a credential."""
+    llm_n = sum(1 for p in config.llm.providers if p.credential_id == credential_id)
+    vision_n = sum(1 for p in config.vision.providers if p.credential_id == credential_id)
+    ocr_n = sum(1 for p in config.ocr.providers if p.credential_id == credential_id)
+    general_n = 1 if config.llm.general.credential_id == credential_id else 0
+    return {"llm": llm_n, "vision": vision_n, "ocr": ocr_n, "general": general_n,
+            "total": llm_n + vision_n + ocr_n + general_n}
+
+
+@router.get("/credentials")
+async def get_credentials(current_user: dict = Depends(get_current_user)):
+    """Return the shared credentials list with api_key masked + reference counts."""
+    config = get_config()
+    out = []
+    for c in config.credentials:
+        entry = c.model_dump()
+        if entry.get("api_key"):
+            entry["has_api_key"] = True
+            entry["api_key"] = ""
+        else:
+            entry["has_api_key"] = False
+        entry["references"] = _count_credential_references(config, c.id)
+        out.append(entry)
+    return out
+
+
+@router.put("/credentials")
+async def update_credentials(
+    credentials: list[dict],
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Replace the full credentials list. Missing ids are generated; missing
+    api_key values preserve the stored secret."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config = get_config()
+    existing_by_id = {c.id: c for c in config.credentials}
+
+    new_creds: list[CredentialEntry] = []
+    new_ids: set[str] = set()
+    for raw in credentials:
+        cid = raw.get("id") or _new_credential_id()
+        if not raw.get("api_key") and cid in existing_by_id:
+            raw["api_key"] = existing_by_id[cid].api_key
+        raw["id"] = cid
+        new_creds.append(CredentialEntry(**raw))
+        new_ids.add(cid)
+
+    # Refuse to delete a credential that's still in use.
+    for cid, existing in existing_by_id.items():
+        if cid in new_ids:
+            continue
+        refs = _count_credential_references(config, cid)
+        if refs["total"] > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Credential '{existing.name}' is in use ({refs['total']} references); remove references first.",
+            )
+
+    config.credentials = new_creds
+
+    data["credentials"] = [c.model_dump() for c in new_creds]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved", "count": len(new_creds)}
+
+
+# --- General LLM ---
+
+@router.get("/general-llm")
+async def get_general_llm(current_user: dict = Depends(get_current_user)):
+    """Return the general (non-pipeline) LLM configuration."""
+    config = get_config()
+    g = config.llm.general
+    return {
+        "credential_id": g.credential_id,
+        "type": g.type,
+        "model": g.model,
+        "timeout": g.timeout,
+        "max_concurrent": g.max_concurrent,
+        "configured": bool(g.credential_id and g.model),
+    }
+
+
+class GeneralLlmUpdate(BaseModel):
+    credential_id: str = ""
+    type: str = "ollama"
+    model: str = ""
+    timeout: int = 120
+    max_concurrent: int = 2
+
+
+@router.put("/general-llm")
+async def update_general_llm(
+    body: GeneralLlmUpdate,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Replace the general LLM settings."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config = get_config()
+
+    # Validate credential_id (when set) exists
+    if body.credential_id and not any(c.id == body.credential_id for c in config.credentials):
+        raise HTTPException(status_code=400, detail="Unknown credential_id")
+
+    config.llm.general = GeneralLlmConfig(**body.model_dump())
+
+    data.setdefault("llm", {})["general"] = config.llm.general.model_dump()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved"}
 
 
 # --- Provider testing ---

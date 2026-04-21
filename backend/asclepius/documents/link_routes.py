@@ -149,10 +149,15 @@ async def suggest_document_links(
     )
 
     from asclepius.llm.prompts import LINK_SUGGESTION_PROMPT
-    from asclepius.pipeline.processor import get_llm_provider
+    from asclepius.pipeline.provider_factory import _build_general_llm_provider
 
     config = get_config()
-    llm = get_llm_provider(config)
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
 
     prompt = LINK_SUGGESTION_PROMPT.format(
         doc_id=doc_id,
@@ -249,10 +254,15 @@ async def get_relevant_documents(
     )
 
     from asclepius.llm.prompts import LINK_SUGGESTION_PROMPT
-    from asclepius.pipeline.processor import get_llm_provider
+    from asclepius.pipeline.provider_factory import _build_general_llm_provider
 
     config = get_config()
-    llm = get_llm_provider(config)
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
 
     prompt = LINK_SUGGESTION_PROMPT.format(
         doc_id=doc_id,

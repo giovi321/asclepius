@@ -13,6 +13,7 @@ router = APIRouter()
 @router.get("/status")
 async def get_pipeline_status(request: Request, current_user: dict = Depends(get_current_user)):
     from asclepius.pipeline.processor import pipeline_status as status
+    from asclepius.llm.gate import snapshot as gate_snapshot
 
     app_state = request.app.state
     task = getattr(app_state, "pipeline_task", None)
@@ -23,6 +24,7 @@ async def get_pipeline_status(request: Request, current_user: dict = Depends(get
         "watcher_active": watcher_active,
         "auto_stopped": getattr(app_state, "pipeline_auto_stopped", False),
         "auto_stop_reason": getattr(app_state, "pipeline_auto_stop_reason", ""),
+        "llm_queues": gate_snapshot(),
     }
 
 

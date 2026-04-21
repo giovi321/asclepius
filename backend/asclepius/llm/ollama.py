@@ -1,6 +1,7 @@
 """Ollama LLM provider implementation."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import re
@@ -16,26 +17,20 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 
-# Per-loop semaphores limit concurrent Ollama requests. The pipeline worker
-# thread (pipeline/watcher.py) runs its own event loop, separate from the
-# FastAPI server's — a single module-level Semaphore reused across both
-# would raise "bound to a different event loop" on the second loop's first
-# await. Key by id(loop) so each loop gets its own instance.
-_sem_by_loop: "dict[int, tuple[asyncio.Semaphore, int]]" = {}
+# Concurrency is now handled by the per-model gate in asclepius.llm.gate
+# (wrapped at provider-build time in pipeline.provider_factory). This module
+# no longer needs its own semaphore.
 
 
-def _get_semaphore() -> asyncio.Semaphore:
-    try:
-        from asclepius.config import get_config
-        size = max(1, int(get_config().llm.max_concurrent_requests))
-    except Exception:
-        size = 2
-    loop_id = id(asyncio.get_running_loop())
-    entry = _sem_by_loop.get(loop_id)
-    if entry is None or entry[1] != size:
-        entry = (asyncio.Semaphore(size), size)
-        _sem_by_loop[loop_id] = entry
-    return entry[0]
+@contextlib.asynccontextmanager
+async def _noop_lock():
+    yield
+
+
+def _get_semaphore():
+    # Kept for source compatibility with callers that may still import it —
+    # the real gating happens at the provider-wrapper level.
+    return _noop_lock()
 
 
 def _get_retry_config() -> tuple[int, list[int]]:

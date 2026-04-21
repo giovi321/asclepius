@@ -1,8 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  Users, Shield, Workflow, Download, ScrollText, FileSearch, KeyRound,
+  Users, Shield, Workflow, Download, ScrollText, FileSearch, KeyRound, Key,
 } from "lucide-react";
 import DocumentAnalysisTab from "@/components/settings/DocumentAnalysisTab";
+import CredentialsTab from "@/components/settings/CredentialsTab";
 import PipelineTab from "@/components/settings/PipelineTab";
 import OidcTab from "@/components/settings/OidcTab";
 import UsersTab from "@/components/settings/UsersTab";
@@ -12,6 +13,7 @@ import LogsTab from "@/components/settings/LogsTab";
 
 const TABS = [
   { key: "analysis", label: "Document Analysis", icon: FileSearch },
+  { key: "credentials", label: "Credentials", icon: Key },
   { key: "pipeline", label: "Pipeline", icon: Workflow },
   { key: "oidc", label: "OIDC / SSO", icon: Shield },
   { key: "users", label: "Users", icon: Users },
@@ -65,6 +67,7 @@ export default function SettingsPage() {
       </div>
 
       {activeTab === "analysis" && <DocumentAnalysisTab />}
+      {activeTab === "credentials" && <CredentialsTab />}
       {activeTab === "pipeline" && <PipelineTab />}
       {activeTab === "oidc" && <OidcTab />}
       {activeTab === "users" && <UsersTab />}

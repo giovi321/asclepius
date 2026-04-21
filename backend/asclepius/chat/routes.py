@@ -11,7 +11,10 @@ from asclepius.chat.service import chat_with_rag
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.patients.service import check_patient_access
-from asclepius.pipeline.processor import get_llm_provider
+from asclepius.pipeline.provider_factory import (
+    _build_general_llm_provider,
+    ProviderUnreachableError,
+)
 
 router = APIRouter()
 
@@ -33,12 +36,20 @@ async def chat(
             raise HTTPException(status_code=403, detail="No access to this patient")
 
     config = get_config()
-    llm = get_llm_provider(config)
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
 
-    result = await chat_with_rag(
-        db, llm, current_user["id"], body.patient_id, body.message,
-        is_admin=(current_user.get("role") == "admin"),
-    )
+    try:
+        result = await chat_with_rag(
+            db, llm, current_user["id"], body.patient_id, body.message,
+            is_admin=(current_user.get("role") == "admin"),
+        )
+    except ProviderUnreachableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     return result
 
 

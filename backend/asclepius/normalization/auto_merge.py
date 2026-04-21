@@ -154,14 +154,14 @@ async def suggest_merges(
         "Identify merge groups per the instructions."
     )
 
-    try:
-        response = await llm.chat(
-            [{"role": "user", "content": user_prompt}],
-            system_prompt=_SYSTEM_PROMPT,
-        )
-    except Exception:
-        logger.exception("LLM call failed during auto-merge suggestion")
-        return {"proposals": [], "entries": entries, "error": "LLM call failed"}
+    # Intentionally does NOT swallow exceptions — let them bubble up as 503 /
+    # 500 so the UI can show the actual reason. Previously we returned an
+    # empty proposals panel with no explanation, which made auto-merge look
+    # silently broken.
+    response = await llm.chat(
+        [{"role": "user", "content": user_prompt}],
+        system_prompt=_SYSTEM_PROMPT,
+    )
 
     raw = _parse_proposals(response)
     valid_ids = {e["id"] for e in entries}

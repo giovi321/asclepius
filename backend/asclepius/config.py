@@ -13,6 +13,7 @@ The resulting :class:`AppConfig` is cached via ``get_config()``.
 import logging
 import os
 import secrets as _secrets
+import uuid as _uuid
 from functools import lru_cache
 from pathlib import Path
 
@@ -91,6 +92,22 @@ class OidcConfig(BaseModel):
     display_name_claim: str = "name"
 
 
+class CredentialEntry(BaseModel):
+    """A shared connection/credential definition referenced by provider entries.
+
+    One credential can be reused by multiple LLM/Vision/OCR entries (e.g. two
+    models on the same Ollama server, or several models on the same OpenAI
+    account). Edit the credential once and every referencing entry picks up
+    the change.
+    """
+    id: str = ""
+    name: str = ""
+    # ollama | vllm | claude | openai | google_vision | tesseract_remote
+    type: str = "ollama"
+    base_url: str = ""
+    api_key: str = ""
+
+
 class OcrProviderEntry(BaseModel):
     """A single OCR provider configuration."""
     id: str = ""
@@ -98,17 +115,21 @@ class OcrProviderEntry(BaseModel):
     name: str = ""
     enabled: bool = True
     priority: int = 1
+    # Shared connection (tesseract_remote, google_vision, llm_vision). Empty
+    # for local Tesseract, which has no credentials.
+    credential_id: str = ""
     # Tesseract settings
     language: str = "eng"
-    # Remote Tesseract settings
+    # Remote Tesseract settings (legacy — prefer credential_id for new entries)
     remote_url: str = ""
     remote_api_key: str = ""
-    # LLM Vision settings
+    # LLM Vision settings (llm_provider is the underlying type;
+    # llm_model is the model name. credential_id supplies base_url + api_key.)
     llm_provider: str = "ollama"  # ollama, claude, openai
     llm_model: str = ""
     llm_base_url: str = ""
     llm_api_key: str = ""
-    # Google Vision settings
+    # Google Vision settings (legacy — prefer credential_id)
     google_vision_key: str = ""
     # Shared
     confidence_threshold: float = 0.7
@@ -121,10 +142,15 @@ class LlmProviderEntry(BaseModel):
     name: str = ""
     enabled: bool = True
     priority: int = 1
+    # Shared connection — when set, base_url/api_key are derived from it.
+    credential_id: str = ""
     base_url: str = "http://ollama:11434"
     model: str = "llama3.1"
     api_key: str = ""
     timeout: int = 120
+    # Max concurrent requests to THIS (credential, model) tuple. The gate
+    # takes the max across entries referencing the same physical model.
+    max_concurrent: int = 2
 
 
 class VisionLlmProviderEntry(BaseModel):
@@ -139,10 +165,26 @@ class VisionLlmProviderEntry(BaseModel):
     name: str = ""
     enabled: bool = True
     priority: int = 1
+    credential_id: str = ""
     base_url: str = ""
     model: str = ""
     api_key: str = ""
     timeout: int = 600
+    max_concurrent: int = 2
+
+
+class GeneralLlmConfig(BaseModel):
+    """Single model used for everything that isn't the document-analysis pipeline.
+
+    Covers chat, auto-merge, auto-rename, link suggestion, event extraction,
+    and document-edit AI. When ``credential_id`` is empty, those endpoints
+    return 503.
+    """
+    credential_id: str = ""
+    type: str = "ollama"  # same vocabulary as LlmProviderEntry.type
+    model: str = ""
+    timeout: int = 120
+    max_concurrent: int = 2
 
 
 class OcrConfig(BaseModel):
@@ -187,6 +229,8 @@ class LlmConfig(BaseModel):
     # this language via a prepended directive on every prompt. Defaults to
     # English to keep the historical behaviour.
     canonical_language: str = "English"
+    # General-purpose LLM (non-pipeline). See GeneralLlmConfig.
+    general: GeneralLlmConfig = GeneralLlmConfig()
 
 
 class VisionConfig(BaseModel):
@@ -220,6 +264,8 @@ class AppConfig(BaseModel):
     llm: LlmConfig = LlmConfig()
     vision: VisionConfig = VisionConfig()
     pipeline: PipelineConfig = PipelineConfig()
+    # Shared credentials referenced by LLM / Vision / OCR provider entries.
+    credentials: list[CredentialEntry] = []
 
 
 _LEGACY_LLM_KEYS = ("provider", "ollama_base_url", "ollama_model", "claude_api_key", "claude_model")
@@ -321,6 +367,135 @@ def _persist_yaml(data: dict) -> None:
     path = Path(config_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+
+def _new_credential_id() -> str:
+    """Stable short id for a freshly-created credential."""
+    return f"cred-{_uuid.uuid4().hex[:12]}"
+
+
+def _ensure_credential(
+    credentials: list[CredentialEntry], cred_type: str, base_url: str, api_key: str,
+    *, suggested_name: str = "",
+) -> CredentialEntry | None:
+    """Find or create a credential for (type, base_url, api_key).
+
+    Returns the credential, or ``None`` if all three inputs are empty (no
+    credential needed for this entry).
+    """
+    if not cred_type and not base_url and not api_key:
+        return None
+    # Local tesseract (no remote URL, no API key) doesn't need a credential.
+    if cred_type in ("tesseract",) and not base_url and not api_key:
+        return None
+    key = (cred_type or "", base_url or "", api_key or "")
+    for c in credentials:
+        if (c.type, c.base_url, c.api_key) == key:
+            return c
+    # Auto-name: "{Name of first entry}" or "Auto-imported {type} {n}".
+    existing_of_type = sum(1 for c in credentials if c.type == cred_type)
+    name = suggested_name or f"Auto-imported {cred_type}" + (f" {existing_of_type + 1}" if existing_of_type else "")
+    entry = CredentialEntry(
+        id=_new_credential_id(), name=name, type=cred_type or "ollama",
+        base_url=base_url, api_key=api_key,
+    )
+    credentials.append(entry)
+    return entry
+
+
+def _migrate_credentials(config: AppConfig) -> bool:
+    """Populate ``config.credentials`` by deduping the inline credentials on
+    LLM / Vision / OCR provider entries.
+
+    Idempotent: entries that already have a ``credential_id`` are left alone
+    (their inline fields are kept as-is so older code paths keep working).
+
+    Returns True if anything was added.
+    """
+    credentials = list(config.credentials)
+    changed = False
+
+    # LLM providers
+    for p in config.llm.providers:
+        if p.credential_id:
+            continue
+        cred = _ensure_credential(
+            credentials, p.type, p.base_url, p.api_key,
+            suggested_name=p.name or f"Auto-imported {p.type}",
+        )
+        if cred is not None:
+            p.credential_id = cred.id
+            changed = True
+
+    # Vision providers
+    for p in config.vision.providers:
+        if p.credential_id:
+            continue
+        cred = _ensure_credential(
+            credentials, p.type, p.base_url, p.api_key,
+            suggested_name=p.name or f"Auto-imported {p.type}",
+        )
+        if cred is not None:
+            p.credential_id = cred.id
+            changed = True
+
+    # OCR providers — three flavours of credential:
+    for p in config.ocr.providers:
+        if p.credential_id:
+            continue
+        cred: CredentialEntry | None = None
+        if p.type == "tesseract_remote" and p.remote_url:
+            cred = _ensure_credential(
+                credentials, "tesseract_remote", p.remote_url, p.remote_api_key,
+                suggested_name=p.name or "Auto-imported tesseract_remote",
+            )
+        elif p.type == "llm_vision" and (p.llm_base_url or p.llm_api_key):
+            cred = _ensure_credential(
+                credentials, p.llm_provider or "ollama", p.llm_base_url, p.llm_api_key,
+                suggested_name=p.name or f"Auto-imported {p.llm_provider or 'ollama'}",
+            )
+        elif p.type == "google_vision" and p.google_vision_key:
+            cred = _ensure_credential(
+                credentials, "google_vision", "", p.google_vision_key,
+                suggested_name=p.name or "Auto-imported google_vision",
+            )
+        if cred is not None:
+            p.credential_id = cred.id
+            changed = True
+
+    # General LLM bootstrap: if unset but we have an enabled pipeline provider,
+    # default to priority-1.
+    if not config.llm.general.credential_id and config.llm.providers:
+        first = _first_enabled_llm(config)
+        if first is not None:
+            cred = _ensure_credential(
+                credentials, first.type, first.base_url, first.api_key,
+                suggested_name=first.name or f"Auto-imported {first.type}",
+            )
+            if cred is not None:
+                config.llm.general.credential_id = cred.id
+                config.llm.general.type = first.type
+                config.llm.general.model = first.model
+                config.llm.general.timeout = first.timeout
+                config.llm.general.max_concurrent = max(
+                    2, getattr(first, "max_concurrent", 2) or 2,
+                )
+                changed = True
+
+    if changed or credentials != config.credentials:
+        config.credentials = credentials
+        return True
+    return False
+
+
+def resolve_credential(config: AppConfig, credential_id: str) -> CredentialEntry | None:
+    """Look up a credential by id; None if not found or id is empty."""
+    if not credential_id:
+        return None
+    for c in config.credentials:
+        if c.id == credential_id:
+            return c
+    return None
 
 
 def _first_enabled_llm(config: "AppConfig") -> LlmProviderEntry | None:
@@ -458,6 +633,27 @@ def load_config() -> AppConfig:
                 google_vision_key=config.ocr.google_vision_key,
             ))
         config.ocr.providers = ocr_providers
+
+    # Post-load credentials migration. Idempotent; only rewrites YAML when
+    # it actually introduces a new credential or assigns a credential_id.
+    migrated_creds = _migrate_credentials(config)
+    if migrated_creds:
+        try:
+            # Merge the migrated in-memory state back into the raw YAML dict
+            # and persist it. We only touch the keys we migrated to avoid
+            # rewriting fields the user hasn't touched.
+            data.setdefault("llm", {})["providers"] = [p.model_dump() for p in config.llm.providers]
+            data.setdefault("vision", {})["providers"] = [p.model_dump() for p in config.vision.providers]
+            data.setdefault("ocr", {})["providers"] = [p.model_dump() for p in config.ocr.providers]
+            data["llm"]["general"] = config.llm.general.model_dump()
+            data["credentials"] = [c.model_dump() for c in config.credentials]
+            _persist_yaml(data)
+            logger.info(
+                "Credential migration: created %d credentials; YAML persisted.",
+                len(config.credentials),
+            )
+        except Exception:
+            logger.exception("Failed to persist credential migration — in-memory migration still applied")
 
     return config
 

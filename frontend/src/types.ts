@@ -100,9 +100,34 @@ export interface PipelineStatus {
   watcher_active: boolean;
   auto_stopped: boolean;
   auto_stop_reason: string;
+  llm_queues?: LlmQueueSnapshot[];
 }
 
 // ─── Providers ─────────────────────────────────────────
+
+export type CredentialType =
+  | "ollama"
+  | "vllm"
+  | "claude"
+  | "openai"
+  | "google_vision"
+  | "tesseract_remote";
+
+export interface Credential {
+  id: string;
+  name: string;
+  type: CredentialType | string;
+  base_url: string;
+  api_key: string;
+  has_api_key?: boolean;
+  references?: {
+    llm: number;
+    vision: number;
+    ocr: number;
+    general: number;
+    total: number;
+  };
+}
 
 export interface LlmProvider {
   id: string;
@@ -110,10 +135,12 @@ export interface LlmProvider {
   name: string;
   enabled: boolean;
   priority: number;
+  credential_id?: string;
   base_url: string;
   model: string;
   api_key: string;
   timeout: number;
+  max_concurrent?: number;
   has_api_key?: boolean;
 }
 
@@ -123,6 +150,7 @@ export interface OcrProvider {
   name: string;
   enabled: boolean;
   priority: number;
+  credential_id?: string;
   language: string;
   remote_url: string;
   remote_api_key: string;
@@ -143,11 +171,32 @@ export interface VisionLlmProvider {
   name: string;
   enabled: boolean;
   priority: number;
+  credential_id?: string;
   base_url: string;
   model: string;
   api_key: string;
   timeout: number;
+  max_concurrent?: number;
   has_api_key?: boolean;
+}
+
+export interface GeneralLlmSettings {
+  credential_id: string;
+  type: string;
+  model: string;
+  timeout: number;
+  max_concurrent: number;
+  configured?: boolean;
+}
+
+export interface LlmQueueSnapshot {
+  kind: "llm" | "vision";
+  credential_id: string;
+  credential_name: string;
+  model: string;
+  in_flight: number;
+  waiting: number;
+  cap: number;
 }
 
 // ─── Patient ───────────────────────────────────────────

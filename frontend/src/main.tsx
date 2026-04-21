@@ -6,6 +6,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { PatientProvider } from "./contexts/PatientContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
+import { PipelineStatusProvider } from "./contexts/PipelineStatusContext";
 import "./index.css";
 
 // Initialise pdf.js worker once at app startup (before any component mounts).
@@ -21,7 +22,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <PatientProvider>
           <ToastProvider>
             <ConfirmProvider>
-              <App />
+              <PipelineStatusProvider>
+                <App />
+              </PipelineStatusProvider>
             </ConfirmProvider>
           </ToastProvider>
         </PatientProvider>

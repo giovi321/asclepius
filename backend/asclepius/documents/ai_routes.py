@@ -39,12 +39,17 @@ async def edit_document_with_ai(
         raise HTTPException(status_code=404, detail="Document not found")
 
     config = get_config()
-    from asclepius.pipeline.processor import get_llm_provider
+    from asclepius.pipeline.provider_factory import _build_general_llm_provider
     from asclepius.pipeline.extractor import build_extraction_context
     import json as _json
     import asyncio as _asyncio
 
-    llm = get_llm_provider(config)
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
     context = await build_extraction_context(db)
 
     # Build a compact current data summary (only non-null fields)
@@ -209,10 +214,15 @@ async def generate_filename(
 
     # Use LLM to generate a concise, descriptive name
     from asclepius.pipeline.organizer import generate_ai_filename
-    from asclepius.pipeline.processor import get_llm_provider
+    from asclepius.pipeline.provider_factory import _build_general_llm_provider
 
     config = get_config()
-    llm = get_llm_provider(config)
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
 
     doc_meta = {
         "doc_type": doc.get("doc_type"),

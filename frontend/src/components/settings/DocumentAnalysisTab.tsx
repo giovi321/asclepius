@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
+import GeneralLlmTab from "./GeneralLlmTab";
 import LlmProvidersTab from "./LlmProvidersTab";
 import OcrProvidersTab from "./OcrProvidersTab";
 import VisionLlmProvidersTab from "./VisionLlmProvidersTab";
@@ -6,6 +7,7 @@ import PromptsTab from "./PromptsTab";
 import NormalizationTab from "./NormalizationTab";
 
 const SUB_TABS = [
+  { key: "general", label: "General" },
   { key: "llm", label: "LLM Providers" },
   { key: "ocr", label: "OCR Providers" },
   { key: "vision", label: "Vision-LLM Providers" },
@@ -15,7 +17,7 @@ const SUB_TABS = [
 
 type SubTab = typeof SUB_TABS[number]["key"];
 const SUB_KEYS: readonly SubTab[] = SUB_TABS.map((t) => t.key);
-const DEFAULT_SUB: SubTab = "llm";
+const DEFAULT_SUB: SubTab = "general";
 
 function isSubTab(v: string | undefined): v is SubTab {
   return !!v && (SUB_KEYS as readonly string[]).includes(v);
@@ -50,6 +52,7 @@ export default function DocumentAnalysisTab() {
         ))}
       </div>
 
+      {subTab === "general" && <GeneralLlmTab />}
       {subTab === "llm" && <LlmProvidersTab />}
       {subTab === "ocr" && <OcrProvidersTab />}
       {subTab === "vision" && <VisionLlmProvidersTab />}

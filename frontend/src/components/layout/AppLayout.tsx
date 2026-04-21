@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePatient } from "@/contexts/PatientContext";
 import { useTheme } from "@/hooks/useTheme";
 import PatientSelector from "@/components/PatientSelector";
+import MetricsStrip from "@/components/layout/MetricsStrip";
 import packageJson from "../../../package.json";
 import {
   LayoutDashboard,
@@ -41,7 +41,6 @@ const navItems = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const { selectedPatient } = usePatient();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme, toggleTheme } = useTheme();
@@ -89,57 +88,53 @@ export default function AppLayout() {
           })}
         </nav>
 
-        {/* Patient selector + logout */}
+        {/* Patient selector + user row with theme toggle + logout */}
         <div className="p-3 space-y-2">
           {sidebarOpen && <PatientSelector />}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <button
               onClick={logout}
-              className="flex items-center gap-2 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center gap-2 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground min-w-0"
               title="Logout"
             >
-              <LogOut className="h-4 w-4" />
-              {sidebarOpen && <span className="text-xs">{user?.display_name || user?.username}</span>}
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              {sidebarOpen && <span className="text-xs truncate">{user?.display_name || user?.username}</span>}
             </button>
-            {sidebarOpen && (
-              <a
-                href="https://github.com/giovi321/asclepius"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-              >
-                Asclepius v{packageJson.version}
-              </a>
-            )}
+            <button
+              onClick={toggleTheme}
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground flex-shrink-0"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
+          {sidebarOpen && (
+            <a
+              href="https://github.com/giovi321/asclepius"
+              target="_blank"
+              rel="noreferrer"
+              className="block text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              Asclepius v{packageJson.version}
+            </a>
+          )}
         </div>
       </aside>
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-14 items-center gap-4 border-b px-4">
+        <header className="flex h-14 items-center gap-3 border-b px-4">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent flex-shrink-0"
             title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
             <Menu className="h-5 w-5" />
           </button>
-          <button
-            onClick={toggleTheme}
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-          </button>
-          {selectedPatient && (
-            <div className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-1">
-              <span className="text-sm font-medium text-primary">
-                {selectedPatient.display_name}
-              </span>
-            </div>
-          )}
+          <div className="flex-1 min-w-0">
+            <MetricsStrip />
+          </div>
         </header>
 
         {/* Page content */}

@@ -277,8 +277,13 @@ async def suggest_events_for_document(
     existing_events = [dict(r) for r in await cursor.fetchall()]
 
     config = get_config()
-    from asclepius.pipeline.processor import get_llm_provider
-    llm = get_llm_provider(config)
+    from asclepius.pipeline.provider_factory import _build_general_llm_provider
+    llm = _build_general_llm_provider(config)
+    if llm is None:
+        raise HTTPException(
+            status_code=503,
+            detail="General LLM is not configured. Set it under Settings → Document Analysis → General.",
+        )
 
     events_text = "\n".join(
         f"- ID {e['id']}: \"{e['title']}\" ({e['event_type']}, {e.get('date_start', '?')} to {e.get('date_end', 'ongoing' if e.get('is_ongoing') else '?')})"

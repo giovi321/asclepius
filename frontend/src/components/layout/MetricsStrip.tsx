@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
-import { FileText, Brain, Eye } from "lucide-react";
+import { FileText, Brain, Eye, ScanText } from "lucide-react";
 
 type ChipSpec = {
   key: string;
@@ -43,24 +43,38 @@ export default function MetricsStrip() {
     });
   }
 
-  // Per-credential LLM + Vision queues. The chip shows credential + model
-  // on a single line; the hover card breaks out the counters.
+  // Per-credential LLM / Vision / OCR queues. The chip shows credential +
+  // model display-name on a single line; the hover card breaks out the
+  // counters. Colour + icon mirror the kind badges on the Providers and
+  // Priority tabs so the user sees the same visual language across the app.
   for (const q of status.llm_queues || []) {
-    const modelsLabel = q.models && q.models.length > 0 ? q.models.join(", ") : q.model || "";
+    // Prefer user-chosen display names (e.g. "Chandra") over raw model ids
+    // (e.g. "fredrezones55/chandra-ocr-2") — the backend enriches the snapshot.
+    const displayList = (q.display_names && q.display_names.length > 0 ? q.display_names : q.models) || [];
+    const modelsLabel = displayList.length > 0 ? displayList.join(", ") : (q.display_name || q.model || "");
     const shortName = q.credential_name || q.credential_id;
+    const kindLabel =
+      q.kind === "vision" ? "Vision-LLM" :
+      q.kind === "ocr" ? "OCR" :
+      "LLM";
+    const icon =
+      q.kind === "vision" ? Eye :
+      q.kind === "ocr" ? ScanText :
+      Brain;
+    const colorClass =
+      q.kind === "vision" ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800" :
+      q.kind === "ocr" ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800" :
+      "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800";
     chips.push({
       key: `${q.kind}-${q.credential_id}`,
-      icon: q.kind === "vision" ? Eye : Brain,
+      icon,
       label: modelsLabel ? `${shortName} · ${modelsLabel}` : shortName,
-      cardTitle: `${shortName} · ${q.kind === "vision" ? "Vision" : "LLM"}`,
+      cardTitle: `${shortName} · ${kindLabel}`,
       cardSubtitle: modelsLabel || undefined,
       running: q.in_flight,
       waiting: q.waiting,
       cap: q.cap,
-      colorClass:
-        q.kind === "vision"
-          ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-          : "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800",
+      colorClass,
     });
   }
 

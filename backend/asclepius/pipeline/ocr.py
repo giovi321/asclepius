@@ -377,11 +377,14 @@ async def _llm_vision_page_with_retry(
     import asyncio as _asyncio
 
     cred_id, cred_name, cap = _resolve_vision_gate_key(provider_entry, config)
-    register_credential(cred_id, cap, kind="vision", credential_name=cred_name)
+    # kind="ocr" so the top-bar chip matches the OCR colour/icon used on
+    # the Priority/Providers tabs. The one-step Vision-LLM flow stays
+    # kind="vision" over in vision_extractor.py.
+    register_credential(cred_id, cap, kind="ocr", credential_name=cred_name)
 
     async def _call() -> str:
         async with credential_slot(
-            cred_id, cap, model=vision_model or "", kind="vision", credential_name=cred_name,
+            cred_id, cap, model=vision_model or "", kind="ocr", credential_name=cred_name,
         ):
             return await _llm_vision_page(
                 b64_image, config, vision_model, provider_entry=provider_entry,

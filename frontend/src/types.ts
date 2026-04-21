@@ -190,11 +190,16 @@ export interface GeneralLlmSettings {
 }
 
 export interface LlmQueueSnapshot {
-  kind: "llm" | "vision";
+  kind: "llm" | "vision" | "ocr";
   credential_id: string;
   credential_name: string;
   models: string[];
   model: string;
+  /** User-chosen display names per model in flight (e.g. "Chandra" instead of
+   * "fredrezones55/chandra-ocr-2"). Falls back to the raw model string when no
+   * entry matches. Populated by pipeline/routes.py at read time. */
+  display_names?: string[];
+  display_name?: string;
   in_flight: number;
   waiting: number;
   cap: number;

@@ -14,18 +14,57 @@ router = APIRouter()
 async def get_pipeline_status(request: Request, current_user: dict = Depends(get_current_user)):
     from asclepius.pipeline.processor import pipeline_status as status
     from asclepius.llm.gate import snapshot as gate_snapshot
+    from asclepius.config import get_config
 
     app_state = request.app.state
     task = getattr(app_state, "pipeline_task", None)
     watcher_active = task is not None and not task.done()
+
+    # Enrich the gate snapshot with user-chosen display names, so the top-bar
+    # chip reads "Chandra" instead of "fredrezones55/chandra-ocr-2". Matching
+    # on (credential_id, raw_model) against the three provider lists.
+    queues = gate_snapshot()
+    config = get_config()
+    for q in queues:
+        cred_id = q.get("credential_id", "")
+        kind = q.get("kind", "llm")
+        labels = []
+        for raw_model in q.get("models", []):
+            labels.append(_resolve_model_display_name(config, kind, cred_id, raw_model) or raw_model)
+        q["display_names"] = labels
+        q["display_name"] = labels[0] if labels else q.get("model", "")
 
     return {
         **status,
         "watcher_active": watcher_active,
         "auto_stopped": getattr(app_state, "pipeline_auto_stopped", False),
         "auto_stop_reason": getattr(app_state, "pipeline_auto_stop_reason", ""),
-        "llm_queues": gate_snapshot(),
+        "llm_queues": queues,
     }
+
+
+def _resolve_model_display_name(config, kind: str, credential_id: str, raw_model: str) -> str:
+    """Return the user-chosen ``name`` for a (credential, model) tuple in the
+    given kind's provider list, or ``""`` if no entry matches."""
+    if not credential_id or not raw_model:
+        return ""
+    if kind == "llm":
+        candidates = config.llm.providers
+        key = "model"
+    elif kind == "vision":
+        candidates = config.vision.providers
+        key = "model"
+    elif kind == "ocr":
+        # LLM-vision OCR entries register with their llm_model as the "model"
+        # string in the gate; the user-chosen display name is on entry.name.
+        candidates = config.ocr.providers
+        key = "llm_model"
+    else:
+        return ""
+    for p in candidates:
+        if p.credential_id == credential_id and getattr(p, key, "") == raw_model:
+            return p.name or ""
+    return ""
 
 
 @router.post("/start")

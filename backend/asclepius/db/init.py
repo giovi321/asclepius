@@ -189,6 +189,50 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             _doc_updates, _denorm_updates,
         )
 
+    # Resync child rows whose doctor_id / facility_id drifted from the owning
+    # document. Happens when a user corrected the doctor / facility on a
+    # document before the cascade in update_document_fields existed — the
+    # parent pointed to the right canonical entry, the children still pointed
+    # to the old one, and the normalization view showed stale references.
+    # Idempotent.
+    await db.execute("""
+        UPDATE encounters
+        SET facility_id = (SELECT d.facility_id FROM documents d WHERE d.id = encounters.document_id)
+        WHERE EXISTS (
+            SELECT 1 FROM documents d
+            WHERE d.id = encounters.document_id
+              AND COALESCE(d.facility_id, -1) != COALESCE(encounters.facility_id, -1)
+        )
+    """)
+    await db.execute("""
+        UPDATE encounters
+        SET doctor_id = (SELECT d.doctor_id FROM documents d WHERE d.id = encounters.document_id)
+        WHERE EXISTS (
+            SELECT 1 FROM documents d
+            WHERE d.id = encounters.document_id
+              AND COALESCE(d.doctor_id, -1) != COALESCE(encounters.doctor_id, -1)
+        )
+    """)
+    await db.execute("""
+        UPDATE imaging_studies
+        SET facility_id = (SELECT d.facility_id FROM documents d WHERE d.id = imaging_studies.document_id)
+        WHERE EXISTS (
+            SELECT 1 FROM documents d
+            WHERE d.id = imaging_studies.document_id
+              AND COALESCE(d.facility_id, -1) != COALESCE(imaging_studies.facility_id, -1)
+        )
+    """)
+    await db.execute("""
+        UPDATE imaging_studies
+        SET doctor_id = (SELECT d.doctor_id FROM documents d WHERE d.id = imaging_studies.document_id)
+        WHERE EXISTS (
+            SELECT 1 FROM documents d
+            WHERE d.id = imaging_studies.document_id
+              AND COALESCE(d.doctor_id, -1) != COALESCE(imaging_studies.doctor_id, -1)
+        )
+    """)
+    await db.commit()
+
     # Add unique constraint on document_links to prevent exact duplicates
     # First deduplicate any existing rows, keeping the oldest
     await db.execute("""

@@ -12,6 +12,7 @@ Security model for LLM-generated SQL:
 - A statement-level ``LIMIT`` cap and an async timeout bound resource use.
 """
 
+import json
 import logging
 import re
 
@@ -238,6 +239,67 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     return "\n".join(parts)
 
 
+def _extract_document_ids(rows: list[dict]) -> list[int]:
+    """Find every document id referenced in a SQL result set.
+
+    Collects explicit ``document_id`` / ``doc_id`` columns plus the ``id``
+    column when the row looks like it came from the ``documents`` table
+    (presence of ``original_filename`` or ``doc_type`` is a strong hint).
+    Preserves the order the LLM returned rows in so the sidebar matches
+    the answer's narrative flow, while de-duplicating.
+    """
+    seen: set[int] = set()
+    ids: list[int] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        candidates: list[int] = []
+        for key in ("document_id", "doc_id"):
+            v = row.get(key)
+            if isinstance(v, int):
+                candidates.append(v)
+        # A document row often shows up in SQL without a ``document_id``
+        # column because the query aliases ``documents.id AS id``. Detect
+        # it by the presence of document-specific fields.
+        if ("original_filename" in row or "doc_type" in row):
+            v = row.get("id")
+            if isinstance(v, int):
+                candidates.append(v)
+        for doc_id in candidates:
+            if doc_id not in seen:
+                seen.add(doc_id)
+                ids.append(doc_id)
+    return ids
+
+
+async def _fetch_sources(
+    db: aiosqlite.Connection, doc_ids: list[int]
+) -> list[dict]:
+    """Look up display metadata for the doc ids referenced in a SQL result."""
+    if not doc_ids:
+        return []
+    placeholders = ",".join("?" * len(doc_ids))
+    cursor = await db.execute(
+        f"""SELECT id, original_filename, doc_type, doc_date
+            FROM documents WHERE id IN ({placeholders})""",
+        doc_ids,
+    )
+    by_id = {r["id"]: dict(r) for r in await cursor.fetchall()}
+    # Re-order to match the LLM-narrative order captured in doc_ids.
+    sources: list[dict] = []
+    for doc_id in doc_ids:
+        row = by_id.get(doc_id)
+        if not row:
+            continue
+        sources.append({
+            "id": row["id"],
+            "filename": row["original_filename"],
+            "doc_type": row["doc_type"],
+            "doc_date": row["doc_date"],
+        })
+    return sources
+
+
 async def _user_patient_ids(
     db: aiosqlite.Connection, user_id: int, is_admin: bool,
 ) -> list[int]:
@@ -315,6 +377,12 @@ async def chat_with_rag(
     except Exception:
         logger.warning("SQL generation/execution failed, falling back to context-based chat")
 
+    # Derive source documents from the SQL result. Rows from a ``documents``
+    # query land as sources directly; rows from joined tables (lab_results,
+    # medications, …) carry a ``document_id`` FK we can follow.
+    if sql_result:
+        sources = await _fetch_sources(db, _extract_document_ids(sql_result))
+
     # Build system prompt
     system = CHAT_SYSTEM_PROMPT.format(patient_context=patient_context)
 
@@ -329,14 +397,16 @@ async def chat_with_rag(
     # Get LLM response
     response = await llm.chat(messages, system)
 
-    # Save to history
+    # Save to history — user message has no sources; the assistant row
+    # carries the JSON blob so reloading the conversation keeps the chips.
     await db.execute(
         "INSERT INTO chat_history (user_id, patient_id, role, content) VALUES (?, ?, 'user', ?)",
         (user_id, patient_id, message),
     )
+    sources_json = json.dumps(sources) if sources else None
     await db.execute(
-        "INSERT INTO chat_history (user_id, patient_id, role, content) VALUES (?, ?, 'assistant', ?)",
-        (user_id, patient_id, response),
+        "INSERT INTO chat_history (user_id, patient_id, role, content, sources) VALUES (?, ?, 'assistant', ?, ?)",
+        (user_id, patient_id, response, sources_json),
     )
     await db.commit()
 

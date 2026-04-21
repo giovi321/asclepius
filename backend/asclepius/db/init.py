@@ -137,6 +137,16 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.commit()
         logger.info("Migration: dropped %d legacy columns from patients", _dropped)
 
+    # Chat history carries a JSON blob of source documents on assistant
+    # messages so the UI can show document chips when the history is
+    # reloaded, not just on the live reply.
+    cursor = await db.execute("PRAGMA table_info(chat_history)")
+    chat_cols = [row[1] for row in await cursor.fetchall()]
+    if "sources" not in chat_cols:
+        await db.execute("ALTER TABLE chat_history ADD COLUMN sources TEXT")
+        await db.commit()
+        logger.info("Migration: added sources column to chat_history")
+
     # Add unique constraint on document_links to prevent exact duplicates
     # First deduplicate any existing rows, keeping the oldest
     await db.execute("""

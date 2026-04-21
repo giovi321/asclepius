@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { MessageCircle, Plus, Send } from "lucide-react";
+import { FileText, MessageCircle, Plus, Send } from "lucide-react";
+
+interface ChatSource {
+  id: number;
+  filename: string | null;
+  doc_type: string | null;
+  doc_date: string | null;
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   created_at?: string;
+  sources?: ChatSource[];
 }
 
 export default function ChatPage() {
@@ -39,7 +48,14 @@ export default function ChatPage() {
         patient_id: selectedPatient?.id,
         message: msg,
       });
-      setMessages((m) => [...m, { role: "assistant", content: res.data.response }]);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: res.data.response,
+          sources: Array.isArray(res.data.sources) ? res.data.sources : [],
+        },
+      ]);
     } catch {
       setMessages((m) => [
         ...m,
@@ -108,6 +124,22 @@ export default function ChatPage() {
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
             </div>
+            {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground mt-1">Sources</span>
+                {msg.sources.map((src) => (
+                  <Link
+                    key={src.id}
+                    to={`/documents/${src.id}`}
+                    className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent"
+                    title={[src.doc_type, src.doc_date].filter(Boolean).join(" • ") || "Open document"}
+                  >
+                    <FileText className="h-3 w-3 text-primary" />
+                    <span className="truncate max-w-[240px]">{src.filename || `Document #${src.id}`}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         ))}
         {loading && (

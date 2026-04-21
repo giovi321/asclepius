@@ -1,5 +1,7 @@
 """Chat API routes."""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -52,13 +54,24 @@ async def chat_history(
             raise HTTPException(status_code=403, detail="No access")
 
     cursor = await db.execute(
-        """SELECT id, role, content, created_at FROM chat_history
+        """SELECT id, role, content, sources, created_at FROM chat_history
            WHERE user_id = ? AND (patient_id = ? OR (? IS NULL AND patient_id IS NULL))
            ORDER BY created_at ASC""",
         (current_user["id"], patient_id, patient_id),
     )
-    rows = await cursor.fetchall()
-    return {"messages": [dict(r) for r in rows]}
+    messages = []
+    for r in await cursor.fetchall():
+        d = dict(r)
+        raw = d.pop("sources", None)
+        if raw:
+            try:
+                d["sources"] = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                d["sources"] = []
+        else:
+            d["sources"] = []
+        messages.append(d)
+    return {"messages": messages}
 
 
 @router.delete("/history")

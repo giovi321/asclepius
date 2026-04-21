@@ -18,6 +18,7 @@ flowchart LR
 1. **SQL Generation** -- The LLM generates a SQL query from your natural language question, targeting the structured database tables (documents, lab_results, encounters, medications, etc.)
 2. **Query Execution** -- The generated SQL is executed against the SQLite database
 3. **Answer Generation** -- The LLM uses the query results to compose a natural language answer
+4. **Source Documents** -- Every document referenced in the query result is attached to the reply as a clickable chip. Click a chip to jump to that document's detail page.
 
 ## Usage
 
@@ -37,7 +38,7 @@ flowchart LR
 
 ## Chat History
 
-Chat history is persisted per user and per patient. Previous conversations are loaded when you return to the Chat page. Click **Start new chat** in the header to clear the current conversation — it removes the chat history for the active user/patient pair on the server (`DELETE /api/chat/history`) and empties the visible message list.
+Chat history is persisted per user and per patient, including the source documents attached to each assistant reply — reloading the page restores the links exactly as they were. Click **Start new chat** in the header to clear the current conversation — it removes the chat history for the active user/patient pair on the server (`DELETE /api/chat/history`) and empties the visible message list.
 
 ## Custom System Prompt
 

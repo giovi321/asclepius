@@ -245,6 +245,7 @@ CREATE TABLE IF NOT EXISTS chat_history (
     patient_id INTEGER REFERENCES patients(id),
     role TEXT NOT NULL,  -- 'user' or 'assistant'
     content TEXT NOT NULL,
+    sources TEXT,  -- JSON list of {id, filename, doc_type, doc_date} populated on assistant messages
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

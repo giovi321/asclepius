@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import aiosqlite
 from asclepius.auth.session import get_current_user, hash_password, require_role
 from asclepius.audit.service import audit_log, get_client_ip
-from asclepius.config import get_config, LlmProviderEntry, OcrProviderEntry
+from asclepius.config import get_config, LlmProviderEntry, OcrProviderEntry, VisionLlmProviderEntry
 from asclepius.db.connection import get_db
 
 router = APIRouter()
@@ -195,6 +195,14 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "poll_interval_seconds": config.pipeline.poll_interval_seconds,
             "retry_interval_seconds": config.pipeline.retry_interval_seconds,
             "max_retries": config.pipeline.max_retries,
+            "default_flow": config.pipeline.default_flow,
+        },
+        "vision": {
+            "extraction_timeout": config.vision.extraction_timeout,
+            "max_concurrent_requests": config.vision.max_concurrent_requests,
+            "max_retries": config.vision.max_retries,
+            "retry_backoff_seconds": list(config.vision.retry_backoff_seconds),
+            "provider_count": len([p for p in config.vision.providers if p.enabled]),
         },
         "auth": {
             "session_ttl_hours": config.auth.session_ttl_hours,
@@ -239,6 +247,12 @@ class SettingsUpdate(BaseModel):
     pipeline_poll_interval: int | None = None
     pipeline_retry_interval: int | None = None
     pipeline_max_retries: int | None = None
+    pipeline_default_flow: str | None = None  # "ocr_llm" | "vision_llm"
+    # Vision-LLM
+    vision_extraction_timeout: int | None = None
+    vision_max_concurrent_requests: int | None = None
+    vision_max_retries: int | None = None
+    vision_retry_backoff_seconds: list[int] | None = None
     # Auth
     session_ttl_hours: int | None = None
     # OIDC
@@ -273,6 +287,11 @@ _SETTINGS_MAP = {
     "pipeline_poll_interval": ("pipeline", "poll_interval_seconds", "pipeline.poll_interval_seconds"),
     "pipeline_retry_interval": ("pipeline", "retry_interval_seconds", "pipeline.retry_interval_seconds"),
     "pipeline_max_retries": ("pipeline", "max_retries", "pipeline.max_retries"),
+    "pipeline_default_flow": ("pipeline", "default_flow", "pipeline.default_flow"),
+    "vision_extraction_timeout": ("vision", "extraction_timeout", "vision.extraction_timeout"),
+    "vision_max_concurrent_requests": ("vision", "max_concurrent_requests", "vision.max_concurrent_requests"),
+    "vision_max_retries": ("vision", "max_retries", "vision.max_retries"),
+    "vision_retry_backoff_seconds": ("vision", "retry_backoff_seconds", "vision.retry_backoff_seconds"),
     "session_ttl_hours": ("auth", "session_ttl_hours", "auth.session_ttl_hours"),
     "oidc_enabled": ("oidc", "enabled", "oidc.enabled"),
     "oidc_provider_url": ("oidc", "provider_url", "oidc.provider_url"),
@@ -303,6 +322,9 @@ async def update_settings(
     changes = body.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status_code=400, detail="No settings to update")
+
+    if "pipeline_default_flow" in changes and changes["pipeline_default_flow"] not in ("ocr_llm", "vision_llm"):
+        raise HTTPException(status_code=400, detail="default_flow must be 'ocr_llm' or 'vision_llm'")
 
     config = get_config()
 
@@ -469,6 +491,58 @@ async def update_ocr_providers(
     return {"status": "saved", "count": len(new_providers)}
 
 
+# --- Vision-LLM Providers ---
+
+@router.get("/vision-providers")
+async def get_vision_providers(current_user: dict = Depends(get_current_user)):
+    """Get the ordered list of Vision-LLM providers."""
+    config = get_config()
+    providers = []
+    for p in config.vision.providers:
+        entry = p.model_dump()
+        if entry.get("api_key"):
+            entry["has_api_key"] = True
+            entry["api_key"] = ""
+        else:
+            entry["has_api_key"] = False
+        providers.append(entry)
+    return providers
+
+
+@router.put("/vision-providers")
+async def update_vision_providers(
+    providers: list[dict],
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Replace the full list of Vision-LLM providers. API keys sent as empty string are preserved."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config = get_config()
+    existing_by_id = {p.id: p for p in config.vision.providers}
+
+    new_providers: list[VisionLlmProviderEntry] = []
+    for i, raw in enumerate(providers):
+        pid = raw.get("id", f"vision-{i}")
+        if not raw.get("api_key") and pid in existing_by_id:
+            raw["api_key"] = existing_by_id[pid].api_key
+        raw["id"] = pid
+        new_providers.append(VisionLlmProviderEntry(**raw))
+
+    config.vision.providers = new_providers
+
+    data["vision"] = data.get("vision", {})
+    data["vision"]["providers"] = [p.model_dump() for p in new_providers]
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved", "count": len(new_providers)}
+
+
 # --- Provider testing ---
 
 class TestProviderRequest(BaseModel):
@@ -556,6 +630,33 @@ async def test_ocr_provider(
         else:
             return {"ok": False, "error": f"Unknown provider type: {entry.type}"}
 
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+
+@router.post("/test-vision-provider")
+async def test_vision_provider(
+    body: TestProviderRequest,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Test connectivity to a Vision-LLM provider with a trivial prompt."""
+    config = get_config()
+    entry = next((p for p in config.vision.providers if p.id == body.provider_id), None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    try:
+        # Build a tiny 1x1 white JPEG so every backend round-trips end-to-end.
+        import io as _io, base64 as _b64
+        from PIL import Image as _Image
+        img = _Image.new("RGB", (8, 8), "white")
+        buf = _io.BytesIO()
+        img.save(buf, format="JPEG")
+        b64 = _b64.b64encode(buf.getvalue()).decode("utf-8")
+
+        from asclepius.pipeline.vision_extractor import _vision_call
+        response = await _vision_call(b64, "Reply with exactly: OK", entry)
+        return {"ok": True, "detail": response.strip()[:200]}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
 

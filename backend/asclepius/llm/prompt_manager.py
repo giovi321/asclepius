@@ -14,6 +14,10 @@ PROMPT_REGISTRY = {
         "description": "Phase 1: Document classification and basic metadata extraction",
         "default_attr": "CLASSIFICATION_PROMPT",
     },
+    "vision_extraction": {
+        "description": "Vision-LLM flow: single-step image → OCR + classification + metadata",
+        "default_attr": "VISION_EXTRACTION_PROMPT",
+    },
     "extraction_bloodtest": {
         "description": "Phase 2: Extract lab results from blood test documents",
         "default_key": "bloodtest",

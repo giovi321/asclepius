@@ -69,10 +69,11 @@ class DocumentMoveRequest(BaseModel):
 
 
 class ReprocessRequest(BaseModel):
-    # "ocr", "llm", or "both" — enforced via Literal so a typo yields 422.
-    mode: Literal["ocr", "llm", "both"] = "both"
+    # Enforced via Literal so a typo yields 422.
+    mode: Literal["ocr", "llm", "both", "vision_llm"] = "both"
     llm_provider_id: str | None = None  # optional override
     ocr_provider_id: str | None = None  # optional override
+    vision_provider_id: str | None = None  # optional override, used when mode == 'vision_llm'
 
 
 # ── Failed documents ─────────────────────────────────────────────
@@ -469,6 +470,7 @@ async def reprocess_doc(
         doc_id, config, mode=body.mode,
         llm_provider_id=body.llm_provider_id,
         ocr_provider_id=body.ocr_provider_id,
+        vision_provider_id=body.vision_provider_id,
     ))
     return {"status": "reprocessing", "document_id": doc_id}
 

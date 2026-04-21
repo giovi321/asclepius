@@ -3,7 +3,7 @@ import api from "@/api/client";
 import {
   RotateCcw, Trash2, Power, AlertTriangle, Loader2, Play,
 } from "lucide-react";
-import { SettingsForm, NumberField, useSettingsSave } from "./SettingsFormHelpers";
+import { SettingsForm, NumberField, SelectField, useSettingsSave } from "./SettingsFormHelpers";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 
@@ -30,6 +30,7 @@ export default function PipelineTab() {
         pipeline_poll_interval: res.data.pipeline.poll_interval_seconds,
         pipeline_retry_interval: res.data.pipeline.retry_interval_seconds,
         pipeline_max_retries: res.data.pipeline.max_retries,
+        pipeline_default_flow: res.data.pipeline.default_flow || "ocr_llm",
         session_ttl_hours: res.data.auth.session_ttl_hours,
       });
     });
@@ -187,8 +188,16 @@ export default function PipelineTab() {
           pipeline_poll_interval: f.pipeline_poll_interval !== s.pipeline.poll_interval_seconds ? f.pipeline_poll_interval : undefined,
           pipeline_retry_interval: f.pipeline_retry_interval !== s.pipeline.retry_interval_seconds ? f.pipeline_retry_interval : undefined,
           pipeline_max_retries: f.pipeline_max_retries !== s.pipeline.max_retries ? f.pipeline_max_retries : undefined,
+          pipeline_default_flow: f.pipeline_default_flow !== (s.pipeline.default_flow || "ocr_llm") ? f.pipeline_default_flow : undefined,
           session_ttl_hours: f.session_ttl_hours !== s.auth.session_ttl_hours ? f.session_ttl_hours : undefined,
         })}>
+        <SelectField label="Default Processing Flow"
+          value={f.pipeline_default_flow || "ocr_llm"}
+          onChange={(v) => setF({ ...f, pipeline_default_flow: v })}
+          options={[
+            { value: "ocr_llm", label: "OCR + LLM (text pipeline)" },
+            { value: "vision_llm", label: "Vision-LLM (single-step)" },
+          ]} />
         <NumberField label="Poll Interval (seconds)" value={f.pipeline_poll_interval}
           onChange={(v) => setF({ ...f, pipeline_poll_interval: v })} min={1} max={60} step={1} />
         <NumberField label="Retry Interval (seconds)" value={f.pipeline_retry_interval}

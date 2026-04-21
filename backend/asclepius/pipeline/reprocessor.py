@@ -20,13 +20,22 @@ async def reprocess_document(
     mode: str = "both",
     llm_provider_id: str | None = None,
     ocr_provider_id: str | None = None,
+    vision_provider_id: str | None = None,
 ) -> dict:
     """Re-run OCR and/or LLM extraction on an existing document.
 
-    mode: "ocr" = re-OCR only, "llm" = re-extract only, "both" = full reprocess.
+    mode:
+        "ocr"        — re-OCR only
+        "llm"        — re-extract only
+        "both"       — full reprocess (OCR + LLM)
+        "vision_llm" — run the Vision-LLM flow (single-step OCR+extraction)
+
     llm_provider_id: if set, use this specific LLM provider instead of the default.
     ocr_provider_id: if set, use this specific OCR provider instead of the default.
+    vision_provider_id: if set and mode == 'vision_llm', prefer this vision provider.
     """
+    if mode == "vision_llm":
+        return await _reprocess_vision_llm(doc_id, config, vision_provider_id)
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA journal_mode=WAL")
@@ -213,6 +222,130 @@ async def reprocess_document(
 
         except Exception as e:
             logger.exception("Reprocessing failed for doc %d", doc_id)
+            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
+            await db.execute(
+                """UPDATE documents SET status = 'failed', error_message = ?,
+                   retry_count = COALESCE(retry_count, 0) + 1,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (error_msg[:2000], doc_id),
+            )
+            await db.commit()
+            return {"error": str(e)}
+
+
+async def _reprocess_vision_llm(
+    doc_id: int, config: AppConfig, vision_provider_id: str | None,
+) -> dict:
+    """Re-run the single-step Vision-LLM flow on a document.
+
+    Overwrites OCR fields AND extraction data — this is a full replacement,
+    equivalent to running ``mode == 'both'`` but through the vision pipeline.
+    """
+    from asclepius.pipeline.vision_extractor import extract_with_vision
+    from asclepius.pipeline.extractor import (
+        extract_and_store, _salvage_classification, _normalize_doc_type,
+    )
+
+    async with aiosqlite.connect(config.database.path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA foreign_keys=ON")
+
+        cursor = await db.execute(
+            "SELECT id, file_path FROM documents WHERE id = ?", (doc_id,),
+        )
+        doc = await cursor.fetchone()
+        if not doc:
+            return {"error": "Document not found"}
+
+        file_path = Path(config.vault.root_path) / doc["file_path"]
+        if not file_path.exists():
+            await db.execute(
+                """UPDATE documents SET status = 'failed', error_message = 'File not found on disk',
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (doc_id,),
+            )
+            await db.commit()
+            return {"error": f"File not found: {doc['file_path']}"}
+
+        await db.execute(
+            """UPDATE documents SET status = 'processing', error_message = NULL,
+               updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+            (doc_id,),
+        )
+        await db.commit()
+
+        # Clear previous extraction state before re-running
+        for table in ["lab_results", "encounters", "medications", "vaccinations",
+                      "invoice_items", "document_sections"]:
+            await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
+        await db.execute(
+            """UPDATE documents SET
+               doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
+               language_source = NULL, summary_en = NULL, summary_original = NULL,
+               doctor_id = NULL, doctor_name = NULL, facility_id = NULL, facility_name = NULL,
+               specialty_original = NULL, norm_specialty_id = NULL,
+               cost_amount = NULL, cost_currency = NULL,
+               insurance_company = NULL, insurance_policy = NULL,
+               raw_extraction = NULL, llm_provider = NULL,
+               updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (doc_id,),
+        )
+        await db.commit()
+
+        logger.info("Re-running Vision-LLM flow on doc %d (provider=%s)",
+                    doc_id, vision_provider_id or "default")
+        try:
+            ocr_text, confidence, engine, vision_result = await extract_with_vision(
+                str(file_path), config, provider_override_id=vision_provider_id,
+            )
+            await db.execute(
+                """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
+                   updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (ocr_text, confidence, engine, doc_id),
+            )
+            await db.commit()
+            try:
+                await cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
+            except Exception:
+                pass
+
+            if not ocr_text.strip() and not vision_result:
+                await db.execute(
+                    """UPDATE documents SET status = 'needs_review',
+                       error_message = 'Vision-LLM produced no content',
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (doc_id,),
+                )
+                await db.commit()
+                return {"error": "Vision-LLM produced no content"}
+
+            _salvage_classification(vision_result)
+            vision_result["doc_type"] = _normalize_doc_type(vision_result.get("doc_type", "other"))
+
+            llm = get_llm_provider(config)
+            extraction = await extract_and_store(
+                db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
+            )
+            if "error" in extraction:
+                await db.execute(
+                    """UPDATE documents SET status = 'failed', error_message = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                    (str(extraction.get("error", "extraction failed"))[:2000], doc_id),
+                )
+                await db.commit()
+                return extraction
+
+            await db.execute(
+                "UPDATE documents SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (doc_id,),
+            )
+            await db.commit()
+            return {"status": "done", "document_id": doc_id}
+
+        except Exception as e:
+            logger.exception("Vision-LLM reprocessing failed for doc %d", doc_id)
             error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
             await db.execute(
                 """UPDATE documents SET status = 'failed', error_message = ?,

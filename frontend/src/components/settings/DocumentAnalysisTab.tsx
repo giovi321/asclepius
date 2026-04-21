@@ -1,12 +1,14 @@
 import { useState } from "react";
 import LlmProvidersTab from "./LlmProvidersTab";
 import OcrProvidersTab from "./OcrProvidersTab";
+import VisionLlmProvidersTab from "./VisionLlmProvidersTab";
 import PromptsTab from "./PromptsTab";
 import NormalizationTab from "./NormalizationTab";
 
 const SUB_TABS = [
   { key: "llm", label: "LLM Providers" },
   { key: "ocr", label: "OCR Providers" },
+  { key: "vision", label: "Vision-LLM Providers" },
   { key: "prompts", label: "Prompts" },
   { key: "normalization", label: "Normalization" },
 ] as const;
@@ -36,6 +38,7 @@ export default function DocumentAnalysisTab() {
 
       {subTab === "llm" && <LlmProvidersTab />}
       {subTab === "ocr" && <OcrProvidersTab />}
+      {subTab === "vision" && <VisionLlmProvidersTab />}
       {subTab === "prompts" && <PromptsTab />}
       {subTab === "normalization" && <NormalizationTab />}
     </div>

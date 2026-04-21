@@ -94,7 +94,7 @@ class OidcConfig(BaseModel):
 class OcrProviderEntry(BaseModel):
     """A single OCR provider configuration."""
     id: str = ""
-    type: str = "tesseract"  # tesseract, tesseract_remote, llm_vision, vision_extraction, google_vision
+    type: str = "tesseract"  # tesseract, tesseract_remote, llm_vision, google_vision
     name: str = ""
     enabled: bool = True
     priority: int = 1
@@ -125,6 +125,24 @@ class LlmProviderEntry(BaseModel):
     model: str = "llama3.1"
     api_key: str = ""
     timeout: int = 120
+
+
+class VisionLlmProviderEntry(BaseModel):
+    """A single Vision-LLM provider configuration.
+
+    Vision-LLM providers receive page images directly and return both the
+    OCR'd text AND the structured classification/extraction in a single call,
+    as an alternative to the OCR + text-LLM pipeline.
+    """
+    id: str = ""
+    type: str = "claude"  # claude, openai, ollama
+    name: str = ""
+    enabled: bool = True
+    priority: int = 1
+    base_url: str = ""
+    model: str = ""
+    api_key: str = ""
+    timeout: int = 600
 
 
 class OcrConfig(BaseModel):
@@ -165,11 +183,25 @@ class LlmConfig(BaseModel):
     canonical_language: str = "English"
 
 
+class VisionConfig(BaseModel):
+    """Vision-LLM flow configuration — alternative to OCR + text-LLM."""
+    extraction_timeout: int = 600
+    max_concurrent_requests: int = 2
+    max_retries: int = 3
+    retry_backoff_seconds: list[int] = [30, 60, 120]
+    # Ordered provider list — tried in priority order.
+    providers: list[VisionLlmProviderEntry] = []
+
+
 class PipelineConfig(BaseModel):
     watch_enabled: bool = True
     poll_interval_seconds: int = 5
     retry_interval_seconds: int = 300
     max_retries: int = 3
+    # Which extraction flow new uploads use by default: "ocr_llm" runs OCR
+    # then a text LLM; "vision_llm" sends page images to a vision LLM for
+    # single-step OCR+extraction. Per-document reprocess overrides this.
+    default_flow: str = "ocr_llm"
 
 
 class AppConfig(BaseModel):
@@ -180,6 +212,7 @@ class AppConfig(BaseModel):
     oidc: OidcConfig = OidcConfig()
     ocr: OcrConfig = OcrConfig()
     llm: LlmConfig = LlmConfig()
+    vision: VisionConfig = VisionConfig()
     pipeline: PipelineConfig = PipelineConfig()
 
 
@@ -229,6 +262,61 @@ def _migrate_legacy_llm_yaml(data: dict) -> bool:
     return migrated
 
 
+def _migrate_vision_extraction_ocr_yaml(data: dict) -> bool:
+    """Move any ``ocr.providers`` entries with ``type == 'vision_extraction'``
+    into ``vision.providers``. The vision flow is now a first-class sibling of
+    OCR and LLM, so these entries no longer belong under OCR.
+
+    Returns True if a migration was performed. The YAML is mutated in place —
+    caller is responsible for persisting it.
+    """
+    ocr = data.get("ocr")
+    if not isinstance(ocr, dict):
+        return False
+    ocr_providers = ocr.get("providers")
+    if not isinstance(ocr_providers, list) or not ocr_providers:
+        return False
+
+    to_migrate = [p for p in ocr_providers if isinstance(p, dict) and p.get("type") == "vision_extraction"]
+    if not to_migrate:
+        return False
+
+    vision = data.setdefault("vision", {})
+    vision_providers = vision.setdefault("providers", [])
+    existing_ids = {p.get("id") for p in vision_providers if isinstance(p, dict)}
+
+    for src in to_migrate:
+        vp_type = src.get("llm_provider") or "claude"
+        mapped = {
+            "id": src.get("id", ""),
+            "type": vp_type if vp_type in ("claude", "openai", "ollama") else "claude",
+            "name": src.get("name", ""),
+            "enabled": src.get("enabled", True),
+            "priority": src.get("priority", len(vision_providers) + 1),
+            "base_url": src.get("llm_base_url", ""),
+            "model": src.get("llm_model", ""),
+            "api_key": src.get("llm_api_key", ""),
+            "timeout": 600,
+        }
+        if mapped["id"] in existing_ids:
+            continue
+        vision_providers.append(mapped)
+        existing_ids.add(mapped["id"])
+
+    ocr["providers"] = [p for p in ocr_providers if not (isinstance(p, dict) and p.get("type") == "vision_extraction")]
+    data["ocr"] = ocr
+    data["vision"] = vision
+    return True
+
+
+def _persist_yaml(data: dict) -> None:
+    """Write the raw YAML dict back to disk at ASCLEPIUS_CONFIG_PATH."""
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+
 def _first_enabled_llm(config: "AppConfig") -> LlmProviderEntry | None:
     enabled = [p for p in config.llm.providers if p.enabled]
     if enabled:
@@ -273,6 +361,9 @@ def load_config() -> AppConfig:
     # Pre-validation migration: strip legacy LLM keys before pydantic sees them.
     migrated_llm = _migrate_legacy_llm_yaml(data)
 
+    # Pre-validation migration: move vision_extraction OCR entries to vision.providers.
+    migrated_vision = _migrate_vision_extraction_ocr_yaml(data)
+
     config = AppConfig(**data)
 
     if migrated_llm:
@@ -280,6 +371,14 @@ def load_config() -> AppConfig:
             "settings.yaml used pre-0.6 flat llm.* fields; they were auto-migrated "
             "to llm.providers[]. Save settings from the webui to persist the new layout.",
         )
+    if migrated_vision:
+        try:
+            _persist_yaml(data)
+            logger.info(
+                "Migrated vision_extraction OCR providers to vision.providers — YAML persisted.",
+            )
+        except Exception:
+            logger.exception("Failed to persist vision migration — in-memory migration still applied")
 
     # Environment variable overrides
     if env := os.environ.get("ASCLEPIUS_ENV"):
@@ -364,6 +463,17 @@ def get_active_llm_provider_config(config: AppConfig, priority: int = 1) -> LlmP
     """
     enabled = sorted(
         [p for p in config.llm.providers if p.enabled],
+        key=lambda p: p.priority,
+    )
+    if 0 < priority <= len(enabled):
+        return enabled[priority - 1]
+    return None
+
+
+def get_active_vision_provider_config(config: AppConfig, priority: int = 1) -> VisionLlmProviderEntry | None:
+    """Get the enabled Vision-LLM provider at the given priority rank (1-based)."""
+    enabled = sorted(
+        [p for p in config.vision.providers if p.enabled],
         key=lambda p: p.priority,
     )
     if 0 < priority <= len(enabled):

@@ -137,6 +137,19 @@ export interface OcrProvider {
   has_google_vision_key?: boolean;
 }
 
+export interface VisionLlmProvider {
+  id: string;
+  type: string;   // claude | openai | ollama
+  name: string;
+  enabled: boolean;
+  priority: number;
+  base_url: string;
+  model: string;
+  api_key: string;
+  timeout: number;
+  has_api_key?: boolean;
+}
+
 // ─── Patient ───────────────────────────────────────────
 
 export interface Patient {

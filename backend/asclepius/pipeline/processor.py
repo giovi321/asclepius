@@ -228,85 +228,147 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
-            # ── OCR phase ────────────────────────────────────────────
-            pipeline_status["processing_step"] = "ocr"
-            pipeline_status["processing_doc_id"] = doc_id
-            pipeline_status["processing_pages"] = page_count
-            logger.info("Running OCR on doc %d: %s", doc_id, path.name)
+            # ── Resolve flow ─────────────────────────────────────────
+            # New uploads use the configured default flow. Reprocess requests
+            # explicitly pass a mode through reprocess_document, not this path.
+            flow = (config.pipeline.default_flow or "ocr_llm").lower()
+            if flow == "vision_llm" and not config.vision.providers:
+                logger.warning(
+                    "default_flow is 'vision_llm' but no vision providers configured — "
+                    "falling back to ocr_llm for doc %d", doc_id,
+                )
+                flow = "ocr_llm"
 
             import asyncio as _asyncio
             ocr_text, confidence, engine = "", 0.0, "none"
-            for ocr_attempt in range(3):
+
+            if flow == "vision_llm":
+                # ── Vision-LLM flow ─────────────────────────────────
+                pipeline_status["processing_step"] = "vision_extraction"
+                pipeline_status["processing_doc_id"] = doc_id
+                pipeline_status["processing_pages"] = page_count
+                logger.info("Running Vision-LLM extraction on doc %d: %s", doc_id, path.name)
+
+                from asclepius.pipeline.vision_extractor import extract_with_vision
+                ocr_text, confidence, engine, vision_result = await extract_with_vision(
+                    file_path, config,
+                )
+
+                await db.execute(
+                    """UPDATE documents SET
+                       ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
+                       status = 'processing', updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (ocr_text, confidence, engine, doc_id),
+                )
+                await db.commit()
+
                 try:
-                    ocr_text, confidence, engine = await extract_text(file_path, config)
-                    break
-                except Exception as ocr_err:
-                    if ocr_attempt < 2:
-                        wait = 60 * (ocr_attempt + 1)
-                        logger.warning(
-                            "OCR failed for doc %d (%s, attempt %d/3): %s — retrying in %ds",
-                            doc_id, path.name, ocr_attempt + 1, ocr_err, wait,
-                        )
-                        await _asyncio.sleep(wait)
-                    else:
-                        logger.error("OCR failed after 3 attempts for doc %d: %s", doc_id, ocr_err)
-                        raise
+                    await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
+                except Exception:
+                    logger.warning("Failed to cache OCR pages for doc %d (non-fatal)", doc_id)
 
-            await db.execute(
-                """UPDATE documents SET
-                   ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
-                   status = 'processing', updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ?""",
-                (ocr_text, confidence, engine, doc_id),
-            )
-            await db.commit()
+                if not ocr_text.strip() and not vision_result:
+                    logger.warning("Vision extraction returned nothing for %s", path.name)
+                    await db.execute(
+                        "UPDATE documents SET status = 'needs_review' WHERE id = ?", (doc_id,)
+                    )
+                    await db.commit()
+                    pipeline_status["total_processed"] += 1
+                    pipeline_status["last_processed"] = path.name
+                    return
 
-            # Cache per-page OCR text
-            try:
-                await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
-            except Exception:
-                logger.warning("Failed to cache OCR pages for doc %d (non-fatal)", doc_id)
+                # Check cancellation before the DB-write phase
+                if doc_id in cancelled_docs:
+                    cancelled_docs.discard(doc_id)
+                    await db.execute(
+                        "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (doc_id,),
+                    )
+                    await db.commit()
+                    logger.info("Processing cancelled for doc %d", doc_id)
+                    pipeline_status["processing"] = None
+                    return
 
-            if not ocr_text.strip():
-                logger.warning("No text extracted from %s", path.name)
-                await db.execute(
-                    "UPDATE documents SET status = 'needs_review' WHERE id = ?", (doc_id,)
-                )
-                await db.commit()
-                pipeline_status["total_processed"] += 1
-                pipeline_status["last_processed"] = path.name
-                return
-
-            # Check confidence
-            if confidence < config.ocr.confidence_threshold:
-                logger.warning(
-                    "Low OCR confidence (%.2f) for %s", confidence, path.name
-                )
-
-            # Check cancellation before LLM extraction
-            if doc_id in cancelled_docs:
-                cancelled_docs.discard(doc_id)
-                await db.execute(
-                    "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (doc_id,),
-                )
-                await db.commit()
-                logger.info("Processing cancelled for doc %d", doc_id)
-                pipeline_status["processing"] = None
-                return
-
-            # ── Check for vision extraction (single-step — OCR + extraction already done) ──
-            from asclepius.pipeline.ocr import _vision_extraction_results
-            vision_result = _vision_extraction_results.pop(file_path, None)
-            if vision_result:
-                logger.info("Using vision extraction result for doc %d (skipping LLM phase)", doc_id)
                 pipeline_status["processing_step"] = "llm_extraction"
-                from asclepius.pipeline.extractor import extract_and_store, _salvage_classification, _normalize_doc_type
+                from asclepius.pipeline.extractor import (
+                    extract_and_store, _salvage_classification, _normalize_doc_type,
+                )
                 _salvage_classification(vision_result)
                 vision_result["doc_type"] = _normalize_doc_type(vision_result.get("doc_type", "other"))
+                # A text LLM is still needed downstream (AI filename, type-specific
+                # DB inserts). Pick the default one; pipeline can still complete
+                # with a no-op LLM because extract_and_store honors the override.
                 llm = get_llm_provider(config)
-                extraction = await extract_and_store(db, llm, doc_id, ocr_text, config, extraction_override=vision_result)
+                extraction = await extract_and_store(
+                    db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
+                )
             else:
+                # ── OCR phase ────────────────────────────────────────────
+                pipeline_status["processing_step"] = "ocr"
+                pipeline_status["processing_doc_id"] = doc_id
+                pipeline_status["processing_pages"] = page_count
+                logger.info("Running OCR on doc %d: %s", doc_id, path.name)
+
+                for ocr_attempt in range(3):
+                    try:
+                        ocr_text, confidence, engine = await extract_text(file_path, config)
+                        break
+                    except Exception as ocr_err:
+                        if ocr_attempt < 2:
+                            wait = 60 * (ocr_attempt + 1)
+                            logger.warning(
+                                "OCR failed for doc %d (%s, attempt %d/3): %s — retrying in %ds",
+                                doc_id, path.name, ocr_attempt + 1, ocr_err, wait,
+                            )
+                            await _asyncio.sleep(wait)
+                        else:
+                            logger.error("OCR failed after 3 attempts for doc %d: %s", doc_id, ocr_err)
+                            raise
+
+                await db.execute(
+                    """UPDATE documents SET
+                       ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
+                       status = 'processing', updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (ocr_text, confidence, engine, doc_id),
+                )
+                await db.commit()
+
+                # Cache per-page OCR text
+                try:
+                    await _cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
+                except Exception:
+                    logger.warning("Failed to cache OCR pages for doc %d (non-fatal)", doc_id)
+
+                if not ocr_text.strip():
+                    logger.warning("No text extracted from %s", path.name)
+                    await db.execute(
+                        "UPDATE documents SET status = 'needs_review' WHERE id = ?", (doc_id,)
+                    )
+                    await db.commit()
+                    pipeline_status["total_processed"] += 1
+                    pipeline_status["last_processed"] = path.name
+                    return
+
+                # Check confidence
+                if confidence < config.ocr.confidence_threshold:
+                    logger.warning(
+                        "Low OCR confidence (%.2f) for %s", confidence, path.name
+                    )
+
+                # Check cancellation before LLM extraction
+                if doc_id in cancelled_docs:
+                    cancelled_docs.discard(doc_id)
+                    await db.execute(
+                        "UPDATE documents SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (doc_id,),
+                    )
+                    await db.commit()
+                    logger.info("Processing cancelled for doc %d", doc_id)
+                    pipeline_status["processing"] = None
+                    return
+
                 # ── Standard LLM extraction phase ─────────────────────────────
                 pipeline_status["processing_step"] = "llm_extraction"
                 logger.info("Running LLM extraction on doc %d", doc_id)

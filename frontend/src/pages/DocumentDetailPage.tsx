@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
-  RefreshCw, FileText, TestTube, Pill, Syringe, Stethoscope, Download,
+  RefreshCw, FileText, Pill, Syringe, Stethoscope, Download,
   Trash2, Plus, X, Link2, Search, ChevronDown,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
@@ -12,6 +12,7 @@ import {
   OcrSection, TechnicalDetails, getSectionTypeStyle, MedFormBadge,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
+import LabResultsEditor from "@/components/document-detail/LabResultsEditor";
 import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -60,9 +61,11 @@ export default function DocumentDetailPage() {
   const [showReprocessMenu, setShowReprocessMenu] = useState(false);
   const [llmProviders, setLlmProviders] = useState<any[]>([]);
   const [ocrProviders, setOcrProviders] = useState<any[]>([]);
+  const [visionProviders, setVisionProviders] = useState<any[]>([]);
   const [reprocessMode, setReprocessMode] = useState("both");
   const [reprocessLlmProvider, setReprocessLlmProvider] = useState("");
   const [reprocessOcrProvider, setReprocessOcrProvider] = useState("");
+  const [reprocessVisionProvider, setReprocessVisionProvider] = useState("");
   const reprocessRef = useRef<HTMLDivElement>(null);
 
   // Load providers once
@@ -72,6 +75,9 @@ export default function DocumentDetailPage() {
     }).catch(() => {});
     api.get("/settings/ocr-providers").then((res: any) => {
       setOcrProviders((res.data || []).filter((p: any) => p.enabled));
+    }).catch(() => {});
+    api.get("/settings/vision-providers").then((res: any) => {
+      setVisionProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});
   }, []);
 
@@ -93,6 +99,7 @@ export default function DocumentDetailPage() {
       mode: reprocessMode,
       ...(reprocessLlmProvider ? { llm_provider_id: reprocessLlmProvider } : {}),
       ...(reprocessOcrProvider ? { ocr_provider_id: reprocessOcrProvider } : {}),
+      ...(reprocessVisionProvider ? { vision_provider_id: reprocessVisionProvider } : {}),
     });
     await loadDoc(false);
   };
@@ -277,16 +284,17 @@ export default function DocumentDetailPage() {
               {showReprocessMenu && (
                 <div className="absolute right-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3">
                   <p className="text-xs font-medium text-muted-foreground">What to reprocess</p>
-                  <div className="flex gap-1">
+                  <div className="grid grid-cols-2 gap-1">
                     {[
                       { value: "both", label: "OCR + LLM" },
                       { value: "ocr", label: "OCR only" },
                       { value: "llm", label: "LLM only" },
+                      { value: "vision_llm", label: "Vision-LLM" },
                     ].map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => setReprocessMode(opt.value)}
-                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                        className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
                           reprocessMode === opt.value
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground hover:text-foreground"
@@ -297,45 +305,72 @@ export default function DocumentDetailPage() {
                     ))}
                   </div>
 
-                  {reprocessMode !== "llm" && ocrProviders.length > 0 && (
+                  {reprocessMode === "vision_llm" ? (
                     <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
-                      <select
-                        value={reprocessOcrProvider}
-                        onChange={(e) => setReprocessOcrProvider(e.target.value)}
-                        className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                      >
-                        <option value="">Default (highest priority)</option>
-                        {ocrProviders.map((p: any) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name || p.id}
-                          </option>
-                        ))}
-                      </select>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Vision-LLM Provider</p>
+                      {visionProviders.length === 0 ? (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          No Vision-LLM providers enabled. Add one under Settings → Document Analysis → Vision-LLM Providers.
+                        </p>
+                      ) : (
+                        <select
+                          value={reprocessVisionProvider}
+                          onChange={(e) => setReprocessVisionProvider(e.target.value)}
+                          className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                        >
+                          <option value="">Default (highest priority)</option>
+                          {visionProviders.map((p: any) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name || p.id}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {reprocessMode !== "llm" && ocrProviders.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
+                          <select
+                            value={reprocessOcrProvider}
+                            onChange={(e) => setReprocessOcrProvider(e.target.value)}
+                            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                          >
+                            <option value="">Default (highest priority)</option>
+                            {ocrProviders.map((p: any) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name || p.id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                  {reprocessMode !== "ocr" && llmProviders.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
-                      <select
-                        value={reprocessLlmProvider}
-                        onChange={(e) => setReprocessLlmProvider(e.target.value)}
-                        className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                      >
-                        <option value="">Default (highest priority)</option>
-                        {llmProviders.map((p: any) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name || p.id}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {reprocessMode !== "ocr" && llmProviders.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
+                          <select
+                            value={reprocessLlmProvider}
+                            onChange={(e) => setReprocessLlmProvider(e.target.value)}
+                            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                          >
+                            <option value="">Default (highest priority)</option>
+                            {llmProviders.map((p: any) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name || p.id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <button
                     onClick={() => handleReprocess()}
-                    className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    disabled={reprocessMode === "vision_llm" && visionProviders.length === 0}
+                    className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     Start Reprocessing
                   </button>
@@ -454,34 +489,14 @@ export default function DocumentDetailPage() {
           }} />
 
           {/* Lab Results */}
-          {doc.lab_results?.length > 0 && (
-            <Section title="Lab Results" icon={TestTube}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-1 text-left font-medium">Test</th>
-                    <th className="py-1 text-left font-medium">Value</th>
-                    <th className="py-1 text-left font-medium">Unit</th>
-                    <th className="py-1 text-left font-medium">Ref</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {doc.lab_results.map((lr: any) => (
-                    <tr key={lr.id} className={lr.is_abnormal ? "text-red-600" : ""}>
-                      <td className="py-1">{lr.test_name_original}</td>
-                      <td className="py-1 font-medium">{lr.value ?? lr.value_text ?? "\u2014"}</td>
-                      <td className="py-1">{lr.unit || ""}</td>
-                      <td className="py-1 text-muted-foreground">
-                        {lr.reference_range_low != null && lr.reference_range_high != null
-                          ? `${lr.reference_range_low}\u2013${lr.reference_range_high}`
-                          : "\u2014"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Section>
-          )}
+          <LabResultsEditor
+            docId={doc.id}
+            patientId={doc.patient_id}
+            docType={doc.doc_type}
+            labResults={doc.lab_results || []}
+            onChange={() => loadDoc(false)}
+          />
+
 
           {/* Encounters */}
           {doc.encounters?.length > 0 && (

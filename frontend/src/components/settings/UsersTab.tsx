@@ -1,20 +1,57 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { Plus, Trash2, ScrollText } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
+import { Plus, Trash2, ScrollText, UserCog, X, Check } from "lucide-react";
+
+interface Patient {
+  id: number;
+  display_name: string;
+  slug?: string;
+}
+
+interface Grant {
+  id: number;
+  display_name: string;
+  role: string;
+}
 
 export default function UsersTab() {
   const confirm = useConfirm();
+  const { toast } = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", password: "", display_name: "", role: "editor" });
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  // Map of user_id → their current access grants. Loaded in parallel on mount.
+  const [grants, setGrants] = useState<Record<number, Grant[]>>({});
   const [auditLog, setAuditLog] = useState<any[]>([]);
   const [showAudit, setShowAudit] = useState(false);
   const [auditTotal, setAuditTotal] = useState(0);
+  // User id whose access modal is currently open, null otherwise.
+  const [accessForUser, setAccessForUser] = useState<number | null>(null);
+
+  const loadUsers = async () => {
+    const res = await api.get("/settings/users");
+    const list: any[] = res.data || [];
+    setUsers(list);
+    // Fetch every user's grants in parallel so the row chips and the modal
+    // open without additional round-trips.
+    const entries = await Promise.all(
+      list.map(async (u) => {
+        try {
+          const r = await api.get(`/settings/users/${u.id}/access`);
+          return [u.id, (r.data || []) as Grant[]] as const;
+        } catch {
+          return [u.id, [] as Grant[]] as const;
+        }
+      }),
+    );
+    setGrants(Object.fromEntries(entries));
+  };
 
   useEffect(() => {
-    api.get("/settings/users").then((res) => setUsers(res.data)).catch(() => {});
+    loadUsers().catch(() => {});
     api.get("/patients").then((res) => setPatients(Array.isArray(res.data) ? res.data : [])).catch(() => {});
   }, []);
 
@@ -30,8 +67,7 @@ export default function UsersTab() {
     await api.post("/settings/users", newUser);
     setNewUser({ username: "", password: "", display_name: "", role: "editor" });
     setShowCreate(false);
-    const res = await api.get("/settings/users");
-    setUsers(res.data);
+    await loadUsers();
   };
 
   const deleteUser = async (id: number) => {
@@ -43,6 +79,7 @@ export default function UsersTab() {
     if (!ok) return;
     await api.delete(`/settings/users/${id}`);
     setUsers(users.filter((u) => u.id !== id));
+    setGrants((g) => { const next = { ...g }; delete next[id]; return next; });
   };
 
   const updateRole = async (userId: number, role: string) => {
@@ -50,15 +87,11 @@ export default function UsersTab() {
     setUsers(users.map((u) => u.id === userId ? { ...u, role } : u));
   };
 
-  const grantAccess = async (userId: number, patientId: number) => {
-    await api.post(`/settings/users/${userId}/access`, { patient_id: patientId, role: "viewer" });
-  };
-
-  const roleColor = (role: string) => {
+  const roleBadgeClass = (role: string) => {
     switch (role) {
-      case "admin": return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-      case "editor": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-      case "viewer": return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
+      case "admin": return "bg-red-500/15 text-red-700 dark:text-red-300";
+      case "editor": return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
+      case "viewer": return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -114,42 +147,88 @@ export default function UsersTab() {
               <th className="px-4 py-2 text-left font-medium">Display Name</th>
               <th className="px-4 py-2 text-left font-medium">Role</th>
               <th className="px-4 py-2 text-left font-medium">Created</th>
-              <th className="px-4 py-2 text-left font-medium">Grant Access</th>
+              <th className="px-4 py-2 text-left font-medium">Patient Access</th>
               <th className="px-4 py-2 text-left font-medium"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-2 font-medium">{u.username}</td>
-                <td className="px-4 py-2">{u.display_name}</td>
-                <td className="px-4 py-2">
-                  <select value={u.role || "editor"}
-                    onChange={(e) => updateRole(u.id, e.target.value)}
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium border-0 cursor-pointer ${roleColor(u.role || "editor")}`}>
-                    <option value="admin">Admin</option>
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{u.created_at?.split("T")[0]}</td>
-                <td className="px-4 py-2">
-                  <select className="rounded border bg-background px-2 py-1 text-xs" defaultValue=""
-                    onChange={(e) => { if (e.target.value) grantAccess(u.id, Number(e.target.value)); e.target.value = ""; }}>
-                    <option value="">Grant patient...</option>
-                    {patients.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
-                  </select>
-                </td>
-                <td className="px-4 py-2">
-                  <button onClick={() => deleteUser(u.id)} className="rounded p-1 text-muted-foreground hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {users.map((u) => {
+              const userGrants = grants[u.id] || [];
+              return (
+                <tr key={u.id}>
+                  <td className="px-4 py-2 font-medium">{u.username}</td>
+                  <td className="px-4 py-2">{u.display_name}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClass(u.role || "editor")}`}>
+                        {u.role || "editor"}
+                      </span>
+                      <select
+                        value={u.role || "editor"}
+                        onChange={(e) => updateRole(u.id, e.target.value)}
+                        className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+                        title="Change role"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{u.created_at?.split("T")[0]}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {u.role === "admin" ? (
+                        <span className="text-xs italic text-muted-foreground">all patients (admin)</span>
+                      ) : userGrants.length === 0 ? (
+                        <span className="text-xs italic text-muted-foreground">no access</span>
+                      ) : (
+                        <>
+                          {userGrants.slice(0, 3).map((g) => (
+                            <span key={g.id} className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs">
+                              {g.display_name}
+                              <span className="text-[10px] text-muted-foreground">({g.role})</span>
+                            </span>
+                          ))}
+                          {userGrants.length > 3 && (
+                            <span className="text-xs text-muted-foreground">+{userGrants.length - 3} more</span>
+                          )}
+                        </>
+                      )}
+                      <button
+                        onClick={() => setAccessForUser(u.id)}
+                        className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
+                      >
+                        <UserCog className="h-3 w-3" /> Manage
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <button onClick={() => deleteUser(u.id)} className="rounded p-1 text-muted-foreground hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* Access management modal */}
+      {accessForUser !== null && (
+        <AccessModal
+          user={users.find((u) => u.id === accessForUser)}
+          patients={patients}
+          initialGrants={grants[accessForUser] || []}
+          onClose={() => setAccessForUser(null)}
+          onSaved={async (updated) => {
+            setGrants((g) => ({ ...g, [accessForUser]: updated }));
+            setAccessForUser(null);
+          }}
+          toast={toast}
+        />
+      )}
 
       {/* Audit Log */}
       {showAudit && (
@@ -193,6 +272,217 @@ export default function UsersTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// ── Access management modal ──────────────────────────────────────
+
+interface AccessModalProps {
+  user: any;
+  patients: Patient[];
+  initialGrants: Grant[];
+  onClose: () => void;
+  onSaved: (updated: Grant[]) => void | Promise<void>;
+  toast: (args: { title: string; description?: string; variant?: "default" | "error" }) => void;
+}
+
+function AccessModal({ user, patients, initialGrants, onClose, onSaved, toast }: AccessModalProps) {
+  // patient_id → role (undefined means no access)
+  const initialMap = useMemo(
+    () => Object.fromEntries(initialGrants.map((g) => [g.id, g.role])) as Record<number, string>,
+    [initialGrants],
+  );
+  const [selection, setSelection] = useState<Record<number, string>>(initialMap);
+  const [filter, setFilter] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  if (!user) return null;
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return patients;
+    return patients.filter((p) => p.display_name.toLowerCase().includes(q));
+  }, [patients, filter]);
+
+  const toggle = (id: number) => {
+    setSelection((prev) => {
+      const next = { ...prev };
+      if (id in next) delete next[id];
+      else next[id] = "viewer";
+      return next;
+    });
+  };
+
+  const setRole = (id: number, role: string) => {
+    setSelection((prev) => ({ ...prev, [id]: role }));
+  };
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((p) => p.id in selection);
+  const toggleAllVisible = () => {
+    setSelection((prev) => {
+      const next = { ...prev };
+      if (allVisibleSelected) {
+        for (const p of filtered) delete next[p.id];
+      } else {
+        for (const p of filtered) if (!(p.id in next)) next[p.id] = "viewer";
+      }
+      return next;
+    });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const grants: Array<[number, string]> = [];
+      const revokes: number[] = [];
+      for (const [pidStr, role] of Object.entries(selection)) {
+        const pid = Number(pidStr);
+        if (initialMap[pid] !== role) grants.push([pid, role]); // new or role-changed
+      }
+      for (const pidStr of Object.keys(initialMap)) {
+        const pid = Number(pidStr);
+        if (!(pid in selection)) revokes.push(pid);
+      }
+
+      // Run all mutations in parallel; gather errors rather than bailing
+      // early so the user sees a partial-success summary.
+      const results = await Promise.allSettled([
+        ...grants.map(([pid, role]) =>
+          api.post(`/settings/users/${user.id}/access`, { patient_id: pid, role }),
+        ),
+        ...revokes.map((pid) =>
+          api.delete(`/settings/users/${user.id}/access/${pid}`),
+        ),
+      ]);
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        toast({
+          title: "Some changes failed",
+          description: `${failed} of ${results.length} access updates did not apply.`,
+          variant: "error",
+        });
+      }
+
+      const updated: Grant[] = Object.entries(selection).map(([pidStr, role]) => {
+        const pid = Number(pidStr);
+        const p = patients.find((x) => x.id === pid);
+        return { id: pid, display_name: p?.display_name || `#${pid}`, role };
+      });
+      updated.sort((a, b) => a.display_name.localeCompare(b.display_name));
+      await onSaved(updated);
+    } catch (err: any) {
+      toast({
+        title: "Save failed",
+        description: err?.response?.data?.detail || err?.message || "",
+        variant: "error",
+      });
+    }
+    setSaving(false);
+  };
+
+  const changeCount = useMemo(() => {
+    let n = 0;
+    for (const [pidStr, role] of Object.entries(selection)) {
+      if (initialMap[Number(pidStr)] !== role) n += 1;
+    }
+    for (const pidStr of Object.keys(initialMap)) {
+      if (!(Number(pidStr) in selection)) n += 1;
+    }
+    return n;
+  }, [selection, initialMap]);
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border bg-background shadow-xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div>
+            <h3 className="text-base font-semibold">Patient access</h3>
+            <p className="text-xs text-muted-foreground">
+              for <span className="font-medium">{user.display_name || user.username}</span> (@{user.username})
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-accent">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="border-b p-3 space-y-2">
+          <input
+            type="text"
+            placeholder="Filter patients..."
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <button onClick={toggleAllVisible} className="hover:text-foreground">
+              {allVisibleSelected ? "Clear visible" : "Select all visible"}
+            </button>
+            <span>
+              {Object.keys(selection).length} selected
+              {changeCount > 0 && <span className="ml-2 text-primary">• {changeCount} change{changeCount === 1 ? "" : "s"}</span>}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {patients.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No patients exist yet.</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">No patients match "{filter}".</div>
+          ) : (
+            <ul className="divide-y">
+              {filtered.map((p) => {
+                const checked = p.id in selection;
+                return (
+                  <li key={p.id} className={`flex items-center gap-3 px-3 py-2 ${checked ? "bg-primary/5" : ""}`}>
+                    <label className="flex flex-1 items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(p.id)}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">{p.display_name}</span>
+                      {initialMap[p.id] && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Check className="h-3 w-3 text-primary" /> current
+                        </span>
+                      )}
+                    </label>
+                    {checked && (
+                      <select
+                        value={selection[p.id]}
+                        onChange={(e) => setRole(p.id, e.target.value)}
+                        className="rounded-md border bg-background px-2 py-0.5 text-xs"
+                      >
+                        <option value="viewer">viewer</option>
+                        <option value="owner">owner</option>
+                      </select>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t p-3">
+          <button onClick={onClose} className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent">Cancel</button>
+          <button
+            onClick={save}
+            disabled={saving || changeCount === 0}
+            className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : changeCount === 0 ? "No changes" : `Apply ${changeCount} change${changeCount === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

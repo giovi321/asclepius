@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Users, Shield, Workflow, Download, ScrollText, FileSearch, KeyRound,
 } from "lucide-react";
@@ -30,10 +30,14 @@ function isTabKey(v: string | undefined): v is TabKey {
 
 export default function SettingsPage() {
   // URL-driven active tab so refresh / copy-paste / back-nav all land on the
-  // correct page. Unknown or missing slug collapses to the default.
-  const { tab } = useParams<{ tab?: string }>();
+  // correct page. Nested panes (Document Analysis sub-tabs, Normalization
+  // entity type) parse their own slot further down the pathname.
+  const location = useLocation();
   const navigate = useNavigate();
-  const activeTab: TabKey = isTabKey(tab) ? tab : DEFAULT_TAB;
+
+  const segments = location.pathname.split("/").filter(Boolean); // ['settings', tab?, subtab?, ...]
+  const slug = segments[1];
+  const activeTab: TabKey = isTabKey(slug) ? slug : DEFAULT_TAB;
 
   const setActiveTab = (key: TabKey) => {
     navigate(`/settings/${key}`, { replace: false });

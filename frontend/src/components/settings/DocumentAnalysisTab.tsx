@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import LlmProvidersTab from "./LlmProvidersTab";
 import OcrProvidersTab from "./OcrProvidersTab";
 import VisionLlmProvidersTab from "./VisionLlmProvidersTab";
@@ -14,9 +14,23 @@ const SUB_TABS = [
 ] as const;
 
 type SubTab = typeof SUB_TABS[number]["key"];
+const SUB_KEYS: readonly SubTab[] = SUB_TABS.map((t) => t.key);
+const DEFAULT_SUB: SubTab = "llm";
+
+function isSubTab(v: string | undefined): v is SubTab {
+  return !!v && (SUB_KEYS as readonly string[]).includes(v);
+}
 
 export default function DocumentAnalysisTab() {
-  const [subTab, setSubTab] = useState<SubTab>("llm");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const segments = location.pathname.split("/").filter(Boolean); // ['settings', 'analysis', subtab?, ...]
+  const slug = segments[2];
+  const subTab: SubTab = isSubTab(slug) ? slug : DEFAULT_SUB;
+
+  const setSubTab = (key: SubTab) => {
+    navigate(`/settings/analysis/${key}`, { replace: false });
+  };
 
   return (
     <div className="space-y-4">

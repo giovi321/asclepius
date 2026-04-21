@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -7,10 +8,27 @@ import {
   FileText, Sparkles, Loader2,
 } from "lucide-react";
 
+const NORM_TYPES = [
+  "lab_tests", "specialties", "diagnoses", "medications", "doctors", "facilities",
+] as const;
+type NormType = typeof NORM_TYPES[number];
+const DEFAULT_NORM: NormType = "lab_tests";
+
+function isNormType(v: string | undefined): v is NormType {
+  return !!v && (NORM_TYPES as readonly string[]).includes(v);
+}
+
 export default function NormalizationTab() {
   const confirm = useConfirm();
   const { toast } = useToast();
-  const [normType, setNormType] = useState("lab_tests");
+  const location = useLocation();
+  const navigate = useNavigate();
+  // Pathname shape: /settings/analysis/normalization/<normType>
+  const segments = location.pathname.split("/").filter(Boolean);
+  const normType: NormType = isNormType(segments[3]) ? segments[3] as NormType : DEFAULT_NORM;
+  const setNormType = (v: string) => {
+    navigate(`/settings/analysis/normalization/${v}`, { replace: false });
+  };
   const [normItems, setNormItems] = useState<any[]>([]);
   const [normFilter, setNormFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,8 +68,14 @@ export default function NormalizationTab() {
 
   useEffect(() => { loadList(); }, [loadList]);
 
-  // Clear selection when switching type or filters
-  useEffect(() => { setSelectedIds(new Set()); setBatchTargetId(null); }, [normType, normFilter, searchQuery]);
+  // Clear selection and any open detail when switching entity type or filters
+  // (URL navigation can change normType without the select onChange firing).
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBatchTargetId(null);
+    setExpandedId(null);
+    setDetail(null);
+  }, [normType, normFilter, searchQuery]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -356,7 +380,7 @@ export default function NormalizationTab() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <select value={normType} onChange={(e: any) => { setNormType(e.target.value); setExpandedId(null); setDetail(null); }}
+        <select value={normType} onChange={(e: any) => setNormType(e.target.value)}
           className="rounded-md border bg-background px-3 py-2 text-sm">
           <option value="lab_tests">Lab Tests</option>
           <option value="specialties">Specialties</option>

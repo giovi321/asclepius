@@ -55,8 +55,7 @@ export default function App() {
         <Route path="imaging" element={<ImagingPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="search" element={<SearchPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="settings/:tab" element={<SettingsPage />} />
+        <Route path="settings/*" element={<SettingsPage />} />
         <Route path="files" element={<FileBrowserPage />} />
       </Route>
     </Routes>

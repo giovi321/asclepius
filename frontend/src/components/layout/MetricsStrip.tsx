@@ -133,7 +133,7 @@ function HoverCard({ spec, rect }: { spec: ChipSpec; rect: DOMRect }) {
         width: CARD_WIDTH,
         zIndex: 60,
       }}
-      className="pointer-events-none rounded-lg border bg-popover text-popover-foreground shadow-xl"
+      className="pointer-events-none rounded-lg border bg-card text-card-foreground shadow-xl"
     >
       <div className="px-3 py-2 border-b">
         <div className="text-sm font-semibold break-words">{spec.cardTitle}</div>

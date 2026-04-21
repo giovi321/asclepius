@@ -250,7 +250,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 logger.info("Running Vision-LLM extraction on doc %d: %s", doc_id, path.name)
 
                 from asclepius.pipeline.vision_extractor import extract_with_vision
-                ocr_text, confidence, engine, vision_result = await extract_with_vision(
+                ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
                     file_path, config,
                 )
 
@@ -298,7 +298,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 _salvage_classification(vision_result)
                 doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
                 vision_result["doc_type"] = doc_type
-                llm = get_llm_provider(config)
+                # Phase 2 reuses the vision provider's config so the model the
+                # user picked for vision also handles type-specific extraction.
+                from asclepius.pipeline.provider_factory import _build_llm_provider
+                llm = _build_llm_provider(vision_entry)
                 # Vision handled classification + universal fields (Phase 1).
                 # Still run Phase 2 type-specific extraction on the vision OCR
                 # text to capture lab_results / medications / diagnoses / etc.

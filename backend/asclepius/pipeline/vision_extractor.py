@@ -257,10 +257,10 @@ async def _vision_call_with_retry(
 
 async def _extract_with_provider(
     file_path: str, config: AppConfig, provider: VisionLlmProviderEntry,
-) -> tuple[str, float, str, dict]:
+) -> tuple[str, float, str, dict, VisionLlmProviderEntry]:
     """Render every page of the document and feed each to the vision provider.
 
-    Returns (full_text, confidence, engine_label, merged_extraction).
+    Returns (full_text, confidence, engine_label, merged_extraction, provider).
     Raises on unrecoverable failure so the caller can fall through to the
     next provider.
     """
@@ -331,23 +331,25 @@ async def _extract_with_provider(
     logger.info("Vision-LLM extraction complete for %s: %d pages, keys=%s",
                 path.name, len(all_extractions), list(merged.keys()))
 
-    return full_text, 0.90, engine_label, merged
+    return full_text, 0.90, engine_label, merged, provider
 
 
 # ── Public entry point ───────────────────────────────────────────
 
 async def extract_with_vision(
     file_path: str, config: AppConfig, provider_override_id: str | None = None,
-) -> tuple[str, float, str, dict]:
+) -> tuple[str, float, str, dict, VisionLlmProviderEntry]:
     """Run the vision-LLM extraction flow for a file.
 
     Tries enabled vision providers in priority order. If ``provider_override_id``
     is given and matches an enabled provider, uses that one first; on failure
     still falls through to the rest of the priority list.
 
-    Returns ``(ocr_text, confidence, engine_label, merged_extraction)``. The
-    merged_extraction dict holds the classification + universal fields and is
-    suitable for passing as ``extraction_override`` to ``extract_and_store``.
+    Returns ``(ocr_text, confidence, engine_label, merged_extraction, provider_used)``.
+    The merged_extraction dict holds the classification + universal fields and
+    is suitable for passing as ``extraction_override`` to ``extract_and_store``;
+    ``provider_used`` is the VisionLlmProviderEntry that actually produced the
+    result (after fallback), so the caller can reuse its config for Phase 2.
     """
     candidates: list[VisionLlmProviderEntry] = []
 

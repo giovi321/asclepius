@@ -298,7 +298,7 @@ async def _reprocess_vision_llm(
         logger.info("Re-running Vision-LLM flow on doc %d (provider=%s)",
                     doc_id, vision_provider_id or "default")
         try:
-            ocr_text, confidence, engine, vision_result = await extract_with_vision(
+            ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
                 str(file_path), config, provider_override_id=vision_provider_id,
             )
             await db.execute(
@@ -326,7 +326,12 @@ async def _reprocess_vision_llm(
             doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
             vision_result["doc_type"] = doc_type
 
-            llm = get_llm_provider(config)
+            # Phase 2 uses the same provider the user selected for vision, so
+            # a user who picks e.g. Haiku for vision gets Haiku doing the
+            # type-specific text extraction too instead of silently falling
+            # back to the default text-LLM.
+            from asclepius.pipeline.provider_factory import _build_llm_provider
+            llm = _build_llm_provider(vision_entry)
             # Phase 2 — vision only handles classification + universal fields,
             # run type-specific extraction on the vision-produced OCR text to
             # capture lab_results / medications / diagnoses / etc.

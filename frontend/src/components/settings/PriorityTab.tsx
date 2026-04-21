@@ -102,7 +102,7 @@ function PrioritySection<T extends AnyEntry>({
 
 const GENERAL_ALLOWED_CRED_TYPES = ["ollama", "vllm", "claude", "openai"];
 
-function GeneralLlmCard({ credentials }: { credentials: Credential[] }) {
+function GeneralLlmCard({ credentials, llm }: { credentials: Credential[]; llm: LlmProvider[] }) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<GeneralLlmSettings>({
     credential_id: "", type: "ollama", model: "", timeout: 120,
@@ -135,6 +135,12 @@ function GeneralLlmCard({ credentials }: { credentials: Credential[] }) {
   const filteredCreds = credentials.filter((c) => GENERAL_ALLOWED_CRED_TYPES.includes(c.type));
   const chosen = credentials.find((c) => c.id === settings.credential_id);
   const isConfigured = !!settings.credential_id && !!settings.model;
+
+  // Models available on the chosen credential (LLM kind only — General
+  // runs chat / auto-merge / auto-rename which are text, not vision).
+  const modelsForChosen = settings.credential_id
+    ? llm.filter((p) => p.credential_id === settings.credential_id)
+    : [];
 
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
@@ -172,14 +178,28 @@ function GeneralLlmCard({ credentials }: { credentials: Credential[] }) {
         </label>
         <label className="space-y-1 block">
           <span className="text-xs font-medium">Model</span>
-          <input type="text" value={settings.model}
+          <select value={settings.model}
             onChange={(e) => setSettings((s) => ({ ...s, model: e.target.value }))}
-            placeholder={
-              chosen?.type === "ollama" ? "e.g. llama3.1" :
-              chosen?.type === "claude" ? "e.g. claude-sonnet-4-20250514" :
-              chosen?.type === "openai" ? "e.g. gpt-4o" : "Model name"
-            }
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm" />
+            disabled={!settings.credential_id || modelsForChosen.length === 0}
+            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm disabled:opacity-50">
+            <option value="">
+              {!settings.credential_id
+                ? "— pick a provider first —"
+                : modelsForChosen.length === 0
+                  ? "— no LLM models on this provider —"
+                  : "— pick a model —"}
+            </option>
+            {modelsForChosen.map((p) => (
+              <option key={p.id} value={p.model}>
+                {p.name && p.name !== p.model ? `${p.name} (${p.model})` : p.model}
+              </option>
+            ))}
+          </select>
+          {settings.credential_id && modelsForChosen.length === 0 && (
+            <span className="block text-[11px] text-amber-600 dark:text-amber-500">
+              Add an LLM model to this provider under <Link to="/settings/analysis/providers" className="underline">Providers</Link>.
+            </span>
+          )}
         </label>
         <button onClick={save} disabled={saving}
           className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap">
@@ -247,7 +267,7 @@ export default function PriorityTab() {
         <Link to="/settings/analysis/providers" className="underline">Providers</Link>.
       </div>
 
-      <GeneralLlmCard credentials={credentials} />
+      <GeneralLlmCard credentials={credentials} llm={llm} />
 
       <PrioritySection
         title="LLM priority (document extraction, classification)"

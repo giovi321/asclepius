@@ -24,8 +24,6 @@ export default function SearchPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Search</h1>
-
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />

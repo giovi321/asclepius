@@ -339,8 +339,10 @@ export default function ProvidersTab() {
     for (const p of ocr) {
       if (!p.credential_id) continue;
       const arr = map.get(p.credential_id) || [];
+      // Prefer the user-chosen display name over the raw model string so
+      // renaming "fredrezones55/chandra-ocr-2" to "Chandra" actually sticks.
       const label =
-        p.type === "llm_vision" ? (p.llm_model || p.name || "LLM vision OCR")
+        p.type === "llm_vision" ? (p.name || p.llm_model || "LLM vision OCR")
         : p.type === "google_vision" ? (p.name || "Google Vision OCR")
         : p.type === "tesseract_remote" ? (p.name || "Tesseract remote")
         : (p.name || p.type);

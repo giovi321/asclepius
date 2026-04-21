@@ -42,8 +42,6 @@ export default function ImagingPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Imaging Studies</h1>
-
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Study list */}
         <div className="space-y-3">

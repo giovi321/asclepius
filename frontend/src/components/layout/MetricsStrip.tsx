@@ -1,3 +1,5 @@
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { FileText, Brain, Eye } from "lucide-react";
 
@@ -15,8 +17,9 @@ type ChipSpec = {
 };
 
 /** Chip strip shown in the top bar. Each chip renders only when its counter
- * is non-zero, so the bar is empty when the app is idle. Hover shows a
- * pure-CSS popover with the breakdown. */
+ * is non-zero, so the bar is empty when the app is idle. The hover card is
+ * portaled into <body> so it escapes the app-wide overflow-hidden wrapper
+ * and never gets clipped by the header. */
 export default function MetricsStrip() {
   const { status } = usePipelineStatus();
   if (!status) return null;
@@ -64,54 +67,98 @@ export default function MetricsStrip() {
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex items-center justify-end gap-2 overflow-x-auto whitespace-nowrap min-w-0 max-w-full">
-      {chips.map((c, i) => {
-        const Icon = c.icon;
-        // Flip popover to the right edge for the last chip so it doesn't
-        // spill off-screen.
-        const isLast = i === chips.length - 1 && chips.length > 1;
-        const alignClass = isLast ? "right-0" : "left-0";
-        return (
-          <div key={c.key} className="group relative">
-            <div
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium max-w-[260px] ${c.colorClass}`}
-            >
-              <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="truncate">{c.label}</span>
-            </div>
+    <div className="flex items-center justify-end gap-2 whitespace-nowrap min-w-0 max-w-full">
+      {chips.map((c) => (
+        <Chip key={c.key} spec={c} />
+      ))}
+    </div>
+  );
+}
 
-            {/* Hover card */}
-            <div
-              className={`pointer-events-none absolute ${alignClass} top-full mt-1.5 hidden group-hover:block z-30 min-w-[220px] rounded-lg border bg-popover text-popover-foreground shadow-xl`}
-            >
-              <div className="px-3 py-2 border-b">
-                <div className="text-sm font-semibold whitespace-nowrap">{c.cardTitle}</div>
-                {c.cardSubtitle && (
-                  <div className="mt-0.5 text-xs text-muted-foreground break-words">
-                    {c.cardSubtitle}
-                  </div>
-                )}
-              </div>
-              {typeof c.cap === "number" && (
-                <div className="grid grid-cols-3 divide-x text-center">
-                  <div className="px-3 py-2">
-                    <div className="text-xs text-muted-foreground">Running</div>
-                    <div className="text-base font-semibold tabular-nums">{c.running ?? 0}</div>
-                  </div>
-                  <div className="px-3 py-2">
-                    <div className="text-xs text-muted-foreground">Waiting</div>
-                    <div className="text-base font-semibold tabular-nums">{c.waiting ?? 0}</div>
-                  </div>
-                  <div className="px-3 py-2">
-                    <div className="text-xs text-muted-foreground">Cap</div>
-                    <div className="text-base font-semibold tabular-nums">{c.cap}</div>
-                  </div>
-                </div>
-              )}
-            </div>
+function Chip({ spec }: { spec: ChipSpec }) {
+  const Icon = spec.icon;
+  const chipRef = useRef<HTMLDivElement>(null);
+  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
+
+  const showCard = () => {
+    if (chipRef.current) setHoverRect(chipRef.current.getBoundingClientRect());
+  };
+  const hideCard = () => setHoverRect(null);
+
+  return (
+    <>
+      <div
+        ref={chipRef}
+        onMouseEnter={showCard}
+        onMouseLeave={hideCard}
+        onFocus={showCard}
+        onBlur={hideCard}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium max-w-[260px] ${spec.colorClass}`}
+      >
+        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="truncate">{spec.label}</span>
+      </div>
+
+      {hoverRect && createPortal(
+        <HoverCard spec={spec} rect={hoverRect} />,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/** The card rendered in the body portal. Position is computed from the
+ * triggering chip's bounding rect and clamped inside the viewport. */
+function HoverCard({ spec, rect }: { spec: ChipSpec; rect: DOMRect }) {
+  const GAP = 6;                 // distance below the chip
+  const CARD_WIDTH = 240;        // wide enough for the three-column grid
+  const MARGIN = 8;              // keep this much space from the viewport edge
+  const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
+
+  // Prefer left-aligned with the chip; fall back to right-aligned when
+  // that would spill past the viewport.
+  let left = rect.left;
+  if (left + CARD_WIDTH > viewportW - MARGIN) {
+    left = Math.max(MARGIN, rect.right - CARD_WIDTH);
+  }
+  const top = rect.bottom + GAP;
+
+  return (
+    <div
+      role="tooltip"
+      style={{
+        position: "fixed",
+        top,
+        left,
+        width: CARD_WIDTH,
+        zIndex: 60,
+      }}
+      className="pointer-events-none rounded-lg border bg-popover text-popover-foreground shadow-xl"
+    >
+      <div className="px-3 py-2 border-b">
+        <div className="text-sm font-semibold break-words">{spec.cardTitle}</div>
+        {spec.cardSubtitle && (
+          <div className="mt-0.5 text-xs text-muted-foreground break-words">
+            {spec.cardSubtitle}
           </div>
-        );
-      })}
+        )}
+      </div>
+      {typeof spec.cap === "number" && (
+        <div className="grid grid-cols-3 divide-x text-center">
+          <div className="px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Running</div>
+            <div className="text-base font-semibold tabular-nums">{spec.running ?? 0}</div>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Waiting</div>
+            <div className="text-base font-semibold tabular-nums">{spec.waiting ?? 0}</div>
+          </div>
+          <div className="px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Cap</div>
+            <div className="text-base font-semibold tabular-nums">{spec.cap}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

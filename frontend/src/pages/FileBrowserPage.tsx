@@ -185,8 +185,7 @@ export default function FileBrowserPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">File Browser</h1>
+      <div className="flex items-center justify-end">
         <button
           onClick={() => fetchTree(breadcrumb.length > 0 ? breadcrumb.join("/") : undefined)}
           className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent flex items-center gap-1.5"

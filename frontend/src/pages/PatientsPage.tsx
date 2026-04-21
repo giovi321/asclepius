@@ -101,8 +101,7 @@ export default function PatientsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Patients</h1>
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowCreate(!showCreate)}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"

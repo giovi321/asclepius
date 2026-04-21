@@ -135,15 +135,14 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Medical Events</h1>
-        {selectedPatient && (
+      {selectedPatient && (
+        <div className="flex items-center justify-end">
           <button onClick={() => setShowCreate(!showCreate)}
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90">
             <Plus className="h-4 w-4" /> New Event
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {!selectedPatient && (
         <p className="text-muted-foreground">Select a patient to view medical events.</p>

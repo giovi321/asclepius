@@ -272,10 +272,6 @@ export default function LabResultsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Lab Results</h1>
-      </div>
-
       {/* Orphan banner */}
       {orphans.length > 0 && (
         <div className="flex items-center justify-between rounded-md border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-sm dark:border-yellow-700/50 dark:bg-yellow-900/20">

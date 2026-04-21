@@ -89,10 +89,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-10rem)] flex-col">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          Chat — {selectedPatient.display_name}
-        </h1>
+      <div className="mb-4 flex items-center justify-end">
         <button
           onClick={startNewChat}
           disabled={loading}

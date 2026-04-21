@@ -4,8 +4,7 @@ Asclepius handles personal health info, so security bugs matter. If you find one
 
 ## How to report
 
-- **Best option:** [open a private advisory](https://github.com/giovi321/asclepius/security/advisories/new).
-- Or email the address on [`giovi321`'s GitHub profile](https://github.com/giovi321) with "Asclepius security" in the subject.
+Open a private advisory from the repo's [Security tab](https://github.com/giovi321/asclepius/security) ("Report a vulnerability").
 
 I'll try to reply within a few days and fix real issues as fast as I can. Happy to credit you in the release notes if you want.
 

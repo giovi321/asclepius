@@ -11,7 +11,6 @@ from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.normalization.auto_merge import suggest_merges
 from asclepius.normalization.service import NormService
-from asclepius.pipeline.processor import get_llm_provider
 
 logger = logging.getLogger(__name__)
 

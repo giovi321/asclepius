@@ -40,17 +40,15 @@ export default function MetricsStrip() {
     });
   }
 
-  // Per-credential LLM + Vision queues. Shows the model(s) currently in
-  // flight so the user can still see "which model is running" even though
-  // the queue itself is shared per credential.
+  // Per-credential LLM + Vision queues. The chip shows credential + model
+  // on a single line; the hover card breaks out the counters.
   for (const q of status.llm_queues || []) {
     const modelsLabel = q.models && q.models.length > 0 ? q.models.join(", ") : q.model || "";
-    const queued = q.waiting > 0 ? ` · ⏳${q.waiting}` : "";
     const shortName = q.credential_name || q.credential_id;
     chips.push({
       key: `${q.kind}-${q.credential_id}`,
       icon: q.kind === "vision" ? Eye : Brain,
-      label: `${shortName}${modelsLabel ? " · " + modelsLabel : ""} ${q.in_flight}/${q.cap}${queued}`,
+      label: modelsLabel ? `${shortName} · ${modelsLabel}` : shortName,
       cardTitle: `${shortName} · ${q.kind === "vision" ? "Vision" : "LLM"}`,
       cardSubtitle: modelsLabel || undefined,
       running: q.in_flight,
@@ -66,7 +64,7 @@ export default function MetricsStrip() {
   if (chips.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap overflow-x-auto">
+    <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap min-w-0">
       {chips.map((c, i) => {
         const Icon = c.icon;
         // Flip popover to the right edge for the last chip so it doesn't

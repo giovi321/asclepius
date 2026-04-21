@@ -17,6 +17,7 @@ interface LabRow {
   document_id: number | null;
   document_filename: string | null;
   document_doc_type: string | null;
+  document_doc_date: string | null;
   document_missing: number; // SQLite returns 0/1
   patient_id: number;
   test_name_original: string;
@@ -96,16 +97,19 @@ export default function LabResultsPage() {
     return [...byCode.values()].sort((a, b) => b.count - a.count);
   }, [results]);
 
-  // Group by (test_date, document_id) when grouping is on.
+  // Group by (test_date, document_id) when grouping is on. Falls back to the
+  // source document's date when the lab row itself has no test_date — otherwise
+  // rows parsed from a dated document would cluster under a "no date" header.
   const groups = useMemo(() => {
     if (!groupByDate) return null;
     const m = new Map<string, { key: string; date: string; document_id: number | null; filename: string | null; rows: LabRow[]; abnormal: number }>();
     for (const r of results) {
-      const key = `${r.test_date || "no-date"}|${r.document_id ?? "none"}`;
+      const effectiveDate = r.test_date || r.document_doc_date;
+      const key = `${effectiveDate || "no-date"}|${r.document_id ?? "none"}`;
       if (!m.has(key)) {
         m.set(key, {
           key,
-          date: r.test_date || "no date",
+          date: effectiveDate || "no date",
           document_id: r.document_id,
           filename: r.document_filename,
           rows: [],
@@ -379,6 +383,7 @@ export default function LabResultsPage() {
                       saveEdit={saveEdit}
                       deleteRow={deleteRow}
                       saving={saving}
+                      showDocument={false}
                     />
                   </div>
                 )}
@@ -465,17 +470,19 @@ interface RowsTableProps {
   saveEdit: (id: number) => void;
   deleteRow: (r: LabRow) => void;
   saving: boolean;
+  showDocument?: boolean;
 }
 
 function RowsTable({
   rows, editingId, editVals, setEditVals,
   startEdit, cancelEdit, saveEdit, deleteRow, saving,
+  showDocument = true,
 }: RowsTableProps) {
   return (
     <table className="w-full text-sm">
       <thead className="border-b bg-muted/50">
         <tr>
-          <th className="px-3 py-2 text-left font-medium">Document</th>
+          {showDocument && <th className="px-3 py-2 text-left font-medium">Document</th>}
           <th className="px-3 py-2 text-left font-medium">Test</th>
           <th className="px-3 py-2 text-left font-medium">Value</th>
           <th className="px-3 py-2 text-left font-medium">Unit</th>
@@ -489,16 +496,18 @@ function RowsTable({
           const editing = editingId === lr.id;
           return (
             <tr key={lr.id} className={`${lr.is_abnormal ? "bg-red-50/50 dark:bg-red-950/30" : ""} ${editing ? "bg-accent/40" : ""}`}>
-              <td className="px-3 py-1.5 max-w-[220px] truncate">
-                {lr.document_id ? (
-                  <Link to={`/documents/${lr.document_id}`} className="inline-flex items-center gap-1 text-primary hover:underline" title={lr.document_filename || ""}>
-                    <FileText className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{lr.document_filename || `#${lr.document_id}`}</span>
-                  </Link>
-                ) : (
-                  <span className="text-xs italic text-muted-foreground">no document</span>
-                )}
-              </td>
+              {showDocument && (
+                <td className="px-3 py-1.5 max-w-[220px] truncate">
+                  {lr.document_id ? (
+                    <Link to={`/documents/${lr.document_id}`} className="inline-flex items-center gap-1 text-primary hover:underline" title={lr.document_filename || ""}>
+                      <FileText className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{lr.document_filename || `#${lr.document_id}`}</span>
+                    </Link>
+                  ) : (
+                    <span className="text-xs italic text-muted-foreground">no document</span>
+                  )}
+                </td>
+              )}
               <td className="px-3 py-1.5">
                 {editing ? (
                   <input

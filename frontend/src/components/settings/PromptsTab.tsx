@@ -98,7 +98,7 @@ export default function PromptsTab() {
         </div>
       </div>
 
-      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         Customize the LLM prompts used for document classification, extraction, chat, and more.
         Prompts use Python format strings with placeholders like {"{ocr_text}"}, {"{patient_list}"}, etc.
         Click a prompt to edit it. Reset to revert to the default.

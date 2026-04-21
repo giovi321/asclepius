@@ -73,7 +73,13 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
                           credential_name: str = ""):
     """Acquire a slot on ``credential_id``. ``cap`` is only honoured on
     first sight or to grow the cap — use :func:`register_credential` when
-    configuration changes so the number is picked up promptly."""
+    configuration changes so the number is picked up promptly.
+
+    On any exit (return, exception, cancellation) the in_flight counter,
+    active-model counter, and semaphore are all released. All the
+    per-acquire bookkeeping lives inside a single try/finally so there is
+    no window where a counter can be leaked.
+    """
     _ensure_slot(credential_id, max(1, cap),
                  kind=kind, credential_name=credential_name)
     key = credential_id or ""
@@ -85,20 +91,25 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
     try:
         await sem.acquire()
         acquired = True
-        stats["waiting"] = max(0, stats["waiting"] - 1)
-        stats["in_flight"] = stats.get("in_flight", 0) + 1
-        if model:
-            active[model] += 1
+        # Everything that mutates stats/active lives inside the try below
+        # so a single finally block owns cleanup — no leak window between
+        # the increment and the yield.
         try:
+            stats["waiting"] = max(0, stats["waiting"] - 1)
+            stats["in_flight"] = stats.get("in_flight", 0) + 1
+            if model:
+                active[model] += 1
             yield
         finally:
             stats["in_flight"] = max(0, stats["in_flight"] - 1)
-            if model and active[model] > 0:
+            if model and active.get(model, 0) > 0:
                 active[model] -= 1
-                if active[model] == 0:
-                    del active[model]
+                if active[model] <= 0:
+                    active.pop(model, None)
             sem.release()
     except BaseException:
+        # Only fired when we never entered the inner try (cancellation
+        # during sem.acquire()). No slot held; just undo the waiting bump.
         if not acquired:
             stats["waiting"] = max(0, stats["waiting"] - 1)
         raise

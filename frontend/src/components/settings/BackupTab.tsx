@@ -36,7 +36,7 @@ export default function BackupTab() {
         patients, events, normalization mappings, and settings — everything except the actual files
         in the vault.
       </p>
-      <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <p>The backup uses SQLite's built-in backup API, so it's safe to download while the server is running.</p>
         <p>To do a full backup, also copy the <code>vault/</code> directory (contains the actual PDF/DICOM files).</p>
       </div>

@@ -261,7 +261,7 @@ export default function PriorityTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         <strong>Priority</strong> controls which model is tried first for each
         task. Providers are defined under{" "}
         <Link to="/settings/analysis/providers" className="underline">Providers</Link>.

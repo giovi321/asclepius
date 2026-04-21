@@ -42,15 +42,15 @@ export default function DocumentAnalysisTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 rounded-lg bg-muted/50 p-1">
+      <div className="flex gap-6 border-b text-sm overflow-x-auto">
         {SUB_TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setSubTab(t.key)}
-            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+            className={`whitespace-nowrap border-b-2 -mb-px px-1 py-2 transition-colors ${
               subTab === t.key
-                ? "bg-background text-foreground shadow-sm font-medium"
-                : "text-muted-foreground hover:text-foreground"
+                ? "border-primary/60 text-foreground font-medium"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {t.label}

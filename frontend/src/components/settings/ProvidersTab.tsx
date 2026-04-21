@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import api from "@/api/client";
 import {
   KeyRound, Plus, Trash2, Save, Check, Pencil, X,
-  Cloud, Zap, Search as SearchIcon, Brain, Eye, ScanText,
+  Cloud, Server, Brain, Eye, ScanText, HardDrive,
 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import type { Credential, LlmProvider, OcrProvider, VisionLlmProvider } from "@/types";
@@ -10,12 +10,12 @@ import type { Credential, LlmProvider, OcrProvider, VisionLlmProvider } from "@/
 // ─── Credential type metadata ─────────────────────────────────────
 
 const CREDENTIAL_TYPES = [
-  { value: "ollama", label: "Ollama", description: "Local LLM via Ollama", icon: Zap, needs_url: true, needs_key: false },
-  { value: "vllm", label: "vLLM", description: "vLLM (OpenAI-compatible)", icon: Zap, needs_url: true, needs_key: true },
+  { value: "ollama", label: "Ollama", description: "Local LLM via Ollama", icon: HardDrive, needs_url: true, needs_key: false },
+  { value: "vllm", label: "vLLM", description: "vLLM (OpenAI-compatible)", icon: Server, needs_url: true, needs_key: true },
   { value: "claude", label: "Anthropic (Claude)", description: "Claude API", icon: Cloud, needs_url: false, needs_key: true },
   { value: "openai", label: "OpenAI", description: "OpenAI-compatible API", icon: Cloud, needs_url: false, needs_key: true },
-  { value: "google_vision", label: "Google Vision", description: "Google Cloud Vision OCR", icon: SearchIcon, needs_url: false, needs_key: true },
-  { value: "tesseract_remote", label: "Tesseract (Remote)", description: "Remote Tesseract OCR server", icon: SearchIcon, needs_url: true, needs_key: false },
+  { value: "google_vision", label: "Google Vision", description: "Google Cloud Vision OCR", icon: Cloud, needs_url: false, needs_key: true },
+  { value: "tesseract_remote", label: "Tesseract (Remote)", description: "Remote Tesseract OCR server", icon: Server, needs_url: true, needs_key: false },
 ];
 
 function iconForType(t: string) {
@@ -478,7 +478,7 @@ export default function ProvidersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         A <strong>provider</strong> is a connection (credentials + concurrency +
         retry policy). Under each provider, list the models it exposes —
         LLM, Vision, or OCR. Ranking and task assignment happens on the

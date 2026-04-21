@@ -45,15 +45,18 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1.5 rounded-lg border p-1.5 overflow-x-auto">
+      <div className="flex border-b overflow-x-auto">
         {TABS.map((t) => {
           const Icon = t.icon;
+          const isActive = activeTab === t.key;
           return (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                activeTab === t.key ? "bg-primary text-primary-foreground" : "hover:bg-accent text-muted-foreground"
+              className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap border-b-2 -mb-px px-3 py-3 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <Icon className="h-4 w-4" />

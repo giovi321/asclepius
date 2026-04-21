@@ -133,7 +133,7 @@ export default function UsersTab() {
         </div>
       )}
 
-      <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <p><strong>Admin:</strong> Full access — settings, user management, all patients.</p>
         <p><strong>Editor:</strong> Can view/edit documents and patients they have access to.</p>
         <p><strong>Viewer:</strong> Read-only access to assigned patients.</p>

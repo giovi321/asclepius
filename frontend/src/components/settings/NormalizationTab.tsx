@@ -374,7 +374,7 @@ export default function NormalizationTab() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         Normalization maps different names for the same medical concept (e.g. "CBC", "Complete Blood Count", "Emocromo")
         to a single canonical entry. Click a row to view and manage its aliases, edit the canonical name, or merge duplicates.
       </div>

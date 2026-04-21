@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Upload, CheckCircle, AlertCircle, X, Calendar } from "lucide-react";
+import SearchableSelect from "@/components/SearchableSelect";
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
@@ -163,26 +164,22 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           <p className="text-sm font-medium">
             Assign {pendingFiles.length} file(s) to a patient:
           </p>
-          <select
-            value={chosenPatientId}
-            onChange={(e) => setChosenPatientId(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">No patient (process unassigned)</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>{p.display_name}</option>
-            ))}
-          </select>
-          <select
-            value={chosenEventId}
-            onChange={(e) => setChosenEventId(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">No medical event (auto-assign later)</option>
-            {events.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.title} ({ev.event_type?.replace(/_/g, " ")})</option>
-            ))}
-          </select>
+          <SearchableSelect
+            value={chosenPatientId || null}
+            onChange={(v) => setChosenPatientId(v || "")}
+            options={patients.map((p) => ({ value: String(p.id), label: p.display_name }))}
+            placeholder="No patient (process unassigned)"
+          />
+          <SearchableSelect
+            value={chosenEventId || null}
+            onChange={(v) => setChosenEventId(v || "")}
+            options={events.map((ev) => ({
+              value: String(ev.id),
+              label: ev.title,
+              hint: ev.event_type?.replace(/_/g, " "),
+            }))}
+            placeholder="No medical event"
+          />
           <div className="flex gap-2">
             <button
               onClick={() => doUpload(pendingFiles, chosenPatientId ? Number(chosenPatientId) : null, chosenEventId ? Number(chosenEventId) : null)}
@@ -290,16 +287,18 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               )}
             </p>
             {selectedPatient && events.length > 0 && (
-              <select
-                value={chosenEventId}
-                onChange={(e) => setChosenEventId(e.target.value)}
-                className="mt-2 rounded-md border bg-background px-2 py-1 text-xs"
-              >
-                <option value="">Medical event: auto-assign</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
-                ))}
-              </select>
+              <div className="mt-2 inline-block text-left min-w-[220px]">
+                <SearchableSelect
+                  value={chosenEventId || null}
+                  onChange={(v) => setChosenEventId(v || "")}
+                  options={events.map((ev) => ({
+                    value: String(ev.id),
+                    label: ev.title,
+                    hint: ev.event_type?.replace(/_/g, " "),
+                  }))}
+                  placeholder="No medical event"
+                />
+              </div>
             )}
           </>
         )}

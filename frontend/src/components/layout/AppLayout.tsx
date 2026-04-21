@@ -121,62 +121,64 @@ export default function AppLayout() {
         <div className="p-3 space-y-2">
           {sidebarOpen && <PatientSelector />}
 
-          {/* Icon row: Settings, Files, Theme, Logout — labels live in tooltips */}
-          <div className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "flex-col"}`}>
-            <Link
-              to="/settings"
-              title="Settings"
-              aria-label="Settings"
-              className={`rounded-md p-2 transition-colors ${
-                settingsActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              <Settings className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/files"
-              title="Files"
-              aria-label="Files"
-              className={`rounded-md p-2 transition-colors ${
-                filesActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              }`}
-            >
-              <FolderTree className="h-4 w-4" />
-            </Link>
-            <button
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              aria-label="Toggle theme"
-              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={logout}
-              title={`Logout (${user?.display_name || user?.username || ""})`}
-              aria-label="Logout"
-              className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
-
-          {sidebarOpen && (
-            <div className="pt-1 text-center">
-              <a
-                href="https://github.com/giovi321/asclepius"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          {/* Icon row + version link pair — tight vertical gap. */}
+          <div>
+            <div className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "flex-col"}`}>
+              <Link
+                to="/settings"
+                title="Settings"
+                aria-label="Settings"
+                className={`rounded-md p-2 transition-colors ${
+                  settingsActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
               >
-                Asclepius v{packageJson.version}
-              </a>
+                <Settings className="h-4 w-4" />
+              </Link>
+              <Link
+                to="/files"
+                title="Files"
+                aria-label="Files"
+                className={`rounded-md p-2 transition-colors ${
+                  filesActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                }`}
+              >
+                <FolderTree className="h-4 w-4" />
+              </Link>
+              <button
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label="Toggle theme"
+                className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+              <button
+                onClick={logout}
+                title={`Logout (${user?.display_name || user?.username || ""})`}
+                aria-label="Logout"
+                className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
-          )}
+
+            {sidebarOpen && (
+              <div className="text-center leading-none">
+                <a
+                  href="https://github.com/giovi321/asclepius"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  Asclepius v{packageJson.version}
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 

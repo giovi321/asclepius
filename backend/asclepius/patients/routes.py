@@ -61,9 +61,10 @@ async def get_patient(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Get a single patient's details."""
-    role = await check_patient_access(db, current_user["id"], patient_id)
-    if not role:
-        raise HTTPException(status_code=403, detail="No access to this patient")
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access to this patient")
 
     cursor = await db.execute(
         """SELECT id, slug, display_name, date_of_birth, sex, blood_type,
@@ -144,11 +145,13 @@ async def update_patient(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    role = await check_patient_access(db, current_user["id"], patient_id)
-    if not role:
-        raise HTTPException(status_code=403, detail="No access to this patient")
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="Only owners can edit patient info")
+    # Admins have implicit owner access to every patient.
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access to this patient")
+        if role != "owner":
+            raise HTTPException(status_code=403, detail="Only owners can edit patient info")
 
     updates = {}
     for field in [
@@ -185,11 +188,13 @@ async def delete_patient(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Delete a patient and disassociate their documents."""
-    role = await check_patient_access(db, current_user["id"], patient_id)
-    if not role:
-        raise HTTPException(status_code=403, detail="No access to this patient")
-    if role != "owner":
-        raise HTTPException(status_code=403, detail="Only owners can delete patients")
+    # Admins have implicit owner access to every patient.
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access to this patient")
+        if role != "owner":
+            raise HTTPException(status_code=403, detail="Only owners can delete patients")
 
     # Disassociate documents (set patient_id to NULL rather than deleting)
     await db.execute(

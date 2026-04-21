@@ -1,7 +1,6 @@
 """OCR processing with Tesseract and optional cloud fallback."""
 
 import base64
-import json
 import logging
 from pathlib import Path
 

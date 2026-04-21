@@ -646,8 +646,9 @@ async def test_vision_provider(
         raise HTTPException(status_code=404, detail="Provider not found")
 
     try:
-        # Build a tiny 1x1 white JPEG so every backend round-trips end-to-end.
-        import io as _io, base64 as _b64
+        # Build a tiny white JPEG so every backend round-trips end-to-end.
+        import io as _io
+        import base64 as _b64
         from PIL import Image as _Image
         img = _Image.new("RGB", (8, 8), "white")
         buf = _io.BytesIO()

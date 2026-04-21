@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { FileText, Search, Upload, Pencil, Check, X, ChevronDown, Columns3 } from "lucide-react";
+import { FileText, Search, Upload, Pencil, Check, X, ChevronDown, Columns3, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import type { PipelineStatus } from "@/types";
@@ -21,7 +21,8 @@ const DOC_TYPES = [
 // The File column is always visible — it's the primary identifier. Everything
 // else is toggleable via the Columns popover and the user's choice is
 // persisted in localStorage.
-type ColumnKey = "type" | "date" | "doctor" | "facility" | "patient" | "specialty" | "status";
+type ColumnKey = "type" | "date" | "doctor" | "facility" | "patient" | "specialty" | "status" | "date_added";
+type SortKey = ColumnKey | "file";
 interface ColumnDef {
   key: ColumnKey;
   label: string;
@@ -29,13 +30,14 @@ interface ColumnDef {
   width: string;  // CSS width used in the colgroup
 }
 const COLUMNS: ColumnDef[] = [
-  { key: "type",      label: "Type",      defaultVisible: true,  width: "14%" },
-  { key: "date",      label: "Date",      defaultVisible: true,  width: "12%" },
-  { key: "facility",  label: "Facility",  defaultVisible: true,  width: "22%" },
-  { key: "doctor",    label: "Doctor",    defaultVisible: false, width: "16%" },
-  { key: "patient",   label: "Patient",   defaultVisible: false, width: "14%" },
-  { key: "specialty", label: "Specialty", defaultVisible: false, width: "14%" },
-  { key: "status",    label: "Status",    defaultVisible: true,  width: "16%" },
+  { key: "type",       label: "Type",       defaultVisible: true,  width: "14%" },
+  { key: "date",       label: "Date",       defaultVisible: true,  width: "12%" },
+  { key: "facility",   label: "Facility",   defaultVisible: true,  width: "22%" },
+  { key: "doctor",     label: "Doctor",     defaultVisible: false, width: "16%" },
+  { key: "patient",    label: "Patient",    defaultVisible: false, width: "14%" },
+  { key: "specialty",  label: "Specialty",  defaultVisible: false, width: "14%" },
+  { key: "status",     label: "Status",     defaultVisible: true,  width: "16%" },
+  { key: "date_added", label: "Date added", defaultVisible: false, width: "14%" },
 ];
 const COLUMN_STORAGE_KEY = "asclepius_documents_columns";
 
@@ -102,9 +104,34 @@ export default function DocumentsPage() {
   const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(() => loadVisibleColumns());
   const [colsOpen, setColsOpen] = useState(false);
   const colsRef = useRef<HTMLDivElement>(null);
+  const [sortBy, setSortBy] = useState<SortKey | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
   const confirm = useConfirm();
   const limit = 20;
+
+  const toggleSort = (key: SortKey) => {
+    setPage(0);
+    setSortBy((prev) => {
+      if (prev !== key) {
+        // New column: default to desc for dates / status, asc for text.
+        setSortOrder(
+          key === "date" || key === "date_added" || key === "status" ? "desc" : "asc",
+        );
+        return key;
+      }
+      // Same column: asc → desc → unsorted (default ordering resumes).
+      setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+      return sortOrder === "desc" ? null : prev;
+    });
+  };
+
+  const sortArrow = (key: SortKey) => {
+    if (sortBy !== key) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+    return sortOrder === "asc"
+      ? <ArrowUp className="h-3 w-3 text-primary" />
+      : <ArrowDown className="h-3 w-3 text-primary" />;
+  };
 
   // Persist column choice.
   useEffect(() => {
@@ -181,6 +208,7 @@ export default function DocumentsPage() {
     if (facilityFilter.length) params.facility_id = facilityFilter.join(",");
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
+    if (sortBy) { params.sort = sortBy; params.order = sortOrder; }
 
     api.get("/documents", { params }).then((res: any) => {
       setDocuments(res.data.items || []);
@@ -188,7 +216,7 @@ export default function DocumentsPage() {
       setLoading(false);
     });
     api.get("/pipeline/status").then((res: any) => setPipeline(res.data)).catch(() => {});
-  }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
+  }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page, sortBy, sortOrder]);
 
   // Poll pipeline status for live page progress
   useEffect(() => {
@@ -649,9 +677,20 @@ export default function DocumentsPage() {
                   className="align-middle"
                 />
               </th>
-              <th className="px-4 py-2 text-left font-medium">File</th>
+              <th
+                className="px-4 py-2 text-left font-medium cursor-pointer select-none hover:text-foreground"
+                onClick={() => toggleSort("file")}
+              >
+                <span className="inline-flex items-center gap-1">File {sortArrow("file")}</span>
+              </th>
               {orderedVisibleColumns.map((c) => (
-                <th key={c.key} className="px-4 py-2 text-left font-medium">{c.label}</th>
+                <th
+                  key={c.key}
+                  className="px-4 py-2 text-left font-medium cursor-pointer select-none hover:text-foreground"
+                  onClick={() => toggleSort(c.key)}
+                >
+                  <span className="inline-flex items-center gap-1">{c.label} {sortArrow(c.key)}</span>
+                </th>
               ))}
             </tr>
           </thead>
@@ -697,6 +736,10 @@ export default function DocumentsPage() {
                     if (c.key === "specialty") {
                       const s = doc.specialty_original || "";
                       return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={s}>{s || "—"}</td>;
+                    }
+                    if (c.key === "date_added") {
+                      const d = doc.created_at ? String(doc.created_at).slice(0, 10) : "";
+                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.created_at || ""}>{d || "—"}</td>;
                     }
                     // status
                     return (

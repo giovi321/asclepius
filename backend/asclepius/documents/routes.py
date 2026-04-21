@@ -131,6 +131,8 @@ async def list_docs(
     facility: str | None = None,
     limit: int = Query(default=50),
     offset: int = Query(default=0, ge=0),
+    sort: str | None = Query(default=None),
+    order: str | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -148,6 +150,7 @@ async def list_docs(
         db, current_user["id"], patient_id, type, date_from, date_to, status, q, limit, offset,
         specialty=specialty, doctor_id=effective_doctor, facility_id=effective_facility,
         user_role=current_user.get("role"),
+        sort=sort, order=order,
     )
 
 

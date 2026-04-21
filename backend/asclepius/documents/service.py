@@ -35,6 +35,22 @@ async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     return dict(row)
 
 
+_SORT_COLUMNS: dict[str, str] = {
+    # Frontend column key → SQL expression. Whitelist only — anything not in
+    # here falls back to the default "best date" ordering, which also
+    # prevents SQL injection via untrusted sort params.
+    "file":       "d.original_filename",
+    "type":       "d.doc_type",
+    "date":       "COALESCE(d.date_visit, d.date_issued, d.doc_date)",
+    "doctor":     "d.doctor_name",
+    "facility":   "d.facility_name",
+    "patient":    "p.display_name",
+    "specialty":  "COALESCE(ns.canonical_display, d.specialty_original)",
+    "status":     "d.status",
+    "date_added": "d.created_at",
+}
+
+
 async def list_documents(
     db: aiosqlite.Connection,
     user_id: int,
@@ -50,6 +66,8 @@ async def list_documents(
     doctor_id: str | int | None = None,
     facility_id: str | int | None = None,
     user_role: str | None = None,
+    sort: str | None = None,
+    order: str | None = None,
 ) -> dict:
     """List documents with filters. Returns {items, total}.
 
@@ -190,10 +208,21 @@ async def list_documents(
                LEFT JOIN norm_specialties ns ON d.norm_specialty_id = ns.id
                LEFT JOIN medical_events me ON d.event_id = me.id"""
 
+    # Sort resolution — honour ?sort= when it matches the whitelist, else
+    # fall back to the default "best date" ordering.
+    sort_col = _SORT_COLUMNS.get((sort or "").strip())
+    sort_dir = "ASC" if (order or "").strip().lower() == "asc" else "DESC"
+    if sort_col is None:
+        order_by = "COALESCE(d.date_visit, d.date_issued, d.doc_date, d.created_at) DESC"
+    else:
+        # NULL-LAST regardless of direction so empty cells never steal the
+        # top of the list when sorting by e.g. Doctor.
+        order_by = f"{sort_col} IS NULL, {sort_col} {sort_dir}, d.id DESC"
+
     query = f"""SELECT {select_cols}
                 FROM documents d {joins}
                 {where}
-                ORDER BY COALESCE(d.date_visit, d.date_issued, d.doc_date, d.created_at) DESC
+                ORDER BY {order_by}
                 LIMIT ? OFFSET ?"""
     params.extend([limit, offset])
     cursor = await db.execute(query, params)

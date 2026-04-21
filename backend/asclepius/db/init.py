@@ -347,6 +347,16 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by_user_id)"
     )
 
+    # Backfill NULL created_at on legacy rows so the Documents page's "Date
+    # added" column always has something to show. Uses the document's
+    # updated_at when it's populated (closest proxy for the real write time),
+    # falling back to CURRENT_TIMESTAMP as a last resort.
+    await db.execute("""
+        UPDATE documents
+        SET created_at = COALESCE(updated_at, CURRENT_TIMESTAMP)
+        WHERE created_at IS NULL
+    """)
+
     # Auto-confirm aliases that are trivially identical to their parent's canonical
     # display name — there is nothing to review when the alias IS the canonical form.
     # Idempotent.

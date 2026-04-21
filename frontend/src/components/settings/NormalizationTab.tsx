@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
+import SearchableSelect from "@/components/SearchableSelect";
 import {
   Plus, Trash2, Save, Check, Search, Edit3, GitMerge, X, ChevronRight,
   FileText, Sparkles, Loader2,
@@ -574,25 +575,21 @@ export default function NormalizationTab() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-medium">{selectedIds.size} selected</span>
             <span className="text-muted-foreground">Merge into:</span>
-            <select
-              value={batchTargetId ?? ""}
-              onChange={(e: any) => {
-                const v = e.target.value;
-                if (v === "") setBatchTargetId(null);
-                else setBatchTargetId(Number(v));
-              }}
-              className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
-            >
-              <option value="">Select target...</option>
-              <option value={-1}>+ Create new entry...</option>
-              {normItems
-                .filter((n: any) => !selectedIds.has(n.id))
-                .map((n: any) => (
-                  <option key={n.id} value={n.id}>
-                    {n.canonical_display} ({n.canonical_code})
-                  </option>
-                ))}
-            </select>
+            <div className="min-w-[240px] max-w-xs">
+              <SearchableSelect
+                value={batchTargetId === null ? null : String(batchTargetId)}
+                onChange={(v) => setBatchTargetId(v === null ? null : Number(v))}
+                placeholder="Select target..."
+                pinnedOptions={[{ value: "-1", label: "+ Create new entry..." }]}
+                options={normItems
+                  .filter((n: any) => !selectedIds.has(n.id))
+                  .map((n: any) => ({
+                    value: String(n.id),
+                    label: n.canonical_display,
+                    hint: n.canonical_code,
+                  }))}
+              />
+            </div>
             <button
               onClick={handleBatchMerge}
               disabled={!batchTargetId || (batchTargetId === -1 && !batchNewDisplay.trim())}
@@ -713,21 +710,21 @@ export default function NormalizationTab() {
                       <div className="flex flex-col gap-2 text-sm">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="text-muted-foreground">Merge <strong>{item.canonical_display}</strong> into:</span>
-                          <select
-                            value={mergeTargetId ?? ""}
-                            onChange={(e: any) => {
-                              const v = e.target.value;
-                              if (v === "") setMergeTargetId(null);
-                              else setMergeTargetId(Number(v));
-                            }}
-                            className="rounded-md border bg-background px-2 py-1 text-sm max-w-xs"
-                          >
-                            <option value="">Select target...</option>
-                            <option value={-1}>+ Create new entry...</option>
-                            {normItems.filter((n: any) => n.id !== item.id).map((n: any) => (
-                              <option key={n.id} value={n.id}>{n.canonical_display} ({n.canonical_code})</option>
-                            ))}
-                          </select>
+                          <div className="min-w-[240px] max-w-xs">
+                            <SearchableSelect
+                              value={mergeTargetId === null ? null : String(mergeTargetId)}
+                              onChange={(v) => setMergeTargetId(v === null ? null : Number(v))}
+                              placeholder="Select target..."
+                              pinnedOptions={[{ value: "-1", label: "+ Create new entry..." }]}
+                              options={normItems
+                                .filter((n: any) => n.id !== item.id)
+                                .map((n: any) => ({
+                                  value: String(n.id),
+                                  label: n.canonical_display,
+                                  hint: n.canonical_code,
+                                }))}
+                            />
+                          </div>
                           <button
                             onClick={() => mergeTargetId && handleMerge(item.id, mergeTargetId)}
                             disabled={!mergeTargetId || (mergeTargetId === -1 && !rowNewDisplay.trim())}

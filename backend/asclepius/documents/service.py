@@ -67,13 +67,19 @@ async def list_documents(
         params.append(patient_id)
     if doc_type:
         types = [t.strip() for t in doc_type.split(",") if t.strip()]
-        if len(types) == 1:
-            conditions.append("d.doc_type = ?")
-            params.append(types[0])
-        elif types:
+        # ``__blank__`` is a UI sentinel meaning "match rows where this field
+        # is null or empty". Split it out so it OR's with the regular IN clause.
+        want_blank = "__blank__" in types
+        types = [t for t in types if t != "__blank__"]
+        clauses: list[str] = []
+        if types:
             placeholders = ",".join(["?"] * len(types))
-            conditions.append(f"d.doc_type IN ({placeholders})")
+            clauses.append(f"d.doc_type IN ({placeholders})")
             params.extend(types)
+        if want_blank:
+            clauses.append("(d.doc_type IS NULL OR d.doc_type = '')")
+        if clauses:
+            conditions.append("(" + " OR ".join(clauses) + ")")
     if date_from:
         # Use the best available date
         conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) >= ?")
@@ -83,46 +89,63 @@ async def list_documents(
         params.append(date_to)
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
-        if len(statuses) == 1:
-            conditions.append("d.status = ?")
-            params.append(statuses[0])
-        elif statuses:
+        want_blank = "__blank__" in statuses
+        statuses = [s for s in statuses if s != "__blank__"]
+        clauses = []
+        if statuses:
             placeholders = ",".join(["?"] * len(statuses))
-            conditions.append(f"d.status IN ({placeholders})")
+            clauses.append(f"d.status IN ({placeholders})")
             params.extend(statuses)
+        if want_blank:
+            clauses.append("(d.status IS NULL OR d.status = '')")
+        if clauses:
+            conditions.append("(" + " OR ".join(clauses) + ")")
     if doctor_id is not None:
-        doctor_ids = [int(x) for x in str(doctor_id).split(",") if x.strip().isdigit()]
-        if len(doctor_ids) == 1:
-            conditions.append("d.doctor_id = ?")
-            params.append(doctor_ids[0])
-        elif doctor_ids:
+        raw_doctor = [x.strip() for x in str(doctor_id).split(",") if x.strip()]
+        want_blank = "__blank__" in raw_doctor
+        doctor_ids = [int(x) for x in raw_doctor if x != "__blank__" and x.isdigit()]
+        clauses = []
+        if doctor_ids:
             placeholders = ",".join(["?"] * len(doctor_ids))
-            conditions.append(f"d.doctor_id IN ({placeholders})")
+            clauses.append(f"d.doctor_id IN ({placeholders})")
             params.extend(doctor_ids)
+        if want_blank:
+            clauses.append("d.doctor_id IS NULL")
+        if clauses:
+            conditions.append("(" + " OR ".join(clauses) + ")")
     if facility_id is not None:
-        facility_ids = [int(x) for x in str(facility_id).split(",") if x.strip().isdigit()]
-        if len(facility_ids) == 1:
-            conditions.append("d.facility_id = ?")
-            params.append(facility_ids[0])
-        elif facility_ids:
+        raw_facility = [x.strip() for x in str(facility_id).split(",") if x.strip()]
+        want_blank = "__blank__" in raw_facility
+        facility_ids = [int(x) for x in raw_facility if x != "__blank__" and x.isdigit()]
+        clauses = []
+        if facility_ids:
             placeholders = ",".join(["?"] * len(facility_ids))
-            conditions.append(f"d.facility_id IN ({placeholders})")
+            clauses.append(f"d.facility_id IN ({placeholders})")
             params.extend(facility_ids)
+        if want_blank:
+            clauses.append("d.facility_id IS NULL")
+        if clauses:
+            conditions.append("(" + " OR ".join(clauses) + ")")
     if specialty:
         spec_values = [s.strip() for s in specialty.split(",") if s.strip()]
-        if len(spec_values) == 1:
-            conditions.append("(d.norm_specialty_id = ? OR d.specialty_original LIKE ?)")
+        want_blank = "__blank__" in spec_values
+        spec_values = [s for s in spec_values if s != "__blank__"]
+        clauses = []
+        for sv in spec_values:
             try:
-                spec_id = int(spec_values[0])
-                params.extend([spec_id, f"%{spec_values[0]}%"])
+                sv_id = int(sv)
+                clauses.append("(d.norm_specialty_id = ? OR d.specialty_original LIKE ?)")
+                params.extend([sv_id, f"%{sv}%"])
             except ValueError:
-                params.extend([-1, f"%{spec_values[0]}%"])
-        elif spec_values:
-            or_parts = []
-            for sv in spec_values:
-                or_parts.append("d.specialty_original LIKE ?")
+                clauses.append("d.specialty_original LIKE ?")
                 params.append(f"%{sv}%")
-            conditions.append(f"({' OR '.join(or_parts)})")
+        if want_blank:
+            clauses.append(
+                "(d.norm_specialty_id IS NULL AND "
+                "(d.specialty_original IS NULL OR d.specialty_original = ''))"
+            )
+        if clauses:
+            conditions.append("(" + " OR ".join(clauses) + ")")
 
     # Fuzzy search across multiple columns using LIKE
     if q:

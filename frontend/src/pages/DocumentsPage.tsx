@@ -291,7 +291,10 @@ export default function DocumentsPage() {
 
         <MultiSelectFilter
           label="Type"
-          options={DOC_TYPES.map((t: string) => ({ value: t, label: t.replace(/_/g, " ") }))}
+          options={[
+            { value: "__blank__", label: "(blank)" },
+            ...DOC_TYPES.map((t: string) => ({ value: t, label: t.replace(/_/g, " ") })),
+          ]}
           selected={typeFilter}
           onChange={(v: string[]) => { setTypeFilter(v); setPage(0); }}
         />
@@ -299,6 +302,7 @@ export default function DocumentsPage() {
         <MultiSelectFilter
           label="Status"
           options={[
+            { value: "__blank__", label: "(blank)" },
             { value: "done", label: "Done" },
             { value: "processing", label: "Processing" },
             { value: "pending", label: "Pending" },
@@ -313,30 +317,39 @@ export default function DocumentsPage() {
 
         <MultiSelectFilter
           label="Specialty"
-          options={specialties.map((s: any) => ({
-            value: s.canonical_code || s.canonical_display,
-            label: s.canonical_display || s.canonical_code,
-          }))}
+          options={[
+            { value: "__blank__", label: "(blank)" },
+            ...specialties.map((s: any) => ({
+              value: s.canonical_code || s.canonical_display,
+              label: s.canonical_display || s.canonical_code,
+            })),
+          ]}
           selected={specialtyFilter}
           onChange={(v: string[]) => { setSpecialtyFilter(v); setPage(0); }}
         />
 
         <MultiSelectFilter
           label="Doctor"
-          options={doctors.map((d: any) => ({
-            value: String(d.id),
-            label: `${d.title ? d.title + " " : ""}${d.name}`,
-          }))}
+          options={[
+            { value: "__blank__", label: "(blank)" },
+            ...doctors.map((d: any) => ({
+              value: String(d.id),
+              label: `${d.title ? d.title + " " : ""}${d.name}`,
+            })),
+          ]}
           selected={doctorFilter}
           onChange={(v: string[]) => { setDoctorFilter(v); setPage(0); }}
         />
 
         <MultiSelectFilter
           label="Facility"
-          options={facilities.map((f: any) => ({
-            value: String(f.id),
-            label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
-          }))}
+          options={[
+            { value: "__blank__", label: "(blank)" },
+            ...facilities.map((f: any) => ({
+              value: String(f.id),
+              label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
+            })),
+          ]}
           selected={facilityFilter}
           onChange={(v: string[]) => { setFacilityFilter(v); setPage(0); }}
         />

@@ -42,14 +42,17 @@ attribution text. Summary:
   associated with them are © Regenstrief Institute, Inc. and the LOINC
   Committee, available under the LOINC license at
   https://loinc.org/license/. Redistribution is permitted (Section 10) as
-  long as the required notice is included — see `NOTICE`. We use Wikidata's
-  P4338 mapping as the LOINC code source; the display strings here are
-  Wikidata labels, which approximate but do not necessarily match the
-  official LOINC `LONG_COMMON_NAME` field byte-for-byte. Deployments that
-  need strict adherence to the LOINC display-name fields should regenerate
-  this file from an officially-licensed LOINC distribution: register at
-  https://loinc.org, drop the LOINC Table CSV at
-  `scripts/build_knowledge/loinc.csv`, and re-run `build_lab_tests.py`.
+  long as the required notice is included — see `NOTICE`. The English
+  display strings shipped here are verbatim copies of the official LOINC
+  `LONG_COMMON_NAME` field (LOINC release 2.82). Italian, French, German,
+  and Spanish aliases come from the official LOINC Linguistic Variants
+  files (itIT16, frFR18, deDE15, esES12). The set of codes shipped is the
+  intersection of Wikidata's P4338 mapping and our hand-curated seed list —
+  roughly 480 commonly-referenced laboratory tests, not the full ~109k
+  LOINC table. To regenerate or extend, register at https://loinc.org,
+  place `LoincTableCore.csv` at `scripts/build_knowledge/loinc.csv` (and
+  the LinguisticVariant CSVs at `loinc_{it,fr,de,es}.csv`), then re-run
+  `build_lab_tests.py`.
 - **ATC** (in `medications.json`): codes maintained by the WHO
   Collaborating Centre for Drug Statistics Methodology; sourced via
   Wikidata for redistribution-friendly use as identifiers.

@@ -25,11 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without explicit attribution). Also documents Wikidata (CC0), ATC, and
   ICD-10 sources. README and the user-guide normalization page now link
   to it.
-- `build_lab_tests.py` accepts an optional `loinc.csv` overlay (registered
-  LOINC distribution) — when present, its `LONG_COMMON_NAME` and
-  `SHORTNAME` fields take precedence over Wikidata labels, satisfying the
-  LOINC display-name requirement for deployments needing strict
-  compliance.
+- `build_lab_tests.py` reads optional official LOINC inputs:
+  `loinc.csv` (LoincTableCore — overrides EN labels with the
+  `LONG_COMMON_NAME` field) and `loinc_{it,fr,de,es}.csv` (LOINC
+  Linguistic Variants — adds per-language aliases). The overlay is
+  enrich-only, so the file stays at ~550 KB instead of ballooning to
+  the full ~109k LOINC codes. The shipped `lab_tests.json` now uses
+  official LOINC display names for all 469 codes that overlap with
+  the LOINC Table, with native Italian / French / German / Spanish
+  translations from the LOINC Linguistic Variants. Both inputs are
+  gitignored so registered LOINC distributions stay local.
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, GitHub issue and
   pull-request templates.
 - GitHub Actions CI (`.github/workflows/ci.yml`), CodeQL

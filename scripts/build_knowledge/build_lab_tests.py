@@ -18,8 +18,11 @@ of (and in priority over) the Wikidata labels.
 Sources, in load order::
 
   1. config/seeds/lab_tests.json (existing curated set)
-  2. scripts/build_knowledge/loinc.csv (optional, official LOINC table)
-  3. Wikidata SPARQL P4338 query (CC0)
+  2. Wikidata SPARQL P4338 query (CC0)
+  3. scripts/build_knowledge/loinc.csv (optional, official LOINC Table or
+     LoincTableCore — overrides EN labels)
+  4. scripts/build_knowledge/loinc_{it,fr,de,es}.csv (optional, official
+     LOINC Linguistic Variants — adds per-language aliases and labels)
 
 Usage::
 
@@ -45,6 +48,15 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT_PATH = ROOT / "bundled_config" / "knowledge" / "lab_tests.json"
 SEED_PATH = ROOT / "config" / "seeds" / "lab_tests.json"
 LOCAL_LOINC = Path(__file__).resolve().parent / "loinc.csv"
+# Optional Linguistic Variants files (Group 3 artifacts in the LOINC
+# distribution). Drop these next to loinc.csv to add per-language aliases
+# straight from the official translations. Filename → BCP-47 language tag.
+LOCAL_LOINC_VARIANTS: dict[str, str] = {
+    "loinc_it.csv": "it",
+    "loinc_fr.csv": "fr",
+    "loinc_de.csv": "de",
+    "loinc_es.csv": "es",
+}
 
 # Wikidata: P4338 = LOINC code. Pull all of them (there are only a few
 # thousand items in the public dump).
@@ -113,38 +125,48 @@ def _from_local_loinc(items: dict[str, dict]) -> None:
     """Overlay official LOINC table fields on top of any earlier sources.
 
     LOINC is the authoritative source — when its CSV is present, its
-    LONG_COMMON_NAME *replaces* the English canonical label populated from
-    seeds or Wikidata, and its SHORTNAME is added as an alias. This is what
-    deployments needing strict LOINC display-name compliance rely on.
+    LONG_COMMON_NAME *replaces* the English canonical label for any code
+    already in our set (from seeds or Wikidata), and its SHORTNAME is
+    added as an alias. This satisfies the LOINC license's display-name
+    requirement for our shipped codes without inflating the file with
+    the ~109k long-tail codes nobody references in real lab reports.
+
+    Deployments that want full LOINC coverage should populate the seed
+    list further (or override `bundled_config/knowledge/lab_tests.json`
+    via the per-install path) — this keeps the repo file at a few MB.
     """
     if not LOCAL_LOINC.is_file():
         print(f"(no local LOINC csv at {LOCAL_LOINC} — skipping)", file=sys.stderr)
         return
     print(f"Overlaying official LOINC csv from {LOCAL_LOINC}...", file=sys.stderr)
+    enriched = 0
     with LOCAL_LOINC.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             code = row.get("LOINC_NUM") or row.get("loinc_num")
+            if not code:
+                continue
+            entry = items.get(code)
+            if entry is None:
+                # Enrich-only — see docstring.
+                continue
             display = (
                 row.get("LONG_COMMON_NAME")
                 or row.get("long_common_name")
                 or row.get("COMPONENT")
                 or row.get("component")
             )
-            if not code or not display:
-                continue
-            entry = items.setdefault(
-                code,
-                {"loinc": code, "labels": {}, "aliases": defaultdict(set)},
-            )
-            # Direct assignment — LOINC table wins over seed/Wikidata for
-            # the canonical English display, satisfying the LOINC license's
-            # display-name requirement.
-            entry["labels"]["en"] = display
-            entry["aliases"]["en"].add(display)
+            if display:
+                # Direct assignment — LOINC table wins over seed/Wikidata
+                # for the canonical English display, satisfying the LOINC
+                # license's display-name requirement.
+                entry["labels"]["en"] = display
+                entry["aliases"]["en"].add(display)
             short = row.get("SHORTNAME") or row.get("shortname")
             if short:
                 entry["aliases"]["en"].add(short)
+            enriched += 1
+    print(f"  enriched {enriched} existing entries with official LOINC names", file=sys.stderr)
 
 
 def _from_wikidata(items: dict[str, dict]) -> None:
@@ -171,12 +193,41 @@ def _from_wikidata(items: dict[str, dict]) -> None:
     time.sleep(2)
 
 
+def _from_local_loinc_variant(items: dict[str, dict], path: Path, lang: str) -> None:
+    """Add official LOINC translations for a single language as aliases."""
+    if not path.is_file():
+        return
+    print(f"Overlaying official LOINC variant ({lang}) from {path}...", file=sys.stderr)
+    with path.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = row.get("LOINC_NUM") or row.get("loinc_num")
+            if not code:
+                continue
+            entry = items.get(code)
+            if entry is None:
+                # Linguistic variants are only useful for codes already in
+                # our set — skip the long tail to keep the file small.
+                continue
+            for field in ("LONG_COMMON_NAME", "SHORTNAME", "LinguisticVariantDisplayName"):
+                val = (row.get(field) or "").strip()
+                if val:
+                    entry["aliases"][lang].add(val)
+                    # Use the long common name as canonical for the language
+                    # if one isn't already set from another source.
+                    if field == "LONG_COMMON_NAME":
+                        entry["labels"].setdefault(lang, val)
+
+
 def main() -> int:
     items = _from_seed()
     _from_wikidata(items)
     # LOINC CSV runs LAST so its display names take precedence over seed
     # and Wikidata labels — see docstring for the compliance rationale.
     _from_local_loinc(items)
+    here = Path(__file__).resolve().parent
+    for fname, lang in LOCAL_LOINC_VARIANTS.items():
+        _from_local_loinc_variant(items, here / fname, lang)
 
     out: list[dict] = []
     for entry in items.values():

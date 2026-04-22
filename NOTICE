@@ -19,12 +19,22 @@ LOINC content appears in:
   - bundled_config/knowledge/lab_tests.json
   - config/seeds/lab_tests.json
 
-The LOINC codes in those files are taken from Wikidata's P4338 mapping
-(CC0) and the project's hand-curated seed set. Wikidata-sourced display
-names are best-effort approximations of LOINC display names; deployments
-that require strict adherence to the LOINC Table's display-name fields
-should regenerate the file from an officially-licensed LOINC distribution
-(register at https://loinc.org).
+The set of LOINC codes shipped is selected from Wikidata's P4338 mapping
+(CC0) and the project's hand-curated seed set — roughly 480 commonly-
+referenced laboratory tests. The English display strings on those entries
+are taken verbatim from the official LOINC Table's LONG_COMMON_NAME field
+(LOINC release 2.82), and SHORTNAME values are added as aliases. Italian,
+French, German, and Spanish display strings are taken from the
+corresponding official LOINC Linguistic Variants files (Group 3 artifacts
+itIT16, frFR18, deDE15, esES12). All such display strings are reproduced
+unmodified in accordance with Section 10 of the LOINC license.
+
+Asclepius does not redistribute the full LOINC table; only the display
+fields associated with the ~480 codes shipped above. To regenerate or
+extend the bundled file, register at https://loinc.org, place
+LoincTableCore.csv at scripts/build_knowledge/loinc.csv (and any
+LinguisticVariant CSVs at loinc_{it,fr,de,es}.csv), then run
+scripts/build_knowledge/build_lab_tests.py.
 
 ------------------------------------------------------------------------
 

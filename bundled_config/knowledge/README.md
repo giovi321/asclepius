@@ -32,17 +32,29 @@ LOINC for labs.
 
 ## Licensing
 
-- **Wikidata**: CC0 (public domain). Can be redistributed without
-  attribution, but it's the right thing to do, so this README is the
-  attribution.
-- **LOINC**: covered by Regenstrief's free license; redistribution requires
-  registration and including the LOINC license notice. We do **not** ship
-  bundled LOINC. The `lab_tests.json` here is built from the CC0 Wikidata
-  P4338 mappings and the project's hand-curated seed list. If you have
-  registered for LOINC and want richer coverage, drop the LOINC table CSV
-  at `scripts/build_knowledge/loinc.csv` and re-run the build script.
-- **ICD-10**: WHO classification, free to use; we use the Wikidata mapping
-  (CC0) so no separate WHO download is needed.
+See [`NOTICE`](../../NOTICE) at the repo root for the canonical
+attribution text. Summary:
+
+- **Wikidata**: CC0 (public domain). The build scripts pull from Wikidata's
+  SPARQL endpoint; the `medications.json`, `diagnoses.json`, and
+  `lab_tests.json` data tables are derived works of CC0 content.
+- **LOINC** (in `lab_tests.json`): the LOINC codes and the long-form names
+  associated with them are © Regenstrief Institute, Inc. and the LOINC
+  Committee, available under the LOINC license at
+  https://loinc.org/license/. Redistribution is permitted (Section 10) as
+  long as the required notice is included — see `NOTICE`. We use Wikidata's
+  P4338 mapping as the LOINC code source; the display strings here are
+  Wikidata labels, which approximate but do not necessarily match the
+  official LOINC `LONG_COMMON_NAME` field byte-for-byte. Deployments that
+  need strict adherence to the LOINC display-name fields should regenerate
+  this file from an officially-licensed LOINC distribution: register at
+  https://loinc.org, drop the LOINC Table CSV at
+  `scripts/build_knowledge/loinc.csv`, and re-run `build_lab_tests.py`.
+- **ATC** (in `medications.json`): codes maintained by the WHO
+  Collaborating Centre for Drug Statistics Methodology; sourced via
+  Wikidata for redistribution-friendly use as identifiers.
+- **ICD-10** (in `diagnoses.json`): WHO classification; sourced via
+  Wikidata.
 
 ## Regenerating
 

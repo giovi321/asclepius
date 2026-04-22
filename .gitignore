@@ -57,3 +57,9 @@ htmlcov/
 
 # MkDocs build
 site/
+
+# Local LOINC distribution (registered download from Regenstrief — not
+# redistributable wholesale; only the per-install overlay CSV at the
+# build-script path is read by build_lab_tests.py)
+/Loinc_*/
+/scripts/build_knowledge/loinc.csv

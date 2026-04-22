@@ -109,5 +109,10 @@ npm run build
 
 Released under the [MIT License](LICENSE).
 
+Bundled medical reference data (LOINC, ATC, ICD-10) is covered by separate
+third-party licenses — see [`NOTICE`](NOTICE) for required attributions,
+including the LOINC short notice required by Section 10 of the LOINC
+license.
+
 This project handles personal health information. Read
 [`SECURITY.md`](SECURITY.md) before deploying to the public internet.

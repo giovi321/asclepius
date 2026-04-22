@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the residual. Doctors / facilities / specialties have no public reference
   and fall through to the existing LLM path. Stdlib-only build scripts
   under `scripts/build_knowledge/` regenerate the JSON from Wikidata SPARQL.
+- `NOTICE` file at the repo root, providing the LOINC short-license
+  attribution required by Section 10 of the LOINC license (covers both
+  the new `bundled_config/knowledge/lab_tests.json` and the pre-existing
+  `config/seeds/lab_tests.json`, which had been shipping LOINC codes
+  without explicit attribution). Also documents Wikidata (CC0), ATC, and
+  ICD-10 sources. README and the user-guide normalization page now link
+  to it.
+- `build_lab_tests.py` accepts an optional `loinc.csv` overlay (registered
+  LOINC distribution) — when present, its `LONG_COMMON_NAME` and
+  `SHORTNAME` fields take precedence over Wikidata labels, satisfying the
+  LOINC display-name requirement for deployments needing strict
+  compliance.
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, GitHub issue and
   pull-request templates.
 - GitHub Actions CI (`.github/workflows/ci.yml`), CodeQL

@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 """Build bundled_config/knowledge/lab_tests.json.
 
-LOINC requires registration with Regenstrief and we don't ship it bundled by
-default. Instead this script seeds from two CC0/free sources:
+The LOINC codes this script writes are obtained from Wikidata items with
+property P4338 (Wikidata is CC0) and from the project's existing curated
+seed file. The codes themselves are © Regenstrief Institute, Inc. and the
+LOINC Committee — see ``NOTICE`` at the repo root for the LOINC short
+notice required by Section 10 of the LOINC license. The Wikidata-derived
+display strings are best-effort approximations of LOINC's official long
+common names, not byte-for-byte copies of the LOINC Table fields.
 
-1. The existing ``config/seeds/lab_tests.json`` (whatever LOINC codes the
-   project already curated).
-2. Wikidata items with property P4338 (LOINC code) — Wikidata is CC0.
+For deployments that need strict adherence to the LOINC display-name
+requirement, register at https://loinc.org, drop the LOINC Table CSV at
+``scripts/build_knowledge/loinc.csv``, and re-run this script — it will
+overlay the official ``LONG_COMMON_NAME`` and ``SHORTNAME`` fields on top
+of (and in priority over) the Wikidata labels.
 
-When you have a local LOINC table (downloaded after registering at
-https://loinc.org), drop the CSV at ``scripts/build_knowledge/loinc.csv``
-and this script will merge its `LOINC_NUM` + `LONG_COMMON_NAME` rows in.
+Sources, in load order::
+
+  1. config/seeds/lab_tests.json (existing curated set)
+  2. scripts/build_knowledge/loinc.csv (optional, official LOINC table)
+  3. Wikidata SPARQL P4338 query (CC0)
 
 Usage::
 
@@ -101,10 +110,17 @@ def _from_seed() -> dict[str, dict]:
 
 
 def _from_local_loinc(items: dict[str, dict]) -> None:
+    """Overlay official LOINC table fields on top of any earlier sources.
+
+    LOINC is the authoritative source — when its CSV is present, its
+    LONG_COMMON_NAME *replaces* the English canonical label populated from
+    seeds or Wikidata, and its SHORTNAME is added as an alias. This is what
+    deployments needing strict LOINC display-name compliance rely on.
+    """
     if not LOCAL_LOINC.is_file():
         print(f"(no local LOINC csv at {LOCAL_LOINC} — skipping)", file=sys.stderr)
         return
-    print(f"Merging local LOINC csv from {LOCAL_LOINC}...", file=sys.stderr)
+    print(f"Overlaying official LOINC csv from {LOCAL_LOINC}...", file=sys.stderr)
     with LOCAL_LOINC.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -121,7 +137,10 @@ def _from_local_loinc(items: dict[str, dict]) -> None:
                 code,
                 {"loinc": code, "labels": {}, "aliases": defaultdict(set)},
             )
-            entry["labels"].setdefault("en", display)
+            # Direct assignment — LOINC table wins over seed/Wikidata for
+            # the canonical English display, satisfying the LOINC license's
+            # display-name requirement.
+            entry["labels"]["en"] = display
             entry["aliases"]["en"].add(display)
             short = row.get("SHORTNAME") or row.get("shortname")
             if short:
@@ -154,8 +173,10 @@ def _from_wikidata(items: dict[str, dict]) -> None:
 
 def main() -> int:
     items = _from_seed()
-    _from_local_loinc(items)
     _from_wikidata(items)
+    # LOINC CSV runs LAST so its display names take precedence over seed
+    # and Wikidata labels — see docstring for the compliance rationale.
+    _from_local_loinc(items)
 
     out: list[dict] = []
     for entry in items.values():

@@ -133,11 +133,11 @@ A separate read-only side index used by the auto-merge feature, located at `bund
 | --- | --- | --- |
 | `medications.json` | ATC | Wikidata (CC0), ~3.7k drugs with multilingual brand and generic names |
 | `diagnoses.json` | ICD-10 | Wikidata (CC0), ~600 chapter and 3-character codes with multilingual labels |
-| `lab_tests.json` | LOINC | Wikidata (CC0) + the project's hand-curated seed list |
+| `lab_tests.json` | LOINC | LOINC codes via Wikidata's P4338 mapping + the project's hand-curated seed list. LOINC is © Regenstrief Institute, Inc. — see [`NOTICE`](https://github.com/giovi321/asclepius/blob/main/NOTICE) for the required attribution |
 
 These files are **not** loaded into the database. They sit in memory and are consulted whenever auto-merge needs to know whether two name variants (e.g. *Amoxicillin* and *Zimox*) refer to the same underlying concept. Same code → deterministic merge; mismatch → the LLM never sees them in the same prompt and can't accidentally collapse them.
 
-The build scripts under `scripts/build_knowledge/` regenerate the JSON files from public Wikidata SPARQL with no third-party dependencies. LOINC's full table requires registration with Regenstrief and is not bundled by default — drop a `loinc.csv` next to the build script if you want richer lab coverage.
+The build scripts under `scripts/build_knowledge/` regenerate the JSON files from public Wikidata SPARQL with no third-party dependencies. The bundled `lab_tests.json` uses Wikidata-derived display names, which approximate but do not exactly match the official LOINC `LONG_COMMON_NAME` field. For deployments that need strict LOINC compliance, register at https://loinc.org, drop the LOINC Table CSV at `scripts/build_knowledge/loinc.csv`, and re-run `build_lab_tests.py` — the official names will overlay the Wikidata labels.
 
 A per-install override at `$ASCLEPIUS_CONFIG_PATH/../knowledge/{medications,diagnoses,lab_tests}.json` shadows the bundled copy, mirroring the seed-data precedence.
 

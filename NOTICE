@@ -1,0 +1,60 @@
+Asclepius — Third-Party Notices
+================================
+
+This product includes content from third-party sources. Their notices and
+license terms follow.
+
+------------------------------------------------------------------------
+
+LOINC® (Logical Observation Identifiers Names and Codes)
+--------------------------------------------------------
+
+This material contains content from LOINC (http://loinc.org). LOINC is
+copyright © Regenstrief Institute, Inc. and the Logical Observation
+Identifiers Names and Codes (LOINC) Committee and is available at no cost
+under the license at http://loinc.org/license. LOINC® is a registered
+United States trademark of Regenstrief Institute, Inc.
+
+LOINC content appears in:
+  - bundled_config/knowledge/lab_tests.json
+  - config/seeds/lab_tests.json
+
+The LOINC codes in those files are taken from Wikidata's P4338 mapping
+(CC0) and the project's hand-curated seed set. Wikidata-sourced display
+names are best-effort approximations of LOINC display names; deployments
+that require strict adherence to the LOINC Table's display-name fields
+should regenerate the file from an officially-licensed LOINC distribution
+(register at https://loinc.org).
+
+------------------------------------------------------------------------
+
+Wikidata
+--------
+
+This product includes data from Wikidata (https://www.wikidata.org), which
+is dedicated to the public domain under the Creative Commons CC0 1.0
+Universal (CC0 1.0) license — https://creativecommons.org/publicdomain/zero/1.0/.
+
+Wikidata-derived content appears in:
+  - bundled_config/knowledge/medications.json (ATC mappings via property P267)
+  - bundled_config/knowledge/diagnoses.json   (ICD-10 mappings via property P494)
+  - bundled_config/knowledge/lab_tests.json   (LOINC mappings via property P4338)
+
+------------------------------------------------------------------------
+
+ATC (Anatomical Therapeutic Chemical Classification)
+----------------------------------------------------
+
+ATC codes are maintained by the World Health Organization Collaborating
+Centre for Drug Statistics Methodology (WHOCC). The ATC codes in this
+repository are obtained via Wikidata (CC0) and are used solely as
+identifiers for cross-referencing pharmacological substances.
+
+------------------------------------------------------------------------
+
+ICD-10
+------
+
+ICD-10 codes are maintained by the World Health Organization. The ICD-10
+codes in this repository are obtained via Wikidata (CC0) and are used
+solely as identifiers for cross-referencing diagnoses.

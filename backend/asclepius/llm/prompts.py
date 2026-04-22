@@ -775,6 +775,7 @@ Rules:
 - Use normalization tables to resolve names when appropriate.
 - Limit results to 100 rows maximum.
 - Return the SQL query inside ```sql``` code block.
+- IMPORTANT: when the query touches the ``documents`` table (directly or via JOIN), ALWAYS include ``documents.id``, ``documents.original_filename``, ``documents.doc_type`` and ``documents.doc_date`` in the SELECT list so the UI can render source links. When joining ``lab_results``, ``medications``, ``encounters``, ``vaccinations`` or ``imaging_studies``, also include their ``document_id`` column.
 
 Question: {question}"""
 

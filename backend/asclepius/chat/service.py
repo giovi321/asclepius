@@ -239,14 +239,22 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
     return "\n".join(parts)
 
 
+# Columns unique enough to ``documents`` that their presence in a row tells us
+# the row's ``id`` column is a document id, not the id of a joined table.
+_DOC_ROW_MARKERS = frozenset({
+    "original_filename", "doc_type", "doc_date", "date_issued", "date_visit",
+    "date_received", "summary_en", "summary_original", "ocr_text",
+    "raw_extraction", "file_path", "specialty_original",
+})
+
+
 def _extract_document_ids(rows: list[dict]) -> list[int]:
     """Find every document id referenced in a SQL result set.
 
     Collects explicit ``document_id`` / ``doc_id`` columns plus the ``id``
-    column when the row looks like it came from the ``documents`` table
-    (presence of ``original_filename`` or ``doc_type`` is a strong hint).
-    Preserves the order the LLM returned rows in so the sidebar matches
-    the answer's narrative flow, while de-duplicating.
+    column when the row carries any documents-only field (see
+    ``_DOC_ROW_MARKERS``). Preserves the order the LLM returned rows in so
+    the sidebar matches the answer's narrative flow, while de-duplicating.
     """
     seen: set[int] = set()
     ids: list[int] = []
@@ -258,10 +266,7 @@ def _extract_document_ids(rows: list[dict]) -> list[int]:
             v = row.get(key)
             if isinstance(v, int):
                 candidates.append(v)
-        # A document row often shows up in SQL without a ``document_id``
-        # column because the query aliases ``documents.id AS id``. Detect
-        # it by the presence of document-specific fields.
-        if ("original_filename" in row or "doc_type" in row):
+        if _DOC_ROW_MARKERS & row.keys():
             v = row.get("id")
             if isinstance(v, int):
                 candidates.append(v)

@@ -110,6 +110,7 @@ class OllamaProvider(LLMProvider):
                             "model": self.model,
                             "messages": ollama_messages,
                             "stream": False,
+                            "format": "json",
                             "options": {"num_predict": extraction_cap},
                         },
                     ),

@@ -64,7 +64,10 @@ def _parse_proposals(text: str) -> list[dict]:
         props = obj.get("proposals") if isinstance(obj, dict) else None
         if isinstance(props, list):
             return props
-    logger.warning("Failed to parse auto-merge proposals from LLM response")
+    logger.warning(
+        "Failed to parse auto-merge proposals from LLM response (len=%d): %r",
+        len(text), text[:500],
+    )
     return []
 
 

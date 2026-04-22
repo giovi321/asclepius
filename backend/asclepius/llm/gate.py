@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import contextvars
 import logging
 from collections import Counter
 from typing import Optional
@@ -34,6 +35,16 @@ _CAPS: dict[str, int] = {}
 _STATS: dict[tuple[str, str], dict] = {}
 _LABELS: dict[tuple[str, str], dict] = {}
 _ACTIVE_MODELS: dict[tuple[str, str], Counter] = {}
+
+# Reentrancy tracking. When a coroutine already holds a slot on a given
+# ``(credential_id, kind)`` pair, a nested acquire on the same pair is a
+# no-op — without this, provider wrappers that gate both the outer method
+# (``extract``) and an inner helper it calls (``_generate``) would deadlock
+# on a cap-1 credential. The set lives in a ContextVar so each asyncio
+# task gets its own independent view.
+_HELD_SLOTS: contextvars.ContextVar[frozenset[tuple[str, str]]] = (
+    contextvars.ContextVar("_HELD_SLOTS", default=frozenset())
+)
 
 
 def _ensure_sem(credential_id: str, cap: int) -> None:
@@ -97,14 +108,28 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
 
     cred_key = credential_id or ""
     sub_key = (cred_key, kind or "")
+
+    # Reentrancy guard: if the current asyncio task already holds this
+    # exact (credential, kind) slot, pass through without touching the
+    # semaphore or stats. Otherwise provider wrappers that gate both an
+    # outer method (``extract``) and a helper it calls (``_generate``)
+    # would deadlock on a cap-1 credential when the inner call blocks on
+    # the semaphore its outer call already holds.
+    held = _HELD_SLOTS.get()
+    if sub_key in held:
+        yield
+        return
+
     sem = _SEMS[cred_key]
     stats = _STATS[sub_key]
     active = _ACTIVE_MODELS[sub_key]
     stats["waiting"] = stats.get("waiting", 0) + 1
     acquired = False
+    token = None
     try:
         await sem.acquire()
         acquired = True
+        token = _HELD_SLOTS.set(held | {sub_key})
         try:
             stats["waiting"] = max(0, stats["waiting"] - 1)
             stats["in_flight"] = stats.get("in_flight", 0) + 1
@@ -122,6 +147,8 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
                 if active[model] <= 0:
                     active.pop(model, None)
             sem.release()
+            if token is not None:
+                _HELD_SLOTS.reset(token)
             logger.info(
                 "gate.exit: credential=%s kind=%s model=%s in_flight=%d waiting=%d",
                 credential_id, kind, model, stats["in_flight"], stats["waiting"],

@@ -13,6 +13,7 @@ import re
 import aiosqlite
 
 from asclepius.llm.base import LLMProvider
+from asclepius.normalization.knowledge_base import get_knowledge_base
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,56 @@ async def _fetch_entries(
     return rows
 
 
+def _resolve_with_knowledge_base(
+    entries: list[dict], main_table: str
+) -> tuple[list[dict], set[int]]:
+    """Group entries by external code (ATC / LOINC / ICD-10) when available.
+
+    Returns ``(deterministic_proposals, resolved_entry_ids)``. Entries whose
+    id is in ``resolved_entry_ids`` are part of a same-code group and should
+    be excluded from the LLM prompt — they're already decided.
+
+    For doctors / facilities / specialties the KB is None and we return
+    ``([], set())`` so the existing LLM-only path runs unchanged.
+    """
+    kb = get_knowledge_base(main_table)
+    if kb is None or kb.alias_count == 0:
+        return [], set()
+
+    code_to_ids: dict[str, list[int]] = {}
+    for e in entries:
+        names = [e["canonical_display"], *(e.get("aliases") or [])]
+        for n in names:
+            code = kb.resolve(n)
+            if code:
+                code_to_ids.setdefault(code, []).append(e["id"])
+                break
+
+    deterministic: list[dict] = []
+    resolved: set[int] = set()
+    for code, ids in code_to_ids.items():
+        if len(ids) < 2:
+            continue
+        target, *sources = ids
+        deterministic.append({
+            "target_id": target,
+            "source_ids": sources,
+            "reason": f"Same {kb.code_label} code ({code})",
+            "confidence": "high",
+            "source": "knowledge_base",
+        })
+        resolved.add(target)
+        resolved.update(sources)
+
+    if deterministic:
+        logger.info(
+            "auto_merge[%s]: knowledge base produced %d deterministic proposal(s) "
+            "covering %d entries",
+            main_table, len(deterministic), len(resolved),
+        )
+    return deterministic, resolved
+
+
 async def suggest_merges(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -173,38 +224,55 @@ async def suggest_merges(
 ) -> dict:
     """Ask the LLM to propose merges for entries in a normalization table.
 
-    Returns {"proposals": [...], "entries": [...]} — entries included so the
-    frontend can render the proposal with canonical names already resolved.
+    Two-stage pipeline:
+
+    1. Deterministic resolution against a bundled knowledge base
+       (ATC/LOINC/ICD-10). Entries that resolve to the same external code
+       are grouped immediately with ``confidence: "high"``.
+    2. The LLM is shown only the residual that lookup couldn't decide. Its
+       proposals come back with ``confidence: "review"``.
+
+    Returns ``{"proposals": [...], "entries": [...]}`` — entries always
+    contains the full set so the frontend can render names without re-fetch.
     """
     entries = await _fetch_entries(db, main_table, alias_table, fk_col)
     if len(entries) < 2:
         return {"proposals": [], "entries": entries}
 
-    # Compact payload for the LLM — drop empty alias arrays to save tokens
-    payload = []
-    for e in entries:
-        item = {"id": e["id"], "display": e["canonical_display"], "code": e["canonical_code"]}
-        if e["aliases"]:
-            item["aliases"] = e["aliases"]
-        payload.append(item)
+    deterministic, resolved_ids = _resolve_with_knowledge_base(entries, main_table)
+    unresolved = [e for e in entries if e["id"] not in resolved_ids]
 
-    user_prompt = (
-        f"Entity type: {norm_type_label}\n"
-        f"Candidate entries ({len(payload)}):\n{json.dumps(payload, ensure_ascii=False)}\n\n"
-        "Identify merge groups per the instructions."
-    )
+    llm_proposals: list[dict] = []
+    if len(unresolved) >= 2:
+        # Compact payload for the LLM — drop empty alias arrays to save tokens
+        payload = []
+        for e in unresolved:
+            item = {"id": e["id"], "display": e["canonical_display"], "code": e["canonical_code"]}
+            if e["aliases"]:
+                item["aliases"] = e["aliases"]
+            payload.append(item)
 
-    # Intentionally does NOT swallow exceptions — let them bubble up as 503 /
-    # 500 so the UI can show the actual reason. Previously we returned an
-    # empty proposals panel with no explanation, which made auto-merge look
-    # silently broken.
-    response = await llm.chat(
-        [{"role": "user", "content": user_prompt}],
-        system_prompt=_SYSTEM_PROMPT,
-        json_mode=True,
-    )
+        user_prompt = (
+            f"Entity type: {norm_type_label}\n"
+            f"Candidate entries ({len(payload)}):\n{json.dumps(payload, ensure_ascii=False)}\n\n"
+            "Identify merge groups per the instructions."
+        )
 
-    raw = _parse_proposals(response)
-    valid_ids = {e["id"] for e in entries}
-    proposals = _validate_proposals(raw, valid_ids)
-    return {"proposals": proposals, "entries": entries}
+        # Intentionally does NOT swallow exceptions — let them bubble up as
+        # 503 / 500 so the UI can show the actual reason. Previously we
+        # returned an empty proposals panel with no explanation, which made
+        # auto-merge look silently broken.
+        response = await llm.chat(
+            [{"role": "user", "content": user_prompt}],
+            system_prompt=_SYSTEM_PROMPT,
+            json_mode=True,
+        )
+
+        raw = _parse_proposals(response)
+        valid_ids = {e["id"] for e in unresolved}
+        llm_proposals = _validate_proposals(raw, valid_ids)
+        for p in llm_proposals:
+            p.setdefault("confidence", "review")
+            p.setdefault("source", "llm")
+
+    return {"proposals": deterministic + llm_proposals, "entries": entries}

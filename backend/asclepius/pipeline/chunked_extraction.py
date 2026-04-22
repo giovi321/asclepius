@@ -31,14 +31,30 @@ async def chunked_extract_and_store(
     ocr_text: str,
     config: AppConfig,
 ) -> dict:
-    """Split long text into page-aligned chunks, extract from each, and merge results.
+    """Two-phase chunked extraction.
 
-    All chunks are extracted in-memory first; we only write to the DB once at
-    the end via extract_and_store(extraction_override=...). That lets us retry
-    truncated chunks by bisecting their pages without having to undo partial
-    writes.
+    Phase 1 runs ``llm.classify`` on the first chunk to nail down the
+    universal fields (doc_type, patient, doctor, facility, dates,
+    summary). Small models reliably hit a short schema when it's the
+    only thing they're asked to produce; giving them the full
+    classification + type-specific schema in one call caused qwen to
+    zoom in on the loudest payload (say, the lab table) and drop the
+    rest.
+
+    Phase 2 runs the type-specific extractor on every chunk with the
+    doc_type picked in Phase 1, then merges the per-chunk results.
+    Lab results / medications / diagnoses that straddle page boundaries
+    are deduped by ``merge_extractions``.
+
+    All chunks are extracted in-memory first; we only write to the DB
+    once at the end via ``extract_and_store(extraction_override=...)``.
+    Truncated chunks bisect and retry without partial DB writes.
     """
-    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
+    from asclepius.pipeline.extractor import (
+        build_extraction_context, extract_and_store,
+        _extract_type_specific, _salvage_classification,
+        _normalize_doc_type, _salvage_array_keys,
+    )
 
     pages = await _load_pages(db, doc_id, ocr_text)
     chunks = _build_page_chunks(pages, _TARGET_CHUNK_CHARS)
@@ -50,7 +66,44 @@ async def chunked_extract_and_store(
     )
 
     context = await build_extraction_context(db)
-    merged: dict | None = None
+
+    # Phase 1 — classify on chunk 1. One cheap short-schema call; qwen
+    # reliably hits this even on hardware that struggled with the full
+    # 80-line combined schema.
+    first = chunks[0]
+    first_text = _prepend_preamble(
+        "\n\n".join(pages[first["page_start"] - 1:first["page_end"]]),
+        1, total_chunks, first["page_start"], first["page_end"],
+        total_pages, overlaps_previous=False,
+    ) if total_chunks > 1 else pages[0] if len(pages) == 1 else "\n\n".join(
+        pages[first["page_start"] - 1:first["page_end"]]
+    )
+    try:
+        classification = await llm.classify(first_text, context)
+    except Exception:
+        logger.exception(
+            "Doc %d: classify call failed during chunked extraction",
+            doc_id,
+        )
+        classification = {"error": "classification failed"}
+
+    if "error" in classification:
+        logger.error(
+            "Doc %d: classification phase failed (%s), storing partial and giving up",
+            doc_id, classification.get("error"),
+        )
+        return classification
+
+    _salvage_classification(classification)
+    doc_type = _normalize_doc_type(classification.get("doc_type", "other"))
+    classification["doc_type"] = doc_type
+    logger.info(
+        "Doc %d chunked extraction: classified as %s, running type-specific extraction on %d chunks",
+        doc_id, doc_type, total_chunks,
+    )
+
+    # Phase 2 — type-specific extraction per chunk, merged.
+    merged: dict = dict(classification)
     any_truncated = False
     covered_pages: set[int] = set()
 
@@ -60,29 +113,28 @@ async def chunked_extract_and_store(
             i, total_chunks, doc_id, chunk["page_start"], chunk["page_end"],
         )
         chunk_pages = pages[chunk["page_start"] - 1:chunk["page_end"]]
-        chunk_result, truncated = await _extract_chunk_with_bisect(
-            llm, context, chunk_pages,
+        chunk_result, truncated = await _extract_type_chunk_with_bisect(
+            llm, context, chunk_pages, doc_type,
             page_start=chunk["page_start"],
             chunk_index=i,
             total_chunks=total_chunks,
             total_pages=total_pages,
             overlaps_previous=(i > 1),
             doc_id=doc_id,
+            db_path=config.database.path,
         )
         any_truncated = any_truncated or truncated
         if not chunk_result or "error" in chunk_result:
             continue
-        if merged is None:
-            merged = chunk_result
-        else:
-            merged = merge_extractions(merged, chunk_result)
+        # Per-chunk salvage (e.g. 'test_results' → 'lab_results') so the
+        # merge below doesn't drop rows that arrived under a drifted key.
+        _salvage_array_keys(chunk_result)
+        merged = merge_extractions(merged, chunk_result)
         for p in range(chunk["page_start"], chunk["page_end"] + 1):
             covered_pages.add(p)
 
-    if merged is None:
-        return {"error": "all chunks failed extraction"}
-
     # Coverage observability — makes missing-page issues visible in logs.
+    # Runs after salvage so the counts match what actually gets stored.
     missing = [p for p in range(1, total_pages + 1) if p not in covered_pages]
     logger.info(
         "Doc %d chunked extraction: pages covered=%d/%d%s, "
@@ -100,10 +152,11 @@ async def chunked_extract_and_store(
     )
 
 
-async def _extract_chunk_with_bisect(
+async def _extract_type_chunk_with_bisect(
     llm,
     context: dict,
     chunk_pages: list[str],
+    doc_type: str,
     *,
     page_start: int,
     chunk_index: int,
@@ -111,13 +164,21 @@ async def _extract_chunk_with_bisect(
     total_pages: int,
     overlaps_previous: bool,
     doc_id: int,
+    db_path: str | None = None,
     _depth: int = 0,
 ) -> tuple[dict | None, bool]:
-    """Extract a chunk; bisect its pages and retry on truncation.
+    """Run type-specific extraction on a chunk; bisect on truncation.
 
-    Returns (extraction, truncation_occurred). The caller merges the result.
-    Depth is capped at 2 so a pathological page can't infinite-loop.
+    Unlike the old single-phase helper this calls ``_extract_type_specific``
+    with the classified doc_type, so the LLM sees a narrow schema
+    (lab results only, or medications only, etc.) instead of the full
+    classification+everything prompt. Small models are a lot happier
+    with that.
+
+    Returns (type_extraction, truncation_occurred). Depth capped at 2.
     """
+    from asclepius.pipeline.extractor import _extract_type_specific
+
     if not chunk_pages:
         return None, False
 
@@ -128,13 +189,18 @@ async def _extract_chunk_with_bisect(
         overlaps_previous=overlaps_previous,
     )
     try:
-        result = await llm.extract(chunk_text, context)
+        result = await _extract_type_specific(
+            llm, chunk_text, doc_type, context, db_path=db_path,
+        )
     except Exception:
         logger.exception(
-            "Chunk %d/%d extraction raised for doc %d (pages %d-%d)",
+            "Chunk %d/%d type-specific extraction raised for doc %d (pages %d-%d)",
             chunk_index, total_chunks, doc_id,
             page_start, page_start + len(chunk_pages) - 1,
         )
+        return None, False
+
+    if not isinstance(result, dict):
         return None, False
 
     truncated = bool(
@@ -142,7 +208,7 @@ async def _extract_chunk_with_bisect(
     )
     if "error" in result and not truncated:
         logger.warning(
-            "Chunk %d/%d extraction returned error for doc %d: %s",
+            "Chunk %d/%d type-specific extraction returned error for doc %d: %s",
             chunk_index, total_chunks, doc_id, result.get("error"),
         )
         return None, False
@@ -165,19 +231,19 @@ async def _extract_chunk_with_bisect(
         page_start, page_start + mid - 1,
         page_start + mid, page_start + len(chunk_pages) - 1,
     )
-    left, left_trunc = await _extract_chunk_with_bisect(
-        llm, context, chunk_pages[:mid],
+    left, left_trunc = await _extract_type_chunk_with_bisect(
+        llm, context, chunk_pages[:mid], doc_type,
         page_start=page_start,
         chunk_index=chunk_index, total_chunks=total_chunks,
         total_pages=total_pages, overlaps_previous=overlaps_previous,
-        doc_id=doc_id, _depth=_depth + 1,
+        doc_id=doc_id, db_path=db_path, _depth=_depth + 1,
     )
-    right, right_trunc = await _extract_chunk_with_bisect(
-        llm, context, chunk_pages[mid:],
+    right, right_trunc = await _extract_type_chunk_with_bisect(
+        llm, context, chunk_pages[mid:], doc_type,
         page_start=page_start + mid,
         chunk_index=chunk_index, total_chunks=total_chunks,
         total_pages=total_pages, overlaps_previous=False,
-        doc_id=doc_id, _depth=_depth + 1,
+        doc_id=doc_id, db_path=db_path, _depth=_depth + 1,
     )
     combined: dict | None = None
     if left and "error" not in left:

@@ -39,12 +39,23 @@ class LLMProvider(ABC):
         ...
 
     @abstractmethod
-    async def chat(self, messages: list[dict], system_prompt: str) -> str:
+    async def chat(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        *,
+        json_mode: bool = False,
+    ) -> str:
         """Send a chat message and get a response.
 
         Args:
             messages: List of {"role": "user"|"assistant", "content": str}.
             system_prompt: System prompt with context.
+            json_mode: When True, instruct the provider to constrain output
+                to a JSON object (Ollama ``format=json``, OpenAI
+                ``response_format={"type": "json_object"}``). For Anthropic
+                this is a no-op since the prompt already specifies the
+                schema.
 
         Returns:
             Assistant response text.

@@ -94,25 +94,33 @@ class OllamaProvider(LLMProvider):
         response_text = await self._generate(prompt, max_output_tokens=extraction_cap)
         return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
-    async def chat(self, messages: list[dict], system_prompt: str) -> str:
+    async def chat(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        *,
+        json_mode: bool = False,
+    ) -> str:
         ollama_messages = [{"role": "system", "content": system_prompt}]
         ollama_messages.extend(messages)
 
         extraction_cap, _ = get_output_token_caps()
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         total_budget = float(self.timeout) + 30.0
+        body: dict = {
+            "model": self.model,
+            "messages": ollama_messages,
+            "stream": False,
+            "options": {"num_predict": extraction_cap},
+        }
+        if json_mode:
+            body["format"] = "json"
         async with _get_semaphore():
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await asyncio.wait_for(
                     client.post(
                         f"{self.base_url}/api/chat",
-                        json={
-                            "model": self.model,
-                            "messages": ollama_messages,
-                            "stream": False,
-                            "format": "json",
-                            "options": {"num_predict": extraction_cap},
-                        },
+                        json=body,
                     ),
                     timeout=total_budget,
                 )

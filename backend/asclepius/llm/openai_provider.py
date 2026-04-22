@@ -54,17 +54,26 @@ class OpenAIProvider(LLMProvider):
         response_text = await self._generate(prompt, max_output_tokens=extraction_cap)
         return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
-    async def chat(self, messages: list[dict], system_prompt: str) -> str:
+    async def chat(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        *,
+        json_mode: bool = False,
+    ) -> str:
         all_messages = [{"role": "system", "content": system_prompt}]
         all_messages.extend(messages)
         extraction_cap, _ = get_output_token_caps()
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        body: dict = {"model": self.model, "messages": all_messages, "max_tokens": extraction_cap}
+        if json_mode:
+            body["response_format"] = {"type": "json_object"}
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
-                json={"model": self.model, "messages": all_messages, "max_tokens": extraction_cap},
+                json=body,
             )
             resp.raise_for_status()
             data = resp.json()

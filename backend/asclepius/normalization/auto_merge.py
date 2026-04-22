@@ -47,7 +47,14 @@ Rules:
 
 
 def _parse_proposals(text: str) -> list[dict]:
-    """Extract the proposals array from an LLM response."""
+    """Extract the proposals array from an LLM response.
+
+    Accepts the documented shape ``{"proposals": [{"target_id", "source_ids",
+    "reason"}, ...]}`` and the common drift ``{"merge_groups": [{"id":
+    [...], "reason"?}, ...]}`` that qwen-class models emit even when asked
+    for the documented one. In the drift form the first id is treated as
+    the target and the rest as sources.
+    """
     candidates = [text]
     fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
     if fenced:
@@ -61,14 +68,44 @@ def _parse_proposals(text: str) -> list[dict]:
             obj = json.loads(c)
         except json.JSONDecodeError:
             continue
-        props = obj.get("proposals") if isinstance(obj, dict) else None
+        if not isinstance(obj, dict):
+            continue
+        props = obj.get("proposals")
         if isinstance(props, list):
             return props
+        groups = obj.get("merge_groups") or obj.get("groups") or obj.get("duplicates")
+        if isinstance(groups, list):
+            return _coerce_groups(groups)
     logger.warning(
         "Failed to parse auto-merge proposals from LLM response (len=%d): %r",
         len(text), text[:500],
     )
     return []
+
+
+def _coerce_groups(groups: list) -> list[dict]:
+    """Translate ``[{"id": [a, b, c], ...}, ...]`` into the proposals shape."""
+    out = []
+    for g in groups:
+        if not isinstance(g, dict):
+            continue
+        ids = g.get("id") or g.get("ids") or g.get("members")
+        if not isinstance(ids, list) or len(ids) < 2:
+            continue
+        ints: list[int] = []
+        for v in ids:
+            try:
+                ints.append(int(v))
+            except (TypeError, ValueError):
+                continue
+        if len(ints) < 2:
+            continue
+        out.append({
+            "target_id": ints[0],
+            "source_ids": ints[1:],
+            "reason": str(g.get("reason") or "").strip(),
+        })
+    return out
 
 
 def _validate_proposals(proposals: list[dict], valid_ids: set[int]) -> list[dict]:
@@ -164,6 +201,7 @@ async def suggest_merges(
     response = await llm.chat(
         [{"role": "user", "content": user_prompt}],
         system_prompt=_SYSTEM_PROMPT,
+        json_mode=True,
     )
 
     raw = _parse_proposals(response)

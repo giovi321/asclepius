@@ -59,7 +59,17 @@ class ClaudeProvider(LLMProvider):
         response_text = response.content[0].text
         return parse_llm_json(response_text, max_output_tokens=extraction_cap)
 
-    async def chat(self, messages: list[dict], system_prompt: str) -> str:
+    async def chat(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        *,
+        json_mode: bool = False,
+    ) -> str:
+        # Anthropic relies on the system prompt to specify JSON shape; the
+        # ``json_mode`` flag is accepted for interface parity but has no
+        # API-level toggle to set here.
+        del json_mode
         extraction_cap, _ = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,

@@ -13,46 +13,49 @@
   <img src="https://img.shields.io/badge/node-20%2B-green" alt="Node 20+">
 </p>
 
-A self-hosted app for ingesting, OCRing, extracting, organizing, and searching personal medical records.
+If you've ever spent twenty minutes hunting for a blood test from three years ago, this is for you.
 
-Drop a document into the inbox folder. The server runs OCR and an LLM extraction pass, writes the structured metadata to SQLite, files the document under `patients/{slug}/{year}/`, and serves a React web UI for browsing, searching, and asking questions about your medical history.
+Asclepius takes the pile of PDFs, scans, discharge letters, and phone photos of paper reports that builds up over a lifetime and turns it into something you can actually search. Drop a file into the inbox folder. The app runs OCR, asks an LLM to pull out the dates, diagnoses, lab values, and medications, and files everything under the right person and year.
 
-> [!WARNING]
-> **Do not expose Asclepius directly to the public internet.** It is designed to run on a trusted LAN or behind a VPN/reverse proxy that handles authentication. The built-in username/password authentication is intentionally minimal — no rate limiting, no MFA, no account lockout, no password-strength enforcement, and session cookies cannot be revoked en masse without rotating the secret key. **For any deployment beyond a single-user LAN install, configure an OIDC provider (e.g. [Authentik](https://goauthentik.io/), Keycloak, Auth0) and disable the local password flow.** See [`SECURITY.md`](SECURITY.md).
+After that, you can plot a hemoglobin trend across a decade, scroll a timeline of every appointment, or just ask plain-language questions about your history.
+
+It runs in one Docker container on your own machine. Your records stay there unless you tell them otherwise.
 
 <p align="center">
-  <img src="docs/public/assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" width="900" />
+  <img src="docs/public/assets/diagrams/journey.svg" alt="From a stack of paper to one searchable archive" width="900" />
 </p>
 
-## Quick Install
-
-**Prerequisites:** Docker + Docker Compose, ~2 GB free disk, and at least one LLM provider (self-hosted Ollama/vLLM or an API key for Claude/OpenAI).
+## Quick start
 
 ```bash
 git clone https://github.com/giovi321/asclepius.git
 cd asclepius
 cp config/settings.example.yaml config/settings.yaml
-# edit config/settings.yaml — at minimum configure one LLM provider
+# edit config/settings.yaml — at minimum point it at one LLM provider
 docker compose up -d
 ```
 
-Open <http://localhost:8070> — a first-launch setup wizard creates your admin account and first patient. Drop files into the inbox folder to start ingestion.
+Open <http://localhost:8070>. A first-launch wizard creates your admin account and your first patient profile, and you're ready to drop files into the inbox.
 
-## Features
+You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Claude or OpenAI API key. The container is small on purpose; the model lives elsewhere.
 
-- **Ingests** PDFs, images, and DICOM files from an inbox folder
-- **Two extraction flows**, pickable per install and per document:
-  - **OCR + LLM**: Tesseract, Google Vision, or LLM Vision for OCR, then Ollama, vLLM, Claude, or OpenAI for extraction
-  - **Vision-LLM**: a single vision model (Qwen2.5-VL, Claude, GPT-4o, and friends) that OCRs and extracts in one call
-- **Priority fallback** over every provider list (OCR, LLM, Vision-LLM), so a flaky endpoint hands off to the next one automatically
-- **Organizes** by patient with multi-user access control, medical events, and a chronological timeline
-- **Lab results** get normalized across languages and plotted as trend charts
-- **Search and chat** over your records, backed by SQLite FTS5 and a small RAG layer
-- **DICOM viewer** with windowing, zoom, and scroll
-- **Learns from your corrections**: edits feed back into retrieval-augmented few-shot examples for later extractions
-- **Selective reprocessing**: OCR only, LLM only, OCR+LLM, or Vision-LLM, with per-document provider choice
+## What it does
 
-## Tech Stack
+<p align="center">
+  <img src="docs/public/assets/diagrams/hero.svg" alt="Asclepius pipeline overview" width="900" />
+</p>
+
+- Drops PDFs, images, and DICOM files into the pipeline. OCR can be Tesseract, Google Vision, or any LLM with vision; extraction can be Ollama, vLLM, Claude, or OpenAI.
+- Long documents (over 5 pages) get split into logical sections — lab block, clinical notes, discharge summary — and each section is extracted on its own.
+- Lab results are normalized across visits and languages. A "ferritin" in Italian, a typo'd "Ferrytin" in a German report, and "ferritin (s)" with weird units all end up on the same trend chart.
+- A built-in DICOM viewer handles MRI and CT studies with windowing, zoom, and slice scrolling.
+- The timeline view groups documents into medical events — a diagnosis, a course of treatment, a surgery and the follow-ups around it.
+- Full-text search (SQLite FTS5) and a small RAG chat layer let you ask things like *when did I last get a tetanus shot?*
+- Multi-patient with role-based access, so you can keep records for a partner or your kids in the same install with separate access.
+- When you correct an extracted field, the change is captured and used as a few-shot example for similar documents later.
+- Every provider list (OCR, LLM, Vision-LLM) supports priority fallback, so a flaky endpoint hands off to the next one without you noticing.
+
+## Tech stack
 
 | Component | Technology |
 |-----------|-----------|
@@ -64,6 +67,10 @@ Open <http://localhost:8070> — a first-launch setup wizard creates your admin 
 | Vision-LLM | Ollama (Qwen2.5-VL, MiniCPM-V, …), Claude vision, GPT-4o |
 | DICOM | pydicom + Cornerstone.js |
 | Deployment | Docker Compose |
+
+## Before you self-host
+
+Asclepius is built for a trusted home network or a single-user laptop. The bundled username/password login is intentionally minimal — no rate limiting, no MFA, no account lockout. For anything reachable from outside your LAN, front it with an OIDC provider like [Authentik](https://goauthentik.io/), Keycloak, or Auth0, or put the whole thing behind a VPN. [`SECURITY.md`](SECURITY.md) has the full picture.
 
 ## Development
 
@@ -87,12 +94,12 @@ npm run dev
 
 ## Contributing
 
-Contributions are welcome! Please read:
+Contributions are welcome. Two files worth reading first:
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, coding style, PR checklist
-- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability **privately**
+- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability privately
 
-Quick starts for contributors:
+Quick starts:
 
 ```bash
 # Backend tests + lint
@@ -112,12 +119,4 @@ npm run build
 
 Released under the [MIT License](LICENSE).
 
-Bundled medical reference data (LOINC, ATC, ICD-10) is covered by separate
-third-party licenses — see [`NOTICE`](NOTICE) for required attributions,
-including the LOINC short notice required by Section 10 of the LOINC
-license.
-
-This project handles personal health information and is **not hardened for
-direct internet exposure**. Read [`SECURITY.md`](SECURITY.md) before
-deploying anywhere outside a trusted LAN, and put it behind an OIDC
-provider such as Authentik for any multi-user or remote-access scenario.
+Bundled medical reference data (LOINC, ATC, ICD-10) is covered by separate third-party licenses — see [`NOTICE`](NOTICE) for required attributions, including the LOINC short notice required by Section 10 of the LOINC license.

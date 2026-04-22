@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/docs/assets/logo.svg" alt="Asclepius" width="120" />
+  <img src="docs/public/assets/logo.svg" alt="Asclepius" width="120" />
 </p>
 
 <h1 align="center">Asclepius</h1>
@@ -18,7 +18,7 @@ A self-hosted app for ingesting, OCRing, extracting, organizing, and searching p
 Drop a document into the inbox folder. The server runs OCR and an LLM extraction pass, writes the structured metadata to SQLite, files the document under `patients/{slug}/{year}/`, and serves a React web UI for browsing, searching, and asking questions about your medical history.
 
 <p align="center">
-  <img src="docs/docs/assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" width="900" />
+  <img src="docs/public/assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" width="900" />
 </p>
 
 ## Quick Install

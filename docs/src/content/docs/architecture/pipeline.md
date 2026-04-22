@@ -4,7 +4,149 @@ title: "Processing Pipeline"
 
 The pipeline is the ingestion engine. It watches the inbox folder, sends each file through OCR and LLM extraction, and files the result into the vault.
 
-<iframe src="../../assets/diagrams/pipeline.html" width="100%" height="850" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
+<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<svg viewBox="0 0 920 728" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Asclepius pipeline flow" style="display:block;width:100%;height:auto;max-width:100%;">
+    <defs>
+      <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+        <circle cx="1" cy="1" r="0.9" fill="rgba(28,25,23,0.10)"/>
+      </pattern>
+      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
+      </marker>
+      <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#8E4449"/>
+      </marker>
+    </defs>
+    <rect width="100%" height="100%" fill="#efeee5"/>
+    <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
+
+    <!-- ===== ARROWS ===== -->
+    <!-- inbox -> hash -->
+    <line x1="460" y1="92" x2="460" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- hash -> dedup decision -->
+    <line x1="460" y1="160" x2="460" y2="184" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- dedup -> skip (left) -->
+    <line x1="408" y1="208" x2="304" y2="208" stroke="#57534e" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+    <!-- dedup -> flow router (down) -->
+    <line x1="460" y1="232" x2="460" y2="260" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- flow -> ocr (left branch) -->
+    <line x1="408" y1="284" x2="220" y2="284" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="200" y1="296" x2="200" y2="324" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- flow -> vision (right branch) -->
+    <line x1="512" y1="284" x2="700" y2="284" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <line x1="720" y1="296" x2="720" y2="324" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <!-- ocr providers -> ocr text gate -->
+    <line x1="200" y1="396" x2="200" y2="420" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- vision providers -> merged result -->
+    <line x1="720" y1="396" x2="720" y2="420" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <!-- ocr -> chunk picker (right) -->
+    <line x1="280" y1="448" x2="416" y2="488" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- vision -> chunk picker (left) -->
+    <line x1="640" y1="448" x2="504" y2="488" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+    <!-- chunk picker -> phase 1 -->
+    <line x1="460" y1="540" x2="460" y2="568" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- phase1 -> phase2 -->
+    <line x1="460" y1="604" x2="460" y2="628" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <!-- phase2 -> store -->
+    <line x1="460" y1="664" x2="460" y2="684" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+    <!-- arrow labels -->
+    <rect x="332" y="200" width="48" height="12" rx="2" fill="#efeee5"/>
+    <text x="356" y="209" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">DUP HIT</text>
+
+    <rect x="296" y="276" width="64" height="12" rx="2" fill="#efeee5"/>
+    <text x="328" y="285" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">OCR_LLM</text>
+
+    <rect x="556" y="276" width="80" height="12" rx="2" fill="#efeee5"/>
+    <text x="596" y="285" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">VISION_LLM</text>
+
+    <!-- ===== NODES ===== -->
+    <!-- Start -->
+    <rect x="376" y="60" width="168" height="32" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="60" width="168" height="32" rx="6" fill="rgba(87,83,78,0.10)" stroke="#78716c" stroke-width="1"/>
+    <text x="460" y="80" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">File detected in inbox/</text>
+
+    <!-- Hash -->
+    <rect x="376" y="120" width="168" height="40" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="120" width="168" height="40" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="460" y="140" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">SHA-256 + record</text>
+    <text x="460" y="153" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">read .patient_hint</text>
+
+    <!-- Dedup decision (diamond-ish via rounded rect) -->
+    <polygon points="460,184 512,208 460,232 408,208" fill="#faf7f2"/>
+    <polygon points="460,184 512,208 460,232 408,208" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="460" y="212" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">duplicate?</text>
+
+    <!-- Skip -->
+    <rect x="160" y="192" width="144" height="32" rx="6" fill="#faf7f2"/>
+    <rect x="160" y="192" width="144" height="32" rx="6" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+    <text x="232" y="212" font-family="'Geist',sans-serif" font-size="11" fill="#57534e" text-anchor="middle">Skip — already processed</text>
+
+    <!-- Flow router -->
+    <polygon points="460,260 528,284 460,308 392,284" fill="#faf7f2"/>
+    <polygon points="460,260 528,284 460,308 392,284" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="460" y="282" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">default_flow</text>
+    <text x="460" y="296" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">router</text>
+
+    <!-- LEFT: OCR engines -->
+    <rect x="120" y="324" width="160" height="72" rx="6" fill="#faf7f2"/>
+    <rect x="120" y="324" width="160" height="72" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <rect x="128" y="332" width="40" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
+    <text x="148" y="341" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(28,25,23,0.8)" text-anchor="middle" letter-spacing="0.08em">OCR</text>
+    <text x="200" y="362" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Provider chain</text>
+    <text x="200" y="377" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">tesseract → remote →</text>
+    <text x="200" y="389" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">llm-vision → gvision</text>
+
+    <!-- RIGHT: Vision providers (focal) -->
+    <rect x="640" y="324" width="160" height="72" rx="6" fill="#faf7f2"/>
+    <rect x="640" y="324" width="160" height="72" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
+    <rect x="648" y="332" width="56" height="12" rx="2" fill="transparent" stroke="rgba(142,68,73,0.50)" stroke-width="0.8"/>
+    <text x="676" y="341" font-family="'Geist Mono',monospace" font-size="7" fill="#8E4449" text-anchor="middle" letter-spacing="0.08em">VISION</text>
+    <text x="720" y="362" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Read + classify</text>
+    <text x="720" y="377" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">qwen2.5-vl · claude</text>
+    <text x="720" y="389" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">gpt-4o (vision)</text>
+
+    <!-- ocr text node -->
+    <rect x="120" y="420" width="160" height="32" rx="6" fill="#faf7f2"/>
+    <rect x="120" y="420" width="160" height="32" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
+    <text x="200" y="440" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">ocr_page_cache</text>
+
+    <!-- vision merged -->
+    <rect x="640" y="420" width="160" height="32" rx="6" fill="#faf7f2"/>
+    <rect x="640" y="420" width="160" height="32" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
+    <text x="720" y="440" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">merged JSON + OCR text</text>
+
+    <!-- Chunk picker -->
+    <rect x="376" y="488" width="168" height="52" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="488" width="168" height="52" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <rect x="384" y="494" width="60" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
+    <text x="414" y="503" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(28,25,23,0.8)" text-anchor="middle" letter-spacing="0.08em">STRATEGY</text>
+    <text x="460" y="520" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">run_extraction()</text>
+    <text x="460" y="534" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">section · chunk · single</text>
+
+    <!-- Phase 1 -->
+    <rect x="376" y="568" width="168" height="36" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="568" width="168" height="36" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="460" y="585" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Phase 1 — classify</text>
+    <text x="460" y="598" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ retrieval few-shot</text>
+
+    <!-- Phase 2 -->
+    <rect x="376" y="628" width="168" height="36" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="628" width="168" height="36" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+    <text x="460" y="645" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Phase 2 — type-specific</text>
+    <text x="460" y="658" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">labs · meds · diagnoses</text>
+
+    <!-- Store / organize -->
+    <rect x="376" y="684" width="168" height="32" rx="6" fill="#faf7f2"/>
+    <rect x="376" y="684" width="168" height="32" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
+    <text x="460" y="704" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Store + organize file</text>
+
+    <!-- ===== Side note (top-left empty band) ===== -->
+    <text x="40" y="76" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">Reprocessing reuses the same picker —</text>
+    <text x="40" y="92" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">section vs. chunk vs. single-shot is</text>
+    <text x="40" y="108" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">decided in exactly one place.</text>
+  </svg>
+</div>
 
 `pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision regardless of when it lands.
 
@@ -146,7 +288,98 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 For PDFs with more than **5 pages** (`should_section()`), the pipeline classifies pages individually and extracts each group with its own prompt instead of sending the whole document to a single extraction call.
 
-<iframe src="../../assets/diagrams/smart-sectioning.html" width="100%" height="540" style="border:0;border-radius:8px;" title="Smart page-level sectioning"></iframe>
+<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<svg viewBox="0 0 920 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart sectioning flow" style="display:block;width:100%;height:auto;max-width:100%;">
+    <defs>
+      <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+        <circle cx="1" cy="1" r="0.9" fill="rgba(28,25,23,0.10)"/>
+      </pattern>
+      <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
+      </marker>
+      <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#8E4449"/>
+      </marker>
+    </defs>
+    <rect width="100%" height="100%" fill="#efeee5"/>
+    <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
+
+    <!-- ===== Stage band labels ===== -->
+    <text x="100" y="56" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.18em" fill="#78716c">1 · INPUT</text>
+    <text x="280" y="56" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.18em" fill="#78716c">2 · PER-PAGE OCR</text>
+    <text x="500" y="56" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.18em" fill="#78716c">3 · CLASSIFY + GROUP</text>
+    <text x="760" y="56" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.18em" fill="#78716c">4 · MERGE</text>
+
+    <!-- arrows -->
+    <line x1="200" y1="160" x2="252" y2="160" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="436" y1="160" x2="488" y2="160" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+    <line x1="704" y1="160" x2="756" y2="160" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+    <!-- ===== 1. Input ===== -->
+    <rect x="60" y="120" width="140" height="80" rx="6" fill="#faf7f2"/>
+    <rect x="60" y="120" width="140" height="80" rx="6" fill="rgba(87,83,78,0.10)" stroke="#78716c" stroke-width="1"/>
+    <text x="130" y="148" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Multi-page PDF</text>
+    <text x="130" y="166" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">page_count &gt; 5</text>
+    <text x="130" y="180" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">should_section()</text>
+
+    <!-- ===== 2. Per-page OCR (a small page-stack) ===== -->
+    <g>
+      <rect x="252" y="124" width="180" height="92" rx="6" fill="#faf7f2"/>
+      <rect x="252" y="124" width="180" height="92" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+      <rect x="260" y="132" width="48" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
+      <text x="284" y="141" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(28,25,23,0.8)" text-anchor="middle" letter-spacing="0.08em">OCR</text>
+      <!-- mini "page" tiles -->
+      <rect x="268" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+      <rect x="292" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+      <rect x="316" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+      <rect x="340" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.05)" stroke="rgba(28,25,23,0.30)" stroke-width="0.8"/>
+      <text x="384" y="174" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">… N</text>
+      <text x="342" y="206" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">cached in ocr_page_cache</text>
+    </g>
+
+    <!-- ===== 3. Classify + group (page tiles colored by type) ===== -->
+    <g>
+      <rect x="488" y="124" width="216" height="92" rx="6" fill="#faf7f2"/>
+      <rect x="488" y="124" width="216" height="92" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+      <rect x="496" y="132" width="64" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
+      <text x="528" y="141" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(28,25,23,0.8)" text-anchor="middle" letter-spacing="0.08em">CLASSIFY</text>
+
+      <!-- coloured page tiles → grouped sections -->
+      <rect x="500" y="156" width="20" height="28" rx="2" fill="rgba(142,68,73,0.20)" stroke="#8E4449" stroke-width="0.8"/>
+      <rect x="524" y="156" width="20" height="28" rx="2" fill="rgba(142,68,73,0.20)" stroke="#8E4449" stroke-width="0.8"/>
+      <rect x="548" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.10)" stroke="#57534e" stroke-width="0.8"/>
+      <rect x="572" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.10)" stroke="#57534e" stroke-width="0.8"/>
+      <rect x="596" y="156" width="20" height="28" rx="2" fill="rgba(28,25,23,0.10)" stroke="#57534e" stroke-width="0.8"/>
+      <rect x="620" y="156" width="20" height="28" rx="2" fill="rgba(120,113,108,0.20)" stroke="#78716c" stroke-width="0.8"/>
+      <rect x="644" y="156" width="20" height="28" rx="2" fill="rgba(120,113,108,0.20)" stroke="#78716c" stroke-width="0.8"/>
+      <text x="676" y="174" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">…</text>
+
+      <text x="596" y="206" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">batches of 10 → group consecutive same-type</text>
+    </g>
+
+    <!-- ===== 4. Merge (focal) ===== -->
+    <rect x="756" y="120" width="124" height="80" rx="6" fill="#faf7f2"/>
+    <rect x="756" y="120" width="124" height="80" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
+    <text x="818" y="148" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Merge</text>
+    <text x="818" y="166" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">dedup labs · meds</text>
+    <text x="818" y="180" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">diagnoses · vaccines</text>
+
+    <!-- ===== Legend strip ===== -->
+    <line x1="60" y1="252" x2="900" y2="252" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
+    <text x="60" y="270" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.14em" fill="#57534e">PAGE TYPES</text>
+
+    <rect x="180" y="262" width="14" height="10" rx="2" fill="rgba(142,68,73,0.20)" stroke="#8E4449" stroke-width="0.8"/>
+    <text x="200" y="271" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">lab_results_page</text>
+
+    <rect x="320" y="262" width="14" height="10" rx="2" fill="rgba(28,25,23,0.10)" stroke="#57534e" stroke-width="0.8"/>
+    <text x="340" y="271" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">clinical_notes</text>
+
+    <rect x="450" y="262" width="14" height="10" rx="2" fill="rgba(120,113,108,0.20)" stroke="#78716c" stroke-width="0.8"/>
+    <text x="470" y="271" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">cover_page  (skipped)</text>
+
+    <text x="60" y="312" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">A discharge summary with cover, history, and lab tables ends up as 3 sections, not one wall of text.</text>
+  </svg>
+</div>
 
 ### Page Classification Types
 

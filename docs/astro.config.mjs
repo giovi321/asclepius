@@ -1,13 +1,36 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import remarkMermaid from './src/plugins/remark-mermaid.mjs';
+
+const mermaidInitScript = `
+  import mermaid from 'https://esm.sh/mermaid@11.4.1';
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  mermaid.initialize({ startOnLoad: false, theme: isDark ? 'dark' : 'default', securityLevel: 'loose' });
+  const run = () => mermaid.run({ querySelector: 'pre.mermaid' });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', run);
+  } else {
+    run();
+  }
+`;
 
 export default defineConfig({
   site: 'https://giovi321.github.io',
   base: '/asclepius',
+  markdown: {
+    remarkPlugins: [remarkMermaid],
+  },
   integrations: [
     starlight({
       title: 'Asclepius',
       description: 'Self-hosted medical records manager — documentation',
+      head: [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          content: mermaidInitScript,
+        },
+      ],
       logo: {
         src: './src/assets/logo.svg',
         replacesTitle: false,

@@ -270,22 +270,20 @@ class PipelineConfig(BaseModel):
     default_flow: str = "ocr_llm"
 
 
-class BackupJobConfig(BaseModel):
-    enabled: bool = False
-    schedule: str = "daily"          # "hourly" | "daily" | "weekly"
-    retention_count: int = 7
-    retention_days: int = 30
-
-
 class BackupConfig(BaseModel):
+    """One scheduled backup job.
+
+    The user picks what to include (database, vault, or both) via the two
+    boolean flags. Retention is a single policy: keep the last N files OR
+    everything newer than N days, not both.
+    """
     directory: str = "/vault/backups"
-    db: BackupJobConfig = BackupJobConfig()
-    vault: BackupJobConfig = BackupJobConfig(
-        schedule="weekly", retention_count=4, retention_days=90
-    )
-    full: BackupJobConfig = BackupJobConfig(
-        schedule="weekly", retention_count=4, retention_days=90
-    )
+    enabled: bool = False
+    include_database: bool = True
+    include_vault: bool = False
+    schedule: str = "daily"           # "hourly" | "daily" | "weekly"
+    retention_mode: str = "count"     # "count" | "days"
+    retention_value: int = 7
 
 
 class AppConfig(BaseModel):

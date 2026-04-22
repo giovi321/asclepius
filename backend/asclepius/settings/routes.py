@@ -128,22 +128,20 @@ async def download_backup(
 # --- Scheduled backup management ---
 
 def _backup_state_block(config):
-    """Nested {'directory', 'db': {...}, 'vault': {...}, 'full': {...},
-    'last_*_backup_at': iso|null} block returned by GET /settings."""
+    """Flat backup state block returned by GET /settings."""
     from asclepius.backup.scheduler import last_backup_time
     from datetime import datetime as _dt
 
-    def _iso(ts):
-        return _dt.fromtimestamp(ts).isoformat(timespec="seconds") if ts else None
-
+    last = last_backup_time(config)
     return {
         "directory": config.backup.directory,
-        "db": config.backup.db.model_dump(),
-        "vault": config.backup.vault.model_dump(),
-        "full": config.backup.full.model_dump(),
-        "last_db_backup_at": _iso(last_backup_time(config, "db")),
-        "last_vault_backup_at": _iso(last_backup_time(config, "vault")),
-        "last_full_backup_at": _iso(last_backup_time(config, "full")),
+        "enabled": config.backup.enabled,
+        "include_database": config.backup.include_database,
+        "include_vault": config.backup.include_vault,
+        "schedule": config.backup.schedule,
+        "retention_mode": config.backup.retention_mode,
+        "retention_value": config.backup.retention_value,
+        "last_backup_at": _dt.fromtimestamp(last).isoformat(timespec="seconds") if last else None,
     }
 
 
@@ -202,32 +200,29 @@ async def delete_scheduled_backup(
     return {"ok": True}
 
 
-class BackupRunRequest(BaseModel):
-    kind: str  # "db" | "vault" | "full"
-
-
 @router.post("/backup/run")
 async def run_scheduled_backup(
-    body: BackupRunRequest,
     request: Request,
     current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Trigger a backup job immediately. Returns the written filename."""
-    from asclepius.backup.scheduler import run_job, JOB_KINDS
-
-    if body.kind not in JOB_KINDS:
-        raise HTTPException(status_code=400, detail=f"kind must be one of {JOB_KINDS}")
+    """Trigger a backup immediately using the configured scope. Returns the
+    written filename."""
+    from asclepius.backup.scheduler import run_current_job, compute_kind
 
     config = get_config()
+    kind = compute_kind(config)
+    if kind is None:
+        raise HTTPException(status_code=400, detail="Select at least one of: database, vault")
+
     try:
-        path = await run_job(config, body.kind)
+        path = await run_current_job(config)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup failed: {type(e).__name__}: {e}")
 
     await audit_log(db, current_user["id"], "backup.run", "backup", None,
-                    {"kind": body.kind, "file": path.name}, get_client_ip(request))
-    return {"ok": True, "file": path.name}
+                    {"kind": kind, "file": path.name}, get_client_ip(request))
+    return {"ok": True, "file": path.name, "kind": kind}
 
 
 # --- Prompts ---
@@ -375,19 +370,13 @@ class SettingsUpdate(BaseModel):
     oidc_auto_create_user: bool | None = None
     oidc_username_claim: str | None = None
     oidc_display_name_claim: str | None = None
-    # Backup scheduler
-    backup_db_enabled: bool | None = None
-    backup_db_schedule: str | None = None
-    backup_db_retention_count: int | None = None
-    backup_db_retention_days: int | None = None
-    backup_vault_enabled: bool | None = None
-    backup_vault_schedule: str | None = None
-    backup_vault_retention_count: int | None = None
-    backup_vault_retention_days: int | None = None
-    backup_full_enabled: bool | None = None
-    backup_full_schedule: str | None = None
-    backup_full_retention_count: int | None = None
-    backup_full_retention_days: int | None = None
+    # Backup scheduler (single job, scope chosen via the include_* flags)
+    backup_enabled: bool | None = None
+    backup_include_database: bool | None = None
+    backup_include_vault: bool | None = None
+    backup_schedule: str | None = None
+    backup_retention_mode: str | None = None
+    backup_retention_value: int | None = None
 
 
 # Mapping: API field -> (yaml_section, yaml_key, config_dotpath)
@@ -428,20 +417,13 @@ _SETTINGS_MAP = {
     "oidc_auto_create_user": ("oidc", "auto_create_user", "oidc.auto_create_user"),
     "oidc_username_claim": ("oidc", "username_claim", "oidc.username_claim"),
     "oidc_display_name_claim": ("oidc", "display_name_claim", "oidc.display_name_claim"),
-    # Backup — yaml_key contains dots to describe nested sub-sections
-    # (db/vault/full). The update loop handles the nesting.
-    "backup_db_enabled": ("backup", "db.enabled", "backup.db.enabled"),
-    "backup_db_schedule": ("backup", "db.schedule", "backup.db.schedule"),
-    "backup_db_retention_count": ("backup", "db.retention_count", "backup.db.retention_count"),
-    "backup_db_retention_days": ("backup", "db.retention_days", "backup.db.retention_days"),
-    "backup_vault_enabled": ("backup", "vault.enabled", "backup.vault.enabled"),
-    "backup_vault_schedule": ("backup", "vault.schedule", "backup.vault.schedule"),
-    "backup_vault_retention_count": ("backup", "vault.retention_count", "backup.vault.retention_count"),
-    "backup_vault_retention_days": ("backup", "vault.retention_days", "backup.vault.retention_days"),
-    "backup_full_enabled": ("backup", "full.enabled", "backup.full.enabled"),
-    "backup_full_schedule": ("backup", "full.schedule", "backup.full.schedule"),
-    "backup_full_retention_count": ("backup", "full.retention_count", "backup.full.retention_count"),
-    "backup_full_retention_days": ("backup", "full.retention_days", "backup.full.retention_days"),
+    # Backup (flat, single job)
+    "backup_enabled": ("backup", "enabled", "backup.enabled"),
+    "backup_include_database": ("backup", "include_database", "backup.include_database"),
+    "backup_include_vault": ("backup", "include_vault", "backup.include_vault"),
+    "backup_schedule": ("backup", "schedule", "backup.schedule"),
+    "backup_retention_mode": ("backup", "retention_mode", "backup.retention_mode"),
+    "backup_retention_value": ("backup", "retention_value", "backup.retention_value"),
 }
 
 
@@ -467,10 +449,10 @@ async def update_settings(
     if "pipeline_default_flow" in changes and changes["pipeline_default_flow"] not in ("ocr_llm", "vision_llm"):
         raise HTTPException(status_code=400, detail="default_flow must be 'ocr_llm' or 'vision_llm'")
 
-    _valid_schedules = ("hourly", "daily", "weekly")
-    for _k in ("backup_db_schedule", "backup_vault_schedule", "backup_full_schedule"):
-        if _k in changes and changes[_k] not in _valid_schedules:
-            raise HTTPException(status_code=400, detail=f"{_k} must be one of {_valid_schedules}")
+    if "backup_schedule" in changes and changes["backup_schedule"] not in ("hourly", "daily", "weekly"):
+        raise HTTPException(status_code=400, detail="backup_schedule must be hourly, daily, or weekly")
+    if "backup_retention_mode" in changes and changes["backup_retention_mode"] not in ("count", "days"):
+        raise HTTPException(status_code=400, detail="backup_retention_mode must be 'count' or 'days'")
 
     config = get_config()
 
@@ -522,8 +504,6 @@ async def update_settings(
                 app_state.pipeline_auto_stop_reason = ""
 
     # Runtime backup scheduler restart when any backup_* field changes.
-    # Cancel-and-recreate is simpler than reconciling live state, and the
-    # scheduler loop's natural tick is slow so there's no perf concern.
     if request is not None and any(k.startswith("backup_") for k in changes):
         import asyncio
         from asclepius.backup.scheduler import start_backup_scheduler
@@ -534,7 +514,7 @@ async def update_settings(
             task.cancel()
             app_state.backup_task = None
 
-        if config.backup.db.enabled or config.backup.vault.enabled or config.backup.full.enabled:
+        if config.backup.enabled:
             app_state.backup_task = asyncio.create_task(
                 start_backup_scheduler(config, app_state)
             )

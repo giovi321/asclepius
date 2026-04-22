@@ -8,22 +8,18 @@ import {
 } from "./SettingsFormHelpers";
 
 type JobKind = "db" | "vault" | "full";
-
-type JobState = {
-  enabled: boolean;
-  schedule: "hourly" | "daily" | "weekly";
-  retention_count: number;
-  retention_days: number;
-};
+type Schedule = "hourly" | "daily" | "weekly";
+type RetentionMode = "count" | "days";
 
 type BackupState = {
   directory: string;
-  db: JobState;
-  vault: JobState;
-  full: JobState;
-  last_db_backup_at: string | null;
-  last_vault_backup_at: string | null;
-  last_full_backup_at: string | null;
+  enabled: boolean;
+  include_database: boolean;
+  include_vault: boolean;
+  schedule: Schedule;
+  retention_mode: RetentionMode;
+  retention_value: number;
+  last_backup_at: string | null;
 };
 
 type BackupFile = {
@@ -39,20 +35,10 @@ const SCHEDULE_OPTIONS = [
   { value: "weekly", label: "Weekly" },
 ];
 
-const JOB_LABELS: Record<JobKind, { title: string; blurb: string }> = {
-  db: {
-    title: "Database backups",
-    blurb: "SQLite snapshot only — small, fast, contains patients/documents metadata, audit log, and settings but not the vault files.",
-  },
-  vault: {
-    title: "Vault backups (files only)",
-    blurb: "Gzipped tarball of the vault directory (PDFs, DICOMs, images). Excludes the live database — pair with a DB backup, or use Full.",
-  },
-  full: {
-    title: "Full backups (DB + vault)",
-    blurb: "Gzipped tarball containing both a consistent DB snapshot and the vault directory. Heaviest option — run weekly or less.",
-  },
-};
+const RETENTION_OPTIONS = [
+  { value: "count", label: "Keep the last N backups" },
+  { value: "days", label: "Keep backups newer than N days" },
+];
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -79,7 +65,7 @@ export default function BackupTab() {
   const [state, setState] = useState<BackupState | null>(null);
   const [form, setForm] = useState<BackupState | null>(null);
   const [files, setFiles] = useState<BackupFile[]>([]);
-  const [runningKind, setRunningKind] = useState<JobKind | null>(null);
+  const [running, setRunning] = useState(false);
   const [downloadingOneShot, setDownloadingOneShot] = useState(false);
 
   const loadSettings = async () => {
@@ -94,7 +80,6 @@ export default function BackupTab() {
       const res = await api.get("/settings/backup/files");
       setFiles(res.data.files || []);
     } catch {
-      // Directory may not exist yet; treat as empty.
       setFiles([]);
     }
   };
@@ -106,27 +91,39 @@ export default function BackupTab() {
 
   if (!state || !form) return <div className="text-muted-foreground">Loading...</div>;
 
-  const diffFor = (kind: JobKind): Record<string, any> => {
-    const current = state[kind];
-    const next = form[kind];
+  const scopeOk = form.include_database || form.include_vault;
+
+  const changedUpdates = (): Record<string, any> => {
     const out: Record<string, any> = {};
-    (Object.keys(next) as Array<keyof JobState>).forEach((k) => {
-      if (next[k] !== current[k]) out[`backup_${kind}_${k}`] = next[k];
+    const keys: (keyof BackupState)[] = [
+      "enabled", "include_database", "include_vault",
+      "schedule", "retention_mode", "retention_value",
+    ];
+    keys.forEach((k) => {
+      if (form[k] !== state[k]) out[`backup_${k}`] = form[k];
     });
     return out;
   };
 
-  const saveJob = async (kind: JobKind) => {
-    const updates = diffFor(kind);
+  const saveJob = async () => {
+    if (!scopeOk) {
+      toast({ title: "Select at least one of Database or Vault", variant: "error" });
+      return;
+    }
+    const updates = changedUpdates();
     if (Object.keys(updates).length === 0) return;
     await save(updates);
     await loadSettings();
   };
 
-  const runNow = async (kind: JobKind) => {
-    setRunningKind(kind);
+  const runNow = async () => {
+    if (!scopeOk) {
+      toast({ title: "Select at least one of Database or Vault", variant: "error" });
+      return;
+    }
+    setRunning(true);
     try {
-      const res = await api.post("/settings/backup/run", { kind });
+      const res = await api.post("/settings/backup/run", {});
       toast({ title: `Backup created: ${res.data.file}`, variant: "success" });
       await loadFiles();
       await loadSettings();
@@ -136,7 +133,7 @@ export default function BackupTab() {
         variant: "error",
       });
     }
-    setRunningKind(null);
+    setRunning(false);
   };
 
   const deleteFile = async (file: BackupFile) => {
@@ -194,85 +191,111 @@ export default function BackupTab() {
     setDownloadingOneShot(false);
   };
 
-  const updateJobField = <K extends keyof JobState>(kind: JobKind, field: K, value: JobState[K]) => {
-    setForm((prev) => (prev ? { ...prev, [kind]: { ...prev[kind], [field]: value } } : prev));
-  };
-
-  const renderJobCard = (kind: JobKind, lastRun: string | null) => {
-    const labels = JOB_LABELS[kind];
-    const f = form[kind];
-    const isRunning = runningKind === kind;
-    return (
-      <SettingsForm
-        key={kind}
-        title={labels.title}
-        saving={saving}
-        saved={saved}
-        onSave={() => saveJob(kind)}
-      >
-        <p className="text-sm text-muted-foreground">{labels.blurb}</p>
-
-        <ToggleField
-          label="Enabled"
-          value={f.enabled}
-          onChange={(v) => updateJobField(kind, "enabled", v)}
-          description="When on, the scheduler runs this job on its schedule in the background."
-        />
-        <SelectField
-          label="Schedule"
-          value={f.schedule}
-          onChange={(v) => updateJobField(kind, "schedule", v as JobState["schedule"])}
-          options={SCHEDULE_OPTIONS}
-        />
-        <NumberField
-          label="Retention — keep last N backups"
-          value={f.retention_count}
-          onChange={(v) => updateJobField(kind, "retention_count", Math.max(1, Math.floor(v)))}
-          min={1}
-          max={365}
-          step={1}
-          description="Older files beyond this count are deleted after each run."
-        />
-        <NumberField
-          label="Retention — max age (days)"
-          value={f.retention_days}
-          onChange={(v) => updateJobField(kind, "retention_days", Math.max(1, Math.floor(v)))}
-          min={1}
-          max={3650}
-          step={1}
-          description="Files older than this are deleted after each run. Both limits apply — whichever hits first."
-        />
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-          <span>Last run: <span className="font-mono">{formatWhen(lastRun)}</span></span>
-          <button
-            type="button"
-            onClick={() => runNow(kind)}
-            disabled={isRunning}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
-          >
-            {isRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-            {isRunning ? "Running..." : "Run now"}
-          </button>
-        </div>
-      </SettingsForm>
-    );
-  };
+  const retentionLabel =
+    form.retention_mode === "count"
+      ? "Number of backups to keep"
+      : "Age limit in days";
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border p-4">
-        <h3 className="font-medium">Backup scheduler</h3>
+        <h3 className="font-medium">Scheduled backups</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Scheduled backups are written to <code>{state.directory}</code>. You can also trigger any job
-          manually with "Run now" below, or download the current database as a one-shot snapshot at the
-          bottom of this page.
+          Files are written to <code>{state.directory}</code>. Pick what to back up, how often,
+          and a single retention strategy.
         </p>
       </div>
 
-      {renderJobCard("db", state.last_db_backup_at)}
-      {renderJobCard("vault", state.last_vault_backup_at)}
-      {renderJobCard("full", state.last_full_backup_at)}
+      <SettingsForm title="Backup job" saving={saving} saved={saved} onSave={saveJob}>
+        <ToggleField
+          label="Enabled"
+          value={form.enabled}
+          onChange={(v) => setForm({ ...form, enabled: v })}
+          description="When on, the scheduler runs this job in the background on the chosen interval."
+        />
+
+        <div className="space-y-2">
+          <span className="text-sm font-medium">What to back up</span>
+          <div className="flex flex-col gap-2 rounded-md border bg-background p-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.include_database}
+                onChange={(e) => setForm({ ...form, include_database: e.target.checked })}
+                className="h-4 w-4 rounded"
+              />
+              <span>Database (SQLite snapshot)</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.include_vault}
+                onChange={(e) => setForm({ ...form, include_vault: e.target.checked })}
+                className="h-4 w-4 rounded"
+              />
+              <span>Vault (document files)</span>
+            </label>
+          </div>
+          {!scopeOk && (
+            <p className="text-xs text-destructive">Select at least one.</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Selecting both produces a single combined archive.
+          </p>
+        </div>
+
+        <SelectField
+          label="Schedule"
+          value={form.schedule}
+          onChange={(v) => setForm({ ...form, schedule: v as Schedule })}
+          options={SCHEDULE_OPTIONS}
+        />
+
+        <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+          <span className="text-sm font-medium">Retention strategy</span>
+          <p className="text-xs text-muted-foreground">
+            Pick one strategy. The other is ignored.
+          </p>
+          <div className="flex flex-col gap-2 pt-1">
+            {RETENTION_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="retention_mode"
+                  value={opt.value}
+                  checked={form.retention_mode === opt.value}
+                  onChange={() => setForm({ ...form, retention_mode: opt.value as RetentionMode })}
+                  className="h-4 w-4"
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="pt-2">
+            <NumberField
+              label={retentionLabel}
+              value={form.retention_value}
+              onChange={(v) => setForm({ ...form, retention_value: Math.max(1, Math.floor(v)) })}
+              min={1}
+              max={3650}
+              step={1}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+          <span>Last run: <span className="font-mono">{formatWhen(state.last_backup_at)}</span></span>
+          <button
+            type="button"
+            onClick={runNow}
+            disabled={running || !scopeOk}
+            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+          >
+            {running ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+            {running ? "Running..." : "Run now"}
+          </button>
+        </div>
+      </SettingsForm>
 
       <div className="rounded-lg border p-4 space-y-4">
         <div className="flex items-center justify-between">
@@ -294,7 +317,7 @@ export default function BackupTab() {
 
         {files.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No backup files yet. Enable a job or click "Run now" on one of the cards above.
+            No backup files yet. Enable the job or click &quot;Run now&quot; above.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -344,8 +367,8 @@ export default function BackupTab() {
       <div className="rounded-lg border p-4 space-y-4">
         <h3 className="font-medium">One-shot database download</h3>
         <p className="text-sm text-muted-foreground">
-          Download a consistent SQLite snapshot right now, without saving it on the server. Handy for
-          ad-hoc pulls; use the scheduler above for regular backups with retention.
+          Download a consistent SQLite snapshot right now, without saving it on the server.
+          Handy for ad-hoc pulls; use the scheduler above for regular backups with retention.
         </p>
         <button
           onClick={downloadOneShot}
@@ -353,7 +376,7 @@ export default function BackupTab() {
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           <Download className="h-4 w-4" />
-          {downloadingOneShot ? "Downloading..." : "Download Database Backup"}
+          {downloadingOneShot ? "Downloading..." : "Download database backup"}
         </button>
       </div>
     </div>

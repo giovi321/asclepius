@@ -42,7 +42,7 @@ Chat history is persisted per user and per patient, including the source documen
 
 ## Custom System Prompt
 
-The chat system prompt and SQL generation prompt can be customized from **Settings** > **Prompts**:
+The chat system prompt and SQL generation prompt can be customized from **Settings → Document Analysis → Prompts**:
 
 - `chat_system` -- The system prompt that defines the assistant's personality and behavior
 - `sql_generation` -- The prompt that instructs the LLM how to generate SQL queries from questions

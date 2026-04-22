@@ -154,6 +154,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `GET` | `/api/lab-results` | Yes | List lab results. Each row carries `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code` via JOINs. |
 | `GET` | `/api/lab-results/orphans` | Yes | Lab results whose `document_id` no longer points to an existing document. |
 | `GET` | `/api/lab-results/timeline` | Yes | Time-series for a specific test (legacy — superseded by the in-page chart picker). |
+| `POST` | `/api/lab-results` | Yes | Create a single lab result (add-by-hand). Requires `document_id` and `test_name_original`. |
 | `PATCH` | `/api/lab-results/{id}` | Yes | Update editable fields (value, unit, reference range, test_date, …). Viewers are blocked. |
 | `DELETE` | `/api/lab-results/{id}` | Yes | Delete a single lab result. |
 
@@ -165,7 +166,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `test_name` | string | Search by test name |
 | `date_from` | string | Filter by date |
 | `date_to` | string | Filter by date |
-| `limit` | int | Results per page (default: 100, max: 500) |
+| `limit` | int | Results per page (default: 500, max: 2000) |
 | `offset` | int | Pagination offset |
 
 ## Imaging
@@ -261,9 +262,17 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `PUT` | `/api/settings/ocr-providers` | Yes | Update OCR providers |
 | `GET` | `/api/settings/vision-providers` | Yes | List Vision-LLM providers |
 | `PUT` | `/api/settings/vision-providers` | Yes | Update Vision-LLM providers |
+| `GET` | `/api/settings/credentials` | Yes | List shared credentials (URL, API key, concurrency, retry policy) |
+| `PUT` | `/api/settings/credentials` | Yes | Update shared credentials |
+| `GET` | `/api/settings/general-llm` | Yes | Get the General-LLM config (chat, auto-merge, AI edit, event extraction, link suggestion) |
+| `PUT` | `/api/settings/general-llm` | Yes | Update the General-LLM config |
 | `POST` | `/api/settings/test-llm-provider` | Yes | Test an LLM provider connection |
 | `POST` | `/api/settings/test-ocr-provider` | Yes | Test an OCR provider connection |
 | `POST` | `/api/settings/test-vision-provider` | Yes | Test a Vision-LLM provider with a tiny image round-trip |
+| `GET` | `/api/settings/logs` | Admin | Recent log lines (tail) |
+| `GET` | `/api/settings/audit-log` | Admin | Structured audit-log entries |
+| `GET` | `/api/settings/sessions` | Admin | List active sessions across all users |
+| `DELETE` | `/api/settings/sessions/{session_id}` | Admin | Revoke a session |
 
 All three test endpoints accept the same request body:
 
@@ -282,7 +291,7 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 
 **OCR (legacy flat fields — kept for the auto-migration path):** `ocr_engine`, `ocr_language`, `ocr_confidence_threshold`, `cloud_ocr_enabled`, `ocr_remote_url`, `ocr_remote_api_key`, `llm_vision_provider`, `llm_vision_model`, `llm_vision_ollama_url`, `google_vision_key`
 
-**Vision-LLM:** `vision_extraction_timeout`, `vision_max_concurrent_requests`, `vision_max_retries`, `vision_retry_backoff_seconds`
+**Vision-LLM (legacy flat fields):** `vision_extraction_timeout`, `vision_max_concurrent_requests`, `vision_max_retries`, `vision_retry_backoff_seconds`. New deployments should leave these at defaults and rely on the per-credential values.
 
 **Pipeline:** `pipeline_watch_enabled`, `pipeline_poll_interval`, `pipeline_retry_interval`, `pipeline_max_retries`, `pipeline_default_flow` (`"ocr_llm"` or `"vision_llm"`)
 
@@ -290,7 +299,7 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 
 **OIDC:** `oidc_enabled`, `oidc_provider_url`, `oidc_client_id`, `oidc_client_secret`, `oidc_scopes`, `oidc_auto_create_user`, `oidc_username_claim`, `oidc_display_name_claim`
 
-For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`), use the dedicated `PUT /api/settings/{type}-providers` endpoints — each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
+For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`) and the shared credential list (`credentials[]`), use the dedicated `PUT /api/settings/{llm|ocr|vision}-providers` and `PUT /api/settings/credentials` endpoints — each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
 
 ## Prompts
 

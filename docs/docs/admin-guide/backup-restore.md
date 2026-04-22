@@ -15,7 +15,7 @@ Back up both regularly to protect against data loss.
 
 Download a SQLite backup directly from the web UI:
 
-1. Go to **Settings**
+1. Go to **Settings → Backup**
 2. Click **Download Backup**
 3. A timestamped `.sqlite` file is downloaded (e.g., `asclepius_backup_20250115_143022.sqlite`)
 

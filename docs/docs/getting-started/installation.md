@@ -39,40 +39,58 @@ The container includes:
 
 You can set environment variables in a `.env` file alongside `docker-compose.yml`, or directly in the compose file:
 
+Application env vars are prefixed with `ASCLEPIUS_`. The `TZ` variable is a plain Linux timezone name consumed by the container.
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SECRET_KEY` | Session signing key (change in production!) | `change-me-in-production` |
-| `ANTHROPIC_API_KEY` | Claude API key (optional, for Claude LLM provider) | -- |
-| `GOOGLE_VISION_KEY` | Google Cloud Vision API key (optional) | -- |
+| `ASCLEPIUS_SECRET_KEY` | Session signing key (change in production!) | `change-me-in-production` |
+| `ASCLEPIUS_ANTHROPIC_API_KEY` | Populates the Claude credential/provider `api_key` if one exists | — |
+| `ASCLEPIUS_OLLAMA_URL` | Populates the Ollama credential/provider `base_url` if one exists | — |
+| `ASCLEPIUS_GOOGLE_VISION_KEY` | Populates `ocr.google_vision_key` and flips `cloud_ocr_enabled` on | — |
+| `ASCLEPIUS_COOKIE_SECURE` | Truthy value forces `Secure` cookies (set behind HTTPS) | `false` |
+| `ASCLEPIUS_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | — |
+| `ASCLEPIUS_VAULT_PATH` | Overrides `vault.root_path` and all sub-paths | `/vault` |
+| `ASCLEPIUS_DB_PATH` | Overrides `database.path` | `/vault/asclepius.sqlite` |
+| `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` | `config/settings.yaml` |
+| `ASCLEPIUS_ENV` | `development` or `production` (affects log formatting) | `production` |
 | `TZ` | Container timezone (IANA timezone name) | `Europe/Zurich` |
 
 Example `.env` file:
 
 ```env
-SECRET_KEY=your-random-secret-key-at-least-32-chars
-ANTHROPIC_API_KEY=sk-ant-api03-...
+ASCLEPIUS_SECRET_KEY=your-random-secret-key-at-least-32-chars
+ASCLEPIUS_ANTHROPIC_API_KEY=sk-ant-api03-...
 TZ=Europe/Zurich
 ```
+
+Unprefixed names (`SECRET_KEY`, `ANTHROPIC_API_KEY`, etc.) are **not** read by the backend. If your orchestration tooling exposes those, map them to the `ASCLEPIUS_`-prefixed names in `docker-compose.yml` via `environment:` substitution.
 
 ### Connecting to Ollama
 
 If you run Ollama on the same machine as Asclepius, add an Ollama entry to `llm.providers`:
 
 ```yaml
+credentials:
+  - id: "cred-ollama-main"
+    name: "Ollama (host)"
+    type: "ollama"
+    base_url: "http://host.docker.internal:11434"   # Docker Desktop
+    # base_url: "http://192.168.1.100:11434"         # Or use the host IP
+    max_concurrent: 1
+
 llm:
   providers:
     - id: "ollama-1"
       type: "ollama"
-      name: "Ollama (Local)"
+      name: "Qwen on Ollama"
       enabled: true
       priority: 1
-      base_url: "http://host.docker.internal:11434"  # Docker Desktop
-      # base_url: "http://192.168.1.100:11434"       # Or use the host IP
-      model: "llama3.1"
+      credential_id: "cred-ollama-main"
+      model: "qwen2.5"
       timeout: 120
 ```
 
-If Ollama runs on a different machine, use that machine's IP or hostname. The same `base_url` / `model` fields are used for `vision.providers` entries — see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
+If Ollama runs on a different machine, use that machine's IP or hostname. Vision-LLM providers reference the **same** credential — see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
 
 ### Volume Mounts
 

@@ -87,6 +87,6 @@ See [Processing Pipeline](pipeline.md) for the complete flow.
 - **File-based storage** -- Files organized on filesystem by patient/year, metadata in DB
 - **External LLMs only** -- No bundled Ollama or model downloads. The container stays lightweight; you bring your own LLM
 - **Two-phase extraction** -- Classify first (cheap), then extract with type-specific prompts (accurate). This avoids sending irrelevant extraction schemas to the LLM
-- **Pipeline in background thread** -- Processing never blocks the web server. Cancellation is cooperative via an in-memory set of cancelled document IDs
+- **Pipeline in background asyncio task** -- Processing never blocks the web server. Cancellation is cooperative via an in-memory set of cancelled document IDs
 - **Runtime pipeline control** -- Pipeline can be started/stopped from the Settings UI at runtime via `app.state.pipeline_task`. Auto-stops after 5 consecutive provider connectivity failures
 - **Settings editable at runtime** -- All configuration changes are persisted to YAML and applied to in-memory config immediately, without restart

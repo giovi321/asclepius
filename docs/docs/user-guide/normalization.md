@@ -55,7 +55,7 @@ A self-alias whose text matches the canonical display name exactly (case- and wh
 
 ## Managing Normalization Data
 
-From **Settings** > **Normalization**, you can:
+From **Settings → Document Analysis → Normalization**, you can:
 
 ### View Canonical Entries
 
@@ -86,8 +86,8 @@ Click **Delete** on a row (or from the linked-documents modal) to permanently re
 
 If two canonical entries represent the same concept, merge them. Three flows:
 
-- **Per row.** Expand a row, click Merge, pick a target from the dropdown. The dropdown also offers **+ Create new entry…** — selecting it reveals Name and Code inputs and the merge creates the new canonical row first, then folds the source into it.
-- **Batch (multi-select).** Tick the checkboxes on several rows. A subdued bar appears above the table: *"N selected — Merge into: [target ▾] — Merge — Clear"*. The target dropdown includes the same **+ Create new entry…** option.
+- **Per row.** Expand a row and click Merge (the Confirm action lives inside the same expanded row). Pick a target from the **fuzzy-searchable** dropdown — start typing part of the canonical display or code to filter. The dropdown also offers **+ Create new entry…** — selecting it reveals Name and Code inputs and the merge creates the new canonical row first, then folds the source into it.
+- **Batch (multi-select).** Tick the checkboxes on several rows. A subdued bar appears above the table: *"N selected — Merge into: [target ▾] — Merge — Clear"*. The target dropdown is fuzzy-searchable and includes the same **+ Create new entry…** option.
 - **Auto-merge with AI.** Click **Auto-merge with AI** in the filter row. The current entries (with aliases) are sent to the configured LLM, which proposes groups of likely duplicates with a short reason for each. Proposals are rendered inline — you can change the target, uncheck individual sources, skip, or approve each group. Nothing is merged until you click **Apply merge**.
 
 Every merge:

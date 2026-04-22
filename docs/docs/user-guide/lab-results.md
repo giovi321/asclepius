@@ -17,7 +17,9 @@ If any lab result references a document that has been deleted, a yellow banner a
 
 ### Trend chart
 
-Above the table is a pill row listing every canonical test present in the current result set, with its row count. Click one or more pills to reveal a line chart plotting the values over time, one series per pill. A reference band is drawn from the mode of the first series' reference ranges.
+Above the table sits a collapsible **test picker** listing every canonical test present in the current result set with its row count. Expand it and type to **fuzzy-search** a test by canonical display or original name. Click one or more tests to reveal a line chart plotting the values over time, one series per selected test. A reference band is drawn from the mode of the first series' reference ranges. The picker stays collapsed by default so the table isn't pushed down until you need the chart.
+
+Each point on the chart is dated by the lab result's `test_date` when present — if a row has no extracted test date, the chart **falls back to the source document's `doc_date`** so a row with only a document-level date still appears in the trend instead of being dropped.
 
 ### Results table
 
@@ -72,8 +74,9 @@ Each lab result record contains:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/lab-results` | List lab results. Enriches each row with `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code`. Scoped to accessible patients; default limit 500. |
+| `GET` | `/api/lab-results` | List lab results. Enriches each row with `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code`. Scoped to accessible patients; default limit 500, max 2000. |
 | `GET` | `/api/lab-results/orphans` | Lab results whose `document_id` no longer points to an existing document. |
 | `GET` | `/api/lab-results/timeline` | Time-series for a single test — historical endpoint used by the old trend view. |
+| `POST` | `/api/lab-results` | Add a row by hand. Requires `document_id` and `test_name_original`; other fields optional. |
 | `PATCH` | `/api/lab-results/{id}` | Update editable fields. Viewers are blocked. |
 | `DELETE` | `/api/lab-results/{id}` | Delete a single row. |

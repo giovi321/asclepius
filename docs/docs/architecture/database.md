@@ -48,13 +48,44 @@ erDiagram
     norm_medications ||--o{ norm_medication_aliases : has
 
     users ||--o{ chat_history : has
+    users ||--o{ sessions : has
+    users ||--o{ documents : uploaded
 
     users {
         int id PK
         text username UK
         text password_hash
         text display_name
+        text role
         datetime created_at
+    }
+
+    sessions {
+        text id PK
+        int user_id FK
+        datetime created_at
+        datetime expires_at
+        datetime last_seen_at
+        text user_agent
+        text ip_address
+    }
+
+    audit_log {
+        int id PK
+        datetime timestamp
+        int user_id FK
+        text event
+        text target_type
+        text target_id
+        text details
+    }
+
+    ocr_page_cache {
+        int document_id FK
+        int page_number
+        text ocr_text
+        text ocr_engine
+        real confidence
     }
 
     patients {
@@ -74,14 +105,18 @@ erDiagram
     documents {
         int id PK
         int patient_id FK
+        int uploaded_by_user_id FK
         text file_path
         text original_filename
+        text suggested_filename
         text doc_type
         date doc_date
         int doctor_id FK
         text doctor_name
         int facility_id FK
         text facility_name
+        int norm_specialty_id FK
+        text specialty_original
         date date_issued
         date date_visit
         date date_received
@@ -89,6 +124,7 @@ erDiagram
         text summary_original
         int event_id FK
         text notes
+        text user_notes
         text tags
         int page_count
         int file_size
@@ -97,8 +133,11 @@ erDiagram
         real ocr_confidence
         text ocr_engine
         text llm_provider
+        text processing_flow
         json raw_extraction
         text status
+        text error_message
+        int retry_count
     }
 
     medical_events {
@@ -113,6 +152,8 @@ erDiagram
         text severity
         text diagnosis_text
         text icd10_code
+        text specialty_text
+        text notes
         text color
     }
 
@@ -355,6 +396,13 @@ erDiagram
 | `chat_history` | Persisted chat messages per user and patient |
 | `custom_prompts` | User-customized LLM prompts (overrides defaults) |
 | `documents_fts` | FTS5 virtual table for full-text search across OCR text and raw extractions |
+| `sessions` | Server-side session records (id, user, IP, user-agent, last-seen, expiry). Backs the admin session-list / revoke UI and replaces the older cookie-only session model. |
+| `audit_log` | Structured audit trail for admin actions (user create/delete, session revoke, settings mutations). Surfaced in the Settings → Audit Log view. |
+| `ocr_page_cache` | Per-page OCR text keyed by `(document_id, page_number)`. Populated during OCR so the extractor and chunking pipeline can read individual pages without re-running OCR. |
+
+### Configuration (not in the database)
+
+Shared credentials (URL + API key + concurrency + retry policy) and LLM/OCR/Vision provider entries live in `config/settings.yaml`, not the SQLite database. Asclepius mutates that file at runtime when you edit providers/credentials from the UI — there is no `credentials` or `providers` table.
 
 ## Key Design Notes
 

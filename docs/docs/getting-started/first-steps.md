@@ -15,17 +15,18 @@ On the very first launch — when no users exist in the database — Asclepius s
 
 ## 2. Configure LLM & OCR
 
-Before processing any documents, configure your LLM and OCR settings:
+Before processing any documents, configure the providers Asclepius will talk to:
 
-1. Go to **Settings** (gear icon in the sidebar)
-2. Under **LLM**, configure your provider:
-    - **Ollama**: set the base URL and model name (e.g., `llama3.1`)
-    - **Claude**: paste your API key and choose a model
-3. Under **OCR**, choose your OCR engine:
-    - **Tesseract** (built-in) — good for clear, printed documents
-    - **LLM Vision** — uses a vision model for OCR (better for handwriting, forms)
-    - **Google Cloud Vision** — high accuracy, requires API key
-    - **Tesseract Remote** — external Tesseract server
+1. Go to **Settings → Document Analysis → Providers** (gear icon in the sidebar).
+2. In the **Credentials** panel, add one credential per physical endpoint — typically one for your Ollama server and/or one for your Claude/OpenAI account. The credential holds the URL, API key, concurrency cap, and retry policy.
+3. In the **LLM** section, add an LLM provider and point it at that credential; pick a model (e.g. `qwen2.5`, `claude-haiku-4-5-20251001`).
+4. In the **OCR** section, add your OCR provider(s):
+    - **Tesseract** (built-in) — good for clear, printed documents; no credential needed.
+    - **LLM Vision** — uses a vision model for OCR (better for handwriting, forms); references an Ollama/Claude/OpenAI credential.
+    - **Google Cloud Vision** — high accuracy; references a Google-Vision credential.
+    - **Tesseract Remote** — external Tesseract server; references a `tesseract_remote` credential.
+5. If you want to use the single-step Vision-LLM flow, add a **Vision-LLM** provider as well.
+6. Drag to reorder priority in the **Priority** sub-tab.
 
 ## 3. Upload Your First Document
 
@@ -58,10 +59,11 @@ Processing steps for each document:
 2. **LLM Extraction** -- classification and structured data extraction
 3. **Organizing** -- file moved to the patient's directory
 
-For large documents (>5 pages), you will also see:
+For multi-page documents, you will also see:
 
-- **Page classification** -- each page is classified by content type
-- **Section extraction** -- data is extracted from each section individually
+- **Chunked extraction** (>1 page or >8k chars OCR text) — pages are packed into ~10k-char chunks with single-page overlap, extracted independently, then merged. Truncated chunks are automatically bisected and retried.
+- **Page classification** (PDFs >5 pages) — each page is classified by content type
+- **Section extraction** (PDFs >5 pages) — data is extracted from each section individually
 
 You can also monitor detailed processing logs from **Settings** > **Logs**. The log viewer auto-refreshes every 3 seconds and auto-scrolls to the latest entries.
 

@@ -52,17 +52,18 @@ Each user must be explicitly granted access to each patient:
 
 ### Granting Access
 
-1. Go to **Settings** > **Users**
-2. Select a user
-3. Click **Grant Access**
-4. Select the patient and role
+1. Go to **Settings → Users**
+2. Click the user's row to open the **Access** modal
+3. Pick a role (`owner` or `viewer`) from the role dropdown
+4. Tick the patients you want the user to access — the list is **multi-select**, so you can add or revoke multiple patients at once
+5. Click **Save**
 
 !!! note "Setup wizard grants owner access"
     The setup wizard automatically grants the first user `owner` access to the first patient.
 
 ### Revoking Access
 
-Remove a user's access to a patient from the same interface.
+Open the same Access modal, untick the patients you want to revoke, and save. Admins can also end a user's active sessions from **Settings → Sessions** — listing every active session (user, IP, user-agent, last-seen, expiry) with a per-row **Revoke** button.
 
 ## OIDC / SSO
 

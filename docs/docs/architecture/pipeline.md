@@ -29,13 +29,14 @@ flowchart TD
 
     K & L & M & N --> O{Text extracted?}
     O -->|No| P
-    O -->|Yes| Q{Document > 5 pages?}
+    O -->|Yes| RE[run_extraction<br/>strategy picker]
 
+    RE --> Q{PDF > 5 pages?}
     Q -->|Yes| R[Smart Page Sectioning]
-    Q -->|No| S{Text > 15k chars?}
+    Q -->|No| S{>1 cached page<br/>or >8k chars?}
 
     S -->|Yes| T[Chunked Extraction]
-    S -->|No| U[Standard Extraction]
+    S -->|No| U[Single-shot Extraction]
 
     R --> V[Phase 1: Classify]
     T --> V
@@ -49,7 +50,7 @@ flowchart TD
     C --> Z
 ```
 
-`pipeline.default_flow` controls which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page can override the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM).
+`pipeline.default_flow` controls which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page can override the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Both the initial-ingest and reprocess paths funnel through the same `run_extraction()` strategy picker, so a 3-page blood test reprocessed after initial ingest takes the same sectioning / chunking / single-shot decision as it would on first import.
 
 ## File Watcher
 
@@ -102,8 +103,9 @@ The `provider_name` stored in the database is the user-configured display name (
 1. Render each PDF page as a JPEG image (150 DPI, auto-downscale if >4.5MB)
 2. Send each page image to the LLM (Claude, OpenAI, or Ollama with vision model)
 3. LLM transcribes all visible text, preserving structure
-4. Supports rate-limit retry with exponential backoff (30s, 60s, 90s)
-5. Can use a **separate** provider/model/URL from the extraction LLM
+4. Transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) retry with per-credential backoff (defaults to `[30, 60, 120]` seconds, configurable via `CredentialEntry.max_retries` / `retry_backoff_seconds`)
+5. Per-page calls are serialized through a process-wide gate keyed by `(credential, kind)` so OCR and LLM traffic to the same endpoint never exceed the credential's configured `max_concurrent`
+6. Can use a **separate** provider/model/URL from the extraction LLM
 
 ### Remote Tesseract
 
@@ -120,12 +122,13 @@ Uses the Google Cloud Vision API for OCR. Requires an API key.
 When `pipeline.default_flow` is `vision_llm` — or the Reprocess menu is set to **Vision-LLM** — the pipeline takes a different path that **skips the OCR and the LLM-classification steps** entirely. Each page image is sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model returns a single JSON document containing both `ocr_text` and all classification/universal fields (doc_type, dates, doctor, facility, summary).
 
 1. Iterate `vision.providers[]` in priority order — fall through to the next provider on failure.
-2. For each PDF page (or the single image), render to JPEG and send to the chosen provider (Ollama / Claude / OpenAI).
+2. For each PDF page (or the single image), render to JPEG and send to the chosen provider (Ollama / Claude / OpenAI). Image dimensions are aligned to a 28-pixel patch grid and capped below the model's `max_pixels` budget (e.g. `qwen2.5-vl`) so the server never silently rescales.
 3. Parse the JSON response; merge extractions across pages (first non-null value per key wins).
 4. Persist `ocr_text` + set `ocr_engine = vision_llm:<provider name>` on the document.
-5. Call `extract_and_store` with the merged result as the override — skips both OCR and the classification LLM call; type-specific extraction is still run if the prompt registry has a matching prompt.
+5. Run **Phase 2 type-specific extraction** on the vision-produced OCR text using the same provider selected for vision — lab results / medications / diagnoses are populated even though classification came from the vision prompt.
+6. Call `extract_and_store` with the merged result as the override.
 
-Retries on transient failures (ReadTimeout, ConnectError, HTTP 429) are controlled by `vision.max_retries` and `vision.retry_backoff_seconds`.
+Retries on transient failures are controlled per-credential (`max_retries`, `retry_backoff_seconds`). Per-page vision calls share the same `(credential, kind)` gate as OCR, so vision traffic respects the credential's configured concurrency cap.
 
 **Advantages:** single model pull, no model swapping, and the model sees visual layout cues (bold headers, table grids, letterhead positioning, signatures) that OCR strips away.
 
@@ -185,7 +188,7 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 ## Smart Page-Level Sectioning
 
-For documents with more than **5 pages**, the pipeline uses smart page-level sectioning instead of sending the entire text to a single extraction prompt:
+For PDFs with more than **5 pages** (`should_section()`), the pipeline uses smart page-level sectioning instead of sending the entire text to a single extraction prompt:
 
 ```mermaid
 flowchart LR
@@ -227,12 +230,30 @@ Sections are stored in the `document_sections` table and are visible in the docu
 
 ## Chunked Extraction
 
-For documents that are not large enough for sectioning but have OCR text longer than **15,000 characters**, the pipeline uses chunked extraction:
+For documents that are not large enough for sectioning, chunking is triggered whenever the cached OCR has **more than one page** or the concatenated OCR text exceeds **8,000 characters**. This is deliberately aggressive: multi-page blood-test tables often fit well under the LLM's input cap but overflow its *output* cap, silently dropping later-page rows if sent as a single prompt.
 
-1. Split text into 10,000-character chunks with 1,000-character overlap
-2. Extract the first chunk normally (writes to DB)
-3. Extract remaining chunks and merge results
-4. Deduplication by test name, medication name, diagnosis, etc.
+### Page-aligned chunks
+
+1. Pages are loaded from the `ocr_page_cache` table (populated during OCR).
+2. Pages are greedily packed into chunks up to `_TARGET_CHUNK_CHARS` (~10k).
+3. The **last page of each chunk is repeated as the first page of the next** chunk, so any table spanning a page boundary is visible in full to at least one chunk.
+4. A preamble (`Chunk i of N, pages X-Y of Z, overlaps previous chunk`) is prepended so the LLM treats the text in context.
+
+### Truncation-aware retry
+
+Each chunk is extracted **in-memory**; the merged result is stored exactly once at the end. If a chunk response is flagged `_truncated` or `_truncation_suspected` and contains more than one page, the chunk is bisected into two halves and each half is retried (depth-capped at 2). The bisection path keeps writes idempotent because nothing hits the DB until all chunks have succeeded.
+
+### Merging & logging
+
+`merge_extractions` deduplicates by:
+
+- `test_name_original` for lab results
+- `brand_name + active_ingredient_original` for medications
+- `diagnosis_original` for diagnoses
+- `vaccine_name + date_administered` for vaccinations
+- `description + amount` for invoice line items
+
+After merging, a **page coverage** line is logged — `pages covered=N/total`, number of lab results/medications/diagnoses produced, and a `[TRUNCATION DETECTED]` tag if any chunk (even after bisection) still hit the output cap. Missing pages show up explicitly instead of being lost silently.
 
 ## Cancellation
 

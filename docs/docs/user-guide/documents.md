@@ -6,7 +6,7 @@
 
 1. Go to **Documents** in the sidebar
 2. Click **Upload** or drag-and-drop files onto the upload area
-3. Optionally select a patient to pre-assign the document
+3. Optionally select a patient to pre-assign the document — the patient picker supports **fuzzy search**, so typing part of the name is enough
 4. Supported formats: **PDF**, **JPEG**, **PNG**, **TIFF**, **DICOM** (.dcm)
 
 When uploading via the UI, a database record is created immediately so the document appears in the list right away with a `pending` status. The pipeline picks it up for processing automatically.
@@ -23,6 +23,12 @@ vault/inbox/document.pdf.patient_hint    # Contains just the patient ID, e.g. "3
 ## Document List
 
 The Documents page shows all documents for the selected patient (or all accessible documents if no patient is selected).
+
+### Sorting & Columns
+
+- Every column header is **click-to-sort**. Clicking cycles through ascending → descending → unsorted; the table remembers the state across filter changes.
+- The **Date added** column (the upload timestamp) is available but not shown by default.
+- Open the **Columns** menu in the table header to toggle optional columns — Facility is shown by default, Date added and a few others are opt-in. Column choices persist per user.
 
 ### Filtering
 

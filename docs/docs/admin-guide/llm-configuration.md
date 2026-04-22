@@ -11,7 +11,32 @@ The two flows are:
 
 Which flow runs for a **new upload** is controlled by `pipeline.default_flow` (Settings → Pipeline). On an **existing document** you can pick any flow on a per-document basis from the Reprocess menu (OCR+LLM, OCR only, LLM only, or Vision-LLM).
 
-All provider configuration is done from **Settings** > **Document Analysis** in the web UI.
+All provider configuration is done from **Settings** > **Document Analysis** in the web UI. That page has four sub-tabs:
+
+- **Providers** — add/edit/reorder LLM, OCR, and Vision-LLM providers, and manage the **Credentials** they share.
+- **Priority** — drag-to-reorder priority across the providers you've defined.
+- **Prompts** — edit classification / extraction / vision / chat / page-classification prompts.
+- **Normalization** — canonical mappings for doctors, facilities, lab tests, specialties, diagnoses, medications.
+
+## Credentials
+
+A **credential** is a shared connection (URL + API key) that multiple providers can reference by `credential_id`. One credential per physical endpoint — a single Ollama server, a single Anthropic account, a single OpenAI project. Any number of LLM / Vision-LLM / OCR entries can point at the same credential and pick up changes to the URL, API key, retry policy, or concurrency cap automatically.
+
+Key fields (per credential):
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `type` | `ollama` | One of `ollama`, `vllm`, `claude`, `openai`, `google_vision`, `tesseract_remote` |
+| `base_url` | — | Only for self-hosted types (Ollama/vLLM/Tesseract-remote) |
+| `api_key` | — | Only for cloud types (Claude / OpenAI / Google Vision) |
+| `max_concurrent` | `2` | Process-wide concurrency cap for this credential. Every provider referencing this credential shares the same queue, split per **kind** (`llm` / `ocr` / `vision`). This matches how a single Ollama or Claude account actually behaves — one physical endpoint, one real concurrency limit. |
+| `max_retries` | `3` | Retries on transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) |
+| `retry_backoff_seconds` | `[30, 60, 120]` | Sleep between successive attempts; last value reused if list is shorter than `max_retries` |
+
+Concurrency is enforced by a process-wide gate keyed by `(credential, kind)`. The Dashboard shows a live chip for each active credential×kind pair, so you can see at a glance which model is currently talking to which endpoint and how many slots are in-flight / waiting.
+
+!!! tip "Why per-credential instead of per-provider?"
+    Two Ollama models on the same server compete for the same GPU. Setting a concurrency cap on each provider entry would let the physical server get overrun as soon as you enabled a second provider on it. A credential-scoped cap means adding a new model to an existing endpoint doesn't silently multiply load.
 
 ## Recommended Stack
 
@@ -33,15 +58,18 @@ ollama pull qwen2.5
 ollama pull qwen2.5vl:7b
 ```
 
-Wire them up under **Settings → Document Analysis**:
+Wire them up under **Settings → Document Analysis → Providers**:
 
-- **OCR Providers:** add an *LLM Vision* provider pointing at `fredrezones55/chandra-ocr-2`.
-- **LLM Providers:** add an *Ollama* provider using `qwen2.5`.
-- **Vision-LLM Providers:** add an *Ollama* provider using `qwen2.5vl:7b`.
+1. First, add a single **Credential** of type `ollama` pointing at your Ollama server URL (e.g. `http://ollama:11434`). `max_concurrent` of `1` is safest when a single GPU serves all three models.
+2. Add an **OCR** provider (*LLM Vision* type) referencing that credential, model `fredrezones55/chandra-ocr-2`.
+3. Add an **LLM** provider (*Ollama* type) referencing the same credential, model `qwen2.5`.
+4. Add a **Vision-LLM** provider (*Ollama* type) referencing the same credential, model `qwen2.5vl:7b`.
+
+Because all three share the same credential, your Ollama server is never asked to run more than one thing at a time.
 
 ### Cloud (Anthropic)
 
-If you'd rather use a hosted model — or want a fallback for documents the local models struggle with — **Claude Haiku** yields good results both as the **text LLM** and as the **Vision-LLM**. It's fast, cheap, and handles the single-step image-to-JSON Vision-LLM flow cleanly. Configure it once as a Claude provider under LLM Providers and again under Vision-LLM Providers, then either set it as the primary or drop it to priority 2 as an escalation target behind the local stack.
+If you'd rather use a hosted model — or want a fallback for documents the local models struggle with — **Claude Haiku** yields good results both as the **text LLM** and as the **Vision-LLM**. It's fast, cheap, and handles the single-step image-to-JSON Vision-LLM flow cleanly. Add a single Claude credential (holds your API key + retry policy + concurrency cap for the Anthropic endpoint), then add two providers on top of it — one in the LLM section and one in the Vision-LLM section, both referencing the Claude credential. Set it as priority 1 or drop it to priority 2 as an escalation target behind the local stack.
 
 ## LLM Providers
 
@@ -58,10 +86,10 @@ LLM providers handle document classification, data extraction, chat, and search.
 
 ### Adding a Provider
 
-1. Go to **Settings** > **Document Analysis** > **LLM Providers**
-2. Click **Add Provider** and select the type
-3. Configure the provider settings (model, URL, API key, timeout)
-4. Use the arrow buttons to set priority order (top = highest priority)
+1. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **LLM** section
+2. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline
+3. Set the **model** (the credential already carries URL + API key) and optionally the timeout
+4. Drag in the **Priority** sub-tab to reorder across all LLM providers (top = highest priority)
 5. Click **Save Changes**
 
 ### Provider Priority & Escalation
@@ -77,41 +105,46 @@ Example setup:
 Providers can also be configured in `settings.yaml`:
 
 ```yaml
+credentials:
+  - id: "cred-ollama-main"
+    name: "Ollama (GPU box)"
+    type: "ollama"
+    base_url: "http://ollama:11434"
+    max_concurrent: 1
+    max_retries: 3
+    retry_backoff_seconds: [30, 60, 120]
+  - id: "cred-claude-1"
+    name: "Claude"
+    type: "claude"
+    api_key: "sk-ant-..."
+    max_concurrent: 4
+
 llm:
   providers:
     - id: "ollama-1"
       type: "ollama"
-      name: "Ollama (Local)"
+      name: "Qwen on Ollama"
       enabled: true
       priority: 1
-      base_url: "http://ollama:11434"
-      model: "llama3.1"
+      credential_id: "cred-ollama-main"
+      model: "qwen2.5"
       timeout: 120
     - id: "claude-1"
       type: "claude"
-      name: "Claude API"
+      name: "Claude Haiku"
       enabled: true
       priority: 2
-      api_key: "sk-ant-..."
-      model: "claude-sonnet-4-20250514"
+      credential_id: "cred-claude-1"
+      model: "claude-haiku-4-5-20251001"
       timeout: 120
-    - id: "openai-1"
-      type: "openai"
-      name: "OpenAI"
-      enabled: false
-      priority: 3
-      api_key: "sk-..."
-      model: "gpt-4o"
-      timeout: 120
-    - id: "vllm-1"
-      type: "vllm"
-      name: "vLLM Server"
-      enabled: false
-      priority: 4
-      base_url: "http://vllm:8000/v1"
-      model: "meta-llama/Llama-3.1-8B-Instruct"
-      timeout: 120
+  general:                    # LLM used for chat, auto-merge, auto-rename,
+    credential_id: "cred-claude-1"  # link suggestion, event extraction, AI
+    type: "claude"            # document edits. Leave credential_id empty to
+    model: "claude-haiku-4-5-20251001"  # disable those features (they'll 503).
+    timeout: 120
 ```
+
+Legacy inline form (`base_url` + `api_key` directly on the provider, no `credential_id`) is still honoured for backwards compatibility — on startup, Asclepius synthesises a credential per unique (type, base_url, api_key) triple and rewrites `settings.yaml` to reference it.
 
 ### Recommended Models
 
@@ -179,15 +212,18 @@ ocr:
       priority: 1
       language: "eng+ita+deu"
       confidence_threshold: 0.7
+      # Local Tesseract has no credential — leave credential_id empty.
     - id: "llm-vision-1"
       type: "llm_vision"
       name: "Chandra Vision OCR"
       enabled: true
       priority: 2
+      credential_id: "cred-ollama-main"     # shared with LLM/Vision providers
       llm_provider: "ollama"
       llm_model: "fredrezones55/chandra-ocr-2"
-      llm_base_url: "http://ollama:11434"
 ```
+
+Tesseract-remote and Google Vision entries also accept `credential_id` (pointing at a credential of type `tesseract_remote` / `google_vision`). The old inline `remote_url` / `google_vision_key` fields are kept for backward compat and auto-migrated on startup.
 
 ## Vision-LLM Providers
 
@@ -210,11 +246,13 @@ This is useful when:
 ### Adding a Vision Provider
 
 1. Pull a vision model (example for Ollama): `ollama pull qwen2.5vl:7b`.
-2. Go to **Settings** > **Document Analysis** > **Vision-LLM Providers**.
-3. Click **Add Provider** and pick the type.
-4. Fill in Model, Base URL (Ollama/OpenAI), and API key (Claude/OpenAI).
+2. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **Vision-LLM** section.
+3. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline.
+4. Fill in the model name (the credential already supplies URL + API key).
 5. Click **Test Connection** — a trivial image round-trip confirms the wiring.
-6. Use the arrow buttons to set priority and **Save Changes**.
+6. Drag to reorder priority in the **Priority** sub-tab and **Save Changes**.
+
+Asclepius also runs Phase 2 type-specific extraction after the vision call, reusing the **same provider you selected for vision** — that way Haiku-for-vision stays Haiku-for-extraction instead of silently falling back to the default text-LLM.
 
 ### Turning on the Vision-LLM flow
 
@@ -234,16 +272,13 @@ The vision prompt is editable under **Settings** > **Document Analysis** > **Pro
 ```yaml
 vision:
   extraction_timeout: 600            # Per-page timeout (seconds)
-  max_concurrent_requests: 2         # Parallel vision calls across providers
-  max_retries: 3                     # Retries on transient failures
-  retry_backoff_seconds: [30, 60, 120]
   providers:
     - id: "qwen25vl-1"
       type: "ollama"
       name: "Qwen2.5-VL"
       enabled: true
       priority: 1
-      base_url: "http://ollama:11434"
+      credential_id: "cred-ollama-main"
       model: "qwen2.5vl:7b"
       timeout: 600
     - id: "claude-vision-1"
@@ -251,10 +286,12 @@ vision:
       name: "Claude (vision fallback)"
       enabled: false
       priority: 2
-      api_key: "sk-ant-..."
-      model: "claude-sonnet-4-20250514"
+      credential_id: "cred-claude-1"
+      model: "claude-haiku-4-5-20251001"
       timeout: 600
 ```
+
+Retries and concurrency aren't configured on `vision.*` itself — they live on the credential each vision provider references.
 
 ### Recommended local models
 
@@ -267,14 +304,31 @@ vision:
 
 `qwen2.5:14b` is **text-only** — there is no 14B vision variant. `minicpm-v` (8B) is a solid alternative to `qwen2.5vl:7b` when OCR on noisy scans matters more than strict JSON adherence. Avoid `llama3.2-vision` for dense tables and strict JSON output.
 
-## Extraction Timeout
+## General LLM
 
-Each provider has its own timeout setting.
+The **General LLM** is a single model used for everything that isn't the document-analysis pipeline: chat, auto-merge suggestions, auto-rename, link suggestions, event extraction from document text, and AI-powered document edits. It's configured separately from the priority list — one credential, one model, no fallback chain.
+
+Set it under **Settings → Document Analysis → Providers → General LLM**, or in YAML:
+
+```yaml
+llm:
+  general:
+    credential_id: "cred-claude-1"
+    type: "claude"
+    model: "claude-haiku-4-5-20251001"
+    timeout: 120
+```
+
+When `credential_id` is empty, all non-pipeline AI features return HTTP 503 with a clear error. This lets you run the pipeline without exposing chat/edit features if you want a read-only deployment.
+
+## Timeouts
+
+Each provider has its own timeout setting (on the provider entry, not the credential).
 
 - LLM providers default to 120 seconds.
 - Vision providers default to 600 seconds (vision calls are slow).
 
-Increase the provider timeout for very large documents, slow inference servers, or large models. For LLM-vision OCR the effective timeout is never lower than 300 seconds regardless of the configured value.
+Increase the provider timeout for very large documents, slow inference servers, or large models. For LLM-vision OCR the effective timeout is never lower than 300 seconds regardless of the configured value. Retries and backoff come from the **credential**, so two providers on the same endpoint share a retry policy.
 
 ## Custom Prompts
 
@@ -333,5 +387,6 @@ Asclepius auto-migrates older layouts on startup:
 - **Flat `llm.*` fields** (`provider`, `ollama_base_url`, `ollama_model`, `claude_api_key`, `claude_model`) are folded into `llm.providers[]`.
 - **Flat `ocr.*` fields** (`engine`, `remote_url`, `llm_vision_*`, `google_vision_key`) are folded into `ocr.providers[]`.
 - **OCR entries of type `vision_extraction`** are moved into `vision.providers[]` and dropped from the OCR list — the single-step flow is now a first-class sibling of OCR.
+- **Inline `base_url` + `api_key`** on LLM/Vision/OCR provider entries are promoted to shared `credentials[]` entries and replaced with `credential_id`. Per-provider retry / concurrency knobs (`llm.max_retries`, `vision.max_concurrent_requests`, etc.) are preserved as a fallback when a credential isn't set, but new deployments should rely on the credential's values.
 
-All three migrations are transparent and the settings file is rewritten on first run so subsequent starts are clean.
+All migrations are transparent and the settings file is rewritten on first run so subsequent starts are clean.

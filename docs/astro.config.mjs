@@ -15,6 +15,23 @@ export default defineConfig({
       components: {
         Head: './src/components/Head.astro',
       },
+      head: [
+        {
+          tag: 'link',
+          attrs: { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        },
+        {
+          tag: 'link',
+          attrs: { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'stylesheet',
+            href: 'https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap',
+          },
+        },
+      ],
       logo: {
         src: './src/assets/logo.svg',
         replacesTitle: false,

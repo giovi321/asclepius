@@ -33,6 +33,8 @@ from typing import Any
 
 import aiosqlite
 
+from .alias_lookup import load_aliases_flat
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,12 +111,7 @@ class AliasCache:
         if entity in self._by_entity:
             return
         tables = _ENTITIES[entity]
-        cursor = await db.execute(
-            f"SELECT alias, {tables.alias_fk} FROM {tables.aliases}"
-        )
-        rows = await cursor.fetchall()
-        lowered = [(str(r[0] or "").strip().lower(), int(r[1])) for r in rows
-                   if r[0] and r[1]]
+        lowered = await load_aliases_flat(db, tables.aliases, tables.alias_fk)
         self._by_entity[entity] = lowered
         self._exact_by_entity[entity] = dict(lowered)  # last wins on dup; fine
 

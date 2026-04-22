@@ -50,14 +50,23 @@ def _timestamp() -> str:
 
 
 def _backup_dir(config: AppConfig) -> Path:
-    directory = Path(config.backup.directory)
+    """Return the configured directory without touching the filesystem.
+    Use :func:`_ensure_backup_dir` when a writable directory is required."""
+    return Path(config.backup.directory)
+
+
+def _ensure_backup_dir(config: AppConfig) -> Path:
+    directory = _backup_dir(config)
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
 
 def list_backup_files(config: AppConfig) -> list[dict]:
-    """Return metadata for every file in the backup directory, newest-first."""
+    """Return metadata for every file in the backup directory, newest-first.
+    Returns an empty list if the directory does not exist yet."""
     directory = _backup_dir(config)
+    if not directory.exists():
+        return []
     out: list[dict] = []
     for entry in directory.iterdir():
         if not entry.is_file():
@@ -88,6 +97,8 @@ def _kind_from_name(name: str) -> str | None:
 
 def _files_for(config: AppConfig, kind: str) -> list[Path]:
     directory = _backup_dir(config)
+    if not directory.exists():
+        return []
     prefix, _ext = _PREFIX[kind]
     return sorted(
         (p for p in directory.iterdir() if p.is_file() and p.name.startswith(prefix)),
@@ -129,7 +140,7 @@ def prune(config: AppConfig, kind: str, keep_count: int, keep_days: int) -> int:
 # --- Job runners -------------------------------------------------------------
 
 def _run_db_sync(config: AppConfig) -> Path:
-    directory = _backup_dir(config)
+    directory = _ensure_backup_dir(config)
     dest = directory / f"{_PREFIX['db'][0]}{_timestamp()}{_PREFIX['db'][1]}"
     snapshot_db(config.database.path, str(dest))
     return dest
@@ -188,7 +199,7 @@ def _add_tree(tar: tarfile.TarFile, vault_root: Path, backup_dir: Path, db_path:
 
 
 def _run_vault_sync(config: AppConfig, *, include_db: bool) -> Path:
-    directory = _backup_dir(config)
+    directory = _ensure_backup_dir(config)
     kind = "full" if include_db else "vault"
     prefix, ext = _PREFIX[kind]
     dest = directory / f"{prefix}{_timestamp()}{ext}"

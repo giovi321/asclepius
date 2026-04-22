@@ -646,6 +646,20 @@ async def extract_and_store(
 
     # Insert lab results
     if patient_id:
+        # Resolve the document's best date once — used as the default for every
+        # lab row that doesn't carry its own test_date. Priority matches the
+        # rest of the codebase (date_visit > date_issued > doc_date). We read
+        # back from the DB rather than the extraction dict so any dates the
+        # user manually set pre-extraction are respected.
+        cursor = await db.execute(
+            "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
+            (doc_id,),
+        )
+        drow = await cursor.fetchone()
+        doc_best_date = None
+        if drow:
+            doc_best_date = drow[0] or drow[1] or drow[2]
+
         for lab in extraction.get("lab_results", []):
             if not isinstance(lab, dict):
                 continue
@@ -662,6 +676,7 @@ async def extract_and_store(
             norm_id = lab.get("norm_lab_test_id")
             if norm_id is None:
                 norm_id = await _resolve_lab_test(db, lab)
+            lab_test_date = lab.get("test_date") or doc_best_date
             await db.execute(
                 """INSERT INTO lab_results
                    (document_id, patient_id, test_name_original, norm_lab_test_id,
@@ -673,7 +688,7 @@ async def extract_and_store(
                  lab.get("unit"), lab.get("reference_range_low"),
                  lab.get("reference_range_high"), lab.get("is_abnormal"),
                  lab.get("sample_type"), lab.get("panel_name"),
-                 extraction.get("doc_date")),
+                 lab_test_date),
             )
 
         # Insert encounters/diagnoses

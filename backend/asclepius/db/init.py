@@ -379,6 +379,20 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
               )
         """)
 
+    # Backfill NULL lab_results.test_date from the parent document's best
+    # available date (date_visit > date_issued > doc_date). Historically the
+    # extractor only propagated the LLM-emitted doc_date, so rows created
+    # before the extraction fix landed can have NULL test_date even though
+    # their document has a date. Idempotent — only touches NULL rows.
+    await db.execute("""
+        UPDATE lab_results
+        SET test_date = (
+            SELECT COALESCE(d.date_visit, d.date_issued, d.doc_date)
+            FROM documents d WHERE d.id = lab_results.document_id
+        )
+        WHERE test_date IS NULL
+    """)
+
     # Extraction corrections table (correction-driven learning)
     await db.execute("""
         CREATE TABLE IF NOT EXISTS extraction_corrections (

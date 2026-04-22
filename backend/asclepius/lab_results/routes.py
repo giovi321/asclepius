@@ -286,6 +286,14 @@ async def update_lab_result(
         await db.execute(
             f"UPDATE lab_results SET {set_clause} WHERE id = ?", values
         )
+        # Reverse cascade: editing a lab row's test_date also updates the
+        # source document's doc_date. Sibling lab rows are deliberately left
+        # alone — the user edited one row, not the whole document.
+        if "test_date" in updates:
+            await db.execute(
+                "UPDATE documents SET doc_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (updates["test_date"], row["document_id"]),
+            )
         await db.commit()
     except Exception as e:
         logger.exception("Failed to update lab result %d", result_id)

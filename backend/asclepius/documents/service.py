@@ -310,6 +310,23 @@ async def update_document_fields(
             "UPDATE imaging_studies SET doctor_id = ? WHERE document_id = ?",
             (updates["doctor_id"], doc_id),
         )
+    # Cascade date changes to lab_results. When the document's best date
+    # (date_visit > date_issued > doc_date) shifts, every lab row attached to
+    # the document moves with it. Per-row manual overrides are overwritten on
+    # purpose — the user edited the document-level date, so their expectation
+    # is that the children follow.
+    if any(k in updates for k in ("doc_date", "date_issued", "date_visit")):
+        cursor = await db.execute(
+            "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
+            (doc_id,),
+        )
+        drow = await cursor.fetchone()
+        if drow:
+            best_date = drow[0] or drow[1] or drow[2]
+            await db.execute(
+                "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
+                (best_date, doc_id),
+            )
     await db.commit()
 
 

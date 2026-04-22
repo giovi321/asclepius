@@ -11,7 +11,7 @@ Chat lets you ask questions about a patient's medical history in plain language.
 1. **SQL generation**. The LLM turns your natural-language question into a SQL query against the structured tables (`documents`, `lab_results`, `encounters`, `medications`, …).
 2. **Query execution**. The SQL runs against SQLite, scoped to patients you have access to.
 3. **Answer generation**. The LLM uses the rows it got back to compose a natural-language reply.
-4. **Source documents**. Every document referenced in the answer is attached as a clickable chip. Click one to jump to its detail page.
+4. **Source documents**. Every document referenced in the conversation is listed in the **Source documents** sidebar to the right, newest answer first. Click a row to jump to its detail page. When the LLM's SQL touches the `documents` table but forgets to select `documents.id`, the backend falls back to matching the result rows against the documents table by `original_filename` / `doc_date` / `doc_type` (scoped to the active patient) so the sidebar still populates.
 
 ## Usage
 

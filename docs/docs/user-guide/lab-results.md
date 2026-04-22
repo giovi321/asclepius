@@ -68,7 +68,7 @@ Each lab result record contains:
 | `is_abnormal` | Whether the value is outside the reference range |
 | `sample_type` | Type of sample (blood, urine, etc.) |
 | `panel_name` | Name of the test panel (e.g., "Complete Blood Count") |
-| `test_date` | Date the test was performed |
+| `test_date` | Date the test was performed. Populated at extraction from the parent document's best date (`date_visit` → `date_issued` → `doc_date`), or the per-row date if the LLM emitted one. Kept in sync both ways: editing any of the document's date fields cascades the new best date to every lab row on that document; editing a single row's `test_date` updates the document's `doc_date` but leaves sibling rows alone. |
 
 ## API
 

@@ -100,7 +100,8 @@ export default function PromptsTab() {
 
       <div className="text-sm text-muted-foreground">
         Customize the LLM prompts used for document classification, extraction, chat, and more.
-        Prompts use Python format strings with placeholders like {"{ocr_text}"}, {"{patient_list}"}, etc.
+        Prompts are Python <code className="font-mono text-xs">str.format()</code> templates — expand a prompt
+        to see the exact <code className="font-mono text-xs">{"{variable}"}</code> placeholders it supports.
         Click a prompt to edit it. Reset to revert to the default.
       </div>
       {prompts.map((p) => (
@@ -123,6 +124,33 @@ export default function PromptsTab() {
           </div>
           {editing === p.key && (
             <div className="border-t p-3 space-y-2">
+              {p.variables && p.variables.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs font-medium">Available variables</div>
+                  <div className="flex flex-wrap gap-1">
+                    {p.variables.map((v: any) => (
+                      <button
+                        key={v.name}
+                        type="button"
+                        title={`${v.description}${v.optional ? " (optional)" : ""}\n\nClick to copy`}
+                        onClick={() => {
+                          const token = `{${v.name}}`;
+                          navigator.clipboard?.writeText(token);
+                          toast({ title: `Copied ${token}` });
+                        }}
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] hover:bg-accent"
+                      >
+                        {`{${v.name}}`}{v.optional ? "?" : ""}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Click a chip to copy the placeholder. Variables marked with{" "}
+                    <code className="font-mono">?</code> are optional — substituted only if the placeholder
+                    actually appears in the template. Using an unknown placeholder will break extraction.
+                  </p>
+                </div>
+              )}
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}

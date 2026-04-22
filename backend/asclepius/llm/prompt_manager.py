@@ -9,6 +9,90 @@ from asclepius.llm import prompts as default_prompts
 logger = logging.getLogger(__name__)
 
 # Registry of all configurable prompts with their keys and descriptions
+# Master reference — every placeholder that can appear in any prompt template.
+# Used by the UI and docs to describe what each {variable} gets substituted with.
+PROMPT_VARIABLES: dict[str, str] = {
+    "ocr_text": "Full OCR-extracted text of the document.",
+    "pages_text": "Multi-page OCR text, formatted as `--- PAGE N ---\\n<text>`.",
+    "patient_list": "JSON list of known patients (id, slug, name, DOB, sex).",
+    "facility_list": "JSON list of known facilities (id, slug, name).",
+    "doctor_list": "JSON list of known doctors (id, slug, name).",
+    "few_shot_examples": "1–2 similar prior documents with their extractions, used as in-context examples.",
+    "lab_test_mappings": "JSON list of canonical lab-test aliases. Substituted only if the placeholder appears in the template.",
+    "specialty_mappings": "JSON list of canonical specialty aliases. Substituted only if the placeholder appears in the template.",
+    "diagnosis_mappings": "JSON list of canonical diagnosis/ICD-10 aliases. Substituted only if the placeholder appears in the template.",
+    "medication_mappings": "JSON list of canonical medication aliases. Substituted only if the placeholder appears in the template.",
+    "doc_id": "ID of the current document.",
+    "doc_type": "Classified document type (bloodtest, invoice, discharge, …).",
+    "doc_date": "Document date (YYYY-MM-DD or 'unknown').",
+    "doctor_name": "Treating/signing doctor's name from the extraction.",
+    "facility_name": "Facility/hospital/clinic name from the extraction.",
+    "summary": "English summary of the document.",
+    "other_documents": "Text list of other documents belonging to the same patient.",
+    "schema": "SQLite schema (tables + columns) for SQL generation.",
+    "context": "Patient context snippet used by chat and SQL generation.",
+    "question": "User's natural-language question (chat).",
+    "patient_context": "Formatted patient demographics + recent history (chat system prompt).",
+    "current_data": "Current document extraction rendered as JSON (document_edit).",
+    "user_instruction": "User's correction/edit instruction (document_edit).",
+    "json_schema": "Expected JSON-schema response shape (document_edit).",
+}
+
+# Per-prompt placeholder lists. Suffix "?" marks an optional placeholder —
+# it is substituted only if it actually appears in the (custom) template.
+PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
+    "classification": ["patient_list", "facility_list", "doctor_list", "ocr_text", "few_shot_examples"],
+    "vision_extraction": [],
+    "extraction_bloodtest": ["ocr_text", "lab_test_mappings?"],
+    "extraction_specialist_report": [
+        "ocr_text",
+        "specialty_mappings?",
+        "diagnosis_mappings?",
+        "medication_mappings?",
+    ],
+    "extraction_prescription": ["ocr_text", "medication_mappings?"],
+    "extraction_invoice": ["ocr_text"],
+    "extraction_discharge": ["ocr_text", "diagnosis_mappings?", "medication_mappings?"],
+    "extraction_radiology": ["ocr_text"],
+    "extraction_vaccination": ["ocr_text"],
+    "document_edit": [
+        "current_data",
+        "patient_list",
+        "facility_list",
+        "doctor_list",
+        "user_instruction",
+        "json_schema",
+    ],
+    "sql_generation": ["schema", "context", "question"],
+    "chat_system": ["patient_context"],
+    "link_suggestion": [
+        "doc_id",
+        "doc_type",
+        "doc_date",
+        "doctor_name",
+        "facility_name",
+        "summary",
+        "other_documents",
+    ],
+    "page_classification": ["pages_text"],
+}
+
+
+def _variables_for(key: str) -> list[dict]:
+    out = []
+    for raw in PROMPT_VARIABLE_KEYS.get(key, []):
+        optional = raw.endswith("?")
+        name = raw.rstrip("?")
+        out.append(
+            {
+                "name": name,
+                "description": PROMPT_VARIABLES.get(name, ""),
+                "optional": optional,
+            }
+        )
+    return out
+
+
 PROMPT_REGISTRY = {
     "classification": {
         "description": "Phase 1: Document classification and basic metadata extraction",
@@ -126,6 +210,7 @@ async def get_all_prompts(db_path: str) -> list[dict]:
             "is_custom": key in custom,
             "updated_at": custom_data["updated_at"] if custom_data else None,
             "default_length": len(default_text),
+            "variables": _variables_for(key),
         })
 
     return result

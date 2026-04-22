@@ -365,6 +365,64 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
+### Available variables
+
+Prompts are Python `str.format()` templates. Each prompt supports a specific set of `{placeholder}` variables that are substituted when the prompt is executed. **Using a placeholder not listed for a given prompt will raise a `KeyError` at runtime and break that extraction path** — stick to the variables below for each prompt.
+
+The Prompts settings page shows the exact variables available for each prompt as clickable chips: click a chip to copy the placeholder into your clipboard.
+
+#### Variable reference
+
+| Variable | Description |
+|----------|-------------|
+| `{ocr_text}` | Full OCR-extracted text of the document |
+| `{pages_text}` | Multi-page OCR text, formatted as `--- PAGE N ---\n<text>` |
+| `{patient_list}` | JSON list of known patients (id, slug, name, DOB, sex) |
+| `{facility_list}` | JSON list of known facilities (id, slug, name) |
+| `{doctor_list}` | JSON list of known doctors (id, slug, name) |
+| `{few_shot_examples}` | 1–2 similar prior documents with their extractions, used as in-context examples |
+| `{lab_test_mappings}` | JSON list of canonical lab-test aliases (optional) |
+| `{specialty_mappings}` | JSON list of canonical specialty aliases (optional) |
+| `{diagnosis_mappings}` | JSON list of canonical diagnosis/ICD-10 aliases (optional) |
+| `{medication_mappings}` | JSON list of canonical medication aliases (optional) |
+| `{doc_id}` | ID of the current document |
+| `{doc_type}` | Classified document type (bloodtest, invoice, discharge, …) |
+| `{doc_date}` | Document date (YYYY-MM-DD or `unknown`) |
+| `{doctor_name}` | Treating/signing doctor's name from the extraction |
+| `{facility_name}` | Facility/hospital/clinic name from the extraction |
+| `{summary}` | English summary of the document |
+| `{other_documents}` | Text list of other documents belonging to the same patient |
+| `{schema}` | SQLite schema (tables + columns) for SQL generation |
+| `{context}` | Patient context snippet used by chat / SQL generation |
+| `{question}` | User's natural-language question (chat) |
+| `{patient_context}` | Formatted patient demographics + recent history (chat system prompt) |
+| `{current_data}` | Current document extraction rendered as JSON (document_edit) |
+| `{user_instruction}` | User's correction/edit instruction (document_edit) |
+| `{json_schema}` | Expected JSON-schema response shape (document_edit) |
+
+Variables labelled **optional** are substituted only if their placeholder actually appears in the (custom) template — they can be safely added to extend a prompt, but are not required.
+
+#### Variables by prompt
+
+| Prompt key | Variables |
+|------------|-----------|
+| `classification` | `{patient_list}`, `{facility_list}`, `{doctor_list}`, `{ocr_text}`, `{few_shot_examples}` |
+| `vision_extraction` | *(none — self-contained)* |
+| `extraction_bloodtest` | `{ocr_text}`, `{lab_test_mappings}`? |
+| `extraction_specialist_report` | `{ocr_text}`, `{specialty_mappings}`?, `{diagnosis_mappings}`?, `{medication_mappings}`? |
+| `extraction_prescription` | `{ocr_text}`, `{medication_mappings}`? |
+| `extraction_invoice` | `{ocr_text}` |
+| `extraction_discharge` | `{ocr_text}`, `{diagnosis_mappings}`?, `{medication_mappings}`? |
+| `extraction_radiology` | `{ocr_text}` |
+| `extraction_vaccination` | `{ocr_text}` |
+| `document_edit` | `{current_data}`, `{patient_list}`, `{facility_list}`, `{doctor_list}`, `{user_instruction}`, `{json_schema}` |
+| `sql_generation` | `{schema}`, `{context}`, `{question}` |
+| `chat_system` | `{patient_context}` |
+| `link_suggestion` | `{doc_id}`, `{doc_type}`, `{doc_date}`, `{doctor_name}`, `{facility_name}`, `{summary}`, `{other_documents}` |
+| `page_classification` | `{pages_text}` |
+
+Variables suffixed with `?` are optional.
+
 ### Editing and resetting prompts
 
 1. Go to **Settings** > **Document Analysis** > **Prompts**

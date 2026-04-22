@@ -179,6 +179,13 @@ Sections are stored in the `document_sections` table and are visible in the docu
 
 For documents that are not large enough for sectioning, chunking is triggered whenever the cached OCR has **more than one page** or the concatenated OCR text exceeds **8,000 characters**. This is deliberately aggressive: multi-page blood-test tables often fit well under the LLM's input cap but overflow its *output* cap, so later-page rows are silently dropped if sent as a single prompt.
 
+### Two phases per document
+
+Chunked extraction runs the same two phases as the non-chunked path, but with Phase 2 repeated per chunk and merged:
+
+1. **Phase 1 — classify on chunk 1.** A short-schema call that captures universal fields (doc_type, patient, doctor, facility, dates, summary, language). Keeping it separate means small models only have to fit one concern in working memory at a time — the reason qwen2.5:14b reliably returns these fields now instead of zooming in on the loudest section (lab table) and dropping everything else.
+2. **Phase 2 — type-specific extraction per chunk.** Runs the prompt for the doc_type picked in Phase 1 (e.g. `bloodtest` → lab-results-only schema). Each chunk produces its own extraction; `merge_extractions` dedupes overlap.
+
 ### Page-aligned chunks
 
 1. Pages are loaded from the `ocr_page_cache` table (populated during OCR).
@@ -189,6 +196,8 @@ For documents that are not large enough for sectioning, chunking is triggered wh
 ### Truncation-aware retry
 
 Each chunk is extracted **in-memory**; the merged result is stored exactly once at the end. If a chunk response is flagged `_truncated` or `_truncation_suspected` and contains more than one page, the chunk is bisected into two halves and each half is retried (depth-capped at 2). The bisection path keeps writes idempotent because nothing hits the DB until all chunks have succeeded.
+
+Small models can also self-truncate mid-JSON well before the token cap is reached — the JSON parser detects an unclosed structure and flags the response as truncated, which feeds the same bisection loop. So "one chunk" on the first attempt often becomes "two single-page halves" on retry, and both finish cleanly.
 
 ### Merging & logging
 
@@ -204,20 +213,24 @@ After merging, a **page coverage** line is logged: `pages covered=N/total`, numb
 
 ## Cancellation
 
-Document processing can be cancelled at any time from the web UI:
+Document processing can be cancelled at any time from the web UI. The Cancel button triggers two mechanisms at once (belt-and-braces):
 
-- The API adds the document ID to an in-memory `cancelled_docs` set
-- The pipeline checks this set between each processing step (OCR, LLM, organizing)
-- If a cancellation is detected, the document status is set to `cancelled` and processing stops
+1. **Hard cancel** — the pipeline keeps a registry of in-flight asyncio tasks keyed by `doc_id`. On cancel, the API calls `asyncio.Task.cancel()` on the registered task. This propagates `CancelledError` into whichever `await` the pipeline is parked on (typically the httpx POST to the LLM), aborts the HTTP connection, releases the credential gate slot via `async with` finalizers, and marks the document `cancelled`. The UI chip disappears within a second.
+2. **Cooperative flag** — the API also adds the doc_id to an in-memory `cancelled_docs` set. Every phase boundary (before OCR, between OCR and LLM, after LLM) checks the set and exits early. This is the fallback for the rare case where the hard cancel can't interrupt the current await (e.g. C-level blocking syscall).
+
+Before this was belt-and-braces, cancel was cooperative only: a mid-extraction click had to wait for the LLM to finish its current call before the pipeline would notice. Reprocess also didn't honour the flag at all. Both are fixed.
 
 ## Name Normalization
 
-During extraction, doctor and facility names are normalized:
+Everything that references a canonical table — lab tests, medications, diagnoses, specialties, doctors, facilities — is matched in Python after extraction, not inside the LLM prompt. The LLM emits the document's original wording; `asclepius.normalization.resolver` does the rest:
 
-1. The LLM extracts raw names from the document
-2. Names are slugified and matched against existing records
-3. If a match is found, the existing record is reused
-4. If no match is found, a new doctor/facility record is created
+1. Exact case-insensitive match against the alias table.
+2. Fuzzy match via `rapidfuzz.process.extractOne` (WRatio ≥ 85). Catches OCR drift and minor language variants.
+3. Auto-create a new canonical row if nothing matches, with the original wording as `canonical_display` and as an `auto_mapped=1` alias for user review in the Normalization UI.
+
+Doctors and facilities still go through their dedicated `_upsert_*` helpers (slug matching + alias-aware upsert), which predate the resolver but behave the same way.
+
+Before this refactor the prompt carried every `(canonical_code, alias)` pair inline so the LLM could pick. On a real install that payload reached 437 kB and broke schema adherence on smaller models. Doing the match in Python cut the extraction prompt to ~15-20 kB and made qwen2.5:14b viable end-to-end.
 5. Document type names are also normalized against fuzzy alias tables
 
 ## Progress Tracking

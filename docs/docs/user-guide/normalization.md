@@ -42,14 +42,17 @@ This is useful because the same doctor may appear under different name variation
 
 ## How normalization works
 
-1. During LLM extraction, the pipeline receives a raw name (e.g., "Emoglobina")
-2. The system searches the alias tables for a matching entry (case-insensitive)
-3. If found, the canonical ID is linked to the record
-4. If not found, the LLM may auto-create a new alias mapping
+The LLM's only job is to copy the test / medication / diagnosis / specialty name exactly as the document writes it (e.g., "Emoglobina"). A Python resolver then maps that raw name to a canonical ID:
+
+1. **Exact alias match** — case-insensitive lookup against the alias table. Covered by the seed data for common tests, specialties, diagnoses, and medications.
+2. **Fuzzy match** — if no exact hit, run `rapidfuzz.process.extractOne` with a score threshold of 85. Catches OCR drift, typos, and minor language variants ("Hepatite C" vs "Hepatitis C", "S-Creatinina" vs "Creatinina"). The matching original text is inserted as a new alias on the canonical entry so the next document with the same phrasing lands on step 1.
+3. **Auto-create** — still nothing? The resolver inserts a new canonical row with `canonical_display` set to the original wording and the original text as an `auto_mapped=1` alias. The row appears in Settings → Normalization flagged for review.
+
+The alias tables aren't sent to the LLM as prompt context any more. Before this refactor the prompt carried every `(canonical_code, alias)` row inline — a moderately-used install pushed extraction prompts past 400 kB, which broke schema adherence on small models. Doing the match in Python is faster, deterministic, auditable, and scales with the database instead of the prompt.
 
 ### Auto-mapped aliases
 
-When the LLM encounters a name it hasn't seen before, it can automatically create a new alias. These auto-mapped aliases have `auto_mapped = 1` in the database, distinguishing them from manually curated aliases — the row displays an `auto` badge and contributes to the entry's "unreviewed" count.
+Any alias inserted by the resolver (steps 2 and 3 above) has `auto_mapped = 1`. Manually curated aliases have `auto_mapped = 0`. The row displays an `auto` badge in the Normalization UI and contributes to the entry's "unreviewed" count. Confirm them in bulk from the row-level Confirm action.
 
 A self-alias whose text matches the canonical display name exactly (case- and whitespace-insensitive) is auto-confirmed on insert because there's no normalization decision to audit — it's just the canonical form echoed back. A one-shot migration clears the `auto_mapped` flag on any existing self-alias of that kind.
 

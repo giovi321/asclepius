@@ -330,6 +330,12 @@ Each provider has its own timeout setting (on the provider entry, not the creden
 
 Increase the provider timeout for very large documents, slow inference servers, or large models. For LLM-vision OCR the effective timeout is never lower than 300 seconds regardless of the configured value. Retries and backoff come from the **credential**, so two providers on the same endpoint share a retry policy.
 
+### Wall-clock budget on Ollama
+
+`timeout` is the httpx **read** timeout — the idle interval between bytes. On a genuinely wedged connection where the server accepts the POST but never replies (seen with stuck Ollama generate workers), the read timer can fail to fire and the request hangs indefinitely, holding the credential's gate slot with it.
+
+Ollama POSTs are therefore also wrapped in `asyncio.wait_for` with a wall-clock budget of `timeout + 30s`. A hung socket raises `TimeoutError` at the wall-clock boundary regardless of what httpx sees. The error is treated the same as any other transient failure and feeds the credential's normal retry/backoff loop. Claude and OpenAI don't need this — their client libraries enforce wall-clock timeouts internally.
+
 ## Custom prompts
 
 All LLM prompts are editable from **Settings** > **Document Analysis** > **Prompts**.

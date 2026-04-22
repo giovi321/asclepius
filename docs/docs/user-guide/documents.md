@@ -168,7 +168,9 @@ This is useful for:
 
 ## Cancelling processing
 
-For documents currently being processed, click **Cancel** to stop processing. The pipeline checks for cancellation between each step.
+For documents currently being processed, click **Cancel** to stop processing. The cancel is immediate: the in-flight LLM or OCR request is aborted, the credential's concurrency slot is released, and the chip in the top bar disappears within a second. Processing chips for other documents are unaffected.
+
+Under the hood this does two things. It hard-cancels the asyncio task the document is running under (so whichever `await` is in flight — an HTTP POST, a DB write — raises `CancelledError` and unwinds immediately), and it sets a cooperative flag the pipeline checks at every phase boundary as a fallback. The Delete action uses the same path, so deleting a document mid-processing doesn't leave orphan requests running against your LLM server.
 
 ## Deleting documents
 

@@ -65,11 +65,14 @@ class ClaudeProvider(LLMProvider):
         system_prompt: str,
         *,
         json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         # Anthropic relies on the system prompt to specify JSON shape; the
-        # ``json_mode`` flag is accepted for interface parity but has no
-        # API-level toggle to set here.
-        del json_mode
+        # ``json_mode`` / ``json_schema`` flags are accepted for interface
+        # parity but have no API-level toggle to set here. (Anthropic's
+        # tool-use mechanism could enforce a schema, but that's a heavier
+        # refactor and Claude already follows JSON instructions reliably.)
+        del json_mode, json_schema
         extraction_cap, _ = get_output_token_caps()
         response = await self.client.messages.create(
             model=self.model,

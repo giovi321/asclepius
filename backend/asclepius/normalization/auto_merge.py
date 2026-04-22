@@ -18,6 +18,35 @@ from asclepius.normalization.knowledge_base import get_knowledge_base
 logger = logging.getLogger(__name__)
 
 
+# JSON schema enforced by Ollama (≥ 0.5) and OpenAI structured outputs.
+# Older Ollama and Anthropic ignore it and rely on prompt + parser
+# tolerance below.
+_PROPOSALS_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "proposals": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "target_id": {"type": "integer"},
+                    "source_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "minItems": 1,
+                    },
+                    "reason": {"type": "string"},
+                },
+                "required": ["target_id", "source_ids", "reason"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["proposals"],
+    "additionalProperties": False,
+}
+
+
 _SYSTEM_PROMPT = """You are a medical data normalization assistant. The user maintains a list of canonical entries (doctors, medical facilities, lab tests, medications, diagnoses, or specialties) and wants you to find duplicates that should be merged.
 
 Identify groups of 2+ entries that clearly refer to the same real-world concept. Examples:
@@ -47,9 +76,10 @@ Rules:
 - Return ONLY the JSON object, no prose before or after"""
 
 
-def _display_to_id_map(entries: list[dict]) -> dict[str, int]:
-    """Build a normalized-display-name → id lookup so the parser can rescue
-    LLM responses that reference entries by display name instead of id."""
+def _name_to_id_map(entries: list[dict]) -> dict[str, int]:
+    """Build a normalized-name → id lookup keyed by display, aliases AND
+    canonical_code, so the parser can rescue LLM responses that reference
+    entries by any of those handles instead of by id."""
     out: dict[str, int] = {}
     for e in entries or []:
         eid = e.get("id")
@@ -58,6 +88,8 @@ def _display_to_id_map(entries: list[dict]) -> dict[str, int]:
         names: list[str] = []
         if e.get("canonical_display"):
             names.append(e["canonical_display"])
+        if e.get("canonical_code"):
+            names.append(e["canonical_code"])
         for a in e.get("aliases") or []:
             if isinstance(a, str):
                 names.append(a)
@@ -70,6 +102,10 @@ def _display_to_id_map(entries: list[dict]) -> dict[str, int]:
     return out
 
 
+# Backwards-compat alias — older code might import the old name.
+_display_to_id_map = _name_to_id_map
+
+
 def _norm_display(text: str) -> str:
     """Casefold + collapse non-alphanumeric runs. Same spirit as the
     knowledge-base normaliser, kept local so it stays a one-liner."""
@@ -78,7 +114,7 @@ def _norm_display(text: str) -> str:
     return re.sub(r"[^0-9a-z]+", " ", text.casefold()).strip()
 
 
-def _parse_proposals(text: str, display_to_ids: dict[str, int] | None = None) -> list[dict]:
+def _parse_proposals(text: str, name_to_ids: dict[str, int] | None = None) -> list[dict]:
     """Extract the proposals array from an LLM response.
 
     Accepts:
@@ -86,10 +122,17 @@ def _parse_proposals(text: str, display_to_ids: dict[str, int] | None = None) ->
     - The documented shape ``{"proposals": [{"target_id", "source_ids",
       "reason"}, ...]}``.
     - The qwen drift ``{"merge_groups": [{"id": [...], "reason"?}, ...]}``.
-    - The display-name-keyed dict ``{"Calcium": ["Total Calcium",
-      "Ionized Calcium"], ...}`` — keys are target display names, values
-      are arrays of source display names. Resolved against
-      ``display_to_ids`` when provided.
+    - Any other top-level dict whose values are flat lists of strings —
+      keys are treated as group labels (and ignored), each value-list
+      becomes one merge group with strings resolved against
+      ``name_to_ids`` (which covers display names, aliases, and
+      canonical codes). Handles e.g.
+      ``{"Calcium": ["Total Calcium", "Ionized Calcium"]}`` and
+      ``{"113142": ["anxiety_disorder", "anxiety"]}``.
+
+    ``name_to_ids`` should be the ``_name_to_id_map(entries)`` of the
+    entries that were sent to the LLM, so the value strings can be
+    resolved.
     """
     candidates = [text]
     fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
@@ -112,15 +155,19 @@ def _parse_proposals(text: str, display_to_ids: dict[str, int] | None = None) ->
         groups = obj.get("merge_groups") or obj.get("groups") or obj.get("duplicates")
         if isinstance(groups, list):
             return _coerce_groups(groups)
-        # Last-resort: treat the dict itself as {target_display: [source_displays]}
-        # if its values look like flat lists of strings and at least one
-        # key matches a known entry.
-        if display_to_ids and _looks_like_display_dict(obj, display_to_ids):
-            logger.info(
-                "auto_merge parser: recovered display-name-keyed dict response (%d keys)",
-                len(obj),
-            )
-            return _coerce_display_dict(obj, display_to_ids)
+        # Last-resort: treat the dict as ``{label: [name, ...]}`` where each
+        # value-list is one merge group. Resolves names against the union
+        # lookup so display names, aliases, and canonical_code values all
+        # work.
+        if name_to_ids and _looks_like_dict_of_string_lists(obj):
+            recovered = _coerce_label_dict(obj, name_to_ids)
+            if recovered:
+                logger.info(
+                    "auto_merge parser: recovered dict-of-lists response "
+                    "(%d keys → %d proposals)",
+                    len(obj), len(recovered),
+                )
+                return recovered
     logger.warning(
         "Failed to parse auto-merge proposals from LLM response (len=%d): %r",
         len(text), text[:500],
@@ -153,39 +200,56 @@ def _coerce_groups(groups: list) -> list[dict]:
     return out
 
 
-def _looks_like_display_dict(obj: dict, display_to_ids: dict[str, int]) -> bool:
-    """Heuristic: every value is a list of strings AND at least one key
-    resolves to a known entry display name."""
+def _looks_like_dict_of_string_lists(obj: dict) -> bool:
+    """Heuristic: every value is a list whose items are all strings."""
+    if not obj:
+        return False
     for v in obj.values():
-        if not isinstance(v, list):
+        if not isinstance(v, list) or not v:
             return False
         for item in v:
             if not isinstance(item, str):
                 return False
-    return any(_norm_display(k) in display_to_ids for k in obj.keys())
+    return True
 
 
-def _coerce_display_dict(obj: dict, display_to_ids: dict[str, int]) -> list[dict]:
-    """Translate ``{"target_display": ["source_display", ...]}`` into proposals."""
+def _coerce_label_dict(obj: dict, name_to_ids: dict[str, int]) -> list[dict]:
+    """Translate ``{label: [name, name, ...]}`` into proposals.
+
+    Each value-list is one merge group. The key is treated as an opaque
+    label — if it resolves to a known entry it becomes the target;
+    otherwise the first resolvable string in the list is the target and
+    the rest are sources. Strings that don't resolve to any known entry
+    are dropped.
+    """
     out: list[dict] = []
+    seen: set[int] = set()
     for key, values in obj.items():
         if not isinstance(values, list):
             continue
-        target_id = display_to_ids.get(_norm_display(key))
-        if target_id is None:
-            continue
-        source_ids: list[int] = []
+        # Resolve key + values; keep insertion order, dedupe.
+        ids: list[int] = []
+        key_id = name_to_ids.get(_norm_display(str(key)))
+        if key_id is not None:
+            ids.append(key_id)
         for v in values:
             if not isinstance(v, str):
                 continue
-            sid = display_to_ids.get(_norm_display(v))
-            if sid is not None and sid != target_id and sid not in source_ids:
-                source_ids.append(sid)
-        if not source_ids:
+            vid = name_to_ids.get(_norm_display(v))
+            if vid is not None and vid not in ids:
+                ids.append(vid)
+        # Need at least 2 distinct entries to form a merge.
+        if len(ids) < 2:
             continue
+        target = ids[0]
+        sources = [i for i in ids[1:] if i != target and i not in seen]
+        if not sources or target in seen:
+            continue
+        seen.add(target)
+        seen.update(sources)
         out.append({
-            "target_id": target_id,
-            "source_ids": source_ids,
+            "target_id": target,
+            "source_ids": sources,
             "reason": "",
         })
     return out
@@ -348,9 +412,10 @@ async def suggest_merges(
             [{"role": "user", "content": user_prompt}],
             system_prompt=_SYSTEM_PROMPT,
             json_mode=True,
+            json_schema=_PROPOSALS_SCHEMA,
         )
 
-        raw = _parse_proposals(response, display_to_ids=_display_to_id_map(unresolved))
+        raw = _parse_proposals(response, name_to_ids=_name_to_id_map(unresolved))
         valid_ids = {e["id"] for e in unresolved}
         llm_proposals = _validate_proposals(raw, valid_ids)
         for p in llm_proposals:

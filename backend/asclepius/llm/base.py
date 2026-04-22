@@ -45,6 +45,7 @@ class LLMProvider(ABC):
         system_prompt: str,
         *,
         json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         """Send a chat message and get a response.
 
@@ -55,7 +56,11 @@ class LLMProvider(ABC):
                 to a JSON object (Ollama ``format=json``, OpenAI
                 ``response_format={"type": "json_object"}``). For Anthropic
                 this is a no-op since the prompt already specifies the
-                schema.
+                schema. Ignored when ``json_schema`` is provided.
+            json_schema: Optional JSON Schema (as a dict) to constrain the
+                output structure. Passed to Ollama's ``format`` field
+                (Ollama ≥ 0.5 enforces it during decoding). Other providers
+                fall back to ``json_mode`` semantics.
 
         Returns:
             Assistant response text.

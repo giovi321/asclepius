@@ -100,6 +100,7 @@ class OllamaProvider(LLMProvider):
         system_prompt: str,
         *,
         json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         ollama_messages = [{"role": "system", "content": system_prompt}]
         ollama_messages.extend(messages)
@@ -113,7 +114,11 @@ class OllamaProvider(LLMProvider):
             "stream": False,
             "options": {"num_predict": extraction_cap},
         }
-        if json_mode:
+        # Schema-constrained output (Ollama ≥ 0.5) wins over the looser
+        # ``format=json`` when the caller provides one.
+        if json_schema is not None:
+            body["format"] = json_schema
+        elif json_mode:
             body["format"] = "json"
         async with _get_semaphore():
             async with httpx.AsyncClient(timeout=timeout) as client:

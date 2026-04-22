@@ -60,6 +60,7 @@ class OpenAIProvider(LLMProvider):
         system_prompt: str,
         *,
         json_mode: bool = False,
+        json_schema: dict | None = None,
     ) -> str:
         all_messages = [{"role": "system", "content": system_prompt}]
         all_messages.extend(messages)
@@ -67,7 +68,15 @@ class OpenAIProvider(LLMProvider):
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         body: dict = {"model": self.model, "messages": all_messages, "max_tokens": extraction_cap}
-        if json_mode:
+        if json_schema is not None:
+            # OpenAI's structured-outputs mode (gpt-4o-2024-08-06+ and
+            # vLLM/llama.cpp servers that implement it) — guarantees the
+            # returned JSON validates against the schema.
+            body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "schema": json_schema, "strict": True},
+            }
+        elif json_mode:
             body["response_format"] = {"type": "json_object"}
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(

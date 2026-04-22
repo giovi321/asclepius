@@ -104,16 +104,20 @@ class OllamaProvider(LLMProvider):
 
         extraction_cap, _ = get_output_token_caps()
         timeout = httpx.Timeout(connect=10.0, read=float(self.timeout), write=10.0, pool=10.0)
+        total_budget = float(self.timeout) + 30.0
         async with _get_semaphore():
             async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(
-                    f"{self.base_url}/api/chat",
-                    json={
-                        "model": self.model,
-                        "messages": ollama_messages,
-                        "stream": False,
-                        "options": {"num_predict": extraction_cap},
-                    },
+                resp = await asyncio.wait_for(
+                    client.post(
+                        f"{self.base_url}/api/chat",
+                        json={
+                            "model": self.model,
+                            "messages": ollama_messages,
+                            "stream": False,
+                            "options": {"num_predict": extraction_cap},
+                        },
+                    ),
+                    timeout=total_budget,
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -159,6 +163,13 @@ class OllamaProvider(LLMProvider):
             max_output_tokens, _ = get_output_token_caps()
         payload["options"] = {"num_predict": int(max_output_tokens)}
 
+        # Total-elapsed budget wrapping the POST. httpx's read-timeout is
+        # per-chunk, so a server that trickles data (or a wedged socket
+        # where the response never starts arriving) can hang a request
+        # indefinitely. asyncio.wait_for enforces a real wall-clock cap.
+        # Budget = configured read timeout + 30s slack for connect/write.
+        total_budget = read_timeout + 30.0
+
         max_retries, retry_backoff = _get_retry_config(self)
         total_attempts = max_retries + 1
         last_err = None
@@ -166,28 +177,33 @@ class OllamaProvider(LLMProvider):
             try:
                 async with _get_semaphore():
                     async with httpx.AsyncClient(timeout=timeout) as client:
-                        resp = await client.post(
-                            f"{self.base_url}/api/generate",
-                            json=payload,
+                        resp = await asyncio.wait_for(
+                            client.post(
+                                f"{self.base_url}/api/generate",
+                                json=payload,
+                            ),
+                            timeout=total_budget,
                         )
                         resp.raise_for_status()
                         data = resp.json()
                         response = data.get("response", "")
                         logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
                         return response
-            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError) as e:
+            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ConnectError,
+                    asyncio.TimeoutError) as e:
                 last_err = e
                 if attempt < total_attempts - 1:
                     wait = retry_backoff[min(attempt, len(retry_backoff) - 1)]
                     logger.warning(
-                        "Ollama %s (attempt %d/%d, prompt_len=%d), retrying in %ds...",
-                        type(e).__name__, attempt + 1, total_attempts, len(prompt), wait,
+                        "Ollama %s (attempt %d/%d, prompt_len=%d, budget=%.0fs), retrying in %ds...",
+                        type(e).__name__, attempt + 1, total_attempts, len(prompt),
+                        total_budget, wait,
                     )
                     await asyncio.sleep(wait)
                 else:
                     logger.error(
-                        "Ollama %s after %d attempts (prompt_len=%d)",
-                        type(e).__name__, total_attempts, len(prompt),
+                        "Ollama %s after %d attempts (prompt_len=%d, budget=%.0fs)",
+                        type(e).__name__, total_attempts, len(prompt), total_budget,
                     )
         raise last_err  # type: ignore[misc]
 

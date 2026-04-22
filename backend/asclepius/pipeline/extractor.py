@@ -667,10 +667,9 @@ async def extract_and_store(
     facility_data = extraction.get("facility", {})
     if facility_data.get("name"):
         facility_id = await _upsert_facility(db, facility_data)
-        facility_name_text = normalize_name(facility_data["name"])
         await db.execute(
-            "UPDATE documents SET facility_id = ?, facility_name = ? WHERE id = ?",
-            (facility_id, facility_name_text, doc_id),
+            "UPDATE documents SET facility_id = ? WHERE id = ?",
+            (facility_id, doc_id),
         )
 
     # Upsert doctor
@@ -678,10 +677,9 @@ async def extract_and_store(
     doctor_data = extraction.get("doctor", {})
     if doctor_data.get("name"):
         doctor_id = await _upsert_doctor(db, doctor_data, facility_id)
-        doctor_name_text = normalize_name(strip_doctor_title(doctor_data["name"]))
         await db.execute(
-            "UPDATE documents SET doctor_id = ?, doctor_name = ? WHERE id = ?",
-            (doctor_id, doctor_name_text, doc_id),
+            "UPDATE documents SET doctor_id = ? WHERE id = ?",
+            (doctor_id, doc_id),
         )
 
     # Insert lab results

@@ -18,8 +18,8 @@ async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     cursor = await db.execute(
         """SELECT d.*,
                   p.display_name as patient_name, p.slug as patient_slug,
-                  COALESCE(d.doctor_name, doc.name) as doctor_name,
-                  COALESCE(d.facility_name, f.name) as facility_name,
+                  doc.name as doctor_name,
+                  f.name as facility_name,
                   ns.canonical_display as specialty_canonical_display,
                   ns.canonical_code as specialty_canonical_code,
                   COALESCE(ns.canonical_display, d.specialty_original) as specialty_display
@@ -44,8 +44,8 @@ _SORT_COLUMNS: dict[str, str] = {
     "file":       "d.original_filename",
     "type":       "d.doc_type",
     "date":       BEST_DATE_SQL,
-    "doctor":     "d.doctor_name",
-    "facility":   "d.facility_name",
+    "doctor":     "doc.name",
+    "facility":   "f.name",
     "patient":    "p.display_name",
     "specialty":  "COALESCE(ns.canonical_display, d.specialty_original)",
     "status":     "d.status",
@@ -181,8 +181,8 @@ async def list_documents(
         conditions.append(
             """(d.original_filename LIKE ? COLLATE NOCASE
                 OR d.doc_type LIKE ? COLLATE NOCASE
-                OR d.doctor_name LIKE ? COLLATE NOCASE
-                OR d.facility_name LIKE ? COLLATE NOCASE
+                OR doc.name LIKE ? COLLATE NOCASE
+                OR f.name LIKE ? COLLATE NOCASE
                 OR d.summary_en LIKE ? COLLATE NOCASE
                 OR d.summary_original LIKE ? COLLATE NOCASE
                 OR d.specialty_original LIKE ? COLLATE NOCASE
@@ -195,8 +195,8 @@ async def list_documents(
 
     select_cols = """d.*,
                      p.display_name as patient_name,
-                     COALESCE(d.doctor_name, doc.name) as doctor_name,
-                     COALESCE(d.facility_name, f.name) as facility_name,
+                     doc.name as doctor_name,
+                     f.name as facility_name,
                      ns.canonical_display as specialty_canonical_display,
                      ns.canonical_code as specialty_canonical_code,
                      COALESCE(ns.canonical_display, d.specialty_original) as specialty_display,

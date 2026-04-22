@@ -132,15 +132,11 @@ async def edit_document_with_ai(
         doctor_name_str = doctor_data
         doctor_data = None
     if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
-        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
-        doctor_id = await _upsert_doctor(db, doctor_data)
-        updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_data["name"]))
+        from asclepius.pipeline.extractor import _upsert_doctor
+        updates["doctor_id"] = await _upsert_doctor(db, doctor_data)
     elif doctor_name_str:
-        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
-        doctor_id = await _upsert_doctor(db, {"name": doctor_name_str})
-        updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_name_str))
+        from asclepius.pipeline.extractor import _upsert_doctor
+        updates["doctor_id"] = await _upsert_doctor(db, {"name": doctor_name_str})
 
     # Handle facility change
     facility_data = changes.get("facility")
@@ -150,14 +146,10 @@ async def edit_document_with_ai(
         facility_data = None
     if facility_data and isinstance(facility_data, dict) and facility_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_facility
-        facility_id = await _upsert_facility(db, facility_data)
-        updates["facility_id"] = facility_id
-        updates["facility_name"] = facility_data["name"]
+        updates["facility_id"] = await _upsert_facility(db, facility_data)
     elif facility_name_str:
         from asclepius.pipeline.extractor import _upsert_facility
-        facility_id = await _upsert_facility(db, {"name": facility_name_str})
-        updates["facility_id"] = facility_id
-        updates["facility_name"] = facility_name_str
+        updates["facility_id"] = await _upsert_facility(db, {"name": facility_name_str})
 
     if updates:
         # Log corrections before applying updates

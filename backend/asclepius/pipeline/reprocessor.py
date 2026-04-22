@@ -180,7 +180,7 @@ async def reprocess_document(
             """UPDATE documents SET
                doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
                language_source = NULL, summary_en = NULL, summary_original = NULL,
-               doctor_id = NULL, doctor_name = NULL, facility_id = NULL, facility_name = NULL,
+               doctor_id = NULL, facility_id = NULL,
                specialty_original = NULL, norm_specialty_id = NULL,
                cost_amount = NULL, cost_currency = NULL,
                insurance_company = NULL, insurance_policy = NULL,
@@ -364,7 +364,7 @@ async def _reprocess_vision_llm(
             """UPDATE documents SET
                doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
                language_source = NULL, summary_en = NULL, summary_original = NULL,
-               doctor_id = NULL, doctor_name = NULL, facility_id = NULL, facility_name = NULL,
+               doctor_id = NULL, facility_id = NULL,
                specialty_original = NULL, norm_specialty_id = NULL,
                cost_amount = NULL, cost_currency = NULL,
                insurance_company = NULL, insurance_policy = NULL,

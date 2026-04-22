@@ -115,9 +115,11 @@ async def get_event(
         f"""SELECT del.id as link_id, del.relevance, del.auto_linked,
                   d.id as document_id, d.original_filename, d.doc_type,
                   {BEST_DATE_SQL} as doc_date,
-                  d.doctor_name, d.facility_name, d.summary_en
+                  doc.name as doctor_name, f.name as facility_name, d.summary_en
            FROM document_event_links del
            JOIN documents d ON del.document_id = d.id
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE del.event_id = ?
            ORDER BY doc_date DESC""",
         (event_id,),

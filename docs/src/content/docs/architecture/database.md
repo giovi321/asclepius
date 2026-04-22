@@ -16,7 +16,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     </defs>
     <rect width="100%" height="100%" fill="#efeee5"/>
     <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
-
     <!-- ===== Relationship lines (z-order behind boxes) ===== -->
     <!-- patients -> documents -->
     <line x1="220" y1="200" x2="368" y2="220" stroke="#57534e" stroke-width="1"/>
@@ -57,7 +56,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <line x1="140" y1="556" x2="700" y2="580" stroke="#57534e" stroke-width="1" stroke-dasharray="4,3"/>
     <rect x="360" y="560" width="80" height="12" rx="2" fill="#efeee5"/>
     <text x="400" y="569" font-family="'Geist Mono',monospace" font-size="8" fill="#57534e" text-anchor="middle" letter-spacing="0.06em">SESSIONS · AUDIT</text>
-
     <!-- ===== USERS (left top) ===== -->
     <rect x="60" y="60" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="60" y="60" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
@@ -66,7 +64,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="140" y="100" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">users</text>
     <text x="140" y="116" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">id · username · role</text>
     <text x="140" y="128" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">password_hash</text>
-
     <!-- ===== PATIENTS (left middle, focal) ===== -->
     <rect x="60" y="160" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="60" y="160" width="160" height="80" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
@@ -75,7 +72,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="140" y="200" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">patients</text>
     <text x="140" y="216" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">id · slug · display_name</text>
     <text x="140" y="228" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">date_of_birth · sex</text>
-
     <!-- ===== DOCTORS (left bottom-mid) ===== -->
     <rect x="60" y="360" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="60" y="360" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
@@ -84,7 +80,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="140" y="400" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">doctors</text>
     <text x="140" y="416" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">id · name · slug</text>
     <text x="140" y="428" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ doctor_aliases</text>
-
     <!-- ===== FACILITIES (left bottom) ===== -->
     <rect x="60" y="460" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="60" y="460" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
@@ -93,7 +88,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="140" y="500" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">facilities</text>
     <text x="140" y="516" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">id · name · slug</text>
     <text x="140" y="528" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ facility_aliases</text>
-
     <!-- ===== DOCUMENTS (center hub, focal) ===== -->
     <rect x="368" y="200" width="184" height="152" rx="6" fill="#faf7f2"/>
     <rect x="368" y="200" width="184" height="152" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
@@ -108,7 +102,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="460" y="316" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">suggested_filename</text>
     <text x="460" y="328" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">user_notes</text>
     <text x="460" y="344" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ documents_fts (FTS5)</text>
-
     <!-- ===== Right column: medical data tables ===== -->
     <rect x="700" y="60" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="700" y="60" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
@@ -117,7 +110,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="780" y="100" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">lab_results</text>
     <text x="780" y="116" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">value · unit · range</text>
     <text x="780" y="128" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">norm_lab_test_id</text>
-
     <rect x="700" y="160" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="700" y="160" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
     <rect x="708" y="168" width="40" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
@@ -125,7 +117,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="780" y="200" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">medications</text>
     <text x="780" y="216" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">brand · ingredient</text>
     <text x="780" y="228" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">dosage · frequency</text>
-
     <rect x="700" y="260" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="700" y="260" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
     <rect x="708" y="268" width="60" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
@@ -133,7 +124,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="780" y="300" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">encounters</text>
     <text x="780" y="316" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">diagnosis · findings</text>
     <text x="780" y="328" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">follow-up</text>
-
     <rect x="700" y="360" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="700" y="360" width="160" height="80" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
     <rect x="708" y="368" width="60" height="12" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
@@ -141,7 +131,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="780" y="400" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">imaging_studies</text>
     <text x="780" y="416" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">modality · body_part</text>
     <text x="780" y="428" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ imaging_series</text>
-
     <rect x="700" y="460" width="160" height="80" rx="6" fill="#faf7f2"/>
     <rect x="700" y="460" width="160" height="80" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
     <rect x="708" y="468" width="56" height="12" rx="2" fill="transparent" stroke="rgba(87,83,78,0.40)" stroke-width="0.8"/>
@@ -149,7 +138,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="780" y="500" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">medical_events</text>
     <text x="780" y="516" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">title · type · range</text>
     <text x="780" y="528" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">+ event_links</text>
-
     <!-- ===== SYSTEM TABLES cluster (single visual block) ===== -->
     <rect x="700" y="560" width="160" height="60" rx="6" fill="#faf7f2"/>
     <rect x="700" y="560" width="160" height="60" rx="6" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="4,4"/>
@@ -157,7 +145,6 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
     <text x="738" y="577" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(87,83,78,0.9)" text-anchor="middle" letter-spacing="0.08em">SYSTEM</text>
     <text x="780" y="596" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">sessions · audit_log</text>
     <text x="780" y="610" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">ocr_page_cache</text>
-
   </svg>
 </div>
 

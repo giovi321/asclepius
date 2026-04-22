@@ -1,6 +1,5 @@
-/* Diagram frame (inline SVGs) + rendered mermaid pre */
-.diagram-frame,
-pre.mermaid {
+/* Diagram frame (inline SVGs) */
+.diagram-frame {
   position: relative;
   background: #efeee5;
   border: 1px solid rgba(28, 25, 23, 0.12);
@@ -9,16 +8,14 @@ pre.mermaid {
   margin: 1.5rem 0;
   overflow: hidden;
   cursor: zoom-in;
-  transition: border-color 0.15s ease, transform 0.1s ease;
+  transition: border-color 0.15s ease;
 }
 
-.diagram-frame:hover,
-pre.mermaid:hover {
+.diagram-frame:hover {
   border-color: rgba(28, 25, 23, 0.4);
 }
 
-.diagram-frame::after,
-pre.mermaid::after {
+.diagram-frame::after {
   content: "⤢";
   position: absolute;
   top: 0.4rem;
@@ -31,34 +28,23 @@ pre.mermaid::after {
   transition: opacity 0.15s ease;
 }
 
-.diagram-frame:hover::after,
-pre.mermaid:hover::after {
+.diagram-frame:hover::after {
   opacity: 1;
 }
 
-.diagram-frame svg,
-pre.mermaid svg {
+.diagram-frame svg {
   display: block;
   width: 100%;
   height: auto;
   max-width: 100%;
 }
 
-pre.mermaid {
-  font-family: inherit;
-  white-space: normal;
-  text-align: center;
-}
-
-/* Dark-mode variant */
-html[data-theme="dark"] .diagram-frame,
-html[data-theme="dark"] pre.mermaid {
+html[data-theme="dark"] .diagram-frame {
   background: #2a2520;
   border-color: rgba(250, 247, 242, 0.15);
 }
 
-html[data-theme="dark"] .diagram-frame::after,
-html[data-theme="dark"] pre.mermaid::after {
+html[data-theme="dark"] .diagram-frame::after {
   color: rgba(250, 247, 242, 0.5);
 }
 
@@ -127,7 +113,6 @@ html[data-theme="dark"] pre.mermaid::after {
   to   { opacity: 1; }
 }
 
-/* Hide body scroll while lightbox is open */
 body.diagram-lightbox-open {
   overflow: hidden;
 }

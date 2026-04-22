@@ -1,13 +1,9 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import remarkMermaid from './src/plugins/remark-mermaid.mjs';
 
 export default defineConfig({
   site: 'https://giovi321.github.io',
   base: '/asclepius',
-  markdown: {
-    remarkPlugins: [remarkMermaid],
-  },
   integrations: [
     starlight({
       title: 'Asclepius',

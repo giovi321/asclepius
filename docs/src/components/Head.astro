@@ -5,28 +5,6 @@ import Default from '@astrojs/starlight/components/Head.astro';
 <Default><slot /></Default>
 
 <script>
-  import mermaid from 'mermaid';
-
-  async function renderMermaid() {
-    const blocks = document.querySelectorAll<HTMLElement>('pre.mermaid');
-    if (blocks.length === 0) return;
-
-    const isDark = document.documentElement.dataset.theme === 'dark';
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: isDark ? 'dark' : 'default',
-      securityLevel: 'loose',
-    });
-
-    blocks.forEach((el) => el.removeAttribute('data-processed'));
-
-    try {
-      await mermaid.run({ querySelector: 'pre.mermaid' });
-    } catch (err) {
-      console.error('[mermaid] render failed', err);
-    }
-  }
-
   function openLightbox(sourceEl: HTMLElement) {
     const svg = sourceEl.querySelector('svg');
     if (!svg) return;
@@ -43,9 +21,6 @@ import Default from '@astrojs/starlight/components/Head.astro';
     const clone = svg.cloneNode(true) as SVGElement;
     clone.removeAttribute('width');
     clone.removeAttribute('height');
-    // Ensure the clone has a viewBox so aspect-ratio-based sizing works in
-    // the flex-centered modal. Most inlined SVGs already declare one; this
-    // is a cheap safeguard for any that don't.
     if (!clone.hasAttribute('viewBox')) {
       const w = svg.getAttribute('width') || svg.getBoundingClientRect().width || 1000;
       const h = svg.getAttribute('height') || svg.getBoundingClientRect().height || 600;
@@ -81,7 +56,7 @@ import Default from '@astrojs/starlight/components/Head.astro';
   }
 
   function wireLightbox() {
-    const targets = document.querySelectorAll<HTMLElement>('.diagram-frame, pre.mermaid');
+    const targets = document.querySelectorAll<HTMLElement>('.diagram-frame');
     targets.forEach((el) => {
       if (el.dataset.lightboxReady) return;
       el.dataset.lightboxReady = '1';
@@ -89,12 +64,6 @@ import Default from '@astrojs/starlight/components/Head.astro';
     });
   }
 
-  async function setupPage() {
-    await renderMermaid();
-    // Wire lightbox after mermaid has rendered so its SVG is in the DOM
-    wireLightbox();
-  }
-
-  setupPage();
-  document.addEventListener('astro:page-load', setupPage);
+  wireLightbox();
+  document.addEventListener('astro:page-load', wireLightbox);
 </script>

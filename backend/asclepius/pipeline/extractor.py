@@ -1,4 +1,12 @@
-"""LLM-based data extraction and DB insertion."""
+"""LLM-based data extraction orchestrator.
+
+Phase 1 (classification + universal fields) and phase 2 (type-specific
+structured arrays) both live here. DB-specific upsert/lookup helpers live
+in :mod:`entity_matching` (patient / doctor / facility) and
+:mod:`extractor_db` (normalized reference tables). Those modules are
+re-exported below so the existing ``from asclepius.pipeline.extractor
+import _upsert_doctor, _match_patient, …`` call sites keep working.
+"""
 
 import json
 import logging
@@ -8,6 +16,38 @@ import aiosqlite
 from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
 from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
+
+from .entity_matching import (
+    _DOCTOR_TITLE_TOKENS,
+    _match_patient,
+    _resolve_specialty_from_doctor,
+    _upsert_doctor,
+    _upsert_facility,
+    normalize_name,
+    strip_doctor_title,
+)
+from .extractor_db import (
+    _resolve_diagnosis,
+    _resolve_lab_test,
+    _resolve_medication,
+    _resolve_specialty_from_data,
+)
+
+__all__ = [
+    "build_extraction_context",
+    "classify_and_extract",
+    "extract_and_store",
+    "strip_doctor_title",
+    "normalize_name",
+    "_match_patient",
+    "_upsert_doctor",
+    "_upsert_facility",
+    "_resolve_specialty_from_doctor",
+    "_resolve_specialty_from_data",
+    "_resolve_lab_test",
+    "_resolve_diagnosis",
+    "_resolve_medication",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -801,429 +841,3 @@ async def extract_and_store(
     return extraction
 
 
-# Honorific / title tokens to strip from doctor names before storing them.
-# We want the raw person-name in the database — the display layer can add
-# "Dr." back if it wants. Covers the English + Italian + German titles we
-# see most often in the documents we parse.
-_DOCTOR_TITLE_TOKENS = {
-    "dr", "dr.", "dr.ssa", "drssa",
-    "doctor", "doctors",
-    "dott", "dott.", "dott.ssa", "dottssa", "dott.essa", "dottessa",
-    "dottore", "dottoressa",
-    "prof", "prof.", "professor", "professore", "professoressa",
-    "med", "med.",
-    "mr", "mr.", "mrs", "mrs.", "ms", "ms.", "mme", "mme.",
-    "md", "md.", "m.d.", "m.d",
-    "phd", "ph.d", "ph.d.",
-    "dds", "dds.",
-    "pharm", "pharm.", "pharma",
-    "ing", "ing.",
-    "sig", "sig.", "sig.ra", "sig.ra.", "sig.na", "sig.na.",
-}
-
-
-def strip_doctor_title(name: str) -> str:
-    """Remove leading / trailing honorific titles from a doctor's name.
-
-    Handles stacked prefixes ("Prof. Dr. med. Hans Müller") and trailing
-    post-nominals ("Anna Rossi MD"). Returns the input unchanged if it
-    contains no recognised titles, so the function is idempotent and safe
-    to call twice.
-    """
-    if not name or not name.strip():
-        return name
-    tokens = name.split()
-    while tokens and tokens[0].lower().rstrip(",") in _DOCTOR_TITLE_TOKENS:
-        tokens.pop(0)
-    while tokens and tokens[-1].lower().rstrip(",") in _DOCTOR_TITLE_TOKENS:
-        tokens.pop()
-    # Trim any leftover punctuation from the token that used to precede a
-    # trailing title (e.g. "Anna Rossi, MD" → "Anna Rossi" not "Anna Rossi,").
-    if tokens:
-        tokens[-1] = tokens[-1].rstrip(",.;")
-    return " ".join(tokens)
-
-
-def normalize_name(name: str) -> str:
-    """Normalize doctor/facility name capitalization.
-
-    - Title-cases the name
-    - Handles common prefixes: "Dr.", "Prof.", "Dr. med."
-    - Handles particles: "von", "della", "de" stay lowercase
-    - Example: "GIOVANNI CRAPELLI" -> "Giovanni Crapelli"
-    - Example: "dr. hans müller" -> "Dr. Hans Müller"
-    - Example: "prof. dr. med. anna von berg" -> "Prof. Dr. med. Anna von Berg"
-    """
-    if not name:
-        return name
-
-    # Particles that should stay lowercase (when not at start)
-    particles = {"von", "della", "del", "de", "di", "van", "den", "der", "la", "le", "da"}
-    # Prefixes that have specific capitalization
-    prefix_map = {
-        "dr.": "Dr.",
-        "dr": "Dr.",
-        "prof.": "Prof.",
-        "prof": "Prof.",
-        "med.": "med.",
-        "med": "med.",
-        "ing.": "Ing.",
-        "ing": "Ing.",
-    }
-
-    words = name.split()
-    result = []
-    for i, word in enumerate(words):
-        lower = word.lower().rstrip(".")
-        lower_with_dot = word.lower()
-
-        if lower_with_dot in prefix_map:
-            result.append(prefix_map[lower_with_dot])
-        elif i > 0 and lower in particles:
-            result.append(lower)
-        else:
-            result.append(word.capitalize())
-
-    return " ".join(result)
-
-
-async def _match_patient(db: aiosqlite.Connection, name: str | None) -> int | None:
-    """Try to match a patient name from the extraction to a known patient."""
-    if not name:
-        return None
-
-    # Simple fuzzy match: try exact, then LIKE
-    cursor = await db.execute(
-        "SELECT id FROM patients WHERE display_name = ? COLLATE NOCASE",
-        (name,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Try partial match
-    cursor = await db.execute(
-        "SELECT id FROM patients WHERE display_name LIKE ? COLLATE NOCASE",
-        (f"%{name}%",),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Try matching parts of the name
-    parts = name.split()
-    for part in parts:
-        if len(part) < 3:
-            continue
-        cursor = await db.execute(
-            "SELECT id FROM patients WHERE display_name LIKE ? COLLATE NOCASE",
-            (f"%{part}%",),
-        )
-        rows = await cursor.fetchall()
-        if len(rows) == 1:
-            return rows[0][0]
-
-    return None
-
-
-async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int:
-    """Insert or get existing facility.
-
-    Looks up by slug, canonical_code, case-insensitive name, and alias in
-    that order. canonical_code has a UNIQUE index, so an INSERT that didn't
-    find a matching slug but collides on canonical_code (possible after a
-    merge or a manual rename) would 500 instead of reusing the existing
-    row. Covering all four lookup paths avoids that.
-    """
-    from asclepius.patients.service import slugify
-
-    name = normalize_name(facility_data["name"])
-    slug = slugify(name)
-
-    cursor = await db.execute(
-        "SELECT id FROM facilities WHERE slug = ? OR canonical_code = ?",
-        (slug, slug),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    cursor = await db.execute(
-        "SELECT id FROM facilities WHERE name = ? COLLATE NOCASE LIMIT 1",
-        (name,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Check facility_aliases — after a merge, the source's name lives here pointing
-    # at the merged target, so future extractions of that name resolve to target.
-    cursor = await db.execute(
-        "SELECT facility_id FROM facility_aliases WHERE alias = ? COLLATE NOCASE LIMIT 1",
-        (name,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    try:
-        cursor = await db.execute(
-            """INSERT INTO facilities (name, slug, canonical_code, canonical_display, type, address, city, country, phone)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name, slug, slug, name,
-             facility_data.get("type"),
-             facility_data.get("address"),
-             facility_data.get("city"),
-             facility_data.get("country"),
-             facility_data.get("phone")),
-        )
-    except aiosqlite.IntegrityError:
-        # canonical_code or slug collision slipped past the lookup above —
-        # recover by returning the row that owns the conflicting identifier
-        # rather than surfacing a 500.
-        cursor = await db.execute(
-            "SELECT id FROM facilities WHERE slug = ? OR canonical_code = ? LIMIT 1",
-            (slug, slug),
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-        raise
-    facility_id = cursor.lastrowid
-    # Seed the initial alias with the extracted name. Because the alias is the
-    # canonical form we just created, mark it already reviewed — there is no
-    # normalization decision to make.
-    await db.execute(
-        "INSERT INTO facility_aliases (facility_id, alias, auto_mapped) VALUES (?, ?, 0)",
-        (facility_id, name),
-    )
-    return facility_id
-
-
-async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_id: int | None = None) -> int:
-    """Insert or get existing doctor.
-
-    See ``_upsert_facility`` — same reasoning: cover slug, canonical_code,
-    case-insensitive name, and alias lookups before insert, and recover
-    from a UNIQUE(canonical_code) collision by returning the owning row.
-    """
-    from asclepius.patients.service import slugify
-
-    name = normalize_name(strip_doctor_title(doctor_data["name"]))
-    slug = slugify(name)
-
-    cursor = await db.execute(
-        "SELECT id FROM doctors WHERE slug = ? OR canonical_code = ?",
-        (slug, slug),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    cursor = await db.execute(
-        "SELECT id FROM doctors WHERE name = ? COLLATE NOCASE LIMIT 1",
-        (name,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Check doctor_aliases — after a merge, the source's name lives here pointing
-    # at the merged target, so future extractions of that name resolve to target.
-    cursor = await db.execute(
-        "SELECT doctor_id FROM doctor_aliases WHERE alias = ? COLLATE NOCASE LIMIT 1",
-        (name,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Resolve specialty for the doctor. resolve_extraction() populates
-    # doctor["norm_specialty_id"] from the doctor's specialty_original text;
-    # fall back to the legacy canonical-based resolver when that wasn't run.
-    norm_spec_id = doctor_data.get("norm_specialty_id")
-    if norm_spec_id is None and doctor_data.get("specialty_canonical"):
-        norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
-
-    try:
-        cursor = await db.execute(
-            """INSERT INTO doctors (name, slug, canonical_code, canonical_display, title, norm_specialty_id, specialty_original, facility_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name, slug, slug, name,
-             doctor_data.get("title"),
-             norm_spec_id,
-             doctor_data.get("specialty_original"),
-             facility_id),
-        )
-    except aiosqlite.IntegrityError:
-        cursor = await db.execute(
-            "SELECT id FROM doctors WHERE slug = ? OR canonical_code = ? LIMIT 1",
-            (slug, slug),
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-        raise
-    doctor_id = cursor.lastrowid
-    # Seed the initial alias with the extracted name (already-reviewed — it's the
-    # canonical form, not a normalization guess).
-    await db.execute(
-        "INSERT INTO doctor_aliases (doctor_id, alias, auto_mapped) VALUES (?, ?, 0)",
-        (doctor_id, name),
-    )
-    return doctor_id
-
-
-async def _resolve_specialty_from_doctor(db: aiosqlite.Connection, doctor_data: dict) -> int | None:
-    """Resolve specialty to norm_specialties ID from doctor extraction data."""
-    canonical = doctor_data.get("specialty_canonical", "")
-
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    return None
-
-
-async def _resolve_specialty_from_data(db: aiosqlite.Connection, specialty_data: dict) -> int | None:
-    """Resolve specialty to norm_specialties ID from specialty extraction data."""
-    canonical = specialty_data.get("canonical", "")
-
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_specialties WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    return None
-
-
-async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
-    """Resolve lab test to norm_lab_tests ID, creating if needed."""
-    canonical = lab.get("test_name_canonical", "")
-    original = lab.get("test_name_original", "")
-    mapped = lab.get("test_mapped", False)
-
-    if mapped and canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    # Try alias lookup
-    cursor = await db.execute(
-        "SELECT norm_lab_test_id FROM norm_lab_test_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    # Create new entry if canonical provided
-    if canonical:
-        display = canonical.replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_lab_tests (canonical_code, canonical_display) VALUES (?, ?)",
-            (canonical, display),
-        )
-        if cursor.lastrowid:
-            test_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_lab_test_aliases (norm_lab_test_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (test_id, original),
-            )
-            return test_id
-        else:
-            cursor = await db.execute(
-                "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
-            )
-            row = await cursor.fetchone()
-            return row[0] if row else None
-
-    return None
-
-
-async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None:
-    """Resolve diagnosis to norm_diagnoses ID."""
-    canonical = diag.get("diagnosis_canonical", "")
-    original = diag.get("diagnosis_original", "")
-
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_diagnoses WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    # Try alias
-    cursor = await db.execute(
-        "SELECT norm_diagnosis_id FROM norm_diagnosis_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    if canonical:
-        display = canonical.replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_diagnoses (canonical_code, canonical_display, icd10_code) VALUES (?, ?, ?)",
-            (canonical, display, diag.get("icd10_code")),
-        )
-        if cursor.lastrowid:
-            diag_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_diagnosis_aliases (norm_diagnosis_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (diag_id, original),
-            )
-            return diag_id
-
-    return None
-
-
-async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None:
-    """Resolve medication to norm_medications ID."""
-    canonical = med.get("active_ingredient_canonical", "")
-    original = med.get("active_ingredient_original", "")
-
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_medications WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    # Try alias
-    cursor = await db.execute(
-        "SELECT norm_medication_id FROM norm_medication_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
-    )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    if canonical:
-        display = canonical.replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_medications (canonical_code, canonical_display) VALUES (?, ?)",
-            (canonical, display),
-        )
-        if cursor.lastrowid:
-            med_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_medication_aliases (norm_medication_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (med_id, original),
-            )
-            return med_id
-
-    return None

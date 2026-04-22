@@ -99,19 +99,16 @@ TYPE_EXTRACTION_PROMPTS = {
     # --- Lab tests ---
     "bloodtest": """You are a medical lab result parser. Extract ONLY the lab test results from this document.
 
-Known lab test mappings: {lab_test_mappings}
-
-When a test name matches an existing mapping, use the canonical_code. If no mapping exists,
-provide your best English canonical name and set "test_mapped": false.
+Emit each test's name in the ORIGINAL wording used in the document (e.g. "Emoglobina",
+"Cholesterol LDL", "Transaminasi GPT"). Do not translate or substitute canonical codes —
+a downstream step matches names to the canonical table.
 
 Respond in JSON only. No markdown.
 
 {{
   "lab_results": [
     {{
-      "test_name_original": "name as written in document",
-      "test_name_canonical": "canonical code (e.g. LOINC short name) or best English name",
-      "test_mapped": true,
+      "test_name_original": "name exactly as written in the document",
       "value": null,
       "value_text": "string for non-numeric (e.g. 'positive', 'reactive')",
       "unit": "string",
@@ -131,19 +128,15 @@ OCR text:
 
     "labtest_other": """You are a medical lab result parser. Extract ONLY the lab test results from this document.
 
-Known lab test mappings: {lab_test_mappings}
-
-When a test name matches an existing mapping, use the canonical_code. If no mapping exists,
-provide your best English canonical name and set "test_mapped": false.
+Emit each test's name in the ORIGINAL wording used in the document. Do not translate
+or substitute canonical codes — a downstream step handles that.
 
 Respond in JSON only. No markdown.
 
 {{
   "lab_results": [
     {{
-      "test_name_original": "name as written in document",
-      "test_name_canonical": "canonical code or best English name",
-      "test_mapped": true,
+      "test_name_original": "name exactly as written in the document",
       "value": null,
       "value_text": "string for non-numeric",
       "unit": "string",
@@ -164,29 +157,24 @@ OCR text:
     # --- Clinical reports ---
     "specialist_report": """You are a medical report parser. Extract diagnoses, encounter details, and medications from this specialist report.
 
-Known diagnosis mappings: {diagnosis_mappings}
-Known medication mappings: {medication_mappings}
-Known specialty mappings: {specialty_mappings}
-
-Use canonical_code from mappings when available. Set "mapped": false for new terms.
+Emit each diagnosis, medication ingredient, and specialty in its ORIGINAL wording —
+exactly as it appears in the document. Don't translate or substitute canonical codes;
+a downstream step handles mapping. Fill ``icd10_code`` only if the document explicitly
+gives one.
 
 Respond in JSON only. No markdown.
 
 {{
   "diagnoses": [
     {{
-      "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "diagnosis_original": "text as written in the document",
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "medications": [
     {{
       "brand_name": "string or null",
-      "active_ingredient_original": "as written",
-      "active_ingredient_canonical": "INN name or best English name",
-      "medication_mapped": true,
+      "active_ingredient_original": "ingredient name as written",
       "dosage": "string (e.g. '500mg')",
       "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
       "frequency": "string (e.g. '2x daily')",
@@ -197,6 +185,7 @@ Respond in JSON only. No markdown.
   "encounter": {{
     "encounter_date": "YYYY-MM-DD or null",
     "findings": "string or null",
+    "specialty_original": "specialty name as written, or null",
     "follow_up_date": "YYYY-MM-DD or null",
     "follow_up_instructions": "string or null"
   }}
@@ -209,11 +198,8 @@ OCR text:
 
     "discharge": """You are a medical report parser. Extract diagnoses, encounter details, medications, and follow-up info from this discharge letter.
 
-Known diagnosis mappings: {diagnosis_mappings}
-Known medication mappings: {medication_mappings}
-Known specialty mappings: {specialty_mappings}
-
-Use canonical_code from mappings when available. Set "mapped": false for new terms.
+Emit each diagnosis, medication ingredient, and specialty in its ORIGINAL wording.
+Don't translate or substitute canonical codes; a downstream step handles that.
 
 Respond in JSON only. No markdown.
 
@@ -221,17 +207,13 @@ Respond in JSON only. No markdown.
   "diagnoses": [
     {{
       "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "medications": [
     {{
       "brand_name": "string or null",
-      "active_ingredient_original": "as written",
-      "active_ingredient_canonical": "INN name or best English name",
-      "medication_mapped": true,
+      "active_ingredient_original": "ingredient name as written",
       "dosage": "string",
       "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
       "frequency": "string",
@@ -244,6 +226,7 @@ Respond in JSON only. No markdown.
     "admission_date": "YYYY-MM-DD or null",
     "discharge_date": "YYYY-MM-DD or null",
     "findings": "string or null",
+    "specialty_original": "specialty name as written, or null",
     "follow_up_date": "YYYY-MM-DD or null",
     "follow_up_instructions": "string or null"
   }}
@@ -256,7 +239,7 @@ OCR text:
 
     "radiology_report": """You are a radiology report parser. Extract encounter details with imaging findings.
 
-Known diagnosis mappings: {diagnosis_mappings}
+Emit each diagnosis in its ORIGINAL wording. Don't translate or substitute canonical codes.
 
 Respond in JSON only. No markdown.
 
@@ -264,9 +247,7 @@ Respond in JSON only. No markdown.
   "diagnoses": [
     {{
       "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "encounter": {{
@@ -284,7 +265,7 @@ OCR text:
 
     "pathology_report": """You are a pathology report parser. Extract encounter details with pathology findings.
 
-Known diagnosis mappings: {diagnosis_mappings}
+Emit each diagnosis in its ORIGINAL wording. Don't translate or substitute canonical codes.
 
 Respond in JSON only. No markdown.
 
@@ -292,9 +273,7 @@ Respond in JSON only. No markdown.
   "diagnoses": [
     {{
       "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "encounter": {{
@@ -312,8 +291,7 @@ OCR text:
 
     "surgical_report": """You are a surgical report parser. Extract encounter details with operative findings.
 
-Known diagnosis mappings: {diagnosis_mappings}
-Known medication mappings: {medication_mappings}
+Emit each diagnosis and medication ingredient in its ORIGINAL wording.
 
 Respond in JSON only. No markdown.
 
@@ -321,17 +299,13 @@ Respond in JSON only. No markdown.
   "diagnoses": [
     {{
       "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "medications": [
     {{
       "brand_name": "string or null",
-      "active_ingredient_original": "as written",
-      "active_ingredient_canonical": "INN name or best English name",
-      "medication_mapped": true,
+      "active_ingredient_original": "ingredient name as written",
       "dosage": "string",
       "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
       "frequency": "string",
@@ -356,8 +330,7 @@ OCR text:
 
     "er_report": """You are an emergency report parser. Extract encounter details, diagnoses, and medications.
 
-Known diagnosis mappings: {diagnosis_mappings}
-Known medication mappings: {medication_mappings}
+Emit each diagnosis and medication ingredient in its ORIGINAL wording.
 
 Respond in JSON only. No markdown.
 
@@ -365,17 +338,13 @@ Respond in JSON only. No markdown.
   "diagnoses": [
     {{
       "diagnosis_original": "text as written",
-      "diagnosis_canonical": "canonical code or best English name",
-      "diagnosis_mapped": true,
-      "icd10_code": "ICD-10 code or null"
+      "icd10_code": "ICD-10 code if explicitly stated, else null"
     }}
   ],
   "medications": [
     {{
       "brand_name": "string or null",
-      "active_ingredient_original": "as written",
-      "active_ingredient_canonical": "INN name or best English name",
-      "medication_mapped": true,
+      "active_ingredient_original": "ingredient name as written",
       "dosage": "string",
       "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
       "frequency": "string",
@@ -401,9 +370,8 @@ OCR text:
     # --- Medications ---
     "prescription": """You are a prescription parser. Extract ONLY the prescribed medications.
 
-Known medication mappings: {medication_mappings}
-
-Use canonical_code from mappings when available. Set "medication_mapped": false for new terms.
+Emit each medication ingredient in its ORIGINAL wording. Don't translate or substitute
+canonical codes; a downstream step handles mapping.
 
 Respond in JSON only. No markdown.
 
@@ -411,9 +379,7 @@ Respond in JSON only. No markdown.
   "medications": [
     {{
       "brand_name": "string or null",
-      "active_ingredient_original": "as written",
-      "active_ingredient_canonical": "INN name or best English name",
-      "medication_mapped": true,
+      "active_ingredient_original": "ingredient name as written",
       "dosage": "string (e.g. '500mg')",
       "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
       "frequency": "string (e.g. '2x daily')",
@@ -573,14 +539,11 @@ CRITICAL RULES:
 Known patients: {patient_list}
 Known facilities: {facility_list}
 Known doctors: {doctor_list}
-Known lab test mappings: {lab_test_mappings}
-Known specialty mappings: {specialty_mappings}
-Known diagnosis mappings: {diagnosis_mappings}
-Known medication mappings: {medication_mappings}
 
-When you encounter a term (lab test name, specialty, diagnosis, medication) that matches an
-existing mapping, use the canonical_code from that mapping. If no mapping exists, provide
-your best English canonical name and set "mapped": false so the system can create a new mapping.
+For lab test names, specialties, diagnoses, and medications, emit them in
+their ORIGINAL wording — exactly as they appear in the document. Do NOT
+invent canonical codes or English translations; a downstream step matches
+each term against the canonical tables deterministically.
 
 Respond in JSON only. No markdown, no explanation.
 

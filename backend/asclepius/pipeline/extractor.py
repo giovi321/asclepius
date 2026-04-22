@@ -41,37 +41,13 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     cursor = await db.execute("SELECT id, slug, name FROM doctors")
     doctors = [{"id": r[0], "slug": r[1], "name": r[2]} for r in await cursor.fetchall()]
 
-    # Get lab test mappings
-    cursor = await db.execute(
-        """SELECT nlt.canonical_code, nlta.alias
-           FROM norm_lab_tests nlt
-           JOIN norm_lab_test_aliases nlta ON nlta.norm_lab_test_id = nlt.id"""
-    )
-    lab_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
-
-    # Get specialty mappings
-    cursor = await db.execute(
-        """SELECT ns.canonical_code, nsa.alias
-           FROM norm_specialties ns
-           JOIN norm_specialty_aliases nsa ON nsa.norm_specialty_id = ns.id"""
-    )
-    specialty_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
-
-    # Get diagnosis mappings
-    cursor = await db.execute(
-        """SELECT nd.canonical_code, nda.alias
-           FROM norm_diagnoses nd
-           JOIN norm_diagnosis_aliases nda ON nda.norm_diagnosis_id = nd.id"""
-    )
-    diagnosis_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
-
-    # Get medication mappings
-    cursor = await db.execute(
-        """SELECT nm.canonical_code, nma.alias
-           FROM norm_medications nm
-           JOIN norm_medication_aliases nma ON nma.norm_medication_id = nm.id"""
-    )
-    medication_mappings = [{"canonical_code": r[0], "alias": r[1]} for r in await cursor.fetchall()]
+    # NOTE: lab_test / medication / diagnosis / specialty mappings are
+    # deliberately NOT fetched here any more. Shipping the full alias
+    # table as prompt context grew to hundreds of kilobytes on real
+    # installs, which blew past small-model context limits and destroyed
+    # schema adherence. Mapping now happens deterministically after
+    # extraction via ``asclepius.normalization.resolver``. The LLM just
+    # emits ``*_original`` text; Python does the lookup.
 
     # Canonical output language — pulled from app config so every LLM call can
     # see it without a second round-trip. Providers prepend the directive via
@@ -86,11 +62,14 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
         "patient_list": patients,
         "facility_list": facilities,
         "doctor_list": doctors,
-        "lab_test_mappings": lab_mappings,
-        "specialty_mappings": specialty_mappings,
-        "diagnosis_mappings": diagnosis_mappings,
-        "medication_mappings": medication_mappings,
         "canonical_language": canonical_language,
+        # NOTE: lab_test/medication/diagnosis/specialty mappings are
+        # intentionally absent from the context. Prompt templates no
+        # longer reference them — the post-extraction
+        # ``asclepius.normalization.resolver`` pass does deterministic
+        # alias matching (with rapidfuzz fallback) and auto-creates
+        # unmapped canonical rows for the user to review in the
+        # Normalization UI.
     }
 
 
@@ -520,6 +499,23 @@ async def extract_and_store(
         if key in extraction and not isinstance(extraction[key], list):
             extraction[key] = []
 
+    # Deterministic normalization — exact-match, fuzzy-match, or
+    # auto-create canonical entries for every referenced lab test /
+    # medication / diagnosis / specialty. Fills in ``norm_*_id`` fields
+    # on each row so the insert loops below can use them directly.
+    # Runs before the error/truncation branches so partial extractions
+    # (e.g. response hit token cap mid-list) still get their usable rows
+    # mapped.
+    if "error" not in extraction:
+        try:
+            from asclepius.normalization.resolver import resolve_extraction
+            await resolve_extraction(db, extraction)
+        except Exception:
+            logger.warning(
+                "Doc %d: normalization resolver failed (non-fatal)",
+                doc_id, exc_info=True,
+            )
+
     if "error" in extraction:
         if extraction.get("_truncation_suspected"):
             logger.error(
@@ -608,7 +604,12 @@ async def extract_and_store(
     specialty_data = extraction.get("specialty", {})
     if specialty_data.get("original"):
         updates["specialty_original"] = specialty_data["original"]
-    if specialty_data.get("canonical"):
+    # resolve_extraction() populates specialty["norm_specialty_id"] from the
+    # original text; fall back to the legacy canonical-based resolver when
+    # that wasn't run (error / override path).
+    if specialty_data.get("norm_specialty_id"):
+        updates["norm_specialty_id"] = specialty_data["norm_specialty_id"]
+    elif specialty_data.get("canonical"):
         norm_spec_id = await _resolve_specialty_from_data(db, specialty_data)
         if norm_spec_id:
             updates["norm_specialty_id"] = norm_spec_id
@@ -655,7 +656,12 @@ async def extract_and_store(
             if not lab.get("test_name_original"):
                 logger.warning("Doc %d: skipping lab result with no test name: %s", doc_id, lab)
                 continue
-            norm_id = await _resolve_lab_test(db, lab)
+            # Pre-populated by resolve_extraction above. Fall back to the
+            # legacy LLM-driven resolver for the edge case where
+            # resolve_extraction wasn't called (error path / override).
+            norm_id = lab.get("norm_lab_test_id")
+            if norm_id is None:
+                norm_id = await _resolve_lab_test(db, lab)
             await db.execute(
                 """INSERT INTO lab_results
                    (document_id, patient_id, test_name_original, norm_lab_test_id,
@@ -677,9 +683,17 @@ async def extract_and_store(
         for diag in extraction.get("diagnoses", []):
             if not isinstance(diag, dict):
                 continue
-            norm_diag_id = await _resolve_diagnosis(db, diag)
-            norm_spec_id = None
-            if doctor_data.get("specialty_canonical"):
+            norm_diag_id = diag.get("norm_diagnosis_id")
+            if norm_diag_id is None:
+                norm_diag_id = await _resolve_diagnosis(db, diag)
+            # Specialty resolution now populates doctor["norm_specialty_id"]
+            # and encounter["norm_specialty_id"] directly. Prefer those, fall
+            # back to the legacy doctor-specialty-canonical path.
+            norm_spec_id = (
+                encounter.get("norm_specialty_id")
+                or doctor_data.get("norm_specialty_id")
+            )
+            if norm_spec_id is None and doctor_data.get("specialty_canonical"):
                 norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
 
             await db.execute(
@@ -719,7 +733,9 @@ async def extract_and_store(
         for med in extraction.get("medications", []):
             if not isinstance(med, dict):
                 continue
-            norm_med_id = await _resolve_medication(db, med)
+            norm_med_id = med.get("norm_medication_id")
+            if norm_med_id is None:
+                norm_med_id = await _resolve_medication(db, med)
             await db.execute(
                 """INSERT INTO medications
                    (document_id, patient_id, norm_medication_id, brand_name,
@@ -1007,9 +1023,11 @@ async def _upsert_doctor(db: aiosqlite.Connection, doctor_data: dict, facility_i
     if row:
         return row[0]
 
-    # Resolve specialty for the doctor
-    norm_spec_id = None
-    if doctor_data.get("specialty_canonical"):
+    # Resolve specialty for the doctor. resolve_extraction() populates
+    # doctor["norm_specialty_id"] from the doctor's specialty_original text;
+    # fall back to the legacy canonical-based resolver when that wasn't run.
+    norm_spec_id = doctor_data.get("norm_specialty_id")
+    if norm_spec_id is None and doctor_data.get("specialty_canonical"):
         norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
 
     try:

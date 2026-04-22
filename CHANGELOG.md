@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-22 - refactor
+
+Major refactor release. No user-visible behavior changes planned, but the
+internal layout changes significantly.
+
+### Changed
+
+- Backend module splits: `settings/routes.py`, `pipeline/extractor.py`,
+  `config.py`, and `chat/service.py` broken into focused sub-modules.
+- DB schema: dropped denormalized `documents.doctor_name` and
+  `documents.facility_name`. Unified `date_visit` / `date_issued` /
+  `doc_date` into `event_date` and `issued_date`.
+- LLM prompts moved from `llm/prompts.py` into YAML files under
+  `config/prompts/`.
+- Frontend: shared API types generated from the FastAPI OpenAPI spec;
+  hand-written interfaces in `types.ts` replaced with re-exports.
+  Mega-components (`NormalizationTab`, `DocumentDetailPage`,
+  `DocumentsPage`, `ProvidersTab`) split into focused pieces. Shared
+  fetch logic extracted into data hooks.
+- Error boundaries added at the page level. 4xx/5xx requests now logged
+  to the audit trail.
+
+### Removed
+
+- Trivial UI walkthrough sections from user-guide docs (timeline,
+  documents, medical-events, imaging, normalization, chat, first-steps).
+
 ## [Unreleased]
 
 ### Added

@@ -62,8 +62,8 @@ GET /api/auth/me
   "patients": [
     {
       "id": 1,
-      "slug": "giovanni-crapelli",
-      "display_name": "Giovanni Crapelli",
+      "slug": "alex-smith",
+      "display_name": "Alex Smith",
       "role": "owner"
     }
   ]

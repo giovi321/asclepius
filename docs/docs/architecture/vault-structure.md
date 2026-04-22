@@ -2,7 +2,7 @@
 
 The vault is the single root for every stored file and the SQLite database. It mounts as a Docker volume at `/vault` inside the container.
 
-<iframe src="../../assets/diagrams/vault-structure.html" width="100%" height="700" style="border:0;border-radius:8px;" title="Vault layout"></iframe>
+<iframe src="../../assets/diagrams/vault-structure.html" width="100%" height="640" style="border:0;border-radius:8px;" title="Vault layout"></iframe>
 
 ## Directory Layout
 
@@ -13,26 +13,26 @@ vault/
 │   │   └── my-upload.pdf
 │   └── user-2/
 ├── patients/
-│   ├── giovanni-crapelli/
+│   ├── alex-smith/
 │   │   ├── 2023/
 │   │   │   ├── sleep-apnea-treatment/              # Medical event folder
-│   │   │   │   ├── 20231017_humanitas_surgical-report.pdf
-│   │   │   │   ├── 20231031_humanitas_specialist-report.pdf
-│   │   │   │   └── 20231115_humanitas_invoice.pdf
-│   │   │   └── 20230315_ospedale-civico_bloodtest.pdf  # No event
+│   │   │   │   ├── 20231017_st-marys-hospital_surgical-report.pdf
+│   │   │   │   ├── 20231031_st-marys-hospital_specialist-report.pdf
+│   │   │   │   └── 20231115_st-marys-hospital_invoice.pdf
+│   │   │   └── 20230315_city-clinic_bloodtest.pdf  # No event
 │   │   ├── 2024/
 │   │   │   ├── knee-injury/
-│   │   │   │   ├── 20240722_clinica-luganese_radiology-report.pdf
-│   │   │   │   └── 20240801_clinica-luganese_specialist-report.pdf
+│   │   │   │   ├── 20240722_riverside-clinic_radiology-report.pdf
+│   │   │   │   └── 20240801_riverside-clinic_specialist-report.pdf
 │   │   │   └── imaging/
-│   │   │       └── 20240722_clinica-luganese_ct-abdomen/
+│   │   │       └── 20240722_riverside-clinic_ct-abdomen/
 │   │   │           ├── series-001/
 │   │   │           │   ├── 00001.dcm
 │   │   │           │   └── ...
 │   │   │           └── series-002/
 │   │   └── 2025/
-│   │       └── 20250110_dr-mueller_prescription.pdf
-│   └── other-patient/
+│   │       └── 20250110_dr-jones_prescription.pdf
+│   └── jordan-lee/
 │       └── ...
 ├── unclassified/
 │   ├── user-1/                         # Per-user unclassified bucket
@@ -59,8 +59,8 @@ Files are renamed during organization to:
 
 Examples:
 
-- `20240315_ospedale-civico_bloodtest.pdf`
-- `20250110_dr-mueller_prescription.pdf`
+- `20240315_city-clinic_bloodtest.pdf`
+- `20250110_dr-jones_prescription.pdf`
 - `20241120_university-hospital_discharge.pdf`
 
 ## Key Rules
@@ -76,8 +76,8 @@ Examples:
 
 Each patient has a URL-safe slug derived from their display name:
 
-- "Giovanni Crapelli" becomes `giovanni-crapelli`
-- The slug is globally unique (used for the filesystem directory name and joins). When two users independently create a patient with the same display name, the second gets an auto-disambiguated slug (`mario-rossi`, then `mario-rossi-2`, etc.). `display_name` is allowed to repeat across users — the slug is an internal handle, not something the UI surfaces for editing.
+- "Alex Smith" becomes `alex-smith`
+- The slug is globally unique (used for the filesystem directory name and joins). When two users independently create a patient with the same display name, the second gets an auto-disambiguated slug (`alex-smith`, then `alex-smith-2`, etc.). `display_name` is allowed to repeat across users — the slug is an internal handle, not something the UI surfaces for editing.
 
 ## File Deduplication
 

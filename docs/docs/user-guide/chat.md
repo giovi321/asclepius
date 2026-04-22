@@ -6,7 +6,7 @@ The Chat feature lets you ask questions about a patient's medical history using 
 
 ## How It Works
 
-<iframe src="../../assets/diagrams/chat-flow.html" width="100%" height="360" style="border:0;border-radius:8px;" title="Chat flow"></iframe>
+<iframe src="../../assets/diagrams/chat-flow.html" width="100%" height="480" style="border:0;border-radius:8px;" title="Chat flow"></iframe>
 
 1. **SQL generation**. The LLM turns your natural-language question into a SQL query against the structured tables (`documents`, `lab_results`, `encounters`, `medications`, …).
 2. **Query execution**. The SQL runs against SQLite, scoped to patients you have access to.

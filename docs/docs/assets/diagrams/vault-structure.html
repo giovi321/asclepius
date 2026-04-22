@@ -29,7 +29,7 @@
   <p class="sub">Three top-level zones — landing, organized records, and a holding bay for documents the pipeline couldn't place.</p>
 
   <div class="frame">
-  <svg viewBox="0 0 920 580" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vault structure tree">
+  <svg viewBox="0 0 920 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vault structure tree">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
         <circle cx="1" cy="1" r="0.9" fill="rgba(28,25,23,0.10)"/>
@@ -37,105 +37,100 @@
       <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
         <polygon points="0 0, 8 3, 0 6" fill="#8E4449"/>
       </marker>
+      <style>
+        .row { font-family:'Geist Mono', monospace; font-size:12px; fill:#1c1917; }
+        .row-soft { font-family:'Geist Mono', monospace; font-size:12px; fill:#57534e; }
+        .anno { font-family:'Geist Mono', monospace; font-size:10px; fill:#78716c; letter-spacing:0.04em; }
+        .pill { font-family:'Geist Mono', monospace; font-size:8px; letter-spacing:0.14em; }
+      </style>
     </defs>
     <rect width="100%" height="100%" fill="#efeee5"/>
     <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
 
-    <!-- ===== Tree connectors (drawn first) ===== -->
-    <!-- Root vault -->
-    <line x1="120" y1="100" x2="120" y2="500" stroke="rgba(28,25,23,0.25)" stroke-width="1"/>
-    <!-- Branches off root -->
-    <line x1="120" y1="140" x2="160" y2="140" stroke="rgba(28,25,23,0.25)" stroke-width="1"/>
-    <line x1="120" y1="240" x2="160" y2="240" stroke="rgba(28,25,23,0.25)" stroke-width="1"/>
-    <line x1="120" y1="440" x2="160" y2="440" stroke="rgba(28,25,23,0.25)" stroke-width="1"/>
-    <line x1="120" y1="500" x2="160" y2="500" stroke="rgba(28,25,23,0.25)" stroke-width="1"/>
+    <!-- ===== Tree pane (left half) ===== -->
+    <rect x="40" y="40" width="500" height="400" rx="8" fill="#faf7f2" stroke="rgba(28,25,23,0.12)" stroke-width="1"/>
 
-    <!-- Inbox sub-branch -->
-    <line x1="200" y1="160" x2="200" y2="200" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <line x1="200" y1="184" x2="240" y2="184" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <!-- patients sub-branches -->
-    <line x1="200" y1="260" x2="200" y2="412" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <line x1="200" y1="284" x2="240" y2="284" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <line x1="200" y1="332" x2="240" y2="332" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <line x1="200" y1="380" x2="240" y2="380" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
-    <!-- year sub-branch (events + flat) -->
-    <line x1="280" y1="304" x2="280" y2="356" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
-    <line x1="280" y1="332" x2="320" y2="332" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
-    <line x1="280" y1="356" x2="320" y2="356" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
-    <!-- unclassified branch -->
-    <line x1="200" y1="460" x2="240" y2="460" stroke="rgba(28,25,23,0.20)" stroke-width="0.8"/>
+    <!-- Tree connectors — drawn first -->
+    <line x1="62" y1="78" x2="62" y2="404" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
+    <line x1="62" y1="106" x2="80" y2="106" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
+    <line x1="62" y1="160" x2="80" y2="160" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
+    <line x1="62" y1="350" x2="80" y2="350" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
+    <line x1="62" y1="404" x2="80" y2="404" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
 
-    <!-- ===== File-flow accent arrow (inbox -> patients) ===== -->
-    <path d="M 540 184 C 700 184, 700 332, 540 332" fill="none" stroke="#8E4449" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
-    <rect x="660" y="240" width="120" height="14" rx="2" fill="#efeee5"/>
-    <text x="720" y="250" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">PIPELINE MOVES ONCE</text>
+    <!-- Inbox sub-tree -->
+    <line x1="100" y1="120" x2="100" y2="134" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
+    <line x1="100" y1="134" x2="118" y2="134" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
 
-    <!-- ===== Nodes ===== -->
-    <!-- vault/ root -->
-    <rect x="60" y="80" width="120" height="40" rx="6" fill="#faf7f2"/>
-    <rect x="60" y="80" width="120" height="40" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
-    <text x="120" y="98" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">vault/</text>
-    <text x="120" y="111" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">root volume</text>
+    <!-- Patients sub-tree -->
+    <line x1="100" y1="174" x2="100" y2="320" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
+    <line x1="100" y1="188" x2="118" y2="188" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
+    <line x1="138" y1="202" x2="138" y2="298" stroke="rgba(28,25,23,0.16)" stroke-width="0.8"/>
+    <line x1="138" y1="216" x2="156" y2="216" stroke="rgba(28,25,23,0.16)" stroke-width="0.8"/>
+    <line x1="176" y1="230" x2="176" y2="270" stroke="rgba(28,25,23,0.14)" stroke-width="0.8"/>
+    <line x1="176" y1="244" x2="194" y2="244" stroke="rgba(28,25,23,0.14)" stroke-width="0.8"/>
+    <line x1="176" y1="270" x2="194" y2="270" stroke="rgba(28,25,23,0.14)" stroke-width="0.8"/>
+    <line x1="138" y1="298" x2="156" y2="298" stroke="rgba(28,25,23,0.16)" stroke-width="0.8"/>
 
-    <!-- inbox/ -->
-    <rect x="160" y="120" width="160" height="40" rx="6" fill="#faf7f2"/>
-    <rect x="160" y="120" width="160" height="40" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-    <text x="240" y="138" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">inbox/</text>
-    <text x="240" y="151" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">drop zone</text>
+    <!-- Unclassified sub-tree -->
+    <line x1="100" y1="364" x2="100" y2="378" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
+    <line x1="100" y1="378" x2="118" y2="378" stroke="rgba(28,25,23,0.18)" stroke-width="0.8"/>
 
-    <!-- inbox/user-1/ -->
-    <rect x="240" y="172" width="200" height="32" rx="6" fill="#faf7f2"/>
-    <rect x="240" y="172" width="200" height="32" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-    <text x="340" y="192" font-family="'Geist Mono',monospace" font-size="11" fill="#1c1917" text-anchor="middle">user-&lt;id&gt;/   per-user dropzone</text>
+    <!-- ===== Tree text (rows) ===== -->
+    <text x="68" y="78" class="row" font-weight="600" fill="#8E4449">vault/</text>
 
-    <!-- patients/ -->
-    <rect x="160" y="220" width="160" height="40" rx="6" fill="#faf7f2"/>
-    <rect x="160" y="220" width="160" height="40" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
-    <text x="240" y="238" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">patients/</text>
-    <text x="240" y="251" font-family="'Geist Mono',monospace" font-size="9" fill="#8E4449" text-anchor="middle">organized records</text>
+    <text x="84" y="110" class="row" font-weight="600">inbox/</text>
+    <text x="190" y="110" class="anno">drop zone, watched</text>
+    <text x="124" y="138" class="row-soft">user-&lt;id&gt;/</text>
+    <text x="220" y="138" class="anno">per-user dropzone</text>
 
-    <!-- patient slug -->
-    <rect x="240" y="272" width="180" height="28" rx="6" fill="#faf7f2"/>
-    <rect x="240" y="272" width="180" height="28" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-    <text x="330" y="289" font-family="'Geist Mono',monospace" font-size="11" fill="#1c1917" text-anchor="middle">{patient-slug}/</text>
+    <text x="84" y="164" class="row" font-weight="600" fill="#8E4449">patients/</text>
+    <text x="200" y="164" class="anno" fill="#8E4449">organized records</text>
+    <text x="124" y="192" class="row-soft">{patient-slug}/</text>
+    <text x="162" y="220" class="row-soft">{year}/</text>
+    <text x="200" y="248" class="row-soft">{event-slug}/</text>
+    <text x="200" y="274" class="row-soft">{YYYYMMDD}_{provider}_{doctype}.pdf</text>
+    <text x="162" y="302" class="row-soft">imaging/{study}/series-NNN/*.dcm</text>
 
-    <!-- year -->
-    <rect x="320" y="318" width="80" height="28" rx="6" fill="#faf7f2"/>
-    <rect x="320" y="318" width="80" height="28" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-    <text x="360" y="335" font-family="'Geist Mono',monospace" font-size="11" fill="#1c1917" text-anchor="middle">{year}/</text>
+    <text x="84" y="354" class="row" font-weight="600">unclassified/</text>
+    <text x="220" y="354" class="anno">no patient resolved</text>
+    <text x="124" y="382" class="row-soft">user-&lt;id&gt;/</text>
 
-    <!-- event subfolder -->
-    <rect x="408" y="318" width="180" height="28" rx="6" fill="#faf7f2"/>
-    <rect x="408" y="318" width="180" height="28" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-    <text x="498" y="335" font-family="'Geist Mono',monospace" font-size="11" fill="#1c1917" text-anchor="middle">{medical-event-slug}/</text>
+    <text x="84" y="408" class="row" font-weight="600">asclepius.sqlite</text>
+    <text x="220" y="408" class="anno">SQLite DB</text>
 
-    <!-- file -->
-    <rect x="408" y="346" width="320" height="32" rx="6" fill="#faf7f2"/>
-    <rect x="408" y="346" width="320" height="32" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
-    <text x="568" y="367" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">{YYYYMMDD}_{provider}_{doctype}.pdf</text>
+    <!-- ===== Right pane: rules + flow ===== -->
+    <!-- Pipeline-moves arrow (between panes) -->
+    <path d="M 360 134 C 470 134, 470 192, 360 192" fill="none" stroke="#8E4449" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+    <rect x="392" y="155" width="76" height="14" rx="2" fill="#efeee5"/>
+    <text x="430" y="166" class="pill" fill="#8E4449" text-anchor="middle">PIPELINE MOVES ONCE</text>
 
-    <!-- imaging dicom -->
-    <rect x="240" y="394" width="240" height="32" rx="6" fill="#faf7f2"/>
-    <rect x="240" y="394" width="240" height="32" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-    <text x="360" y="414" font-family="'Geist Mono',monospace" font-size="11" fill="#1c1917" text-anchor="middle">imaging/{study}/series-NNN/*.dcm</text>
+    <!-- Rules card -->
+    <rect x="568" y="40" width="312" height="200" rx="8" fill="#ffffff" stroke="rgba(28,25,23,0.20)" stroke-width="1"/>
+    <rect x="582" y="56" width="68" height="14" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
+    <text x="616" y="66" class="pill" fill="rgba(28,25,23,0.8)" text-anchor="middle">RULES</text>
 
-    <!-- unclassified/ -->
-    <rect x="160" y="420" width="160" height="40" rx="6" fill="#faf7f2"/>
-    <rect x="160" y="420" width="160" height="40" rx="6" fill="rgba(28,25,23,0.02)" stroke="rgba(28,25,23,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
-    <text x="240" y="438" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">unclassified/</text>
-    <text x="240" y="451" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e" text-anchor="middle">no patient resolved</text>
+    <text x="582" y="98" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917">Files move exactly once</text>
+    <text x="582" y="114" class="anno">inbox/ → patients/{slug}/{year}/</text>
 
-    <!-- asclepius.sqlite -->
-    <rect x="160" y="480" width="220" height="40" rx="6" fill="#faf7f2"/>
-    <rect x="160" y="480" width="220" height="40" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-    <rect x="168" y="486" width="40" height="12" rx="2" fill="transparent" stroke="rgba(87,83,78,0.40)" stroke-width="0.8"/>
-    <text x="188" y="495" font-family="'Geist Mono',monospace" font-size="7" fill="rgba(87,83,78,0.9)" text-anchor="middle" letter-spacing="0.08em">DB</text>
-    <text x="270" y="510" font-family="'Geist Mono',monospace" font-size="11" font-weight="600" fill="#1c1917" text-anchor="middle">asclepius.sqlite</text>
+    <text x="582" y="142" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917">DB is the source of truth</text>
+    <text x="582" y="158" class="anno">documents.file_path is relative to vault root</text>
 
-    <!-- ===== Naming convention callout ===== -->
-    <line x1="60" y1="540" x2="860" y2="540" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-    <text x="60" y="558" font-family="'Geist Mono',monospace" font-size="8" letter-spacing="0.14em" fill="#57534e">EXAMPLE</text>
-    <text x="160" y="558" font-family="'Geist Mono',monospace" font-size="10" fill="#1c1917">vault/patients/giovanni-crapelli/2024/knee-injury/20240722_clinica-luganese_radiology-report.pdf</text>
+    <text x="582" y="186" font-family="'Geist',sans-serif" font-size="11" font-weight="600" fill="#1c1917">Per-user scope</text>
+    <text x="582" y="202" class="anno">non-admins see their own patients</text>
+    <text x="582" y="216" class="anno">+ their own inbox/ and unclassified/ subfolders</text>
+
+    <!-- Naming convention card -->
+    <rect x="568" y="260" width="312" height="180" rx="8" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
+    <rect x="582" y="276" width="92" height="14" rx="2" fill="transparent" stroke="rgba(142,68,73,0.50)" stroke-width="0.8"/>
+    <text x="628" y="286" class="pill" fill="#8E4449" text-anchor="middle">FILE NAMING</text>
+
+    <text x="582" y="316" font-family="'Geist Mono',monospace" font-size="13" font-weight="600" fill="#1c1917">{YYYYMMDD}_{provider}_{doctype}.{ext}</text>
+
+    <text x="582" y="344" class="anno">date     compact, as extracted by the LLM</text>
+    <text x="582" y="362" class="anno">provider facility slug (preferred) or doctor slug</text>
+    <text x="582" y="380" class="anno">doctype  bloodtest · prescription · discharge · …</text>
+
+    <text x="582" y="412" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">Same scheme on disk and in the UI download.</text>
   </svg>
   </div>
 

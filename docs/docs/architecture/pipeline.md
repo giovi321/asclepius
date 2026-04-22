@@ -2,7 +2,7 @@
 
 The pipeline is the ingestion engine. It watches the inbox folder, sends each file through OCR and LLM extraction, and files the result into the vault.
 
-<iframe src="../../assets/diagrams/pipeline.html" width="100%" height="820" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
+<iframe src="../../assets/diagrams/pipeline.html" width="100%" height="850" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
 
 `pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision whether it lands today or two weeks from now.
 
@@ -144,7 +144,7 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 For PDFs with more than **5 pages** (`should_section()`), the pipeline classifies pages individually and extracts each group with its own prompt instead of sending the whole document to a single extraction call.
 
-<iframe src="../../assets/diagrams/smart-sectioning.html" width="100%" height="420" style="border:0;border-radius:8px;" title="Smart page-level sectioning"></iframe>
+<iframe src="../../assets/diagrams/smart-sectioning.html" width="100%" height="540" style="border:0;border-radius:8px;" title="Smart page-level sectioning"></iframe>
 
 ### Page Classification Types
 

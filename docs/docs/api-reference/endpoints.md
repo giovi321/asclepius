@@ -19,10 +19,10 @@ All endpoints require authentication unless noted. Base prefix: `/api`
 
 ```json
 {
-  "username": "giovanni",
+  "username": "alex",
   "password": "your-password",
-  "display_name": "Giovanni Crapelli",
-  "patient_name": "Giovanni Crapelli",
+  "display_name": "Alex Smith",
+  "patient_name": "Alex Smith",
   "patient_date_of_birth": "1990-01-15",
   "patient_sex": "M"
 }

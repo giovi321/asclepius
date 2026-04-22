@@ -44,7 +44,18 @@ _USER_KNOWLEDGE_DIR = (
     Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "/data/config/settings.yaml")).parent
     / "knowledge"
 )
+# In Docker the package installs into ``/app/asclepius`` and the JSON files
+# land at ``/app/bundled_config/knowledge`` (see Dockerfile). Three parents
+# from this file (``backend/asclepius/normalization/knowledge_base.py``)
+# resolves to ``/app`` in Docker and ``backend/`` in the dev tree — same
+# pattern as ``BUNDLED_SEEDS_DIR`` in ``db/init.py``.
 _BUNDLED_KNOWLEDGE_DIR = (
+    Path(__file__).parent.parent.parent / "bundled_config" / "knowledge"
+)
+# Repo top-level fallback for developers running outside Docker — the JSON
+# files live at ``<repo>/bundled_config/knowledge``, which the dev tree
+# pattern above doesn't reach.
+_REPO_KNOWLEDGE_DIR = (
     Path(__file__).parent.parent.parent.parent / "bundled_config" / "knowledge"
 )
 
@@ -122,10 +133,13 @@ class KnowledgeBase:
         """Read the knowledge JSON. Silently no-op if the file is missing."""
         path = self._resolve_path()
         if path is None:
-            logger.info(
-                "knowledge_base[%s]: no data file found (looked in %s and %s); "
-                "auto-merge will skip deterministic resolution",
-                self.kind, _USER_KNOWLEDGE_DIR, _BUNDLED_KNOWLEDGE_DIR,
+            # WARNING (not INFO) so deployments notice — when this fires
+            # auto-merge falls back to LLM-only, which is the very failure
+            # mode this module exists to prevent.
+            logger.warning(
+                "knowledge_base[%s]: no data file found (looked in %s, %s, %s); "
+                "auto-merge will skip deterministic resolution and rely on the LLM only",
+                self.kind, _USER_KNOWLEDGE_DIR, _BUNDLED_KNOWLEDGE_DIR, _REPO_KNOWLEDGE_DIR,
             )
             return
 
@@ -183,7 +197,7 @@ class KnowledgeBase:
 
     @staticmethod
     def _resolve_path_for(kind: Kind) -> Path | None:
-        for base in (_USER_KNOWLEDGE_DIR, _BUNDLED_KNOWLEDGE_DIR):
+        for base in (_USER_KNOWLEDGE_DIR, _BUNDLED_KNOWLEDGE_DIR, _REPO_KNOWLEDGE_DIR):
             candidate = base / f"{kind}.json"
             if candidate.is_file():
                 return candidate

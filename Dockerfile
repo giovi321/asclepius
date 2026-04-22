@@ -52,6 +52,11 @@ WORKDIR /app
 COPY backend/ .
 COPY --from=frontend-build /frontend/dist /app/static
 COPY config/ /app/bundled_config/
+# Knowledge bases (LOINC / ATC / ICD-10 lookup tables) used by auto-merge —
+# separate from seeds because they're read-only side indexes loaded into
+# memory, not seeded into the DB. Merges into the same /app/bundled_config/
+# destination next to seeds/.
+COPY bundled_config/ /app/bundled_config/
 COPY docker/entrypoint.sh /usr/local/bin/asclepius-entrypoint
 RUN chmod +x /usr/local/bin/asclepius-entrypoint
 

@@ -632,7 +632,7 @@ export default function NormalizationTab() {
       )}
 
       {/* Table */}
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
             <tr>
@@ -683,21 +683,24 @@ export default function NormalizationTab() {
                     )}
                   </td>
                   <td className="px-3 py-1.5 whitespace-nowrap w-px" onClick={(e: any) => e.stopPropagation()}>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1">
                       <button onClick={() => handleViewDocuments(item.id, item.canonical_display || item.name || `#${item.id}`)}
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
-                        title="Show documents that reference this entry">
-                        <FileText className="h-3 w-3" /> Documents
+                        className="rounded-md border p-1.5 hover:bg-accent"
+                        title="Show documents that reference this entry"
+                        aria-label="Show documents">
+                        <FileText className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => { setShowMergeFor(showMergeFor === item.id ? null : item.id); }}
-                        className="rounded-md border px-2 py-1 text-xs hover:bg-accent flex items-center gap-1"
-                        title="Merge into another entry">
-                        <GitMerge className="h-3 w-3" /> Merge
+                        className="rounded-md border p-1.5 hover:bg-accent"
+                        title="Merge into another entry"
+                        aria-label="Merge">
+                        <GitMerge className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => handleDelete(item.id, item.canonical_display || item.name || `#${item.id}`)}
-                        className="rounded-md border px-2 py-1 text-xs text-destructive hover:bg-destructive/10 flex items-center gap-1"
-                        title="Delete this entry">
-                        <Trash2 className="h-3 w-3" /> Delete
+                        className="rounded-md border p-1.5 text-destructive hover:bg-destructive/10"
+                        title="Delete this entry"
+                        aria-label="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </td>

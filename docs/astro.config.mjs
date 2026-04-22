@@ -15,6 +15,7 @@ export default defineConfig({
       components: {
         Head: './src/components/Head.astro',
       },
+      customCss: ['./src/styles/diagrams.css'],
       head: [
         {
           tag: 'link',

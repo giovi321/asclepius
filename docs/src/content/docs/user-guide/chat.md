@@ -8,7 +8,7 @@ Chat lets you ask questions about a patient's medical history in plain language.
 
 ## How it works
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 920 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chat flow" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -76,7 +76,7 @@ Chat lets you ask questions about a patient's medical history in plain language.
     <text x="876" y="140" font-family="'Geist Mono',monospace" font-size="8" fill="#57534e" text-anchor="middle">+sidebar</text>
     <!-- footer note -->
     <line x1="40" y1="220" x2="900" y2="220" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
-    <text x="40" y="244" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">SQL is generated, not retrieved — every question hits the live DB. Every cited row's document_id lands in the source documents sidebar.</text>
+    <text x="40" y="244" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">SQL is generated, not retrieved — every question hits the live DB. Every cited row's document_id lands in the source documents sidebar.</text>
   </svg>
 </div>
 

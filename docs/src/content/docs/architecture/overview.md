@@ -4,7 +4,7 @@ title: "Architecture Overview"
 
 Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at. There is no bundled model server.
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 1040 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Asclepius architecture diagram" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -158,7 +158,7 @@ Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves
     <text x="632" y="459" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">External HTTP</text>
     <line x1="740" y1="455" x2="764" y2="455" stroke="#57534e" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
     <text x="772" y="459" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">File serve</text>
-    <text x="60" y="510" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">The gate enforces per-credential concurrency; the resolver collapses aliases before writes.</text>
+    <text x="60" y="510" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">The gate enforces per-credential concurrency; the resolver collapses aliases before writes.</text>
   </svg>
 </div>
 

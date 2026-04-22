@@ -4,7 +4,7 @@ title: "Processing Pipeline"
 
 The pipeline is the ingestion engine. It watches the inbox folder, sends each file through OCR and LLM extraction, and files the result into the vault.
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 920 728" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Asclepius pipeline flow" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -124,9 +124,9 @@ The pipeline is the ingestion engine. It watches the inbox folder, sends each fi
     <rect x="376" y="684" width="168" height="32" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
     <text x="460" y="704" font-family="'Geist',sans-serif" font-size="12" font-weight="600" fill="#1c1917" text-anchor="middle">Store + organize file</text>
     <!-- ===== Side note (top-left empty band) ===== -->
-    <text x="40" y="76" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">Reprocessing reuses the same picker —</text>
-    <text x="40" y="92" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">section vs. chunk vs. single-shot is</text>
-    <text x="40" y="108" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">decided in exactly one place.</text>
+    <text x="40" y="76" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">Reprocessing reuses the same picker —</text>
+    <text x="40" y="92" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">section vs. chunk vs. single-shot is</text>
+    <text x="40" y="108" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">decided in exactly one place.</text>
   </svg>
 </div>
 
@@ -270,7 +270,7 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 For PDFs with more than **5 pages** (`should_section()`), the pipeline classifies pages individually and extracts each group with its own prompt instead of sending the whole document to a single extraction call.
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 920 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smart sectioning flow" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -346,7 +346,7 @@ For PDFs with more than **5 pages** (`should_section()`), the pipeline classifie
     <text x="340" y="271" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">clinical_notes</text>
     <rect x="450" y="262" width="14" height="10" rx="2" fill="rgba(120,113,108,0.20)" stroke="#78716c" stroke-width="0.8"/>
     <text x="470" y="271" font-family="'Geist Mono',monospace" font-size="9" fill="#57534e">cover_page  (skipped)</text>
-    <text x="60" y="312" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">A discharge summary with cover, history, and lab tables ends up as 3 sections, not one wall of text.</text>
+    <text x="60" y="312" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">A discharge summary with cover, history, and lab tables ends up as 3 sections, not one wall of text.</text>
   </svg>
 </div>
 

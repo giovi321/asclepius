@@ -4,7 +4,7 @@ title: "Database Schema"
 
 Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) for safe concurrent reads during pipeline writes and FTS5 for full-text search. The database file lives at `vault/asclepius.sqlite`.
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 920 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Core data model" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">

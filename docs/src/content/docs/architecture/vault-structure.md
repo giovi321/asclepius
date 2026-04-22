@@ -4,7 +4,7 @@ title: "Vault Structure"
 
 The vault is the single root for every stored file and the SQLite database. It mounts as a Docker volume at `/vault` inside the container.
 
-<div style="background:#efeee5;border:1px solid rgba(28,25,23,0.12);border-radius:8px;padding:1rem;margin:1rem 0;overflow:hidden;">
+<div class="diagram-frame">
 <svg viewBox="0 0 920 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vault structure tree" style="display:block;width:100%;height:auto;max-width:100%;">
     <defs>
       <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
@@ -87,7 +87,7 @@ The vault is the single root for every stored file and the SQLite database. It m
     <text x="582" y="344" class="anno">date     compact, as extracted by the LLM</text>
     <text x="582" y="362" class="anno">provider facility slug (preferred) or doctor slug</text>
     <text x="582" y="380" class="anno">doctype  bloodtest · prescription · discharge · …</text>
-    <text x="582" y="412" font-family="'Instrument Serif',serif" font-style="italic" font-size="13" fill="#57534e">Same scheme on disk and in the UI download.</text>
+    <text x="582" y="412" font-family="'Geist',sans-serif" font-size="13" fill="#57534e">Same scheme on disk and in the UI download.</text>
   </svg>
 </div>
 

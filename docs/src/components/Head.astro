@@ -18,10 +18,7 @@ import Default from '@astrojs/starlight/components/Head.astro';
       securityLevel: 'loose',
     });
 
-    // Reset any previous render markers so we can re-run on navigation
-    blocks.forEach((el) => {
-      el.removeAttribute('data-processed');
-    });
+    blocks.forEach((el) => el.removeAttribute('data-processed'));
 
     try {
       await mermaid.run({ querySelector: 'pre.mermaid' });
@@ -30,8 +27,66 @@ import Default from '@astrojs/starlight/components/Head.astro';
     }
   }
 
-  // Initial load
-  renderMermaid();
-  // Astro view-transition navigation
-  document.addEventListener('astro:page-load', renderMermaid);
+  function openLightbox(sourceEl: HTMLElement) {
+    const svg = sourceEl.querySelector('svg');
+    if (!svg) return;
+
+    const existing = document.querySelector('.diagram-lightbox');
+    if (existing) existing.remove();
+
+    const lightbox = document.createElement('div');
+    lightbox.className = 'diagram-lightbox';
+
+    const content = document.createElement('div');
+    content.className = 'diagram-lightbox-content';
+
+    const clone = svg.cloneNode(true) as SVGElement;
+    clone.removeAttribute('width');
+    clone.removeAttribute('height');
+    clone.setAttribute('style', 'display:block;width:auto;max-width:min(90vw,1400px);max-height:82vh;height:auto;');
+    content.appendChild(clone);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'diagram-lightbox-close';
+    closeBtn.textContent = '✕';
+    closeBtn.setAttribute('aria-label', 'Close');
+
+    lightbox.appendChild(content);
+    lightbox.appendChild(closeBtn);
+
+    const close = () => {
+      lightbox.remove();
+      document.body.classList.remove('diagram-lightbox-open');
+      document.removeEventListener('keydown', onKey);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) close();
+    });
+    closeBtn.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    document.body.classList.add('diagram-lightbox-open');
+    document.body.appendChild(lightbox);
+  }
+
+  function wireLightbox() {
+    const targets = document.querySelectorAll<HTMLElement>('.diagram-frame, pre.mermaid');
+    targets.forEach((el) => {
+      if (el.dataset.lightboxReady) return;
+      el.dataset.lightboxReady = '1';
+      el.addEventListener('click', () => openLightbox(el));
+    });
+  }
+
+  async function setupPage() {
+    await renderMermaid();
+    // Wire lightbox after mermaid has rendered so its SVG is in the DOM
+    wireLightbox();
+  }
+
+  setupPage();
+  document.addEventListener('astro:page-load', setupPage);
 </script>

@@ -459,11 +459,26 @@ async def chat_with_rag(
     # Build system prompt
     system = CHAT_SYSTEM_PROMPT.format(patient_context=patient_context)
 
-    # Add SQL results as context if available
+    # Add SQL results as context if available. Also surface the resolved
+    # sources list so the LLM can emit proper ``[name](/documents/<id>)``
+    # markdown links — the LLM never sees document ids in the SQL result
+    # for free (they may be nested in joined rows), so we hand it a clean
+    # mapping.
     messages = list(history)
     if sql_result:
-        context_msg = f"Database query results for the user's question:\n{sql_result}\n\nUser question: {message}"
-        messages.append({"role": "user", "content": context_msg})
+        parts = [f"Database query results for the user's question:\n{sql_result}"]
+        if sources:
+            doc_lines = "\n".join(
+                f"- id={s['id']} filename={s['filename']!r} "
+                f"doc_type={s['doc_type']!r} doc_date={s['doc_date']!r}"
+                for s in sources
+            )
+            parts.append(
+                "Available documents (use these ids for links formatted as "
+                "`[filename](/documents/<id>)`):\n" + doc_lines
+            )
+        parts.append(f"User question: {message}")
+        messages.append({"role": "user", "content": "\n\n".join(parts)})
     else:
         messages.append({"role": "user", "content": message})
 

@@ -791,7 +791,11 @@ When answering questions:
 - If you're unsure, say so rather than guessing
 - Don't provide medical advice — just help navigate the records
 - Reference specific lab values, dates, and providers when available
-- If the data doesn't contain the answer, say so clearly"""
+- If the data doesn't contain the answer, say so clearly
+- When you refer to a specific document, format it as a markdown link:
+  ``[filename](/documents/{{id}})``. Use the exact id from the
+  ``Available documents`` list provided in the user turn (if present). Never
+  invent ids; if no id is available for a document, mention it by name only."""
 
 
 DB_SCHEMA_FOR_CHAT = """

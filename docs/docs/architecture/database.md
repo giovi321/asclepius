@@ -352,7 +352,7 @@ erDiagram
 | Table | Purpose |
 |-------|---------|
 | `users` | User accounts with bcrypt password hashes |
-| `patients` | Patient demographics — deliberately minimal (name, DOB, sex) since only those fields are passed to the LLM for extraction |
+| `patients` | Patient demographics; deliberately minimal (name, DOB, sex) since only those fields are passed to the LLM for extraction |
 | `user_patient_access` | Maps users to patients with role (`owner` or `viewer`) |
 | `documents` | Central document records with metadata, OCR text, and extraction results |
 
@@ -409,12 +409,12 @@ erDiagram
 
 ### Configuration (not in the database)
 
-Shared credentials (URL + API key + concurrency + retry policy) and LLM/OCR/Vision provider entries live in `config/settings.yaml`, not the SQLite database. Asclepius mutates that file at runtime when you edit providers/credentials from the UI — there is no `credentials` or `providers` table.
+Shared credentials (URL + API key + concurrency + retry policy) and LLM/OCR/Vision provider entries live in `config/settings.yaml`, not the SQLite database. Asclepius mutates that file at runtime when you edit providers/credentials from the UI. There is no `credentials` or `providers` table.
 
 ## Key Design Notes
 
-- **Deduplication** -- Documents have a unique `file_hash` (SHA-256) to prevent duplicate imports
-- **Denormalized names** -- `documents.doctor_name` and `documents.facility_name` store the raw extracted names alongside normalized `doctor_id`/`facility_id` foreign keys
-- **Cascading deletes** -- Deleting a document cascades to all child records (lab results, encounters, medications, etc.)
-- **FTS triggers** -- Insert/update/delete triggers keep the FTS5 index in sync with the documents table automatically
-- **WAL mode** -- Enabled at connection time for concurrent reads during pipeline writes
+- **Deduplication.** Documents have a unique `file_hash` (SHA-256) to prevent duplicate imports.
+- **Denormalized names.** `documents.doctor_name` and `documents.facility_name` store the raw extracted names alongside normalized `doctor_id`/`facility_id` foreign keys.
+- **Cascading deletes.** Deleting a document cascades to all child records (lab results, encounters, medications, etc.).
+- **FTS triggers.** Insert/update/delete triggers keep the FTS5 index in sync with the documents table automatically.
+- **WAL mode.** Enabled at connection time for concurrent reads during pipeline writes.

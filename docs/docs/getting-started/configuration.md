@@ -141,7 +141,7 @@ See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full deta
 
 ### Concurrency caps
 
-Each **credential** carries a `max_concurrent` value — the process-wide cap for everything that uses that endpoint. Every LLM/Vision/OCR provider referencing the credential shares a queue, split per kind (`llm` / `ocr` / `vision`). A single Ollama server with `max_concurrent: 1` will never run more than one LLM request *and* one OCR request *and* one vision request at the same time — matching how the physical GPU actually behaves.
+Each **credential** carries a `max_concurrent` value — the process-wide cap for everything that uses that endpoint. Every LLM/Vision/OCR provider referencing the credential shares a queue, split per kind (`llm` / `ocr` / `vision`). A single Ollama server with `max_concurrent: 1` will never run more than one LLM request *and* one OCR request *and* one vision request at the same time, matching how the physical GPU actually behaves.
 
 When a provider still uses inline URL + API key (no `credential_id`), the process falls back to the legacy flat caps:
 

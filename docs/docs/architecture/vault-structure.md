@@ -53,9 +53,9 @@ Files are renamed during organization to:
 {YYYYMMDD}_{provider-slug}_{doctype}.{ext}
 ```
 
-- **Date** -- Compact date format (e.g., `20251231`) as extracted by the LLM
-- **Provider slug** -- Facility slug (preferred) or doctor slug, lowercase with hyphens
-- **Doc type** -- One of the document type codes (e.g., `bloodtest`, `prescription`, `specialist_report`)
+- **Date.** Compact date format (e.g., `20251231`) as extracted by the LLM.
+- **Provider slug.** Facility slug (preferred) or doctor slug, lowercase with hyphens.
+- **Doc type.** One of the document type codes (e.g., `bloodtest`, `prescription`, `specialist_report`).
 
 Examples:
 

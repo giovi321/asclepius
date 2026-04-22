@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at — there is no bundled model server.
+Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at. There is no bundled model server.
 
 <iframe src="../../assets/diagrams/architecture.html" width="100%" height="660" style="border:0;border-radius:8px;" title="Architecture diagram"></iframe>
 

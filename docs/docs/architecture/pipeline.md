@@ -4,7 +4,7 @@ The pipeline is the ingestion engine. It watches the inbox folder, sends each fi
 
 <iframe src="../../assets/diagrams/pipeline.html" width="100%" height="850" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
 
-`pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision whether it lands today or two weeks from now.
+`pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision regardless of when it lands.
 
 ## File Watcher
 
@@ -73,13 +73,13 @@ Uses the Google Cloud Vision API for OCR. Requires an API key.
 
 ## Vision-LLM Flow (alternative to OCR + LLM)
 
-When `pipeline.default_flow` is `vision_llm` — or the Reprocess menu is set to **Vision-LLM** — the pipeline takes a different path that **skips the OCR and the LLM-classification steps** entirely. Each page image is sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model returns a single JSON document containing both `ocr_text` and all classification/universal fields (doc_type, dates, doctor, facility, summary).
+When `pipeline.default_flow` is `vision_llm`, or the Reprocess menu is set to **Vision-LLM**, the pipeline takes a different path that **skips the OCR and the LLM-classification steps** entirely. Each page image is sent directly to a vision-capable LLM with a combined read-and-classify prompt. The model returns a single JSON document containing both `ocr_text` and all classification/universal fields (doc_type, dates, doctor, facility, summary).
 
-1. Iterate `vision.providers[]` in priority order — fall through to the next provider on failure.
+1. Iterate `vision.providers[]` in priority order; fall through to the next provider on failure.
 2. For each PDF page (or the single image), render to JPEG and send to the chosen provider (Ollama / Claude / OpenAI). Image dimensions are aligned to a 28-pixel patch grid and capped below the model's `max_pixels` budget (e.g. `qwen2.5-vl`) so the server never silently rescales.
 3. Parse the JSON response; merge extractions across pages (first non-null value per key wins).
 4. Persist `ocr_text` + set `ocr_engine = vision_llm:<provider name>` on the document.
-5. Run **Phase 2 type-specific extraction** on the vision-produced OCR text using the same provider selected for vision — lab results / medications / diagnoses are populated even though classification came from the vision prompt.
+5. Run **Phase 2 type-specific extraction** on the vision-produced OCR text using the same provider selected for vision. Lab results, medications, and diagnoses are populated even though classification came from the vision prompt.
 6. Call `extract_and_store` with the merged result as the override.
 
 Retries on transient failures are controlled per-credential (`max_retries`, `retry_backoff_seconds`). Per-page vision calls share the same `(credential, kind)` gate as OCR, so vision traffic respects the credential's configured concurrency cap.
@@ -96,11 +96,11 @@ After OCR, the extracted text is sent to the LLM in two phases:
 
 ### Retrieval-Augmented Extraction (Few-Shot Examples)
 
-Before classification, the pipeline searches for **similar previously-processed documents** to use as few-shot examples in the prompt. This dramatically improves extraction quality, especially for smaller models like qwen2.5.
+Before classification, the pipeline searches for **similar previously-processed documents** to use as few-shot examples in the prompt. This improves extraction quality, especially for smaller models like qwen2.5.
 
 **Example selection priority:**
 
-1. Documents with user corrections from the same facility (highest quality — human-verified)
+1. Documents with user corrections from the same facility (highest quality, human-verified)
 2. Documents with user corrections from any facility
 3. Completed documents from the same facility
 4. FTS5 text similarity search (BM25 ranking on OCR text)
@@ -177,7 +177,7 @@ Sections are stored in the `document_sections` table and are visible in the docu
 
 ## Chunked Extraction
 
-For documents that are not large enough for sectioning, chunking is triggered whenever the cached OCR has **more than one page** or the concatenated OCR text exceeds **8,000 characters**. This is deliberately aggressive: multi-page blood-test tables often fit well under the LLM's input cap but overflow its *output* cap, silently dropping later-page rows if sent as a single prompt.
+For documents that are not large enough for sectioning, chunking is triggered whenever the cached OCR has **more than one page** or the concatenated OCR text exceeds **8,000 characters**. This is deliberately aggressive: multi-page blood-test tables often fit well under the LLM's input cap but overflow its *output* cap, so later-page rows are silently dropped if sent as a single prompt.
 
 ### Page-aligned chunks
 
@@ -200,7 +200,7 @@ Each chunk is extracted **in-memory**; the merged result is stored exactly once 
 - `vaccine_name + date_administered` for vaccinations
 - `description + amount` for invoice line items
 
-After merging, a **page coverage** line is logged — `pages covered=N/total`, number of lab results/medications/diagnoses produced, and a `[TRUNCATION DETECTED]` tag if any chunk (even after bisection) still hit the output cap. Missing pages show up explicitly instead of being lost silently.
+After merging, a **page coverage** line is logged: `pages covered=N/total`, number of lab results/medications/diagnoses produced, and a `[TRUNCATION DETECTED]` tag if any chunk (even after bisection) still hit the output cap. Missing pages show up explicitly instead of being lost silently.
 
 ## Cancellation
 
@@ -254,7 +254,7 @@ The pipeline can be started and stopped at runtime from the Settings UI without 
 
 If the pipeline encounters **5 consecutive provider connectivity failures** (connection refused, timeout, HTTP 5xx), it automatically pauses and sets an `auto_stopped` flag. A warning banner appears in the Settings UI with a "Restart" button.
 
-Only connectivity errors trigger auto-stop — document-specific extraction failures (malformed content, unsupported format) do not.
+Only connectivity errors trigger auto-stop. Document-specific extraction failures (malformed content, unsupported format) do not.
 
 ### Extraction Validation
 
@@ -277,4 +277,4 @@ These corrections serve two purposes:
 1. **Few-shot example quality** -- Documents with corrections are preferred as few-shot examples in retrieval-augmented extraction, since they represent human-verified ground truth
 2. **Learning signal** -- Corrections from the same facility are especially valuable, as documents from the same source share the same layout and formatting patterns
 
-Corrections are logged transparently — no UI changes needed. The system compares each edit against the original `raw_extraction` JSON and only logs fields that actually differ from what the LLM produced.
+Corrections are logged transparently; no UI changes needed. The system compares each edit against the original `raw_extraction` JSON and only logs fields that actually differ from what the LLM produced.

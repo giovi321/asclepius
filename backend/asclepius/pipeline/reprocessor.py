@@ -178,7 +178,7 @@ async def reprocess_document(
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.execute(
             """UPDATE documents SET
-               doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
+               doc_type = NULL, event_date = NULL, issued_date = NULL,
                language_source = NULL, summary_en = NULL, summary_original = NULL,
                doctor_id = NULL, facility_id = NULL,
                specialty_original = NULL, norm_specialty_id = NULL,
@@ -254,6 +254,8 @@ async def reprocess_document(
                 extraction.get("doc_type"),
                 extraction.get("summary_en"),
                 extraction.get("summary_original"),
+                extraction.get("event_date"),
+                extraction.get("issued_date"),
                 extraction.get("date_visit"),
                 extraction.get("date_issued"),
                 extraction.get("doc_date"),
@@ -362,7 +364,7 @@ async def _reprocess_vision_llm(
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.execute(
             """UPDATE documents SET
-               doc_type = NULL, doc_date = NULL, date_issued = NULL, date_visit = NULL,
+               doc_type = NULL, event_date = NULL, issued_date = NULL,
                language_source = NULL, summary_en = NULL, summary_original = NULL,
                doctor_id = NULL, facility_id = NULL,
                specialty_original = NULL, norm_specialty_id = NULL,

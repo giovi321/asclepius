@@ -365,18 +365,29 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         """)
 
     # Backfill NULL lab_results.test_date from the parent document's best
-    # available date (date_visit > date_issued > doc_date). Historically the
-    # extractor only propagated the LLM-emitted doc_date, so rows created
-    # before the extraction fix landed can have NULL test_date even though
-    # their document has a date. Idempotent — only touches NULL rows.
-    await db.execute("""
-        UPDATE lab_results
-        SET test_date = (
-            SELECT COALESCE(d.date_visit, d.date_issued, d.doc_date)
-            FROM documents d WHERE d.id = lab_results.document_id
-        )
-        WHERE test_date IS NULL
-    """)
+    # available date. Post-rename, every document has a single event_date so
+    # we just copy it forward. Idempotent — only touches NULL rows. Guarded
+    # against databases that haven't run the event_date rename migration yet
+    # (event_date is only available after the rename step below executes).
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    _doc_cols_for_labs = [row[1] for row in await cursor.fetchall()]
+    if "event_date" in _doc_cols_for_labs:
+        await db.execute("""
+            UPDATE lab_results
+            SET test_date = (
+                SELECT d.event_date FROM documents d WHERE d.id = lab_results.document_id
+            )
+            WHERE test_date IS NULL
+        """)
+    elif "doc_date" in _doc_cols_for_labs:
+        await db.execute("""
+            UPDATE lab_results
+            SET test_date = (
+                SELECT COALESCE(d.date_visit, d.date_issued, d.doc_date)
+                FROM documents d WHERE d.id = lab_results.document_id
+            )
+            WHERE test_date IS NULL
+        """)
 
     # Extraction corrections table (correction-driven learning)
     await db.execute("""
@@ -410,6 +421,71 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     if _denorm_dropped:
         await db.commit()
         logger.info("Migration: dropped %d denormalized name columns from documents", _denorm_dropped)
+
+    # Phase 2 refactor: collapse date_visit / date_issued / doc_date into
+    # event_date (canonical timeline anchor) + issued_date (administrative).
+    # event_date takes the first non-null in the historic priority order.
+    # Idempotent: only runs while the old columns still exist.
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    doc_cols_now = [row[1] for row in await cursor.fetchall()]
+    legacy_date_cols = {"doc_date", "date_visit", "date_issued"}
+    if legacy_date_cols & set(doc_cols_now):
+        if "event_date" not in doc_cols_now:
+            await db.execute("ALTER TABLE documents ADD COLUMN event_date DATE")
+        if "issued_date" not in doc_cols_now:
+            await db.execute("ALTER TABLE documents ADD COLUMN issued_date DATE")
+        await db.execute(
+            "UPDATE documents SET event_date = COALESCE(date_visit, date_issued, doc_date) "
+            "WHERE event_date IS NULL"
+        )
+        await db.execute(
+            "UPDATE documents SET issued_date = date_issued WHERE issued_date IS NULL"
+        )
+        # Drop legacy FTS triggers + virtual table before removing base columns;
+        # rebuild afterwards so the index is in sync with the new schema.
+        await db.execute("DROP TRIGGER IF EXISTS documents_ai")
+        await db.execute("DROP TRIGGER IF EXISTS documents_au")
+        await db.execute("DROP TRIGGER IF EXISTS documents_ad")
+        await db.execute("DROP TABLE IF EXISTS documents_fts")
+        for col in ("doc_date", "date_visit", "date_issued"):
+            if col in doc_cols_now:
+                await db.execute(f"ALTER TABLE documents DROP COLUMN {col}")
+        await db.execute("DROP INDEX IF EXISTS idx_documents_doc_date")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
+        )
+        # Rebuild FTS5 virtual table + sync triggers
+        await db.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+                ocr_text,
+                raw_extraction,
+                content='documents',
+                content_rowid='id'
+            )
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+                INSERT INTO documents_fts(rowid, ocr_text, raw_extraction)
+                VALUES (new.id, new.ocr_text, new.raw_extraction);
+            END
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, ocr_text, raw_extraction)
+                VALUES ('delete', old.id, old.ocr_text, old.raw_extraction);
+            END
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, ocr_text, raw_extraction)
+                VALUES ('delete', old.id, old.ocr_text, old.raw_extraction);
+                INSERT INTO documents_fts(rowid, ocr_text, raw_extraction)
+                VALUES (new.id, new.ocr_text, new.raw_extraction);
+            END
+        """)
+        await db.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
+        await db.commit()
+        logger.info("Migration: unified date columns into event_date + issued_date, rebuilt FTS5")
 
     await db.commit()
 

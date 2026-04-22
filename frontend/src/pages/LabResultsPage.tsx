@@ -17,7 +17,7 @@ interface LabRow {
   document_id: number | null;
   document_filename: string | null;
   document_doc_type: string | null;
-  document_doc_date: string | null;
+  document_event_date: string | null;
   document_missing: number; // SQLite returns 0/1
   patient_id: number;
   test_name_original: string;
@@ -134,7 +134,7 @@ export default function LabResultsPage() {
     if (!groupByDate) return null;
     const m = new Map<string, { key: string; date: string; document_id: number | null; filename: string | null; rows: LabRow[]; abnormal: number }>();
     for (const r of results) {
-      const effectiveDate = r.test_date || r.document_doc_date;
+      const effectiveDate = r.test_date || r.document_event_date;
       const key = `${effectiveDate || "no-date"}|${r.document_id ?? "none"}`;
       if (!m.has(key)) {
         m.set(key, {

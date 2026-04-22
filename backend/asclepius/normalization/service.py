@@ -244,12 +244,12 @@ class NormService:
 
         placeholders = ",".join("?" * len(doc_ids))
         cursor = await self.db.execute(
-            f"""SELECT d.id, d.original_filename, d.doc_type, d.doc_date,
+            f"""SELECT d.id, d.original_filename, d.doc_type, d.event_date,
                        d.patient_id, p.display_name AS patient_name
                 FROM documents d
                 LEFT JOIN patients p ON p.id = d.patient_id
                 WHERE d.id IN ({placeholders})
-                ORDER BY d.doc_date DESC, d.id DESC""",
+                ORDER BY d.event_date DESC, d.id DESC""",
             list(doc_ids),
         )
         return [dict(r) for r in await cursor.fetchall()]

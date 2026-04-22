@@ -49,9 +49,8 @@ class DocumentUpdate(BaseModel):
     """Partial update payload. Unset fields are left untouched."""
     patient_id: int | None = None
     doc_type: str | None = Field(default=None, max_length=120)
-    doc_date: str | None = Field(default=None, max_length=40)
-    date_issued: str | None = Field(default=None, max_length=40)
-    date_visit: str | None = Field(default=None, max_length=40)
+    event_date: str | None = Field(default=None, max_length=40)
+    issued_date: str | None = Field(default=None, max_length=40)
     doctor_id: int | None = None
     doctor_name: str | None = Field(default=None, max_length=200)
     facility_id: int | None = None

@@ -18,9 +18,8 @@ export interface Document {
   file_path: string;
   original_filename: string;
   doc_type: string | null;
-  doc_date: string | null;
-  date_visit: string | null;
-  date_issued: string | null;
+  event_date: string | null;
+  issued_date: string | null;
   date_received: string | null;
   doctor_id: number | null;
   doctor_name: string | null;
@@ -72,7 +71,7 @@ export interface DocumentLink {
   // Joined fields
   original_filename?: string;
   doc_type?: string;
-  doc_date?: string | null;
+  event_date?: string | null;
 }
 
 export interface DocumentSection {

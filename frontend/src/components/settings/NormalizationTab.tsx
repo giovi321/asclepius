@@ -574,7 +574,7 @@ export default function NormalizationTab() {
                   >
                     <span className="font-medium truncate">{d.original_filename || `Document #${d.id}`}</span>
                     <span className="text-xs text-muted-foreground">
-                      {[d.doc_type, d.doc_date, d.patient_name].filter(Boolean).join(" • ")}
+                      {[d.doc_type, d.event_date, d.patient_name].filter(Boolean).join(" • ")}
                     </span>
                   </a>
                 ))}

@@ -119,12 +119,12 @@ async def test_update_document(client, db_path):
         await db.commit()
 
     resp = await client.patch(
-        f"/api/documents/{doc_id}", json={"doc_type": "prescription", "doc_date": "2024-03-15"}
+        f"/api/documents/{doc_id}", json={"doc_type": "prescription", "event_date": "2024-03-15"}
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["doc_type"] == "prescription"
-    assert data["doc_date"] == "2024-03-15"
+    assert data["event_date"] == "2024-03-15"
 
 
 @pytest.mark.asyncio

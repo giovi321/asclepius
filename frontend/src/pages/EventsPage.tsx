@@ -292,7 +292,7 @@ export default function EventsPage() {
                             <FileText className="h-3 w-3 flex-shrink-0 text-primary" />
                             <span className="font-medium truncate">{doc.original_filename}</span>
                             <span className="text-muted-foreground">{doc.doc_type?.replace(/_/g, " ")}</span>
-                            <span className="text-muted-foreground">{doc.doc_date}</span>
+                            <span className="text-muted-foreground">{doc.event_date}</span>
                             {doc.relevance !== "primary" && (
                               <span className="rounded bg-muted px-1 py-0.5 text-[9px]">{doc.relevance}</span>
                             )}

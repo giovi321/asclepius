@@ -68,7 +68,7 @@ export default function SuggestLinksButton({ docId, onLink }: { docId: number; o
                     </a>
                     <div className="flex flex-wrap gap-2 mt-1 text-muted-foreground">
                       {sg.doc_type && <span className="rounded bg-muted px-1.5 py-0.5">{sg.doc_type.replace(/_/g, " ")}</span>}
-                      {sg.doc_date && <span>{sg.doc_date}</span>}
+                      {sg.event_date && <span>{sg.event_date}</span>}
                       {sg.doctor_name && <span>{sg.doctor_name}</span>}
                       {sg.facility_name && <span>{sg.facility_name}</span>}
                     </div>

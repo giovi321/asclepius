@@ -28,13 +28,13 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
         parts.append(f"Sex: {patient[2]}")
 
     cursor = await db.execute(
-        """SELECT d.doc_type, d.doc_date, d.original_filename, d.summary_en,
+        """SELECT d.doc_type, d.event_date, d.original_filename, d.summary_en,
                   doc.name as doctor_name, f.name as facility_name
            FROM documents d
            LEFT JOIN doctors doc ON d.doctor_id = doc.id
            LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE d.patient_id = ? AND d.status = 'done'
-           ORDER BY d.doc_date DESC LIMIT 10""",
+           ORDER BY d.event_date DESC LIMIT 10""",
         (patient_id,),
     )
     docs = await cursor.fetchall()
@@ -88,7 +88,7 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
 # Columns unique enough to ``documents`` that their presence in a row tells
 # us the row's ``id`` column is a document id, not the id of a joined table.
 _DOC_ROW_MARKERS = frozenset({
-    "original_filename", "doc_type", "doc_date", "date_issued", "date_visit",
+    "original_filename", "doc_type", "event_date", "issued_date",
     "date_received", "summary_en", "summary_original", "ocr_text",
     "raw_extraction", "file_path", "specialty_original",
 })
@@ -133,8 +133,8 @@ async def match_document_rows(
     The SQL generation prompt asks the LLM to include ``documents.id`` when
     the query touches the documents table, but the model doesn't always
     comply. When every marker-bearing row is missing an id we fall back to
-    matching on ``original_filename`` / ``doc_date`` / ``doc_type`` — any of
-    those is usually enough to pin the row to a specific document, and we
+    matching on ``original_filename`` / ``event_date`` / ``doc_type`` — any
+    of those is usually enough to pin the row to a specific document, and we
     scope the lookup to the active patient so a leaked filename from
     another patient can't end up in the sidebar.
     """
@@ -151,13 +151,13 @@ async def match_document_rows(
             continue
         parts: list[str] = []
         fn = row.get("original_filename")
-        dd = row.get("doc_date")
+        dd = row.get("event_date")
         dt = row.get("doc_type")
         if fn:
             parts.append("original_filename = ?")
             params.append(fn)
         if dd:
-            parts.append("doc_date = ?")
+            parts.append("event_date = ?")
             params.append(dd)
         if dt:
             parts.append("doc_type = ?")
@@ -189,7 +189,7 @@ async def fetch_sources(
         return []
     placeholders = ",".join("?" * len(doc_ids))
     cursor = await db.execute(
-        f"""SELECT id, original_filename, doc_type, doc_date
+        f"""SELECT id, original_filename, doc_type, event_date
             FROM documents WHERE id IN ({placeholders})""",
         doc_ids,
     )
@@ -203,7 +203,7 @@ async def fetch_sources(
             "id": row["id"],
             "filename": row["original_filename"],
             "doc_type": row["doc_type"],
-            "doc_date": row["doc_date"],
+            "event_date": row["event_date"],
         })
     return sources
 

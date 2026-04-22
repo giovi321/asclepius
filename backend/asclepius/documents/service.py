@@ -5,7 +5,7 @@ from pathlib import Path
 
 import aiosqlite
 
-from asclepius.util.dates import BEST_DATE_SQL, BEST_DATE_SQL_WITH_CREATED, best_date
+from asclepius.util.dates import BEST_DATE_SQL, BEST_DATE_SQL_WITH_CREATED
 
 
 async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
@@ -311,24 +311,15 @@ async def update_document_fields(
             "UPDATE imaging_studies SET doctor_id = ? WHERE document_id = ?",
             (updates["doctor_id"], doc_id),
         )
-    # Cascade date changes to lab_results. When the document's best date
+    # Cascade date changes to lab_results. When the document's event_date
     # shifts, every lab row attached to the document moves with it. Per-row
     # manual overrides are overwritten on purpose - the user edited the
     # document-level date, so their expectation is that the children follow.
-    if any(k in updates for k in ("doc_date", "date_issued", "date_visit")):
-        cursor = await db.execute(
-            "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
-            (doc_id,),
+    if "event_date" in updates:
+        await db.execute(
+            "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
+            (updates["event_date"], doc_id),
         )
-        drow = await cursor.fetchone()
-        if drow:
-            doc_best = best_date(
-                {"date_visit": drow[0], "date_issued": drow[1], "doc_date": drow[2]}
-            )
-            await db.execute(
-                "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
-                (doc_best, doc_id),
-            )
     await db.commit()
 
 

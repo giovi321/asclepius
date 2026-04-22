@@ -13,9 +13,8 @@ IMPORTANT: Respond with ONLY this exact JSON structure. No markdown, no extra ke
   "ocr_text": "ALL text you can read from the document, preserving structure",
   "patient_name": "string or null",
   "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",
-  "doc_date": "YYYY-MM-DD or null",
-  "date_issued": "YYYY-MM-DD or null",
-  "date_visit": "YYYY-MM-DD or null",
+  "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened)",
+  "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
   "language_detected": "ISO 639-1 code",
   "doctor": { "name": "string or null", "title": "string or null", "specialty_original": "string or null" },
   "facility": { "name": "string or null", "type": "hospital|clinic|lab|pharmacy|other|null", "address": "string or null", "city": "string or null" },
@@ -78,9 +77,8 @@ IMPORTANT: You MUST respond with ONLY this exact JSON structure. Do not add extr
 {{
   "patient_name": "string or null",
   "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",
-  "doc_date": "YYYY-MM-DD or null",
-  "date_issued": "YYYY-MM-DD or null",
-  "date_visit": "YYYY-MM-DD or null",
+  "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened)",
+  "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
   "language_detected": "ISO 639-1 code",
   "doctor": {{ "name": "string or null", "title": "string or null", "specialty_original": "string or null", "specialty_canonical": "string or null", "specialty_mapped": false }},
   "facility": {{ "name": "string or null", "type": "hospital|clinic|lab|pharmacy|imaging_center|other|null", "address": "string or null", "city": "string or null", "country": "string or null", "phone": "string or null" }},
@@ -550,9 +548,8 @@ Respond in JSON only. No markdown, no explanation.
 {{
   "patient_name": "string or null",
   "doc_type": "one of: bloodtest, labtest_other, prescription, invoice, receipt, insurance_claim, insurance_doc, referral, discharge, specialist_report, radiology_report, pathology_report, surgical_report, er_report, vaccination, allergy, sick_leave, medical_cert, physio_report, dental, ophthalmology, mental_health, consent, advance_directive, imaging_dicom, imaging_other, correspondence, other",
-  "doc_date": "YYYY-MM-DD or null (most generic date; fallback)",
-  "date_issued": "YYYY-MM-DD or null (when the document was issued/printed)",
-  "date_visit": "YYYY-MM-DD or null (when the visit/exam actually happened)",
+  "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened; canonical timeline anchor)",
+  "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
   "language_detected": "ISO 639-1 code",
   "doctor": {{
     "name": "string or null (the treating/signing doctor's name)",
@@ -749,7 +746,7 @@ Rules:
 - If the user mentions a patient name, match it against known patients and set "patient_name" to the exact known name.
 - If the user mentions a doctor, set the "doctor" object.
 - If the user mentions a facility/hospital/clinic, set the "facility" object.
-- If the user mentions a date, determine which date field it belongs to (doc_date, date_issued, date_visit).
+- If the user mentions a date, determine which date field it belongs to (event_date, issued_date).
 - If the user mentions a document type, set "doc_type" using the standard codes.
 - If the user mentions a diagnosis, add it to "diagnoses".
 - If the user mentions medications, add them to "medications".
@@ -775,7 +772,7 @@ Rules:
 - Use normalization tables to resolve names when appropriate.
 - Limit results to 100 rows maximum.
 - Return the SQL query inside ```sql``` code block.
-- IMPORTANT: when the query touches the ``documents`` table (directly or via JOIN), ALWAYS include ``documents.id``, ``documents.original_filename``, ``documents.doc_type`` and ``documents.doc_date`` in the SELECT list so the UI can render source links. When joining ``lab_results``, ``medications``, ``encounters``, ``vaccinations`` or ``imaging_studies``, also include their ``document_id`` column.
+- IMPORTANT: when the query touches the ``documents`` table (directly or via JOIN), ALWAYS include ``documents.id``, ``documents.original_filename``, ``documents.doc_type`` and ``documents.event_date`` in the SELECT list so the UI can render source links. When joining ``lab_results``, ``medications``, ``encounters``, ``vaccinations`` or ``imaging_studies``, also include their ``document_id`` column.
 
 Question: {question}"""
 
@@ -800,7 +797,7 @@ When answering questions:
 
 DB_SCHEMA_FOR_CHAT = """
 Tables:
-- documents(id, patient_id, file_path, original_filename, doc_type, doc_date, doctor_id, facility_id, date_issued, date_visit, date_received, summary_en, summary_original, norm_specialty_id, specialty_original, insurance_company, insurance_policy, notes, tags, ocr_text, raw_extraction, status)
+- documents(id, patient_id, file_path, original_filename, doc_type, event_date, issued_date, doctor_id, facility_id, date_received, summary_en, summary_original, norm_specialty_id, specialty_original, insurance_company, insurance_policy, notes, tags, ocr_text, raw_extraction, status)
 - patients(id, slug, display_name, date_of_birth, sex)
 - facilities(id, name, slug, type, address, city, country, phone, email, website)
 - doctors(id, name, slug, title, norm_specialty_id, specialty_original, facility_id, phone, email)

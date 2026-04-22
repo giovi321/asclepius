@@ -118,7 +118,7 @@ async def chat_with_rag(
     # query land as sources directly; rows from joined tables (lab_results,
     # medications, ...) carry a ``document_id`` FK we can follow. When the
     # LLM queries ``documents`` but forgets to select the id column, fall
-    # back to matching by filename / doc_date so the sidebar still
+    # back to matching by filename / event_date so the sidebar still
     # populates.
     if sql_result:
         doc_ids = extract_document_ids(sql_result)
@@ -144,7 +144,7 @@ async def chat_with_rag(
         if sources:
             doc_lines = "\n".join(
                 f"- id={s['id']} filename={s['filename']!r} "
-                f"doc_type={s['doc_type']!r} doc_date={s['doc_date']!r}"
+                f"doc_type={s['doc_type']!r} event_date={s['event_date']!r}"
                 for s in sources
             )
             parts.append(

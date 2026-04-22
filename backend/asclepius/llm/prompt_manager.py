@@ -24,7 +24,7 @@ PROMPT_VARIABLES: dict[str, str] = {
     "medication_mappings": "JSON list of canonical medication aliases. Substituted only if the placeholder appears in the template.",
     "doc_id": "ID of the current document.",
     "doc_type": "Classified document type (bloodtest, invoice, discharge, …).",
-    "doc_date": "Document date (YYYY-MM-DD or 'unknown').",
+    "doc_date": "Canonical event date (YYYY-MM-DD or 'unknown'). Placeholder name kept for template compat; value comes from documents.event_date.",
     "doctor_name": "Treating/signing doctor's name from the extraction.",
     "facility_name": "Facility/hospital/clinic name from the extraction.",
     "summary": "English summary of the document.",

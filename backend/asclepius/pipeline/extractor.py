@@ -259,8 +259,11 @@ def _salvage_classification(c: dict) -> None:
                 c["summary_en"] = "; ".join(str(x) for x in val[:5])[:500]
                 break
 
-    # Date — LLM might use "date", "visit_date", "data", "datum"
-    if not c.get("doc_date") and not c.get("date_visit"):
+    # Date — LLM might use "date", "visit_date", "data", "datum". We write
+    # the salvaged value back into the legacy doc_date key; the caller
+    # collapses doc_date/date_visit/date_issued/event_date into event_date
+    # before the DB write.
+    if not c.get("event_date") and not c.get("doc_date") and not c.get("date_visit"):
         for alt_key in ("date", "visit_date", "data", "datum", "consultation_date"):
             val = c.get(alt_key)
             if val and isinstance(val, str) and len(val) >= 8:
@@ -462,13 +465,12 @@ async def classify_and_extract(
                 formatted = _canonical_language_directive(context.get("canonical_language", "English")) + formatted
                 response_text = await llm._generate(formatted)
                 classification = llm._parse_json(response_text)
-                logger.info("Classification result for doc %d: doc_type=%s, summary=%s, dates=%s/%s/%s, doctor=%s",
+                logger.info("Classification result for doc %d: doc_type=%s, summary=%s, event=%s, issued=%s, doctor=%s",
                             doc_id,
                             classification.get("doc_type"),
                             repr(classification.get("summary_en", ""))[:60],
-                            classification.get("doc_date"),
-                            classification.get("date_issued"),
-                            classification.get("date_visit"),
+                            classification.get("event_date") or classification.get("date_visit") or classification.get("date_issued") or classification.get("doc_date"),
+                            classification.get("issued_date") or classification.get("date_issued"),
                             classification.get("doctor", {}).get("name") if isinstance(classification.get("doctor"), dict) else classification.get("doctor"))
             except Exception as e:
                 logger.warning("Classification prompt failed for doc %d: %s, using default", doc_id, e)
@@ -613,12 +615,20 @@ async def extract_and_store(
     updates = {}
     if extraction.get("doc_type"):
         updates["doc_type"] = extraction["doc_type"]
-    if extraction.get("doc_date"):
-        updates["doc_date"] = extraction["doc_date"]
-    if extraction.get("date_issued"):
-        updates["date_issued"] = extraction["date_issued"]
-    if extraction.get("date_visit"):
-        updates["date_visit"] = extraction["date_visit"]
+    # Collapse the historic three-date LLM schema (date_visit > date_issued >
+    # doc_date) into the canonical event_date. Prefer an explicit event_date
+    # if the LLM already emitted one.
+    event_date_val = (
+        extraction.get("event_date")
+        or extraction.get("date_visit")
+        or extraction.get("date_issued")
+        or extraction.get("doc_date")
+    )
+    if event_date_val:
+        updates["event_date"] = event_date_val
+    issued_date_val = extraction.get("issued_date") or extraction.get("date_issued")
+    if issued_date_val:
+        updates["issued_date"] = issued_date_val
     if extraction.get("language_detected"):
         updates["language_source"] = extraction["language_detected"]
     if extraction.get("summary_en"):
@@ -684,19 +694,15 @@ async def extract_and_store(
 
     # Insert lab results
     if patient_id:
-        # Resolve the document's best date once — used as the default for every
-        # lab row that doesn't carry its own test_date. Priority matches the
-        # rest of the codebase (date_visit > date_issued > doc_date). We read
-        # back from the DB rather than the extraction dict so any dates the
-        # user manually set pre-extraction are respected.
+        # Default test_date for every lab row that doesn't carry its own.
+        # Read back from the DB rather than the extraction dict so any dates
+        # the user manually set pre-extraction are respected.
         cursor = await db.execute(
-            "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
+            "SELECT event_date FROM documents WHERE id = ?",
             (doc_id,),
         )
         drow = await cursor.fetchone()
-        doc_best_date = None
-        if drow:
-            doc_best_date = drow[0] or drow[1] or drow[2]
+        doc_best_date = drow[0] if drow else None
 
         for lab in extraction.get("lab_results", []):
             if not isinstance(lab, dict):
@@ -757,7 +763,7 @@ async def extract_and_store(
                     notes, findings, follow_up_date, follow_up_instructions)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (doc_id, patient_id, doctor_id, facility_id,
-                 encounter.get("encounter_date") or extraction.get("doc_date"),
+                 encounter.get("encounter_date") or event_date_val,
                  encounter.get("admission_date"), encounter.get("discharge_date"),
                  norm_diag_id, diag.get("diagnosis_original"),
                  diag.get("icd10_code"), norm_spec_id,
@@ -799,7 +805,7 @@ async def extract_and_store(
                  med.get("active_ingredient_original"), med.get("dosage"),
                  med.get("form"), med.get("frequency"),
                  med.get("duration"), med.get("quantity"),
-                 extraction.get("doc_date")),
+                 event_date_val),
             )
 
         # Insert vaccinations

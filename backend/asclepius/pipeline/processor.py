@@ -433,6 +433,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 extraction.get("doc_type"),
                 extraction.get("summary_en"),
                 extraction.get("summary_original"),
+                extraction.get("event_date"),
+                extraction.get("issued_date"),
                 extraction.get("date_visit"),
                 extraction.get("date_issued"),
                 extraction.get("doc_date"),
@@ -474,7 +476,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Get document metadata for file organization
             cursor = await db.execute(
-                """SELECT d.patient_id, d.doc_type, d.doc_date, d.date_visit, d.date_issued,
+                """SELECT d.patient_id, d.doc_type, d.event_date, d.issued_date,
                           d.date_received, d.doctor_id, d.facility_id,
                           d.event_id, d.summary_en, d.uploaded_by_user_id,
                           p.slug as patient_slug,
@@ -505,7 +507,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 try:
                     doc_meta = {
                         "doc_type": doc["doc_type"],
-                        "doc_date": doc["doc_date"],
+                        "event_date": doc["event_date"],
                         "doctor_name": doc["doctor_slug"],
                         "facility_name": doc["facility_slug"],
                         "summary_en": doc["summary_en"],

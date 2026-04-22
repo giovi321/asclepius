@@ -114,7 +114,7 @@ async def list_lab_results(
                p.display_name as patient_name,
                d.original_filename as document_filename,
                d.doc_type as document_doc_type,
-               d.doc_date as document_doc_date,
+               d.event_date as document_event_date,
                (d.id IS NULL) as document_missing
         FROM lab_results lr
         LEFT JOIN norm_lab_tests nlt ON lr.norm_lab_test_id = nlt.id
@@ -287,11 +287,11 @@ async def update_lab_result(
             f"UPDATE lab_results SET {set_clause} WHERE id = ?", values
         )
         # Reverse cascade: editing a lab row's test_date also updates the
-        # source document's doc_date. Sibling lab rows are deliberately left
-        # alone — the user edited one row, not the whole document.
+        # source document's event_date. Sibling lab rows are deliberately
+        # left alone — the user edited one row, not the whole document.
         if "test_date" in updates:
             await db.execute(
-                "UPDATE documents SET doc_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE documents SET event_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (updates["test_date"], row["document_id"]),
             )
         await db.commit()

@@ -484,8 +484,8 @@ export default function DocumentDetailPage() {
                 "medical_cert", "physio_report", "dental", "ophthalmology",
                 "mental_health", "consent", "advance_directive", "correspondence", "other",
               ]} />
-            <EditableField label="Date of Visit" value={doc.date_visit} field="date_visit" type="date" docId={doc.id} onSave={updateDocFields} />
-            <EditableField label="Date Issued" value={doc.date_issued} field="date_issued" type="date" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Event Date" value={doc.event_date} field="event_date" type="date" docId={doc.id} onSave={updateDocFields} />
+            <EditableField label="Issued Date" value={doc.issued_date} field="issued_date" type="date" docId={doc.id} onSave={updateDocFields} />
             <EditableCombobox label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={updateDocFields} normType="doctors" />
             <EditableCombobox label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={updateDocFields} normType="facilities" />
             <EditableCombobox label="Specialty" value={doc.specialty_display || doc.specialty_original} field="specialty_original" docId={doc.id} onSave={updateDocFields} normType="specialties" />
@@ -697,7 +697,7 @@ export default function DocumentDetailPage() {
                             {sg.filename || `Document #${sg.document_id}`}
                           </a>
                           <span className="text-muted-foreground">
-                            {sg.doc_type?.replace(/_/g, " ")} | {sg.doc_date || "no date"}
+                            {sg.doc_type?.replace(/_/g, " ")} | {sg.event_date || "no date"}
                           </span>
                           {sg.reason && <p className="text-muted-foreground italic mt-0.5">{sg.reason}</p>}
                         </div>
@@ -796,7 +796,7 @@ export default function DocumentDetailPage() {
                           <div className="flex-1 min-w-0">
                             <span className="block truncate font-medium">{d.original_filename}</span>
                             <span className="block text-muted-foreground">
-                              {d.doc_type?.replace(/_/g, " ") || "—"} | {d.doc_date || "no date"}
+                              {d.doc_type?.replace(/_/g, " ") || "no type"} | {d.event_date || "no date"}
                               {d.doctor_name && ` | ${d.doctor_name}`}
                               {d.facility_name && ` | ${d.facility_name}`}
                             </span>

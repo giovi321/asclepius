@@ -19,7 +19,7 @@ async def generate_ai_filename(llm, doc_metadata: dict) -> str | None:
 
     prompt = FILENAME_GENERATION_PROMPT.format(
         doc_type=doc_metadata.get("doc_type") or "unknown",
-        doc_date=doc_metadata.get("doc_date") or "unknown",
+        doc_date=doc_metadata.get("event_date") or doc_metadata.get("doc_date") or "unknown",
         doctor_name=doc_metadata.get("doctor_name") or "unknown",
         facility_name=doc_metadata.get("facility_name") or "unknown",
         summary=doc_metadata.get("summary_en") or "N/A",

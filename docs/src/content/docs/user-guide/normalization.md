@@ -93,7 +93,11 @@ If two canonical entries represent the same concept, merge them. Three flows:
 
 - **Per row.** Expand a row and click Merge (the Confirm action lives inside the same expanded row). Pick a target from the **fuzzy-searchable** dropdown — start typing part of the canonical display or code to filter. The dropdown also offers **+ Create new entry…** — selecting it reveals Name and Code inputs and the merge creates the new canonical row first, then folds the source into it.
 - **Batch (multi-select).** Tick the checkboxes on several rows. A subdued bar appears above the table: *"N selected — Merge into: [target ▾] — Merge — Clear"*. The target dropdown is fuzzy-searchable and includes the same **+ Create new entry…** option.
-- **Auto-merge with AI.** Click **Auto-merge with AI** in the filter row. The current entries (with aliases) are sent to the configured LLM, which proposes groups of likely duplicates with a short reason for each. Proposals are rendered inline — you can change the target, uncheck individual sources, skip, or approve each group. Nothing is merged until you click **Apply merge**.
+- **Auto-merge with AI.** Click **Auto-merge with AI** in the filter row. The current entries are run through a two-stage pipeline:
+  1. **Knowledge-base resolution.** For lab tests / medications / diagnoses each entry's display + aliases are looked up against a bundled reference (LOINC / ATC / ICD-10). Entries that resolve to the same external code are grouped immediately as high-confidence proposals — no LLM call needed. The reason field reads e.g. *"Same ATC code (J01CA04)"*.
+  2. **LLM fallback.** Any entries that didn't resolve (typos, unusual brand names, doctors / facilities / specialties — which have no public reference) are sent to the configured General LLM, which proposes additional groups with a short reason. Those come back marked for review.
+
+  Proposals are rendered inline — you can change the target, uncheck individual sources, skip, or approve each group. Each carries a `source` (`knowledge_base` or `llm`) and `confidence` (`high` or `review`) so you can scan past the high-confidence ones quickly. Nothing is merged until you click **Apply merge**.
 
 Every merge:
 
@@ -106,14 +110,36 @@ Every merge:
 
 Batch merges run every step inside a single transaction.
 
-## Seed data
+## Reference data
 
-Asclepius ships with seed data for common medical terms across multiple languages. The seed data is loaded on first database initialization and covers:
+Asclepius ships with two layers of bundled medical reference data:
+
+### Seed data
+
+Loaded into the database on first initialization from `config/seeds/`:
 
 - Common lab tests (complete blood count, metabolic panels, lipid panels, etc.)
 - Medical specialties
 - Common diagnoses
 - Common medications
+
+These rows live in the normalization tables themselves and behave like any other entry — you can rename, alias, merge, or delete them. The seed only fires on an empty database; subsequent boots leave your data alone.
+
+### Knowledge bases
+
+A separate read-only side index used by the auto-merge feature, located at `bundled_config/knowledge/`:
+
+| File | Codes | Source |
+| --- | --- | --- |
+| `medications.json` | ATC | Wikidata (CC0), ~3.7k drugs with multilingual brand and generic names |
+| `diagnoses.json` | ICD-10 | Wikidata (CC0), ~600 chapter and 3-character codes with multilingual labels |
+| `lab_tests.json` | LOINC | Wikidata (CC0) + the project's hand-curated seed list |
+
+These files are **not** loaded into the database. They sit in memory and are consulted whenever auto-merge needs to know whether two name variants (e.g. *Amoxicillin* and *Zimox*) refer to the same underlying concept. Same code → deterministic merge; mismatch → the LLM never sees them in the same prompt and can't accidentally collapse them.
+
+The build scripts under `scripts/build_knowledge/` regenerate the JSON files from public Wikidata SPARQL with no third-party dependencies. LOINC's full table requires registration with Regenstrief and is not bundled by default — drop a `loinc.csv` next to the build script if you want richer lab coverage.
+
+A per-install override at `$ASCLEPIUS_CONFIG_PATH/../knowledge/{medications,diagnoses,lab_tests}.json` shadows the bundled copy, mirroring the seed-data precedence.
 
 ## API endpoints
 

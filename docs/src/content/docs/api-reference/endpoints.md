@@ -220,7 +220,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `POST` | `/api/normalization/{type}/{id}/confirm` | Yes | Mark every auto-mapped alias on this entry as reviewed |
 | `POST` | `/api/normalization/{type}/merge` | Yes | Merge one source into a target |
 | `POST` | `/api/normalization/{type}/merge-batch` | Yes | Merge many sources; body takes `target_id` **or** `new_target: {canonical_code, canonical_display}` to create the target inline |
-| `POST` | `/api/normalization/{type}/auto-merge` | Yes | Ask the LLM for merge proposals; returns `{proposals, entries}` without executing anything |
+| `POST` | `/api/normalization/{type}/auto-merge` | Yes | Propose merges; returns `{proposals, entries}` without executing anything. Each proposal carries `target_id`, `source_ids`, `reason`, plus `source` (`"knowledge_base"` for ATC/LOINC/ICD-10 same-code matches, `"llm"` for model proposals) and `confidence` (`"high"` or `"review"`) |
 
 **Types:** `lab_tests`, `specialties`, `diagnoses`, `medications`, `doctors`, `facilities`
 

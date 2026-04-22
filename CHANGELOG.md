@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Knowledge-base layer for normalization auto-merge. Bundled
+  `bundled_config/knowledge/{medications,diagnoses,lab_tests}.json` (ATC,
+  ICD-10, LOINC; ~5 MB total, generated from CC0 Wikidata). Auto-merge now
+  resolves entries to external codes BEFORE calling the LLM — same-code
+  entries become high-confidence deterministic proposals
+  (`source: "knowledge_base"`, `confidence: "high"`) and the LLM only sees
+  the residual. Doctors / facilities / specialties have no public reference
+  and fall through to the existing LLM path. Stdlib-only build scripts
+  under `scripts/build_knowledge/` regenerate the JSON from Wikidata SPARQL.
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, GitHub issue and
   pull-request templates.
 - GitHub Actions CI (`.github/workflows/ci.yml`), CodeQL
@@ -26,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Auto-merge robustness: the `chat()` interface on every LLM provider gained
+  an opt-in `json_mode` flag (Ollama `format=json`, OpenAI
+  `response_format=json_object`; Anthropic relies on the system prompt).
+  Auto-merge passes `json_mode=True` so qwen-class models stop wrapping JSON
+  in prose. The proposal parser also tolerates the common `merge_groups`
+  schema drift and logs the raw response on parse failure.
 - The first user created by the setup wizard is now always `role='admin'`.
 - Passwords are SHA-256-prehashed before bcrypt to avoid the 72-byte
   truncation. Legacy hashes continue to verify.

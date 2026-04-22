@@ -6,19 +6,12 @@ The Chat feature lets you ask questions about a patient's medical history using 
 
 ## How It Works
 
-```mermaid
-flowchart LR
-    A[User question] --> B[SQL Generation]
-    B --> C[Execute SQL query]
-    C --> D[Format results]
-    D --> E[LLM generates answer]
-    E --> F[Response with sources]
-```
+<iframe src="../../assets/diagrams/chat-flow.html" width="100%" height="360" style="border:0;border-radius:8px;" title="Chat flow"></iframe>
 
-1. **SQL Generation** -- The LLM generates a SQL query from your natural language question, targeting the structured database tables (documents, lab_results, encounters, medications, etc.)
-2. **Query Execution** -- The generated SQL is executed against the SQLite database
-3. **Answer Generation** -- The LLM uses the query results to compose a natural language answer
-4. **Source Documents** -- Every document referenced in the query result is attached to the reply as a clickable chip. Click a chip to jump to that document's detail page.
+1. **SQL generation**. The LLM turns your natural-language question into a SQL query against the structured tables (`documents`, `lab_results`, `encounters`, `medications`, …).
+2. **Query execution**. The SQL runs against SQLite, scoped to patients you have access to.
+3. **Answer generation**. The LLM uses the rows it got back to compose a natural-language reply.
+4. **Source documents**. Every document referenced in the answer is attached as a clickable chip. Click one to jump to its detail page.
 
 ## Usage
 

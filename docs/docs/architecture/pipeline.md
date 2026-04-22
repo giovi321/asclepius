@@ -2,55 +2,7 @@
 
 The pipeline is the ingestion engine. It watches the inbox folder, sends each file through OCR and LLM extraction, and files the result into the vault.
 
-<iframe src="../assets/diagrams/pipeline.html" width="100%" height="820" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
-
-## Pipeline Architecture (source)
-
-```mermaid
-flowchart TD
-    A[File detected in inbox/] --> B{File type?}
-    B -->|DICOM| C[DICOM Ingest]
-    B -->|PDF / Image| D[Compute SHA-256 hash]
-    D --> E{Duplicate?}
-    E -->|Yes| F[Skip - already processed]
-    E -->|No| G[Create document record]
-    G --> H[Read patient hint file]
-    H --> FLOW{pipeline.default_flow}
-
-    FLOW -->|vision_llm| VX[Vision-LLM: image -> OCR + classification in one call]
-    VX --> V2{Result produced?}
-    V2 -->|No| P[Mark needs_review]
-    V2 -->|Yes| X[Store extracted data]
-
-    FLOW -->|ocr_llm| I[OCR]
-    I --> J{OCR engine?}
-    J -->|tesseract| K[Local Tesseract]
-    J -->|tesseract_remote| L[Remote Tesseract Server]
-    J -->|llm_vision| M[LLM Vision OCR]
-    J -->|google_vision| N[Google Cloud Vision]
-
-    K & L & M & N --> O{Text extracted?}
-    O -->|No| P
-    O -->|Yes| RE[run_extraction<br/>strategy picker]
-
-    RE --> Q{PDF > 5 pages?}
-    Q -->|Yes| R[Smart Page Sectioning]
-    Q -->|No| S{>1 cached page<br/>or >8k chars?}
-
-    S -->|Yes| T[Chunked Extraction]
-    S -->|No| U[Single-shot Extraction]
-
-    R --> V[Phase 1: Classify]
-    T --> V
-    U --> V
-
-    V --> W[Phase 2: Type-specific extraction]
-    W --> X
-    X --> Y[Organize file]
-    Y --> Z[Done]
-
-    C --> Z
-```
+<iframe src="../../assets/diagrams/pipeline.html" width="100%" height="820" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
 
 `pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision whether it lands today or two weeks from now.
 
@@ -190,16 +142,9 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 ## Smart Page-Level Sectioning
 
-For PDFs with more than **5 pages** (`should_section()`), the pipeline uses smart page-level sectioning instead of sending the entire text to a single extraction prompt:
+For PDFs with more than **5 pages** (`should_section()`), the pipeline classifies pages individually and extracts each group with its own prompt instead of sending the whole document to a single extraction call.
 
-```mermaid
-flowchart LR
-    A[Multi-page PDF] --> B[Per-page OCR]
-    B --> C[Classify each page]
-    C --> D[Group consecutive<br/>same-type pages]
-    D --> E[Extract per section]
-    E --> F[Merge all results]
-```
+<iframe src="../../assets/diagrams/smart-sectioning.html" width="100%" height="420" style="border:0;border-radius:8px;" title="Smart page-level sectioning"></iframe>
 
 ### Page Classification Types
 

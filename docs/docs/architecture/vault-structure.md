@@ -2,7 +2,7 @@
 
 The vault is the single root for every stored file and the SQLite database. It mounts as a Docker volume at `/vault` inside the container.
 
-<iframe src="../assets/diagrams/vault-structure.html" width="100%" height="700" style="border:0;border-radius:8px;" title="Vault layout"></iframe>
+<iframe src="../../assets/diagrams/vault-structure.html" width="100%" height="700" style="border:0;border-radius:8px;" title="Vault layout"></iframe>
 
 ## Directory Layout
 

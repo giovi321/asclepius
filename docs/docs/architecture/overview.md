@@ -2,48 +2,7 @@
 
 Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at — there is no bundled model server.
 
-<iframe src="../assets/diagrams/architecture.html" width="100%" height="640" style="border:0;border-radius:8px;" title="Architecture diagram"></iframe>
-
-## System Diagram (source)
-
-```mermaid
-graph TB
-    subgraph "Client"
-        Browser[Web Browser]
-    end
-
-    subgraph "Docker Container"
-        FE[React Frontend<br/>TypeScript + Vite + Tailwind]
-        API[FastAPI Backend<br/>Python 3.12]
-        Pipeline[Processing Pipeline<br/>Background Thread]
-        DB[(SQLite + FTS5<br/>WAL Mode)]
-        Tesseract[Tesseract OCR]
-    end
-
-    subgraph "External Services"
-        Ollama[Ollama LLM Server]
-        Claude[Claude API]
-        GVision[Google Cloud Vision]
-        RemoteOCR[Remote Tesseract Server]
-    end
-
-    subgraph "Storage"
-        Vault[Vault Directory<br/>inbox/ patients/ unclassified/]
-    end
-
-    Browser -->|HTTP| FE
-    FE -->|REST API| API
-    API --> DB
-    API --> Pipeline
-    Pipeline --> DB
-    Pipeline --> Vault
-    Pipeline --> Tesseract
-    Pipeline -->|LLM calls| Ollama
-    Pipeline -->|LLM calls| Claude
-    Pipeline -->|OCR| GVision
-    Pipeline -->|OCR| RemoteOCR
-    API -->|File serving| Vault
-```
+<iframe src="../../assets/diagrams/architecture.html" width="100%" height="640" style="border:0;border-radius:8px;" title="Architecture diagram"></iframe>
 
 ## Component Responsibilities
 

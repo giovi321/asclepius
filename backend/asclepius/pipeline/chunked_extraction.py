@@ -52,8 +52,7 @@ async def chunked_extract_and_store(
     """
     from asclepius.pipeline.extractor import (
         build_extraction_context, extract_and_store,
-        _extract_type_specific, _salvage_classification,
-        _normalize_doc_type, _salvage_array_keys,
+        _salvage_classification, _normalize_doc_type, _salvage_array_keys,
     )
 
     pages = await _load_pages(db, doc_id, ocr_text)

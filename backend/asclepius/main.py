@@ -98,11 +98,20 @@ async def lifespan(app: FastAPI):
         from asclepius.pipeline.watcher import start_watcher
         app.state.pipeline_task = asyncio.create_task(start_watcher(config, app.state))
 
+    # Start backup scheduler if any job is enabled
+    app.state.backup_task = None
+    if config.backup.db.enabled or config.backup.vault.enabled or config.backup.full.enabled:
+        import asyncio
+        from asclepius.backup.scheduler import start_backup_scheduler
+        app.state.backup_task = asyncio.create_task(start_backup_scheduler(config, app.state))
+
     yield
 
     # Shutdown
     if app.state.pipeline_task:
         app.state.pipeline_task.cancel()
+    if app.state.backup_task:
+        app.state.backup_task.cancel()
 
 
 def create_app() -> FastAPI:

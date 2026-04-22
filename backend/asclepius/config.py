@@ -270,6 +270,24 @@ class PipelineConfig(BaseModel):
     default_flow: str = "ocr_llm"
 
 
+class BackupJobConfig(BaseModel):
+    enabled: bool = False
+    schedule: str = "daily"          # "hourly" | "daily" | "weekly"
+    retention_count: int = 7
+    retention_days: int = 30
+
+
+class BackupConfig(BaseModel):
+    directory: str = "/vault/backups"
+    db: BackupJobConfig = BackupJobConfig()
+    vault: BackupJobConfig = BackupJobConfig(
+        schedule="weekly", retention_count=4, retention_days=90
+    )
+    full: BackupJobConfig = BackupJobConfig(
+        schedule="weekly", retention_count=4, retention_days=90
+    )
+
+
 class AppConfig(BaseModel):
     server: ServerConfig = ServerConfig()
     database: DatabaseConfig = DatabaseConfig()
@@ -280,6 +298,7 @@ class AppConfig(BaseModel):
     llm: LlmConfig = LlmConfig()
     vision: VisionConfig = VisionConfig()
     pipeline: PipelineConfig = PipelineConfig()
+    backup: BackupConfig = BackupConfig()
     # Shared credentials referenced by LLM / Vision / OCR provider entries.
     credentials: list[CredentialEntry] = []
 

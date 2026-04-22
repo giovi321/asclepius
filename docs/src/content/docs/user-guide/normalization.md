@@ -137,6 +137,19 @@ A separate read-only side index used by the auto-merge feature, located at `bund
 
 These files are **not** loaded into the database. They sit in memory and are consulted whenever auto-merge needs to know whether two name variants (e.g. *Amoxicillin* and *Zimox*) refer to the same underlying concept. Same code → deterministic merge; mismatch → the LLM never sees them in the same prompt and can't accidentally collapse them.
 
+#### How the knowledge base feeds the merge
+
+The knowledge files are **never sent to any LLM, in part or in whole** — they're not in the system prompt, the user prompt, or any context passed to the model. The data path is entirely in-process Python:
+
+1. **Lazy load.** On the first auto-merge call for a given category, `knowledge_base.py` reads the relevant JSON file from disk once and builds a flat `dict[str, str]` mapping `normalized_alias → external_code` (~30k keys for medications, ~6k for diagnoses, ~3k for lab tests). The dict is cached at module scope; later calls reuse it. Per-process memory: a few MB.
+2. **Normalization.** Each alias key is casefolded, has trailing dosage tokens stripped (`"Augmentin 500mg"` → `"augmentin"`), parenthetical content removed, and punctuation collapsed. The same normalization is applied to every entry name being looked up.
+3. **Lookup.** For each canonical entry the user is reviewing, every alias and the canonical display are normalized and looked up in the dict (O(1) per name). The first hit wins; the entry is tagged with that external code. Entries that don't hit anything are unresolved.
+4. **Group.** Resolved entries are bucketed by external code. Any bucket with two or more entries becomes a deterministic merge proposal (`source: "knowledge_base"`, `confidence: "high"`) with a reason like *"Same ATC code (J01CA04)"*. No LLM call has happened at this point.
+5. **Residual to the LLM.** Only the **unresolved** entries are placed into the prompt sent to the configured General LLM. The prompt does not include the knowledge dictionary, the resolved entries, the external codes, or the matches found in step 3. If everything resolved, the LLM call is **skipped entirely** — you'll see no `gate.enter` log line for that auto-merge run.
+6. **Merge.** Both proposal lists are returned to the UI. Nothing is written to the database until you approve.
+
+So a `lab_tests` auto-merge call on a database where the knowledge base recognises every entry's name is a pure-Python computation that costs a single 550 KB file read and a few hundred dict lookups, with **zero token cost and zero outbound LLM traffic**. The LLM is reserved for the long tail of locally-named entries the public references can't decide.
+
 The build scripts under `scripts/build_knowledge/` regenerate the JSON files from public Wikidata SPARQL with no third-party dependencies. For lab tests the script also reads an optional official LOINC overlay: register at https://loinc.org, drop `LoincTableCore.csv` at `scripts/build_knowledge/loinc.csv` and the per-language `LinguisticVariant` CSVs at `scripts/build_knowledge/loinc_{it,fr,de,es}.csv`, then re-run `build_lab_tests.py`. The script enriches existing entries — it doesn't expand the file with the long tail of ~109k LOINC codes that nobody references in real reports. Both inputs are gitignored so a registered LOINC distribution stays local to your machine.
 
 A per-install override at `$ASCLEPIUS_CONFIG_PATH/../knowledge/{medications,diagnoses,lab_tests}.json` shadows the bundled copy, mirroring the seed-data precedence.

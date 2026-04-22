@@ -277,6 +277,64 @@ def _extract_document_ids(rows: list[dict]) -> list[int]:
     return ids
 
 
+async def _match_document_rows(
+    db: aiosqlite.Connection,
+    rows: list[dict],
+    patient_id: int | None,
+) -> list[int]:
+    """Resolve document ids for result rows that carry document markers but no id.
+
+    The SQL generation prompt asks the LLM to include ``documents.id`` when
+    the query touches the documents table, but the model doesn't always
+    comply. When every marker-bearing row is missing an id we fall back to
+    matching on ``original_filename`` / ``doc_date`` / ``doc_type`` — any of
+    those is usually enough to pin the row to a specific document, and we
+    scope the lookup to the active patient so a leaked filename from another
+    patient can't end up in the sidebar.
+    """
+    clauses: list[str] = []
+    params: list = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if (isinstance(row.get("id"), int)
+                or isinstance(row.get("document_id"), int)
+                or isinstance(row.get("doc_id"), int)):
+            continue
+        if not (_DOC_ROW_MARKERS & row.keys()):
+            continue
+        parts: list[str] = []
+        fn = row.get("original_filename")
+        dd = row.get("doc_date")
+        dt = row.get("doc_type")
+        if fn:
+            parts.append("original_filename = ?")
+            params.append(fn)
+        if dd:
+            parts.append("doc_date = ?")
+            params.append(dd)
+        if dt:
+            parts.append("doc_type = ?")
+            params.append(dt)
+        if parts:
+            clauses.append("(" + " AND ".join(parts) + ")")
+    if not clauses:
+        return []
+    sql = f"SELECT id FROM documents WHERE ({' OR '.join(clauses)})"
+    if patient_id is not None:
+        sql += " AND patient_id = ?"
+        params.append(patient_id)
+    cursor = await db.execute(sql, params)
+    seen: set[int] = set()
+    ids: list[int] = []
+    for r in await cursor.fetchall():
+        doc_id = r[0]
+        if doc_id not in seen:
+            seen.add(doc_id)
+            ids.append(doc_id)
+    return ids
+
+
 async def _fetch_sources(
     db: aiosqlite.Connection, doc_ids: list[int]
 ) -> list[dict]:
@@ -384,9 +442,19 @@ async def chat_with_rag(
 
     # Derive source documents from the SQL result. Rows from a ``documents``
     # query land as sources directly; rows from joined tables (lab_results,
-    # medications, …) carry a ``document_id`` FK we can follow.
+    # medications, …) carry a ``document_id`` FK we can follow. When the LLM
+    # queries ``documents`` but forgets to select the id column, fall back to
+    # matching by filename / doc_date so the sidebar still populates.
     if sql_result:
-        sources = await _fetch_sources(db, _extract_document_ids(sql_result))
+        doc_ids = _extract_document_ids(sql_result)
+        if not doc_ids:
+            doc_ids = await _match_document_rows(db, sql_result, patient_id)
+        if not doc_ids:
+            logger.debug(
+                "Chat: SQL result had %d rows but no document ids could be resolved",
+                len(sql_result),
+            )
+        sources = await _fetch_sources(db, doc_ids)
 
     # Build system prompt
     system = CHAT_SYSTEM_PROMPT.format(patient_context=patient_context)

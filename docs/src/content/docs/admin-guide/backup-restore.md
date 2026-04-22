@@ -23,6 +23,77 @@ Download a SQLite backup directly from the web UI:
 
 This uses SQLite's online backup API, which creates a consistent snapshot even while the application is running. The backup includes all structured data (documents, patients, lab results, etc.) but **not** the actual document files on disk.
 
+### Scheduled backups (built-in)
+
+Asclepius can run one configurable backup job on a schedule, write the file to a directory you choose, and prune old files automatically. No cron required.
+
+Configure it under **Settings → Backup → Scheduled backups**:
+
+| Setting | Values | Notes |
+|---------|--------|-------|
+| **Enabled** | on / off | Master switch |
+| **Directory** | path | Defaults to `/vault/backups` (kept inside the volume so a host-level vault backup picks it up) |
+| **Include database** | yes / no | Adds the SQLite snapshot to the run |
+| **Include vault** | yes / no | Adds the document files; gzipped tarball |
+| **Schedule** | hourly / daily / weekly | Runs once per interval since the last successful backup |
+| **Retention** | keep last N / keep newer than N days | One policy at a time, applied after every successful run |
+
+The scheduler picks the artifact format from your scope flags:
+
+- **database only** → `asclepius_db_YYYYMMDD_HHMMSS.sqlite` (SQLite online backup; safe while the app runs)
+- **vault only** → `asclepius_vault_YYYYMMDD_HHMMSS.tar.gz`
+- **database + vault** → `asclepius_full_YYYYMMDD_HHMMSS.tar.gz` (a snapshot of the SQLite file is taken first, then added to the tarball alongside the vault tree)
+
+The vault archive walks `vault/` and skips three things automatically: the backup directory itself (no recursion), the live `asclepius.sqlite` file, and the WAL/SHM/journal sidecars. Inside a `*_full_*` archive the consistent SQLite snapshot is written as `asclepius.sqlite` at the root, with the vault tree under `vault/`.
+
+#### Run, list, download, delete
+
+The same Settings page lets you:
+
+- **Run now** — triggers the configured job immediately, no waiting for the next tick
+- **List existing backups** — newest first, with size and timestamp
+- **Download** any backup file
+- **Delete** any backup file (admin only — emits a `backup.delete` audit-log entry)
+
+You can also drive the same actions via the API:
+
+```
+POST   /api/settings/backup/run         # admin · runs the configured job
+GET    /api/settings/backup/files       # list, newest first
+GET    /api/settings/backup/files/{name} # download
+DELETE /api/settings/backup/files/{name} # admin · delete one file
+```
+
+#### Retention
+
+Retention runs after every successful backup. Two modes:
+
+- **count** (default `7`) — keep the N most recent files across all kinds, delete the rest
+- **days** (e.g. `30`) — keep everything newer than N days, delete the rest
+
+Both modes operate across the whole backup directory, so mixing scopes (e.g. switching from `db` to `full`) still results in a clean directory. Pruning a file logs a single `Pruned backup ...` line.
+
+:::caution[The schedule fires once per interval since the last backup]
+"Daily" means *24 hours since the most recent file in the backup directory*, not "at midnight". If you enable a daily job for the first time, the next run happens immediately; subsequent runs space themselves out by 24 hours. Restarting the container does not reset the clock — the scheduler reads the most recent file's mtime on startup.
+:::
+
+#### Settings file equivalent
+
+If you prefer editing `settings.yaml` directly:
+
+```yaml
+backup:
+  directory: /vault/backups
+  enabled: true
+  include_database: true
+  include_vault: true
+  schedule: daily          # hourly | daily | weekly
+  retention_mode: count    # count | days
+  retention_value: 7
+```
+
+Settings are live — changes are written back to YAML and the in-memory scheduler is cancelled and restarted with the new config. No container restart needed.
+
 ### Full backup (recommended)
 
 For a complete backup, copy the entire `vault/` directory and `config/settings.yaml`:

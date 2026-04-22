@@ -28,15 +28,15 @@ Chat lets you ask questions about a patient's medical history in plain language.
     <line x1="384" y1="120" x2="448" y2="120" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
     <line x1="588" y1="120" x2="652" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
     <line x1="792" y1="120" x2="852" y2="120" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-    <!-- arrow labels -->
-    <rect x="200" y="108" width="48" height="14" rx="2" fill="#efeee5"/>
-    <text x="224" y="118" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">PROMPT</text>
-    <rect x="404" y="108" width="48" height="14" rx="2" fill="#efeee5"/>
-    <text x="428" y="118" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">SELECT</text>
-    <rect x="608" y="108" width="48" height="14" rx="2" fill="#efeee5"/>
-    <text x="632" y="118" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">ROWS</text>
-    <rect x="812" y="108" width="48" height="14" rx="2" fill="#efeee5"/>
-    <text x="832" y="118" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">REPLY</text>
+    <!-- arrow labels — centered on each segment midpoint, ~8px above the line -->
+    <rect x="188" y="98" width="48" height="14" rx="2" fill="#efeee5"/>
+    <text x="212" y="108" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">PROMPT</text>
+    <rect x="392" y="98" width="48" height="14" rx="2" fill="#efeee5"/>
+    <text x="416" y="108" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">SELECT</text>
+    <rect x="596" y="98" width="48" height="14" rx="2" fill="#efeee5"/>
+    <text x="620" y="108" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">ROWS</text>
+    <rect x="798" y="98" width="48" height="14" rx="2" fill="#efeee5"/>
+    <text x="822" y="108" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">REPLY</text>
     <!-- nodes -->
     <!-- 1. User question -->
     <rect x="40" y="80" width="140" height="80" rx="6" fill="#faf7f2"/>

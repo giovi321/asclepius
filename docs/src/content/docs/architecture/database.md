@@ -27,12 +27,12 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
   <text x="288" y="225" class="db-label" text-anchor="middle">1—N</text>
   <!-- users -> documents: uploaded_by (optional, dashed) -->
   <line x1="216" y1="96" x2="360" y2="168" stroke="#57534e" stroke-width="1" stroke-dasharray="4,3"/>
-  <rect x="240" y="124" width="64" height="14" rx="2" fill="#efeee5"/>
-  <text x="272" y="133" class="db-label" text-anchor="middle">UPLOADED</text>
+  <rect x="256" y="124" width="64" height="14" rx="2" fill="#efeee5"/>
+  <text x="288" y="133" class="db-label" text-anchor="middle">UPLOADED</text>
   <!-- medical_events -> documents: M-N via document_event_links -->
   <line x1="216" y1="352" x2="360" y2="328" stroke="#57534e" stroke-width="1" stroke-dasharray="4,3"/>
-  <rect x="240" y="332" width="68" height="14" rx="2" fill="#efeee5"/>
-  <text x="274" y="341" class="db-label" text-anchor="middle">M—N LINKS</text>
+  <rect x="254" y="332" width="68" height="14" rx="2" fill="#efeee5"/>
+  <text x="288" y="341" class="db-label" text-anchor="middle">M—N LINKS</text>
   <!-- documents -> right-side medical data tables (all 1-N) -->
   <line x1="560" y1="176" x2="704" y2="88"  stroke="#57534e" stroke-width="1"/>
   <line x1="560" y1="216" x2="704" y2="192" stroke="#57534e" stroke-width="1"/>

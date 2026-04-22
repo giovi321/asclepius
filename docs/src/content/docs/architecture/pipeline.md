@@ -48,13 +48,13 @@ The pipeline is the ingestion engine. It watches the inbox folder, sends each fi
     <line x1="460" y1="604" x2="460" y2="628" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
     <!-- phase2 -> store -->
     <line x1="460" y1="664" x2="460" y2="684" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
-    <!-- arrow labels -->
-    <rect x="332" y="200" width="48" height="12" rx="2" fill="#efeee5"/>
-    <text x="356" y="209" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">DUP HIT</text>
-    <rect x="296" y="276" width="64" height="12" rx="2" fill="#efeee5"/>
-    <text x="328" y="285" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">OCR_LLM</text>
-    <rect x="556" y="276" width="80" height="12" rx="2" fill="#efeee5"/>
-    <text x="596" y="285" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">VISION_LLM</text>
+    <!-- arrow labels — centered on each segment midpoint, sitting above the line -->
+    <rect x="332" y="190" width="48" height="12" rx="2" fill="#efeee5"/>
+    <text x="356" y="199" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">DUP HIT</text>
+    <rect x="282" y="266" width="64" height="12" rx="2" fill="#efeee5"/>
+    <text x="314" y="275" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">OCR_LLM</text>
+    <rect x="566" y="266" width="80" height="12" rx="2" fill="#efeee5"/>
+    <text x="606" y="275" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">VISION_LLM</text>
     <!-- ===== NODES ===== -->
     <!-- Start -->
     <rect x="376" y="60" width="168" height="32" rx="6" fill="#faf7f2"/>

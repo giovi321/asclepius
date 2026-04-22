@@ -53,19 +53,21 @@ Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves
     <line x1="808" y1="180" x2="856" y2="240" stroke="#2563eb" stroke-width="1" marker-end="url(#arrow-link)"/>
     <!-- Credential Gate -> External OCR -->
     <line x1="808" y1="200" x2="856" y2="320" stroke="#2563eb" stroke-width="1" marker-end="url(#arrow-link)"/>
-    <!-- arrow labels with masking -->
-    <rect x="214" y="152" width="36" height="12" rx="2" fill="#efeee5"/>
-    <text x="232" y="161" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
-    <rect x="448" y="170" width="48" height="12" rx="2" fill="#efeee5"/>
-    <text x="472" y="179" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">DISPATCH</text>
-    <rect x="648" y="170" width="60" height="12" rx="2" fill="#efeee5"/>
-    <text x="678" y="179" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">ACQUIRE</text>
-    <rect x="820" y="148" width="36" height="12" rx="2" fill="#efeee5"/>
-    <text x="838" y="157" font-family="'Geist Mono',monospace" font-size="8" fill="#2563eb" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
-    <rect x="548" y="232" width="68" height="12" rx="2" fill="#efeee5"/>
-    <text x="582" y="241" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">LLM JSON</text>
-    <rect x="448" y="280" width="56" height="12" rx="2" fill="#efeee5"/>
-    <text x="476" y="289" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">RESOLVED</text>
+    <!-- arrow labels — centered on each segment midpoint, sitting above the line -->
+    <rect x="216" y="142" width="36" height="12" rx="2" fill="#efeee5"/>
+    <text x="234" y="151" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
+    <rect x="450" y="162" width="48" height="12" rx="2" fill="#efeee5"/>
+    <text x="474" y="171" font-family="'Geist Mono',monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.06em">DISPATCH</text>
+    <rect x="646" y="162" width="60" height="12" rx="2" fill="#efeee5"/>
+    <text x="676" y="171" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">ACQUIRE</text>
+    <rect x="814" y="124" width="36" height="12" rx="2" fill="#efeee5"/>
+    <text x="832" y="133" font-family="'Geist Mono',monospace" font-size="8" fill="#2563eb" text-anchor="middle" letter-spacing="0.06em">HTTP</text>
+    <!-- vertical arrow: place label to the right of the line -->
+    <rect x="586" y="240" width="68" height="12" rx="2" fill="#efeee5"/>
+    <text x="620" y="249" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">LLM JSON</text>
+    <!-- diagonal arrow: place label above the line midpoint -->
+    <rect x="456" y="266" width="56" height="12" rx="2" fill="#efeee5"/>
+    <text x="484" y="275" font-family="'Geist Mono',monospace" font-size="8" fill="#65655c" text-anchor="middle" letter-spacing="0.06em">RESOLVED</text>
     <!-- ===== NODES ===== -->
     <!-- Browser -->
     <rect x="64" y="128" width="128" height="64" rx="6" fill="#faf7f2"/>

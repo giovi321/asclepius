@@ -9,13 +9,8 @@ title: "Medical Imaging"
 
 ## DICOM viewer
 
-The built-in DICOM viewer (powered by Cornerstone.js) provides:
-
-- **Windowing** — adjust window width and level for contrast
-- **Zoom** — zoom in and out on the image
-- **Pan** — move the image within the viewport
-- **Slice scrolling** — scroll through slices in multi-slice studies (CT, MRI)
-- **Series navigation** — switch between different series in a study
+Powered by Cornerstone.js: windowing (width/level), zoom, pan, slice
+scrolling through multi-slice studies, and series navigation.
 
 ## Imaging studies
 

@@ -85,12 +85,6 @@ Chat lets you ask questions about a patient's medical history in plain language.
 3. **Answer generation**. The LLM uses the rows it got back to compose a natural-language reply.
 4. **Source documents**. Every document referenced in the conversation is listed in the **Source documents** sidebar to the right, newest answer first. Click a row to jump to its detail page. When the LLM's SQL touches the `documents` table but forgets to select `documents.id`, the backend falls back to matching the result rows against the documents table by `original_filename` / `doc_date` / `doc_type` (scoped to the active patient) so the sidebar still populates.
 
-## Usage
-
-1. Select a patient from the sidebar (optional — chat can work across all patients you have access to)
-2. Go to **Chat** in the sidebar
-3. Type your question and press Enter
-
 ### Example questions
 
 - "What were my last cholesterol results?"

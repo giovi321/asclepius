@@ -4,193 +4,145 @@ title: "Documents"
 
 ## Uploading documents
 
-### Via the web UI
+Two ingestion paths:
 
-1. Go to **Documents** in the sidebar
-2. Click **Upload** or drag-and-drop files onto the upload area
-3. Optionally select a patient to pre-assign the document — the patient picker supports **fuzzy search**, so typing part of the name is enough
-4. Supported formats: **PDF**, **JPEG**, **PNG**, **TIFF**, **DICOM** (.dcm)
+- **Web UI** — drag-and-drop onto the upload area or use the Upload button.
+  Optionally pre-assign a patient via a fuzzy-search picker.
+- **Inbox folder** — drop files into `vault/inbox/`. The watcher queues
+  them automatically. To pre-assign a patient, place a `<filename>.patient_hint`
+  sibling file containing the patient ID.
 
-When uploading via the UI, a database record is created immediately so the document appears in the list right away with a `pending` status. The pipeline picks it up for processing automatically.
+Supported formats: PDF, JPEG, PNG, TIFF, DICOM (.dcm).
 
-### Via the inbox folder
-
-Drop files directly into `vault/inbox/`. The file watcher detects new files and queues them for processing. To pre-assign a patient, create a hint file alongside the document:
-
-```
-vault/inbox/document.pdf
-vault/inbox/document.pdf.patient_hint    # Contains just the patient ID, e.g. "3"
-```
+Documents appear in the list immediately with `pending` status; the pipeline
+picks them up asynchronously.
 
 ## Document list
 
-The Documents page shows all documents for the selected patient, or all accessible documents if no patient is selected.
+Shows documents for the selected patient, or all accessible documents when
+no patient is selected.
 
-### Sorting and columns
+### Sorting, columns, pagination
 
-- Every column header is **click-to-sort**. Clicking cycles through ascending → descending → unsorted; the table remembers the state across filter changes.
-- The **Date added** column (the upload timestamp) is available but not shown by default.
-- Open the **Columns** menu in the table header to toggle optional columns — Facility is shown by default, Date added and a few others are opt-in. Column choices persist per user.
+Columns are sortable (ascending / descending / unsorted) and togglable from
+the **Columns** menu. Column choices persist per user. Pages of 20.
 
 ### Filtering
 
-Documents can be filtered using **Excel-style multi-select dropdowns** with search. Each filter supports selecting multiple values simultaneously:
+Excel-style multi-select dropdowns with search, combined with a free-text
+query:
 
-- **Document type** (bloodtest, prescription, specialist_report, etc.) -- multi-select with search
-- **Status** (pending, processing, done, failed, needs_review, cancelled) -- multi-select
-- **Specialty** -- multi-select with search, populated from extracted specialties
-- **Doctor** -- multi-select with search, populated from the doctors table
-- **Facility** -- multi-select with search, populated from the facilities table
-- **Date range** (from/to date pickers)
-- **Search query** (full-text search across OCR text, filenames, summaries, and metadata)
+- **Type**, **Status**, **Specialty**, **Doctor**, **Facility** — multi-select
+- **Date range** — from/to pickers
+- **Search query** — full-text search across OCR text, filenames,
+  summaries, and metadata
 
-Each dropdown supports:
+API parameters accept comma-separated values (e.g.
+`?type=bloodtest,prescription&status=done,needs_review`).
 
-- **Search within options** -- type to filter the option list
-- **Select all / Clear** -- bulk select or deselect all options
-- **Add search results to selection** -- when searching, add all matching results to your current selection
-- **Badge count** -- shows how many values are selected
-- **Clear all filters** button -- resets all active filters at once
+### Persistence and sharing
 
-All filter parameters support comma-separated multi-values in the API (e.g., `?type=bloodtest,prescription&status=done,needs_review`).
-
-### Pagination
-
-Documents are loaded in pages of 20. Use the Previous/Next controls at the bottom to navigate.
-
-### Filter and search persistence
-
-Every active filter (search query, doc type, status, specialty, doctor, facility, date range, and the current page) is mirrored into the URL query string. Open a document, hit browser Back, and you land on the exact same filter state you were in. The URL is also bookmarkable and shareable: `?status=needs_review&type=prescription` is a valid deep link into the filtered view.
+Every filter and the current page are reflected in the URL, so back/forward
+navigation restores state and filtered views are bookmarkable and
+shareable: `?status=needs_review&type=prescription` is a valid deep link.
 
 ### Access scope
 
-Non-admin users see only documents for patients they have access to, plus any documents they uploaded themselves (even unclassified ones). Admins see everything. Legacy rows that pre-date the per-user attribution column stay admin-only until their `uploaded_by_user_id` is backfilled.
+Non-admin users see documents for patients they have access to, plus any
+documents they uploaded themselves. Admins see everything. Legacy rows
+without `uploaded_by_user_id` stay admin-only until backfilled.
 
 ### Bulk actions
 
-Tick the checkbox on any row (or the header checkbox to select every visible document on the current page). When at least one row is selected, a subdued action bar appears above the table:
+Selecting rows reveals a bulk action bar:
 
-- **Delete** -- remove every selected document. One confirm prompt up front.
-- **Reprocess ▾** -- drops a small menu for *OCR + LLM*, *OCR only*, or *LLM only*, matching the single-doc reprocess flow.
-- **Regenerate filename** -- runs AI filename generation on each selected doc and renames the file on disk and in the DB. On collisions (related docs often produce the same AI slug), the rename endpoint auto-disambiguates by appending `-2`, `-3`, … to the stem.
-- **Clear** -- deselect everything.
+- **Delete** — one confirm, deletes all selected.
+- **Reprocess ▾** — OCR + LLM, OCR only, or LLM only, matching the
+  single-doc flow.
+- **Regenerate filename** — AI filename generation for each doc; collisions
+  are auto-disambiguated with `-2`, `-3`, ….
 
-Each bulk action runs sequentially and reports a single toast at the end: *"Delete: 18/20 done, 2 failed — #3: reason • #7: reason"*. Selection clears automatically when you change filters, page, or patient.
+Actions run sequentially and report a single summary toast. Selection
+clears automatically on filter / page / patient changes.
 
 ## Document detail page
 
-Click any document to open the detail view with:
+The left panel shows the PDF viewer (or the DICOM viewer for imaging
+studies). The right panel holds all extracted metadata with inline-editable
+fields:
 
-### PDF viewer
+- **Type** — dropdown across the 25+ supported types
+- **Dates** — document date, date issued, date of visit, date received
+- **Doctor / Facility / Specialty** — searchable comboboxes with inline
+  *+ Create new* when the typed text has no match. Selecting resolves
+  through the alias-aware upsert, so merged entities are honored.
+- **Summary** — English summary
 
-The left panel shows the PDF in an embedded viewer. For DICOM studies, the imaging viewer is shown instead.
-
-### Metadata panel
-
-The right panel shows all extracted metadata, all fields are **inline-editable** -- click any field to edit:
-
-- **Document type** -- dropdown selector with all 25+ supported types
-- **Dates** -- document date, date issued, date of visit, date received
-- **Doctor** -- searchable combobox over the existing doctors list, with a **+ Create new** row when the typed text has no exact match. Selecting an existing entry (or creating one inline) also sets the document's `doctor_id` so it's not a dangling text-only value. Goes through the alias-aware upsert, so if you merged two doctors earlier, typing the old name will correctly resolve to the merged target.
-- **Facility** -- same searchable combobox + inline-create over the facilities list.
-- **Specialty** -- same combobox over existing specialties. Saves as text on the document (specialty IDs are linked later by the extractor).
-- **Summary** -- English summary of the document content
-
-A collapsible **Processing details** section shows technical metadata: OCR engine name, OCR confidence score, and the LLM provider/model used for extraction.
+A collapsible **Processing details** section shows OCR engine, OCR
+confidence, and LLM provider/model.
 
 ### AI Edit
 
-Click the **AI Edit** button to modify metadata with natural-language instructions. Examples:
+Apply natural-language instructions to the metadata, e.g. "Change the
+doctor to Dr. Bianchi" or "This is a prescription, not a specialist
+report". The LLM updates only the relevant fields.
 
-- "Change the doctor to Dr. Bianchi"
-- "Set the date to March 15, 2024"
-- "This is a prescription, not a specialist report"
-- "The facility is Ospedale Civico"
+### Tags, notes, sections
 
-The LLM interprets your instruction and updates only the relevant fields.
+Tags (comma-separated) and free-text notes are available. Multi-page
+documents processed with page-level sectioning also show a sections panel
+(section type, page range, brief summary).
 
-### Tags and notes
+### Extracted data
 
-- **Tags** — comma-separated tags for custom categorization
-- **Notes** — free-text notes visible on the document
+Structured extractions appear as tables below the metadata: lab results,
+medications, encounters, vaccinations.
 
-### Document sections
+### Linked documents and medical events
 
-For multi-page documents that were processed with page-level sectioning, the sections panel shows:
-
-- Section type (lab results, clinical notes, discharge summary, etc.)
-- Page range (e.g., pages 3-5)
-- Brief summary of each section
-
-### Extracted data tables
-
-Below the metadata, tables show all extracted structured data:
-
-- **Lab Results** -- test name, value, unit, reference range, abnormal flag
-- **Medications** -- name, dosage, form, frequency, duration
-- **Encounters** -- diagnosis, findings, follow-up date and instructions
-- **Vaccinations** -- vaccine name, manufacturer, lot number, dose
-
-### Linked documents
-
-Link related documents together:
-
-- **Invoice for** -- link an invoice to the medical document it covers
-- **Report for** -- link a report to a related procedure
-- **Imaging for** -- link imaging results to a clinical report
-- **Follow up** -- link follow-up documents
-- **Related** -- general relationship
-
-Use **Suggest Links** to have the LLM recommend related documents for the same patient.
-
-### Medical event
-
-Assign the document to a medical event, or use **Suggest Event** to have the LLM pick one.
+Related documents can be linked with a relationship type — *invoice for*,
+*report for*, *imaging for*, *follow up*, *related*. **Suggest Links** asks
+the LLM to recommend related documents for the same patient. Documents can
+be assigned to a medical event, with a **Suggest Event** affordance for LLM
+suggestions.
 
 ## Reprocessing
 
-Click the **Reprocess** dropdown button to re-run processing on a document. A popover lets you choose:
+The **Reprocess** dropdown re-runs processing on a document. Choose:
 
-- **What to reprocess:**
-    - **OCR + LLM** -- full OCR+LLM reprocess (re-extract text and re-run classification/extraction)
-    - **OCR only** -- re-extract text without re-running the LLM
-    - **LLM only** -- re-run LLM extraction using the existing OCR text
-    - **Vision-LLM** -- run the single-step Vision-LLM flow instead of OCR+LLM
-- **OCR Provider** (when OCR is included) -- pick a specific OCR provider, or leave as default (highest priority)
-- **LLM Provider** (when LLM is included) -- pick a specific LLM provider, or leave as default (highest priority)
-- **Vision-LLM Provider** (Vision-LLM mode only) -- pick a specific vision provider, or leave as default (highest priority)
+- **What to reprocess** — OCR + LLM, OCR only, LLM only, or Vision-LLM (the
+  single-step vision flow).
+- **Provider overrides** — pick a specific OCR, LLM, or Vision-LLM provider
+  instead of the default (highest priority).
 
-When reprocessing with LLM or Vision-LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, so you get a clean slate rather than stale data sitting next to fresh data.
+LLM / Vision-LLM reprocessing clears previously extracted metadata and
+child records first, so you get a clean slate.
 
-This is useful for:
-
-- Trying a different OCR engine, or moving a document onto the Vision-LLM flow
-- Re-running extraction with a more capable model
-- Fixing documents that were marked "done" with empty results
+Useful for trying a different engine, moving a document onto the
+Vision-LLM flow, re-running with a more capable model, or rescuing
+documents marked "done" with empty results.
 
 ## Cancelling processing
 
-For documents currently being processed, click **Cancel** to stop processing. The cancel is immediate: the in-flight LLM or OCR request is aborted, the credential's concurrency slot is released, and the chip in the top bar disappears within a second. Processing chips for other documents are unaffected.
-
-Under the hood this does two things. It hard-cancels the asyncio task the document is running under (so whichever `await` is in flight — an HTTP POST, a DB write — raises `CancelledError` and unwinds immediately), and it sets a cooperative flag the pipeline checks at every phase boundary as a fallback. The Delete action uses the same path, so deleting a document mid-processing doesn't leave orphan requests running against your LLM server.
+The **Cancel** action aborts the in-flight LLM or OCR request immediately:
+the asyncio task is hard-cancelled (raising `CancelledError` in whatever
+`await` is in flight), the credential's concurrency slot is released, and
+the processing chip disappears within a second. A cooperative flag is also
+set as a fallback. The Delete action uses the same path, so deleting a
+document mid-processing leaves no orphan requests running against the LLM
+server.
 
 ## Deleting documents
 
-Click **Delete** to permanently remove a document:
+Delete permanently removes the file on disk and all database records
+(document + child tables via CASCADE). If the document is processing, it
+is cancelled first.
 
-- The file is deleted from disk
-- All database records (document + child tables) are removed via CASCADE
-- If the document was being processed, it is cancelled first
-
-Admins can delete any document. Editors and owners can delete documents for patients they have access to. Viewers cannot delete documents.
+Admins can delete any document. Editors and owners can delete documents
+for accessible patients. Viewers cannot delete.
 
 ## Moving documents
 
-To reassign a document to a different patient:
-
-1. Open the document detail page
-2. Change the patient assignment
-3. The file is moved on disk to the new patient's directory
-4. All child records (lab results, encounters, etc.) are updated
-
-Only users with the `owner` role can move documents.
+Reassigning a document to a different patient moves the file on disk to
+the new patient's directory and updates all child records. Only users with
+the `owner` role can move documents.

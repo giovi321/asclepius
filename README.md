@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/docs/assets/logo.svg" alt="Asclepius" width="160" />
+  <img src="docs/docs/assets/logo.svg" alt="Asclepius" width="120" />
 </p>
 
 <h1 align="center">Asclepius</h1>
@@ -13,9 +13,13 @@
   <img src="https://img.shields.io/badge/node-20%2B-green" alt="Node 20+">
 </p>
 
-A self-hosted application to ingest, OCR, extract, organize, and search personal medical records.
+A self-hosted app for ingesting, OCRing, extracting, organizing, and searching personal medical records.
 
-Documents go into an inbox folder, the server processes them (OCR + LLM extraction), stores structured metadata in SQLite, organizes files into a patient/year folder hierarchy, and serves a React web UI for browsing, searching, and chatting with your medical history.
+Drop a document into the inbox folder. The server runs OCR and an LLM extraction pass, writes the structured metadata to SQLite, files the document under `patients/{slug}/{year}/`, and serves a React web UI for browsing, searching, and asking questions about your medical history.
+
+<p align="center">
+  <img src="docs/docs/assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" width="900" />
+</p>
 
 ## Quick Install
 
@@ -33,17 +37,17 @@ Open <http://localhost:8070> — a first-launch setup wizard creates your admin 
 
 ## Features
 
-- **Ingest** PDFs, images, and DICOM files from an inbox folder
-- **Two extraction flows**, selectable per install and per document:
-  - **OCR + LLM** — Tesseract / Google Vision / LLM Vision OCR, then Ollama / vLLM / Claude / OpenAI for extraction
-  - **Vision-LLM** — single-step vision model (Qwen2.5-VL, Claude, GPT-4o, …) that OCRs and extracts in one call
-- **Priority-based fallback** across every provider list (OCR, LLM, Vision-LLM)
-- **Organize** by patient with multi-user access control, medical events, and a chronological timeline
-- **Lab results** normalized across languages, with trend charts
-- **Search + chat** your records with SQLite FTS5 and RAG-powered Q&A
+- **Ingests** PDFs, images, and DICOM files from an inbox folder
+- **Two extraction flows**, pickable per install and per document:
+  - **OCR + LLM**: Tesseract, Google Vision, or LLM Vision for OCR, then Ollama, vLLM, Claude, or OpenAI for extraction
+  - **Vision-LLM**: a single vision model (Qwen2.5-VL, Claude, GPT-4o, and friends) that OCRs and extracts in one call
+- **Priority fallback** over every provider list (OCR, LLM, Vision-LLM), so a flaky endpoint hands off to the next one automatically
+- **Organizes** by patient with multi-user access control, medical events, and a chronological timeline
+- **Lab results** get normalized across languages and plotted as trend charts
+- **Search and chat** over your records, backed by SQLite FTS5 and a small RAG layer
 - **DICOM viewer** with windowing, zoom, and scroll
-- **Learns from your edits** via correction-driven learning and retrieval-augmented extraction
-- **Selective reprocessing** — OCR only, LLM only, OCR+LLM, or Vision-LLM — with per-document provider choice
+- **Learns from your corrections**: edits feed back into retrieval-augmented few-shot examples for later extractions
+- **Selective reprocessing**: OCR only, LLM only, OCR+LLM, or Vision-LLM, with per-document provider choice
 
 ## Tech Stack
 

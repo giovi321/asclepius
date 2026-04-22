@@ -6,28 +6,32 @@
 
 **Self-hosted medical records manager**
 
-Asclepius is a self-hosted application that ingests, OCRs, extracts, organizes, and searches personal medical records. Drop documents into an inbox folder (or upload via the web UI), and the server automatically processes them -- extracting structured data using OCR and LLM, organizing files by patient and date, and making everything searchable through a modern web interface.
+Asclepius ingests, OCRs, extracts, organizes, and searches your personal medical records. Drop documents into the inbox (or upload them through the web UI), and the server runs OCR plus an LLM extraction pass, files everything under `patients/{slug}/{year}/`, and makes the whole archive browsable and searchable in a single web app.
+
+<p align="center">
+  <img src="assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" />
+</p>
 
 ## Key Features
 
-- **Automated ingestion** -- Drop PDFs, images, or DICOM files into the inbox, or upload via the web UI
-- **OCR + LLM extraction** -- Four OCR engines (Tesseract, Tesseract Remote, LLM Vision, Google Cloud Vision) with LLM-powered structured data extraction
-- **Two-phase extraction** -- Documents are classified first, then extracted with type-specific prompts for higher accuracy
-- **Smart page-level sectioning** -- Large documents (>5 pages) are split into logical sections (lab results, clinical notes, discharge summary, etc.) and extracted individually
-- **Canonical output language** -- Force every LLM-produced field (summaries, canonical names, findings) into the language of your choice, regardless of the document's source language
-- **Medical events** -- Organize documents around medical stories (diagnosis, treatment, surgery) with AI-powered event suggestions
-- **Multi-language input** -- Handles documents in English, Italian, German, French, Spanish, and more
-- **Multi-patient** -- Organize records by patient with role-based access control
-- **Lab result tracking** -- Extracted, normalized, with interactive trend visualization
-- **Medical imaging** -- DICOM viewer with windowing, zoom, and slice scrolling
-- **Timeline view** -- Vertical timeline with mini-map navigation, jump-to-date, and color-coded event types
-- **RAG chat** -- Ask questions about medical history, powered by SQL generation and structured DB queries
-- **Full-text search** -- SQLite FTS5 across all document content and metadata
-- **Normalization** -- Canonical mapping for lab tests, diagnoses, medications, specialties, doctors, and facilities across languages with merge and alias management
-- **Correction-driven learning** -- User edits to LLM-extracted fields are captured and used to improve future extractions via retrieval-augmented few-shot examples
-- **Customizable prompts** -- All LLM prompts are editable from the UI with reset-to-default
-- **OIDC / SSO** -- Single sign-on with Authentik, Keycloak, or any OIDC provider
-- **Self-hosted** -- Your data stays on your server, deployed as a single Docker container
+- **Automated ingestion**. Drop PDFs, images, or DICOM files into the inbox, or upload them through the web UI.
+- **OCR + LLM extraction**. Four OCR engines available (Tesseract, Tesseract Remote, LLM Vision, Google Cloud Vision), then an LLM extraction pass for structured data.
+- **Two-phase extraction**. A cheap classification pass runs first; the second pass loads only the type-specific prompt the document needs.
+- **Smart page-level sectioning** for documents over 5 pages. The pipeline splits them into logical sections (lab results, clinical notes, discharge summary, etc.) and extracts each one separately.
+- **Canonical output language**. Pin every LLM-produced field (summaries, canonical names, findings) to the language you want, regardless of the document's source language.
+- **Medical events** group documents around a story: a diagnosis, a treatment course, a surgery. The system suggests likely events.
+- **Multi-language input**. Handles English, Italian, German, French, Spanish, and others.
+- **Multi-patient** with role-based access control per patient.
+- **Lab results** are extracted, normalized, and plotted as interactive trend charts.
+- **Medical imaging**. Built-in DICOM viewer with windowing, zoom, and slice scrolling.
+- **Timeline view** with mini-map navigation, jump-to-date, and color-coded event types.
+- **RAG chat**. Ask questions about a patient's history; the system writes SQL against the structured tables to answer.
+- **Full-text search** with SQLite FTS5 over OCR text and extracted metadata.
+- **Normalization**. Canonical mapping for lab tests, diagnoses, medications, specialties, doctors, and facilities across languages, with merge and alias tooling.
+- **Correction-driven learning**. When you edit an LLM-extracted field, the change is captured and used as a few-shot example next time a similar document arrives.
+- **Customizable prompts**. Every LLM prompt is editable from the UI, with one-click reset to default.
+- **OIDC / SSO**. Single sign-on with Authentik, Keycloak, or any OIDC provider.
+- **Self-hosted**. Your data stays on your server, in one Docker container.
 
 ## Quick Start
 
@@ -59,8 +63,8 @@ Then open [http://localhost:8070](http://localhost:8070). On first launch, a **s
 
 ## Architecture at a Glance
 
-Asclepius runs as a **single Docker container**. The FastAPI backend serves both the REST API and the pre-built React frontend. All LLM inference happens on external services (your own Ollama instance or the Claude API) -- there is no bundled LLM server.
+Asclepius runs as a **single Docker container**. The FastAPI backend serves the REST API and the pre-built React frontend out of the same process. LLM inference is always external — point Asclepius at your own Ollama, vLLM, Claude, or OpenAI endpoint.
 
-The processing pipeline runs in a separate background thread, so document ingestion never blocks the web server. Files are organized on the filesystem under a vault directory, with all metadata stored in SQLite.
+The ingestion pipeline runs as a background asyncio task, so processing never blocks HTTP requests. Files live on disk inside a vault directory; all metadata sits in SQLite.
 
-See [Architecture Overview](architecture/overview.md) for details.
+See [Architecture Overview](architecture/overview.md) for the full picture.

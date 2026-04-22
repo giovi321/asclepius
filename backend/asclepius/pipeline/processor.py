@@ -3,6 +3,7 @@
 Sub-modules handle provider factory, OCR caching, chunked extraction, and reprocessing.
 """
 
+import asyncio
 import logging
 import os
 from pathlib import Path
@@ -50,8 +51,50 @@ pipeline_status = {
     "queued_files": [],  # list of {filename, size} in queue
 }
 
-# Set of doc IDs that have been requested for cancellation
+# Set of doc IDs that have been requested for cancellation. Checked
+# cooperatively between pipeline steps so a mid-step cancel takes effect at
+# the next checkpoint even if the asyncio task can't be hard-cancelled.
 cancelled_docs: set[int] = set()
+
+
+# Registry of in-flight asyncio tasks by doc id. When a cancel request comes
+# in, we call ``.cancel()`` on the task in addition to adding the id to
+# ``cancelled_docs`` — this aborts any running ``await`` (httpx POST, DB
+# write, etc.) immediately via CancelledError instead of having to wait for
+# the LLM to finish on its own. The gate slots and DB connections release
+# through their ``async with`` finalizers, so the chip in the UI and the
+# concurrency counters clear right away.
+_running_tasks: dict[int, "asyncio.Task"] = {}
+
+
+def register_running_task(doc_id: int, task: "asyncio.Task") -> None:
+    """Record the asyncio task handling ``doc_id`` so ``cancel_running_task``
+    can interrupt it. Safe to call multiple times — the latest task wins."""
+    _running_tasks[doc_id] = task
+
+
+def unregister_running_task(doc_id: int, task: "asyncio.Task | None" = None) -> None:
+    """Drop the registered task for ``doc_id``. If ``task`` is given, only
+    unregister when it matches (prevents a stale entry from clobbering a
+    newer reprocess that ran after)."""
+    current = _running_tasks.get(doc_id)
+    if current is None:
+        return
+    if task is not None and current is not task:
+        return
+    _running_tasks.pop(doc_id, None)
+
+
+def cancel_running_task(doc_id: int) -> bool:
+    """Cancel the registered asyncio task for ``doc_id``. Returns True when
+    a task was found and cancel was issued, False otherwise. The task's own
+    finalizers (gate release, DB commit, status update) run before the
+    CancelledError propagates out."""
+    task = _running_tasks.get(doc_id)
+    if task is None or task.done():
+        return False
+    task.cancel()
+    return True
 
 
 def _count_pages(file_path: str) -> int | None:
@@ -185,6 +228,14 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 return
 
             doc_id = existing["id"]
+
+            # Register this coroutine so a cancel request can interrupt it.
+            # We record the task *before* any long await (OCR, LLM) so
+            # cancel is responsive. Unregistration happens in the outer
+            # finally of process_file.
+            _current_task = asyncio.current_task()
+            if _current_task is not None:
+                register_running_task(doc_id, _current_task)
 
             # Ensure patient_id and event_id are set even if pipeline created the record first
             extra_updates = ""
@@ -541,6 +592,27 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             pipeline_status["last_processed"] = path.name
             logger.info("Completed processing doc %d: %s -> %s", doc_id, path.name, final_path)
 
+        except asyncio.CancelledError:
+            # A hard cancel came in via ``cancel_running_task``. Mark the
+            # doc cancelled, clear the cooperative flag, and re-raise so
+            # the asyncio machinery sees the task as cancelled. The gate
+            # slot and DB connection were released by the ``async with``
+            # finalizers on the way out.
+            logger.info("Pipeline task cancelled for %s", path.name)
+            try:
+                _doc_id = locals().get("doc_id")
+                if _doc_id is not None:
+                    cancelled_docs.discard(_doc_id)
+                    await db.execute(
+                        """UPDATE documents SET status = 'cancelled',
+                           error_message = NULL,
+                           updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                        (_doc_id,),
+                    )
+                    await db.commit()
+            except Exception:
+                pass
+            raise
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else f"{type(e).__name__} (no message)"
             logger.exception("Pipeline error for %s — %s", path.name, error_msg)
@@ -566,6 +638,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # Re-raise as ProviderUnreachableError if it's a connectivity issue
             if _is_provider_unreachable(e):
                 raise ProviderUnreachableError(error_msg) from e
+        finally:
+            _doc_id = locals().get("doc_id")
+            if _doc_id is not None:
+                unregister_running_task(_doc_id)
 
     pipeline_status["processing"] = None
     pipeline_status["processing_step"] = None

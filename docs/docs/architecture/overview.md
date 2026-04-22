@@ -1,8 +1,10 @@
 # Architecture Overview
 
-Asclepius is a **single Docker container** application with a Python/FastAPI backend serving both the REST API and the pre-built React frontend. All LLM inference is performed by external services.
+Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at — there is no bundled model server.
 
-## System Diagram
+<iframe src="../assets/diagrams/architecture.html" width="100%" height="640" style="border:0;border-radius:8px;" title="Architecture diagram"></iframe>
+
+## System Diagram (source)
 
 ```mermaid
 graph TB
@@ -81,12 +83,12 @@ See [Processing Pipeline](pipeline.md) for the complete flow.
 
 ## Key Design Decisions
 
-- **No ORM** -- Raw SQL with aiosqlite for simplicity, control, and performance
-- **SQLite with WAL** -- Portable, no external dependency, sufficient for single-instance. WAL mode enables concurrent reads during pipeline writes
-- **Session-based auth** -- Signed cookies via itsdangerous, bcrypt password hashing. No JWTs
-- **File-based storage** -- Files organized on filesystem by patient/year, metadata in DB
-- **External LLMs only** -- No bundled Ollama or model downloads. The container stays lightweight; you bring your own LLM
-- **Two-phase extraction** -- Classify first (cheap), then extract with type-specific prompts (accurate). This avoids sending irrelevant extraction schemas to the LLM
-- **Pipeline in background asyncio task** -- Processing never blocks the web server. Cancellation is cooperative via an in-memory set of cancelled document IDs
-- **Runtime pipeline control** -- Pipeline can be started/stopped from the Settings UI at runtime via `app.state.pipeline_task`. Auto-stops after 5 consecutive provider connectivity failures
-- **Settings editable at runtime** -- All configuration changes are persisted to YAML and applied to in-memory config immediately, without restart
+- **No ORM**. Raw SQL with aiosqlite. Easier to reason about, easier to optimize, fewer hidden N+1s.
+- **SQLite with WAL**. Portable, no extra service to run, fast enough for single-instance use. WAL mode lets the web server keep reading while the pipeline writes.
+- **Session-based auth**. Signed cookies via itsdangerous, bcrypt for passwords. No JWTs to rotate or revoke.
+- **File-based storage**. Files live on disk under patient/year folders; metadata lives in the database.
+- **No bundled LLM**. You point Asclepius at your own Ollama, vLLM, Claude, or OpenAI endpoint. The container stays small and the model lifecycle is yours to manage.
+- **Two-phase extraction**. A cheap classification pass runs first; the second pass loads only the type-specific prompt. The LLM never sees a kitchen-sink schema.
+- **Pipeline in a background asyncio task**. The web server never blocks on processing. Cancellation works through an in-memory set of cancelled document IDs that the pipeline checks between steps.
+- **Runtime pipeline control**. The Settings UI starts and stops the pipeline at runtime via `app.state.pipeline_task`. After five consecutive provider connectivity failures, the pipeline pauses itself.
+- **Settings are live**. Configuration changes are written back to YAML and applied to the in-memory config immediately, no restart.

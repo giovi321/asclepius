@@ -1,8 +1,12 @@
 # Database Schema
 
-Asclepius uses SQLite with WAL (Write-Ahead Logging) mode and FTS5 (Full-Text Search) for all structured data storage. The database file is stored at `vault/asclepius.sqlite`.
+Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) for safe concurrent reads during pipeline writes and FTS5 for full-text search. The database file lives at `vault/asclepius.sqlite`.
 
-## Entity-Relationship Diagram
+<iframe src="../assets/diagrams/data-model.html" width="100%" height="700" style="border:0;border-radius:8px;" title="Core data model"></iframe>
+
+The diagram above shows the core hub-and-spoke shape: `documents` is the centre, `patients` is the access boundary, and the medical-data tables (`lab_results`, `medications`, `encounters`, `imaging_studies`) hang off both. Normalization tables (`norm_lab_tests`, etc.), audit logs, sessions, FTS triggers, and the per-page OCR cache are listed in the full ER source below.
+
+## Entity-Relationship Diagram (full source)
 
 ```mermaid
 erDiagram

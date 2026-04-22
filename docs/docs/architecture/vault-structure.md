@@ -1,6 +1,8 @@
 # Vault Structure
 
-The vault is the root directory for all stored files and the SQLite database. It is mounted as a Docker volume at `/vault` inside the container.
+The vault is the single root for every stored file and the SQLite database. It mounts as a Docker volume at `/vault` inside the container.
+
+<iframe src="../assets/diagrams/vault-structure.html" width="100%" height="700" style="border:0;border-radius:8px;" title="Vault layout"></iframe>
 
 ## Directory Layout
 
@@ -63,12 +65,12 @@ Examples:
 
 ## Key Rules
 
-1. **Files move once.** From `inbox/user-<id>/` to their final location in `patients/{slug}/{year}/`. After that, the path never changes.
-2. **No manual reorganization.** Use the web UI to reassign documents to different patients. The server handles moving the file on disk.
-3. **The database is the source of truth.** File paths are stored in `documents.file_path` relative to the vault root.
-4. **Imaging files preserve DICOM structure.** Series folders contain the original `.dcm` files with their series instance UIDs.
-5. **Unclassified documents** go to `vault/unclassified/user-<id>/` when the pipeline cannot determine the patient. Legacy rows with no `uploaded_by_user_id` fall back to the flat `unclassified/` directory and remain admin-only.
-6. **Per-user scope.** Non-admin users see only their own patients and their own `inbox/` + `unclassified/` subfolders in the file browser and document lists. Admins always see everything.
+1. **Files move once.** From `inbox/user-<id>/` to their final spot in `patients/{slug}/{year}/`. After that, the path doesn't change.
+2. **No manual reorganization.** Reassign documents through the web UI; the server takes care of moving the file on disk.
+3. **The database is the source of truth.** Paths in `documents.file_path` are relative to the vault root.
+4. **Imaging files keep their DICOM structure.** Series folders contain the original `.dcm` files with their series instance UIDs.
+5. **Unclassified documents** land in `vault/unclassified/user-<id>/` when the pipeline can't figure out the patient. Legacy rows without `uploaded_by_user_id` fall back to the flat `unclassified/` directory and stay admin-only.
+6. **Per-user scope.** Non-admin users see only their own patients and their own `inbox/` and `unclassified/` subfolders in the file browser and document lists. Admins see everything.
 
 ## Patient Slug
 

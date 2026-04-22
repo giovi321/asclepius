@@ -1,5 +1,6 @@
 """Document reprocessing — re-run OCR and/or LLM extraction on existing documents."""
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -12,6 +13,25 @@ from asclepius.pipeline.ocr_cache import cache_ocr_pages
 from asclepius.pipeline.provider_factory import get_llm_provider, _build_llm_provider
 
 logger = logging.getLogger(__name__)
+
+
+def _is_cancelled(doc_id: int) -> bool:
+    """True if a cancel has been requested for this doc. Used as a
+    cooperative checkpoint between reprocess phases so cancel is honoured
+    even when the task can't be hard-cancelled immediately."""
+    from asclepius.pipeline.processor import cancelled_docs
+    return doc_id in cancelled_docs
+
+
+async def _mark_cancelled(db: aiosqlite.Connection, doc_id: int) -> None:
+    from asclepius.pipeline.processor import cancelled_docs
+    cancelled_docs.discard(doc_id)
+    await db.execute(
+        """UPDATE documents SET status = 'cancelled', error_message = NULL,
+           updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+        (doc_id,),
+    )
+    await db.commit()
 
 
 async def reprocess_document(
@@ -36,6 +56,14 @@ async def reprocess_document(
     """
     if mode == "vision_llm":
         return await _reprocess_vision_llm(doc_id, config, vision_provider_id)
+
+    from asclepius.pipeline.processor import (
+        register_running_task, unregister_running_task,
+    )
+    _current_task = asyncio.current_task()
+    if _current_task is not None:
+        register_running_task(doc_id, _current_task)
+
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA journal_mode=WAL")
@@ -47,11 +75,18 @@ async def reprocess_document(
         )
         doc = await cursor.fetchone()
         if not doc:
+            unregister_running_task(doc_id, _current_task)
             return {"error": "Document not found"}
 
         ocr_text = doc["ocr_text"]
         run_ocr = mode in ("ocr", "both")
         run_llm = mode in ("llm", "both")
+
+        # Cooperative cancel checkpoint before OCR.
+        if _is_cancelled(doc_id):
+            await _mark_cancelled(db, doc_id)
+            unregister_running_task(doc_id, _current_task)
+            return {"status": "cancelled", "document_id": doc_id}
 
         # --- OCR phase ---
         if run_ocr:
@@ -63,6 +98,7 @@ async def reprocess_document(
                     (doc_id,),
                 )
                 await db.commit()
+                unregister_running_task(doc_id, _current_task)
                 return {"error": f"File not found: {doc['file_path']}"}
 
             logger.info("Re-running OCR on doc %d", doc_id)
@@ -116,6 +152,7 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
+            unregister_running_task(doc_id, _current_task)
             return {"error": "No text could be extracted"}
 
         # OCR-only mode: done here
@@ -126,7 +163,14 @@ async def reprocess_document(
             )
             await db.commit()
             logger.info("OCR-only reprocess complete for doc %d", doc_id)
+            unregister_running_task(doc_id, _current_task)
             return {"status": "done", "document_id": doc_id}
+
+        # Cooperative cancel checkpoint between OCR and LLM phases.
+        if _is_cancelled(doc_id):
+            await _mark_cancelled(db, doc_id)
+            unregister_running_task(doc_id, _current_task)
+            return {"status": "cancelled", "document_id": doc_id}
 
         # --- LLM phase ---
         # Clear old extracted data before re-extraction (child tables + document metadata)
@@ -237,6 +281,16 @@ async def reprocess_document(
             logger.info("Reprocessing complete for doc %d", doc_id)
             return {"status": "done", "document_id": doc_id}
 
+        except asyncio.CancelledError:
+            # Hard cancel via ``cancel_running_task``. The httpx POST the
+            # task was waiting on gets aborted; gate slots release via
+            # the context-manager finally blocks on the way out.
+            logger.info("Reprocess task cancelled for doc %d", doc_id)
+            try:
+                await _mark_cancelled(db, doc_id)
+            except Exception:
+                pass
+            raise
         except Exception as e:
             logger.exception("Reprocessing failed for doc %d", doc_id)
             error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
@@ -248,6 +302,8 @@ async def reprocess_document(
             )
             await db.commit()
             return {"error": str(e)}
+        finally:
+            unregister_running_task(doc_id, _current_task)
 
 
 async def _reprocess_vision_llm(
@@ -263,6 +319,13 @@ async def _reprocess_vision_llm(
         extract_and_store, _salvage_classification, _normalize_doc_type,
         _extract_type_specific, build_extraction_context,
     )
+    from asclepius.pipeline.processor import (
+        register_running_task, unregister_running_task,
+    )
+
+    _current_task = asyncio.current_task()
+    if _current_task is not None:
+        register_running_task(doc_id, _current_task)
 
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
@@ -383,6 +446,13 @@ async def _reprocess_vision_llm(
             await db.commit()
             return {"status": "done", "document_id": doc_id}
 
+        except asyncio.CancelledError:
+            logger.info("Vision-LLM reprocess task cancelled for doc %d", doc_id)
+            try:
+                await _mark_cancelled(db, doc_id)
+            except Exception:
+                pass
+            raise
         except Exception as e:
             logger.exception("Vision-LLM reprocessing failed for doc %d", doc_id)
             error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
@@ -394,3 +464,5 @@ async def _reprocess_vision_llm(
             )
             await db.commit()
             return {"error": str(e)}
+        finally:
+            unregister_running_task(doc_id, _current_task)

@@ -1,8 +1,10 @@
 # Processing Pipeline
 
-The pipeline is the core ingestion engine of Asclepius. It watches the inbox folder, processes files through OCR and LLM extraction, and organizes them into the vault.
+The pipeline is the ingestion engine. It watches the inbox folder, sends each file through OCR and LLM extraction, and files the result into the vault.
 
-## Pipeline Architecture
+<iframe src="../assets/diagrams/pipeline.html" width="100%" height="820" style="border:0;border-radius:8px;" title="Pipeline flow"></iframe>
+
+## Pipeline Architecture (source)
 
 ```mermaid
 flowchart TD
@@ -50,7 +52,7 @@ flowchart TD
     C --> Z
 ```
 
-`pipeline.default_flow` controls which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page can override the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Both the initial-ingest and reprocess paths funnel through the same `run_extraction()` strategy picker, so a 3-page blood test reprocessed after initial ingest takes the same sectioning / chunking / single-shot decision as it would on first import.
+`pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision whether it lands today or two weeks from now.
 
 ## File Watcher
 

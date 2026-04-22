@@ -284,9 +284,17 @@ async def cancel_processing(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Cancel processing of a document. Requires write access."""
+    """Cancel processing of a document. Requires write access.
+
+    Belt-and-braces: we both set the cooperative ``cancelled_docs`` flag
+    (honoured at phase boundaries inside the pipeline) and hard-cancel the
+    running asyncio task if one is registered. The hard cancel aborts any
+    in-flight ``await`` immediately (httpx POST, DB write), so the gate
+    slot releases and the processing chip clears without waiting for the
+    LLM request to finish on its own.
+    """
     from asclepius.documents.file_routes import _require_write_access
-    from asclepius.pipeline.processor import cancelled_docs
+    from asclepius.pipeline.processor import cancelled_docs, cancel_running_task
 
     doc = await get_document(db, doc_id)
     if not doc:
@@ -294,8 +302,13 @@ async def cancel_processing(
     await _require_write_access(db, current_user, doc)
 
     cancelled_docs.add(doc_id)
+    hard_cancelled = cancel_running_task(doc_id)
     await update_document_status(db, doc_id, "cancelled")
-    return {"status": "cancelled", "document_id": doc_id}
+    return {
+        "status": "cancelled",
+        "document_id": doc_id,
+        "hard_cancelled": hard_cancelled,
+    }
 
 
 @router.delete("/{doc_id}")
@@ -307,7 +320,7 @@ async def delete_doc(
 ):
     """Delete a document and its file from disk. Gracefully handles in-progress processing."""
     import asyncio
-    from asclepius.pipeline.processor import cancelled_docs
+    from asclepius.pipeline.processor import cancelled_docs, cancel_running_task
 
     doc = await get_document(db, doc_id)
     if not doc:
@@ -326,9 +339,11 @@ async def delete_doc(
             # Unclassified doc and not the uploader → block.
             raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
 
-    # If document is being processed, cancel it first
+    # If document is being processed, cancel it first — both cooperatively
+    # and hard-cancel so an in-flight LLM request releases its gate slot.
     if doc["status"] in ("processing", "pending"):
         cancelled_docs.add(doc_id)
+        cancel_running_task(doc_id)
         # Give the pipeline a moment to notice the cancellation
         await asyncio.sleep(0.5)
 

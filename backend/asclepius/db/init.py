@@ -174,12 +174,34 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             "Migration: stripped titles from %d doctor rows", _doc_updates,
         )
 
-    # Resync child rows whose doctor_id / facility_id drifted from the owning
-    # document. Happens when a user corrected the doctor / facility on a
-    # document before the cascade in update_document_fields existed — the
-    # parent pointed to the right canonical entry, the children still pointed
-    # to the old one, and the normalization view showed stale references.
-    # Idempotent.
+    # Keep encounters.{doctor_id,facility_id} and imaging_studies.{...} in
+    # lockstep with the parent document via AFTER UPDATE triggers. Replaces
+    # the belt-and-braces periodic re-sync that used to run on every startup
+    # — the service layer already cascades on edits, and this catches any
+    # direct SQL that bypasses it.
+    for table in ("encounters", "imaging_studies"):
+        await db.execute(f"""
+            CREATE TRIGGER IF NOT EXISTS {table}_doctor_sync
+            AFTER UPDATE OF doctor_id ON documents
+            FOR EACH ROW
+            WHEN NEW.doctor_id IS NOT OLD.doctor_id
+            BEGIN
+                UPDATE {table} SET doctor_id = NEW.doctor_id WHERE document_id = NEW.id;
+            END
+        """)
+        await db.execute(f"""
+            CREATE TRIGGER IF NOT EXISTS {table}_facility_sync
+            AFTER UPDATE OF facility_id ON documents
+            FOR EACH ROW
+            WHEN NEW.facility_id IS NOT OLD.facility_id
+            BEGIN
+                UPDATE {table} SET facility_id = NEW.facility_id WHERE document_id = NEW.id;
+            END
+        """)
+
+    # One-shot backfill for databases created before the triggers existed:
+    # resolve any remaining drift so the two tables start clean. Idempotent
+    # — the WHERE clauses short-circuit once everything is in sync.
     await db.execute("""
         UPDATE encounters
         SET facility_id = (SELECT d.facility_id FROM documents d WHERE d.id = encounters.document_id)

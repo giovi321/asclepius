@@ -278,12 +278,9 @@ async def update_document_fields(
 ) -> None:
     """Generic field update on a document row.
 
-    Also cascades ``doctor_id`` / ``facility_id`` to this document's
-    children (``encounters`` and ``imaging_studies``). Those tables carry
-    their own FK copies, and the normalization view counts documents as
-    'referenced' through any of them — without the cascade, renaming a
-    doctor/facility on a document leaves the child rows pointing at the
-    old canonical entry and the stale reference shows up in the norm view.
+    Changes to ``doctor_id`` / ``facility_id`` cascade to this document's
+    children (``encounters`` and ``imaging_studies``) via AFTER UPDATE
+    triggers installed by db.init — no manual cascade needed here.
     """
     if not updates:
         return
@@ -293,24 +290,6 @@ async def update_document_fields(
         f"UPDATE documents SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         values,
     )
-    if "facility_id" in updates:
-        await db.execute(
-            "UPDATE encounters SET facility_id = ? WHERE document_id = ?",
-            (updates["facility_id"], doc_id),
-        )
-        await db.execute(
-            "UPDATE imaging_studies SET facility_id = ? WHERE document_id = ?",
-            (updates["facility_id"], doc_id),
-        )
-    if "doctor_id" in updates:
-        await db.execute(
-            "UPDATE encounters SET doctor_id = ? WHERE document_id = ?",
-            (updates["doctor_id"], doc_id),
-        )
-        await db.execute(
-            "UPDATE imaging_studies SET doctor_id = ? WHERE document_id = ?",
-            (updates["doctor_id"], doc_id),
-        )
     # Cascade date changes to lab_results. When the document's event_date
     # shifts, every lab row attached to the document moves with it. Per-row
     # manual overrides are overwritten on purpose - the user edited the

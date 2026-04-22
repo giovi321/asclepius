@@ -31,7 +31,13 @@ async def chunked_extract_and_store(
     ocr_text: str,
     config: AppConfig,
 ) -> dict:
-    """Split long text into page-aligned chunks, extract from each, and merge results."""
+    """Split long text into page-aligned chunks, extract from each, and merge results.
+
+    All chunks are extracted in-memory first; we only write to the DB once at
+    the end via extract_and_store(extraction_override=...). That lets us retry
+    truncated chunks by bisecting their pages without having to undo partial
+    writes.
+    """
     from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
 
     pages = await _load_pages(db, doc_id, ocr_text)
@@ -43,44 +49,142 @@ async def chunked_extract_and_store(
         doc_id, total_pages, total_chunks,
     )
 
-    first = chunks[0]
-    first_text = _prepend_preamble(
-        first["text"], 1, total_chunks,
-        first["page_start"], first["page_end"], total_pages,
-        overlaps_previous=False,
-    ) if total_chunks > 1 else first["text"]
-    # The first chunk goes through extract_and_store which writes to DB.
-    # The preamble is prepended to the OCR text so the LLM sees the chunk
-    # context at the top of the document block in the prompt.
-    extraction = await extract_and_store(db, llm, doc_id, first_text, config)
-    if "error" in extraction:
-        return extraction
-
-    # Subsequent chunks: extract in-memory and merge.
     context = await build_extraction_context(db)
-    for i, chunk in enumerate(chunks[1:], start=2):
+    merged: dict | None = None
+    any_truncated = False
+    covered_pages: set[int] = set()
+
+    for i, chunk in enumerate(chunks, start=1):
         logger.info(
             "Extracting chunk %d/%d for doc %d (pages %d-%d)",
             i, total_chunks, doc_id, chunk["page_start"], chunk["page_end"],
         )
-        chunk_text = _prepend_preamble(
-            chunk["text"], i, total_chunks,
-            chunk["page_start"], chunk["page_end"], total_pages,
-            overlaps_previous=True,
+        chunk_pages = pages[chunk["page_start"] - 1:chunk["page_end"]]
+        chunk_result, truncated = await _extract_chunk_with_bisect(
+            llm, context, chunk_pages,
+            page_start=chunk["page_start"],
+            chunk_index=i,
+            total_chunks=total_chunks,
+            total_pages=total_pages,
+            overlaps_previous=(i > 1),
+            doc_id=doc_id,
         )
-        try:
-            chunk_extraction = await llm.extract(chunk_text, context)
-            if "error" in chunk_extraction:
-                logger.warning(
-                    "Chunk %d extraction returned error for doc %d: %s",
-                    i, doc_id, chunk_extraction.get("error"),
-                )
-                continue
-            extraction = merge_extractions(extraction, chunk_extraction)
-        except Exception:
-            logger.exception("Chunk %d extraction failed for doc %d", i, doc_id)
+        any_truncated = any_truncated or truncated
+        if not chunk_result or "error" in chunk_result:
+            continue
+        if merged is None:
+            merged = chunk_result
+        else:
+            merged = merge_extractions(merged, chunk_result)
+        for p in range(chunk["page_start"], chunk["page_end"] + 1):
+            covered_pages.add(p)
 
-    return extraction
+    if merged is None:
+        return {"error": "all chunks failed extraction"}
+
+    # Coverage observability — makes missing-page issues visible in logs.
+    missing = [p for p in range(1, total_pages + 1) if p not in covered_pages]
+    logger.info(
+        "Doc %d chunked extraction: pages covered=%d/%d%s, "
+        "lab_results=%d, medications=%d, diagnoses=%d%s",
+        doc_id, len(covered_pages), total_pages,
+        f" (missing {missing})" if missing else "",
+        len(merged.get("lab_results") or []),
+        len(merged.get("medications") or []),
+        len(merged.get("diagnoses") or []),
+        " [TRUNCATION DETECTED]" if any_truncated else "",
+    )
+
+    return await extract_and_store(
+        db, llm, doc_id, ocr_text, config, extraction_override=merged,
+    )
+
+
+async def _extract_chunk_with_bisect(
+    llm,
+    context: dict,
+    chunk_pages: list[str],
+    *,
+    page_start: int,
+    chunk_index: int,
+    total_chunks: int,
+    total_pages: int,
+    overlaps_previous: bool,
+    doc_id: int,
+    _depth: int = 0,
+) -> tuple[dict | None, bool]:
+    """Extract a chunk; bisect its pages and retry on truncation.
+
+    Returns (extraction, truncation_occurred). The caller merges the result.
+    Depth is capped at 2 so a pathological page can't infinite-loop.
+    """
+    if not chunk_pages:
+        return None, False
+
+    chunk_text = _prepend_preamble(
+        "\n\n".join(chunk_pages),
+        chunk_index, total_chunks,
+        page_start, page_start + len(chunk_pages) - 1, total_pages,
+        overlaps_previous=overlaps_previous,
+    )
+    try:
+        result = await llm.extract(chunk_text, context)
+    except Exception:
+        logger.exception(
+            "Chunk %d/%d extraction raised for doc %d (pages %d-%d)",
+            chunk_index, total_chunks, doc_id,
+            page_start, page_start + len(chunk_pages) - 1,
+        )
+        return None, False
+
+    truncated = bool(
+        result.get("_truncated") or result.get("_truncation_suspected")
+    )
+    if "error" in result and not truncated:
+        logger.warning(
+            "Chunk %d/%d extraction returned error for doc %d: %s",
+            chunk_index, total_chunks, doc_id, result.get("error"),
+        )
+        return None, False
+
+    if not truncated or len(chunk_pages) <= 1 or _depth >= 2:
+        if truncated:
+            logger.warning(
+                "Doc %d chunk pages %d-%d: output truncated, kept partial "
+                "(cannot bisect further: pages=%d, depth=%d)",
+                doc_id, page_start, page_start + len(chunk_pages) - 1,
+                len(chunk_pages), _depth,
+            )
+        return result, truncated
+
+    mid = len(chunk_pages) // 2
+    logger.warning(
+        "Doc %d chunk pages %d-%d: output truncated — bisecting into "
+        "pages %d-%d and %d-%d",
+        doc_id, page_start, page_start + len(chunk_pages) - 1,
+        page_start, page_start + mid - 1,
+        page_start + mid, page_start + len(chunk_pages) - 1,
+    )
+    left, left_trunc = await _extract_chunk_with_bisect(
+        llm, context, chunk_pages[:mid],
+        page_start=page_start,
+        chunk_index=chunk_index, total_chunks=total_chunks,
+        total_pages=total_pages, overlaps_previous=overlaps_previous,
+        doc_id=doc_id, _depth=_depth + 1,
+    )
+    right, right_trunc = await _extract_chunk_with_bisect(
+        llm, context, chunk_pages[mid:],
+        page_start=page_start + mid,
+        chunk_index=chunk_index, total_chunks=total_chunks,
+        total_pages=total_pages, overlaps_previous=False,
+        doc_id=doc_id, _depth=_depth + 1,
+    )
+    combined: dict | None = None
+    if left and "error" not in left:
+        combined = left
+    if right and "error" not in right:
+        combined = right if combined is None else merge_extractions(combined, right)
+    return combined, (left_trunc or right_trunc)
 
 
 def _prepend_preamble(
@@ -223,3 +327,114 @@ def merge_extractions(base: dict, additional: dict) -> dict:
             existing_items.add(key)
 
     return base
+
+
+# Threshold above which a document is chunked even when it's single-page or
+# page boundaries aren't known. Kept well below the LLM input cap so output
+# truncation is the binding constraint, not input.
+_SINGLE_SHOT_CHAR_LIMIT = 8000
+
+
+async def run_extraction(
+    db: aiosqlite.Connection,
+    llm,
+    doc_id: int,
+    ocr_text: str,
+    config: AppConfig,
+    file_path: str | None = None,
+) -> dict:
+    """Pick the right extraction strategy for a document and run it.
+
+    Strategy order:
+      1. Sectioning — only for large PDFs (``should_section`` returns True).
+      2. Chunked extraction — whenever cached OCR has >1 page, or raw text
+         exceeds the single-shot char limit. Tables that span pages, or long
+         single pages, both benefit from the chunk merger.
+      3. Single-shot ``classify_and_extract`` — short, single-page docs.
+    """
+    from asclepius.pipeline.extractor import classify_and_extract
+
+    cached_pages = await load_cached_ocr_pages(db, doc_id)
+    page_count = len(cached_pages) if cached_pages else None
+
+    # 1. Sectioning — only meaningful when we have a file on disk.
+    if file_path:
+        try:
+            from asclepius.pipeline.section_processor import should_section
+            if await should_section(file_path):
+                return await _run_sectioning(
+                    db, llm, doc_id, ocr_text, config, file_path,
+                    cached_pages=cached_pages,
+                )
+        except Exception:
+            logger.exception(
+                "Sectioning check failed for doc %d, continuing with chunking",
+                doc_id,
+            )
+
+    # 2. Chunking — multi-page OR long single-page.
+    if (page_count and page_count > 1) or len(ocr_text) > _SINGLE_SHOT_CHAR_LIMIT:
+        logger.info(
+            "Doc %d: routing through chunked extraction (pages=%s, chars=%d)",
+            doc_id, page_count, len(ocr_text),
+        )
+        return await chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
+
+    # 3. Single-shot.
+    logger.info(
+        "Doc %d: routing through single-shot extraction (pages=%s, chars=%d)",
+        doc_id, page_count or 1, len(ocr_text),
+    )
+    return await classify_and_extract(db, llm, doc_id, ocr_text, config)
+
+
+async def _run_sectioning(
+    db: aiosqlite.Connection,
+    llm,
+    doc_id: int,
+    ocr_text: str,
+    config: AppConfig,
+    file_path: str,
+    cached_pages: list[str] | None,
+) -> dict:
+    """Run page-level sectioning on a large document. Falls back to chunked
+    extraction if sectioning itself fails."""
+    from asclepius.pipeline.extractor import build_extraction_context, extract_and_store
+    from asclepius.pipeline.section_processor import process_with_sections
+
+    ocr_pages = cached_pages
+    if not ocr_pages:
+        normalised = ocr_text.replace("\r\n", "\n").strip()
+        if "\n\n" in normalised:
+            ocr_pages = [p for p in normalised.split("\n\n") if p.strip()]
+        else:
+            ocr_pages = [normalised]
+
+    try:
+        section_extraction = await process_with_sections(
+            db, llm, doc_id, file_path, ocr_pages, config,
+        )
+    except Exception:
+        logger.exception(
+            "Sectioning failed for doc %d, falling back to chunked extraction",
+            doc_id,
+        )
+        return await chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
+
+    if section_extraction is None:
+        return await chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
+
+    context = await build_extraction_context(db)
+    try:
+        classification = await llm.classify(ocr_text[:5000], context)
+    except Exception:
+        classification = {"error": "classification failed"}
+
+    if "error" in classification:
+        merged = section_extraction
+    else:
+        merged = {**classification, **section_extraction}
+
+    return await extract_and_store(
+        db, llm, doc_id, ocr_text, config, extraction_override=merged,
+    )

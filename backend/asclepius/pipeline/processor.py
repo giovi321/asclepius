@@ -12,7 +12,6 @@ import aiosqlite
 from asclepius.config import AppConfig
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
-from asclepius.pipeline.extractor import classify_and_extract
 from asclepius.pipeline.organizer import build_organized_path, move_file
 
 # Re-export from sub-modules for backward compatibility
@@ -391,75 +390,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 logger.info("Running LLM extraction on doc %d", doc_id)
                 llm = get_llm_provider(config)
 
-                # Check if document needs page-level sectioning
-                from asclepius.pipeline.section_processor import should_section, process_with_sections
-
-                if await should_section(file_path):
-                    logger.info("Large document (%s pages) — using page-level sectioning for doc %d", page_count, doc_id)
-
-                    # Try loading from OCR page cache first
-                    ocr_pages = await _load_cached_ocr_pages(db, doc_id)
-                    if ocr_pages:
-                        logger.info("Loaded %d cached OCR pages for doc %d", len(ocr_pages), doc_id)
-                    elif engine in ("llm_vision",) and "\n\n" in ocr_text:
-                        # LLM vision joins pages with "\n\n", split them back
-                        ocr_pages = ocr_text.split("\n\n")
-                        logger.info("Re-using %d already-extracted OCR pages for doc %d", len(ocr_pages), doc_id)
-                    elif engine == "tesseract" and page_count and page_count > 1:
-                        # For Tesseract, we can split per page cheaply (no LLM calls)
-                        from asclepius.pipeline.ocr import extract_text_per_page
-                        ocr_pages = await extract_text_per_page(file_path, config)
-                    else:
-                        # Fallback: split full text into equal chunks
-                        total_pages = max(page_count or 1, 1)
-                        chunk_size = max(1, len(ocr_text) // total_pages)
-                        ocr_pages = [ocr_text[i:i + chunk_size] for i in range(0, len(ocr_text), chunk_size)]
-
-                    # If per-page extraction returned nothing useful, split full OCR text
-                    if all(not p.strip() for p in ocr_pages):
-                        total_pages = max(page_count or 1, 1)
-                        chunk_size = max(1, len(ocr_text) // total_pages)
-                        ocr_pages = [ocr_text[i:i + chunk_size] for i in range(0, len(ocr_text), chunk_size)]
-
-                    # Run section-level extraction (classify pages, extract per-section)
-                    try:
-                        section_extraction = await process_with_sections(db, llm, doc_id, file_path, ocr_pages, config)
-                    except Exception:
-                        logger.exception("Sectioning failed for doc %d, falling back to normal extraction", doc_id)
-                        section_extraction = None
-
-                    if section_extraction is not None:
-                        # Run normal classification on a truncated version of the text
-                        # to get document-level metadata (patient, doctor, facility, dates)
-                        from asclepius.pipeline.extractor import (
-                            build_extraction_context, extract_and_store,
-                        )
-                        context = await build_extraction_context(db)
-
-                        # Classify using first ~5000 chars (cover page + start)
-                        classification_text = ocr_text[:5000]
-                        try:
-                            classification = await llm.classify(classification_text, context)
-                        except Exception:
-                            classification = {"error": "classification failed"}
-
-                        if "error" not in classification:
-                            merged = {**classification, **section_extraction}
-                            extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
-                                                                extraction_override=merged)
-                        else:
-                            extraction = await extract_and_store(db, llm, doc_id, ocr_text, config,
-                                                                extraction_override=section_extraction)
-                    else:
-                        # Sectioning failed — fall through to normal extraction
-                        logger.info("Falling back to chunked extraction for doc %d", doc_id)
-                        extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
-                # Chunked LLM extraction for very long texts
-                elif len(ocr_text) > 15000:
-                    logger.info("Long text (%d chars) — using chunked extraction for doc %d", len(ocr_text), doc_id)
-                    extraction = await _chunked_extract_and_store(db, llm, doc_id, ocr_text, config)
-                else:
-                    extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
+                from asclepius.pipeline.chunked_extraction import run_extraction
+                extraction = await run_extraction(
+                    db, llm, doc_id, ocr_text, config, file_path=file_path,
+                )
 
             if "error" in extraction:
                 err_msg = extraction.get("error", "Extraction failed")

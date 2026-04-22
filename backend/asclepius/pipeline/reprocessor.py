@@ -7,7 +7,7 @@ import aiosqlite
 
 from asclepius.config import AppConfig
 from asclepius.pipeline.ocr import extract_text
-from asclepius.pipeline.extractor import classify_and_extract
+from asclepius.pipeline.chunked_extraction import run_extraction
 from asclepius.pipeline.ocr_cache import cache_ocr_pages
 from asclepius.pipeline.provider_factory import get_llm_provider, _build_llm_provider
 
@@ -172,7 +172,13 @@ async def reprocess_document(
             else:
                 llm = get_llm_provider(config)
 
-            extraction = await classify_and_extract(db, llm, doc_id, ocr_text, config)
+            file_path_for_extract = str(
+                Path(config.vault.root_path) / doc["file_path"]
+            )
+            extraction = await run_extraction(
+                db, llm, doc_id, ocr_text, config,
+                file_path=file_path_for_extract,
+            )
 
             if "error" in extraction:
                 raw_resp = extraction.get("raw_response", "")

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
 import SearchableSelect from "@/components/SearchableSelect";
 import {
@@ -251,6 +252,20 @@ export default function NormalizationTab() {
   const applyProposal = async (proposal: { target_id: number; source_ids: number[] }) => {
     const sources = proposal.source_ids.filter((id) => id !== proposal.target_id);
     if (sources.length === 0) return;
+    if (shouldConfirmBulk(sources.length)) {
+      const targetEntry = autoMergeEntries.find((e: any) => e.id === proposal.target_id);
+      const targetLabel = targetEntry?.canonical_display || `#${proposal.target_id}`;
+      const ok = await confirm(buildBulkConfirm({
+        count: sources.length,
+        verb: "Merge",
+        noun: "entry",
+        targetLabel,
+        description: "Aliases and references will be moved into the target and the source rows will be deleted.",
+        confirmText: "Merge",
+        variant: "destructive",
+      }));
+      if (!ok) return;
+    }
     await api.post(`/normalization/${normType}/merge-batch`, {
       source_ids: sources,
       target_id: proposal.target_id,

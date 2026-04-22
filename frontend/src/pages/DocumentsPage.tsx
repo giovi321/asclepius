@@ -8,6 +8,7 @@ import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import type { PipelineStatus } from "@/types";
 import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
+import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
 
 const DOC_TYPES = [
@@ -332,6 +333,20 @@ export default function DocumentsPage() {
   };
 
   const bulkReprocess = async () => {
+    const mode = reprocessMode;
+
+    if (shouldConfirmBulk(selectedIds.size)) {
+      const modeLabel = mode === "both" ? "OCR and LLM" : mode.toUpperCase();
+      const ok = await confirm(buildBulkConfirm({
+        count: selectedIds.size,
+        verb: "Reprocess",
+        noun: "document",
+        description: `This will re-run ${modeLabel} on every selected document. It can take a while and may consume paid-provider tokens.`,
+        confirmText: "Reprocess",
+      }));
+      if (!ok) return;
+    }
+
     // Warn on long documents — reprocessing every page through OCR + LLM
     // can take a while and burn paid-provider tokens.
     const longDocs = documents
@@ -352,7 +367,6 @@ export default function DocumentsPage() {
       if (!ok) return;
     }
 
-    const mode = reprocessMode;
     const payload: Record<string, any> = { mode };
     if (reprocessLlmProvider) payload.llm_provider_id = reprocessLlmProvider;
     if (reprocessOcrProvider) payload.ocr_provider_id = reprocessOcrProvider;
@@ -363,6 +377,16 @@ export default function DocumentsPage() {
   };
 
   const bulkRegenerateFilename = async () => {
+    if (shouldConfirmBulk(selectedIds.size)) {
+      const ok = await confirm(buildBulkConfirm({
+        count: selectedIds.size,
+        verb: "Regenerate filename on",
+        noun: "document",
+        description: "Each file is re-analyzed by the LLM and renamed on disk. This can take a while and may consume paid-provider tokens.",
+        confirmText: "Regenerate",
+      }));
+      if (!ok) return;
+    }
     await runBulk("Regenerate filename", async (id) => {
       const gen = await api.post(`/documents/${id}/generate-filename`);
       const suggested = gen.data?.suggested_filename;

@@ -43,7 +43,15 @@ import Default from '@astrojs/starlight/components/Head.astro';
     const clone = svg.cloneNode(true) as SVGElement;
     clone.removeAttribute('width');
     clone.removeAttribute('height');
-    clone.setAttribute('style', 'display:block;width:auto;max-width:min(90vw,1400px);max-height:82vh;height:auto;');
+    // Ensure the clone has a viewBox so aspect-ratio-based sizing works in
+    // the flex-centered modal. Most inlined SVGs already declare one; this
+    // is a cheap safeguard for any that don't.
+    if (!clone.hasAttribute('viewBox')) {
+      const w = svg.getAttribute('width') || svg.getBoundingClientRect().width || 1000;
+      const h = svg.getAttribute('height') || svg.getBoundingClientRect().height || 600;
+      clone.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    }
+    clone.removeAttribute('style');
     content.appendChild(clone);
 
     const closeBtn = document.createElement('button');

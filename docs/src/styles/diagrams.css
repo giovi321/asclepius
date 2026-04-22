@@ -71,32 +71,31 @@ html[data-theme="dark"] pre.mermaid::after {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(15, 12, 10, 0.88);
-  backdrop-filter: blur(4px);
+  background: rgba(10, 8, 6, 0.96);
   cursor: zoom-out;
   animation: diagram-fade 0.15s ease;
 }
 
 .diagram-lightbox-content {
   position: relative;
-  max-width: 96vw;
+  width: min(94vw, 1600px);
   max-height: 92vh;
-  width: auto;
-  height: auto;
   background: #efeee5;
   border-radius: 8px;
-  padding: 1.5rem 2rem;
+  padding: 1.5rem;
   overflow: auto;
   cursor: default;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .diagram-lightbox-content svg {
   display: block;
-  width: auto;
-  max-width: min(90vw, 1400px);
-  max-height: 82vh;
+  width: 100%;
   height: auto;
+  max-height: calc(92vh - 3rem);
 }
 
 .diagram-lightbox-close {

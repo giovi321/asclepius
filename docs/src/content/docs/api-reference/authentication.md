@@ -4,6 +4,12 @@ title: "Authentication"
 
 Asclepius uses session-based authentication with signed cookies. All API endpoints (except login, setup, and health check) require a valid session.
 
+:::danger[Local auth is intentionally minimal — use OIDC]
+The built-in `/api/auth/login` endpoint is a basic username/password check with **no rate limiting, no account lockout, no MFA, and no password-strength enforcement**. It is meant for single-user LAN installs and first-launch setup only.
+
+**Do not expose Asclepius directly to the public internet.** For any multi-user or remote-access deployment, configure an OIDC provider (see the [OIDC authentication](#oidc-authentication) section below) — [Authentik](https://goauthentik.io/), Keycloak, and Auth0 are all supported — and consider disabling the local password flow entirely.
+:::
+
 ## First-time setup
 
 On a fresh installation (no users in the database), the `/api/setup/status` endpoint returns `{"needs_setup": true}`. The frontend detects this and redirects to the setup wizard, which calls `/api/setup/complete` to create the first admin user and patient. This endpoint only works when no users exist — it returns `400` once setup is complete.

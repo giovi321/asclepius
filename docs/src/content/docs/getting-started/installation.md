@@ -2,6 +2,17 @@
 title: "Installation"
 ---
 
+:::danger[Do not expose Asclepius directly to the internet]
+Asclepius is **not hardened for direct public-internet exposure**. The built-in authentication has no rate limiting, no MFA, and no account-lockout protection — it exists to make solo / LAN installs frictionless.
+
+For any deployment that is reachable from outside a trusted network, or that has more than a single user, you **must** front Asclepius with one of:
+
+- An **OIDC provider** such as [Authentik](https://goauthentik.io/), Keycloak, Auth0, or Google (recommended — see [User Management](../admin-guide/user-management.md)), and/or
+- A **VPN** (WireGuard, Tailscale, …) or an **authenticating reverse proxy**.
+
+The local username/password login should be treated as a single-user convenience, not a production auth system. Bind port `8070` to `127.0.0.1` or a private subnet — never `0.0.0.0` on a public host.
+:::
+
 ## Prerequisites
 
 - **Docker and Docker Compose** (v2+)

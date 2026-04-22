@@ -17,6 +17,9 @@ A self-hosted app for ingesting, OCRing, extracting, organizing, and searching p
 
 Drop a document into the inbox folder. The server runs OCR and an LLM extraction pass, writes the structured metadata to SQLite, files the document under `patients/{slug}/{year}/`, and serves a React web UI for browsing, searching, and asking questions about your medical history.
 
+> [!WARNING]
+> **Do not expose Asclepius directly to the public internet.** It is designed to run on a trusted LAN or behind a VPN/reverse proxy that handles authentication. The built-in username/password authentication is intentionally minimal — no rate limiting, no MFA, no account lockout, no password-strength enforcement, and session cookies cannot be revoked en masse without rotating the secret key. **For any deployment beyond a single-user LAN install, configure an OIDC provider (e.g. [Authentik](https://goauthentik.io/), Keycloak, Auth0) and disable the local password flow.** See [`SECURITY.md`](SECURITY.md).
+
 <p align="center">
   <img src="docs/public/assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" width="900" />
 </p>
@@ -114,5 +117,7 @@ third-party licenses — see [`NOTICE`](NOTICE) for required attributions,
 including the LOINC short notice required by Section 10 of the LOINC
 license.
 
-This project handles personal health information. Read
-[`SECURITY.md`](SECURITY.md) before deploying to the public internet.
+This project handles personal health information and is **not hardened for
+direct internet exposure**. Read [`SECURITY.md`](SECURITY.md) before
+deploying anywhere outside a trusted LAN, and put it behind an OIDC
+provider such as Authentik for any multi-user or remote-access scenario.

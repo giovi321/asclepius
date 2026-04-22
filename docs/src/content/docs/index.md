@@ -10,6 +10,12 @@ title: "Asclepius"
 
 Asclepius ingests, OCRs, extracts, organizes, and searches your personal medical records. Drop documents into the inbox (or upload them through the web UI), and the server runs OCR plus an LLM extraction pass, files everything under `patients/{slug}/{year}/`, and makes the whole archive browsable and searchable in a single web app.
 
+:::danger[Not safe to expose to the public internet]
+Asclepius is designed to run on a **trusted LAN, a single-user workstation, or behind a VPN / authenticating reverse proxy** — never bound directly to a public IP. The bundled username/password authentication is intentionally minimal: no rate limiting, no MFA, no account lockout, and no brute-force protection.
+
+**For any multi-user or remote-access deployment, configure an OIDC provider such as [Authentik](https://goauthentik.io/), Keycloak, or Auth0** and treat the local-password flow as a single-user convenience only. See [Installation](getting-started/installation.md) and [User Management](admin-guide/user-management.md).
+:::
+
 <p align="center">
   <img src="assets/diagrams/hero.svg" alt="Asclepius — drop a file in, get organized records out" />
 </p>

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import aiosqlite
 
+from asclepius.util.dates import BEST_DATE_SQL, BEST_DATE_SQL_WITH_CREATED, best_date
+
 
 async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     """Get a single document by ID.
@@ -41,7 +43,7 @@ _SORT_COLUMNS: dict[str, str] = {
     # prevents SQL injection via untrusted sort params.
     "file":       "d.original_filename",
     "type":       "d.doc_type",
-    "date":       "COALESCE(d.date_visit, d.date_issued, d.doc_date)",
+    "date":       BEST_DATE_SQL,
     "doctor":     "d.doctor_name",
     "facility":   "d.facility_name",
     "patient":    "p.display_name",
@@ -108,11 +110,10 @@ async def list_documents(
         if clauses:
             conditions.append("(" + " OR ".join(clauses) + ")")
     if date_from:
-        # Use the best available date
-        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) >= ?")
+        conditions.append(f"{BEST_DATE_SQL} >= ?")
         params.append(date_from)
     if date_to:
-        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) <= ?")
+        conditions.append(f"{BEST_DATE_SQL} <= ?")
         params.append(date_to)
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
@@ -213,7 +214,7 @@ async def list_documents(
     sort_col = _SORT_COLUMNS.get((sort or "").strip())
     sort_dir = "ASC" if (order or "").strip().lower() == "asc" else "DESC"
     if sort_col is None:
-        order_by = "COALESCE(d.date_visit, d.date_issued, d.doc_date, d.created_at) DESC"
+        order_by = f"{BEST_DATE_SQL_WITH_CREATED} DESC"
     else:
         # NULL-LAST regardless of direction so empty cells never steal the
         # top of the list when sorting by e.g. Doctor.
@@ -311,10 +312,9 @@ async def update_document_fields(
             (updates["doctor_id"], doc_id),
         )
     # Cascade date changes to lab_results. When the document's best date
-    # (date_visit > date_issued > doc_date) shifts, every lab row attached to
-    # the document moves with it. Per-row manual overrides are overwritten on
-    # purpose — the user edited the document-level date, so their expectation
-    # is that the children follow.
+    # shifts, every lab row attached to the document moves with it. Per-row
+    # manual overrides are overwritten on purpose - the user edited the
+    # document-level date, so their expectation is that the children follow.
     if any(k in updates for k in ("doc_date", "date_issued", "date_visit")):
         cursor = await db.execute(
             "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
@@ -322,10 +322,12 @@ async def update_document_fields(
         )
         drow = await cursor.fetchone()
         if drow:
-            best_date = drow[0] or drow[1] or drow[2]
+            doc_best = best_date(
+                {"date_visit": drow[0], "date_issued": drow[1], "doc_date": drow[2]}
+            )
             await db.execute(
                 "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
-                (best_date, doc_id),
+                (doc_best, doc_id),
             )
     await db.commit()
 

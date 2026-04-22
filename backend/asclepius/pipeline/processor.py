@@ -14,6 +14,7 @@ from asclepius.config import AppConfig
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.organizer import build_organized_path, move_file
+from asclepius.util.dates import best_date_with_received
 
 # Re-export from sub-modules for backward compatibility
 from asclepius.pipeline.provider_factory import (  # noqa: F401
@@ -559,10 +560,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
                     summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
 
-            # Use the best available date: date_visit > date_issued > doc_date > date_received
-            best_date = None
-            if doc:
-                best_date = doc["date_visit"] or doc["date_issued"] or doc["doc_date"] or doc["date_received"]
+            best_date = best_date_with_received(doc) if doc else None
 
             # Organize file
             dest_path = build_organized_path(

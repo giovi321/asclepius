@@ -17,6 +17,7 @@ from asclepius.auth.session import get_current_user, require_role
 from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.util.dates import best_date_with_received
 from asclepius.documents.service import (
     get_document, list_documents, get_failed_documents,
     get_related_records, get_document_sections, get_document_links,
@@ -445,9 +446,9 @@ async def move_doc(
             _summary = re.sub(r"-+", "-", _summary).strip("-")
             summary_slug = _summary
 
-        best_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or doc.get("date_received")
+        best = best_date_with_received(doc)
         new_relative = build_organized_path(
-            config, target_slug, best_date, provider_slug,
+            config, target_slug, best, provider_slug,
             doc.get("doc_type"), doc["original_filename"],
             event_slug=event_slug,
             summary_slug=summary_slug,

@@ -33,69 +33,29 @@ from asclepius.pipeline.chunked_extraction import (  # noqa: F401
     merge_extractions as _merge_extractions,
 )
 from asclepius.pipeline.reprocessor import reprocess_document  # noqa: F401
+from asclepius.pipeline.state import PIPELINE_STATE
 
 logger = logging.getLogger(__name__)
 
 
-# Pipeline status tracking (in-memory)
-pipeline_status = {
-    "queue_depth": 0,
-    "processing": None,
-    "processing_step": None,  # 'ocr', 'llm_extraction', 'organizing'
-    "processing_doc_id": None,
-    "processing_pages": None,
-    "processing_page_current": None,
-    "last_processed": None,
-    "total_processed": 0,
-    "total_errors": 0,
-    "recent_errors": [],
-    "queued_files": [],  # list of {filename, size} in queue
-}
-
-# Set of doc IDs that have been requested for cancellation. Checked
-# cooperatively between pipeline steps so a mid-step cancel takes effect at
-# the next checkpoint even if the asyncio task can't be hard-cancelled.
-cancelled_docs: set[int] = set()
-
-
-# Registry of in-flight asyncio tasks by doc id. When a cancel request comes
-# in, we call ``.cancel()`` on the task in addition to adding the id to
-# ``cancelled_docs`` — this aborts any running ``await`` (httpx POST, DB
-# write, etc.) immediately via CancelledError instead of having to wait for
-# the LLM to finish on its own. The gate slots and DB connections release
-# through their ``async with`` finalizers, so the chip in the UI and the
-# concurrency counters clear right away.
-_running_tasks: dict[int, "asyncio.Task"] = {}
+# Backward-compatible aliases. The containers are the same mutable objects
+# PIPELINE_STATE owns, so every `.append(...)` / `[key] = ...` call site in
+# the rest of the pipeline still writes through to the singleton.
+pipeline_status = PIPELINE_STATE.pipeline_status
+cancelled_docs: set[int] = PIPELINE_STATE.cancelled_docs
+_running_tasks: dict[int, "asyncio.Task"] = PIPELINE_STATE.running_tasks
 
 
 def register_running_task(doc_id: int, task: "asyncio.Task") -> None:
-    """Record the asyncio task handling ``doc_id`` so ``cancel_running_task``
-    can interrupt it. Safe to call multiple times — the latest task wins."""
-    _running_tasks[doc_id] = task
+    PIPELINE_STATE.register_running_task(doc_id, task)
 
 
 def unregister_running_task(doc_id: int, task: "asyncio.Task | None" = None) -> None:
-    """Drop the registered task for ``doc_id``. If ``task`` is given, only
-    unregister when it matches (prevents a stale entry from clobbering a
-    newer reprocess that ran after)."""
-    current = _running_tasks.get(doc_id)
-    if current is None:
-        return
-    if task is not None and current is not task:
-        return
-    _running_tasks.pop(doc_id, None)
+    PIPELINE_STATE.unregister_running_task(doc_id, task)
 
 
 def cancel_running_task(doc_id: int) -> bool:
-    """Cancel the registered asyncio task for ``doc_id``. Returns True when
-    a task was found and cancel was issued, False otherwise. The task's own
-    finalizers (gate release, DB commit, status update) run before the
-    CancelledError propagates out."""
-    task = _running_tasks.get(doc_id)
-    if task is None or task.done():
-        return False
-    task.cancel()
-    return True
+    return PIPELINE_STATE.cancel_running_task(doc_id)
 
 
 def _count_pages(file_path: str) -> int | None:

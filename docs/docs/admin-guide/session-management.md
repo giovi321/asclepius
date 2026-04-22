@@ -1,6 +1,6 @@
-# Session Management
+# Session management
 
-Asclepius stores every login as a row in the `sessions` table. The cookie delivered to the browser is a signed opaque session id — the row is the source of truth, which means the server can list and revoke active logins at any time.
+Asclepius stores every login as a row in the `sessions` table. The cookie delivered to the browser is a signed opaque session id; the row is the source of truth, which means the server can list and revoke active logins at any time.
 
 ## The Sessions tab
 

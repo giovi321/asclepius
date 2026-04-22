@@ -1,8 +1,8 @@
 # Documents
 
-## Uploading Documents
+## Uploading documents
 
-### Via the Web UI
+### Via the web UI
 
 1. Go to **Documents** in the sidebar
 2. Click **Upload** or drag-and-drop files onto the upload area
@@ -11,7 +11,7 @@
 
 When uploading via the UI, a database record is created immediately so the document appears in the list right away with a `pending` status. The pipeline picks it up for processing automatically.
 
-### Via the Inbox Folder
+### Via the inbox folder
 
 Drop files directly into `vault/inbox/`. The file watcher detects new files and queues them for processing. To pre-assign a patient, create a hint file alongside the document:
 
@@ -20,11 +20,11 @@ vault/inbox/document.pdf
 vault/inbox/document.pdf.patient_hint    # Contains just the patient ID, e.g. "3"
 ```
 
-## Document List
+## Document list
 
-The Documents page shows all documents for the selected patient (or all accessible documents if no patient is selected).
+The Documents page shows all documents for the selected patient, or all accessible documents if no patient is selected.
 
-### Sorting & Columns
+### Sorting and columns
 
 - Every column header is **click-to-sort**. Clicking cycles through ascending → descending → unsorted; the table remembers the state across filter changes.
 - The **Date added** column (the upload timestamp) is available but not shown by default.
@@ -56,15 +56,15 @@ All filter parameters support comma-separated multi-values in the API (e.g., `?t
 
 Documents are loaded in pages of 20. Use the Previous/Next controls at the bottom to navigate.
 
-### Filter + search persistence
+### Filter and search persistence
 
-Every active filter — search query, doc type, status, specialty, doctor, facility, date range, and the current page — is mirrored into the URL query string. Open a document, hit browser Back, and you land on the exact same filter state you were in. The URL is also bookmarkable and shareable: `?status=needs_review&type=prescription` is a valid deep-link into the filtered view.
+Every active filter (search query, doc type, status, specialty, doctor, facility, date range, and the current page) is mirrored into the URL query string. Open a document, hit browser Back, and you land on the exact same filter state you were in. The URL is also bookmarkable and shareable: `?status=needs_review&type=prescription` is a valid deep link into the filtered view.
 
 ### Access scope
 
 Non-admin users see only documents for patients they have access to, plus any documents they uploaded themselves (even unclassified ones). Admins see everything. Legacy rows that pre-date the per-user attribution column stay admin-only until their `uploaded_by_user_id` is backfilled.
 
-### Bulk Actions
+### Bulk actions
 
 Tick the checkbox on any row (or the header checkbox to select every visible document on the current page). When at least one row is selected, a subdued action bar appears above the table:
 
@@ -75,15 +75,15 @@ Tick the checkbox on any row (or the header checkbox to select every visible doc
 
 Each bulk action runs sequentially and reports a single toast at the end: *"Delete: 18/20 done, 2 failed — #3: reason • #7: reason"*. Selection clears automatically when you change filters, page, or patient.
 
-## Document Detail Page
+## Document detail page
 
 Click any document to open the detail view with:
 
-### PDF Viewer
+### PDF viewer
 
 The left panel shows the PDF in an embedded viewer. For DICOM studies, the imaging viewer is shown instead.
 
-### Metadata Panel
+### Metadata panel
 
 The right panel shows all extracted metadata, all fields are **inline-editable** -- click any field to edit:
 
@@ -98,7 +98,7 @@ A collapsible **Processing details** section shows technical metadata: OCR engin
 
 ### AI Edit
 
-Click the **AI Edit** button to modify metadata using natural language instructions. Examples:
+Click the **AI Edit** button to modify metadata with natural-language instructions. Examples:
 
 - "Change the doctor to Dr. Bianchi"
 - "Set the date to March 15, 2024"
@@ -107,12 +107,12 @@ Click the **AI Edit** button to modify metadata using natural language instructi
 
 The LLM interprets your instruction and updates only the relevant fields.
 
-### Tags and Notes
+### Tags and notes
 
-- **Tags** -- comma-separated tags for custom categorization
-- **Notes** -- free text notes visible on the document
+- **Tags** — comma-separated tags for custom categorization
+- **Notes** — free-text notes visible on the document
 
-### Document Sections
+### Document sections
 
 For multi-page documents that were processed with page-level sectioning, the sections panel shows:
 
@@ -120,7 +120,7 @@ For multi-page documents that were processed with page-level sectioning, the sec
 - Page range (e.g., pages 3-5)
 - Brief summary of each section
 
-### Extracted Data Tables
+### Extracted data tables
 
 Below the metadata, tables show all extracted structured data:
 
@@ -129,7 +129,7 @@ Below the metadata, tables show all extracted structured data:
 - **Encounters** -- diagnosis, findings, follow-up date and instructions
 - **Vaccinations** -- vaccine name, manufacturer, lot number, dose
 
-### Linked Documents
+### Linked documents
 
 Link related documents together:
 
@@ -141,9 +141,9 @@ Link related documents together:
 
 Use **Suggest Links** to have the LLM recommend related documents for the same patient.
 
-### Medical Event
+### Medical event
 
-Assign the document to a medical event, or use **Suggest Event** for AI-powered event matching.
+Assign the document to a medical event, or use **Suggest Event** to have the LLM pick one.
 
 ## Reprocessing
 
@@ -158,19 +158,19 @@ Click the **Reprocess** dropdown button to re-run processing on a document. A po
 - **LLM Provider** (when LLM is included) -- pick a specific LLM provider, or leave as default (highest priority)
 - **Vision-LLM Provider** (Vision-LLM mode only) -- pick a specific vision provider, or leave as default (highest priority)
 
-When reprocessing with LLM or Vision-LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, ensuring a clean slate rather than stale data persisting.
+When reprocessing with LLM or Vision-LLM, all previously extracted metadata (document type, dates, doctor, facility, summary, etc.) and child records (lab results, medications, encounters, etc.) are **cleared before re-extraction**, so you get a clean slate rather than stale data sitting next to fresh data.
 
 This is useful for:
 
-- Trying a different OCR engine or moving a document onto the Vision-LLM flow
+- Trying a different OCR engine, or moving a document onto the Vision-LLM flow
 - Re-running extraction with a more capable model
 - Fixing documents that were marked "done" with empty results
 
-## Cancelling Processing
+## Cancelling processing
 
 For documents currently being processed, click **Cancel** to stop processing. The pipeline checks for cancellation between each step.
 
-## Deleting Documents
+## Deleting documents
 
 Click **Delete** to permanently remove a document:
 
@@ -180,7 +180,7 @@ Click **Delete** to permanently remove a document:
 
 Admins can delete any document. Editors and owners can delete documents for patients they have access to. Viewers cannot delete documents.
 
-## Moving Documents
+## Moving documents
 
 To reassign a document to a different patient:
 

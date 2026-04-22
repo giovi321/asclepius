@@ -1,11 +1,11 @@
 # Search
 
-## Full-Text Search
+## Full-text search
 
-Asclepius uses SQLite FTS5 for fast, ranked full-text search across:
+Asclepius uses SQLite FTS5 for ranked full-text search across:
 
-- **OCR text** -- the raw text extracted from documents
-- **Raw extraction data** -- the JSON output from LLM extraction
+- **OCR text** — the raw text extracted from documents
+- **Raw extraction data** — the JSON output from LLM extraction
 
 ## Usage
 
@@ -13,7 +13,7 @@ Asclepius uses SQLite FTS5 for fast, ranked full-text search across:
 2. Type your search query
 3. Results are ranked by relevance and show matching document metadata
 
-## How It Works
+## How it works
 
 The search uses a fuzzy LIKE query across multiple fields, searching:
 
@@ -31,14 +31,14 @@ Results show:
 - Matching text snippet (highlighted)
 - Link to the full document detail page
 
-## Search Tips
+## Search tips
 
 - Search is case-insensitive
-- Use specific medical terms for more precise results (e.g., "hemoglobin" rather than "blood test")
+- Specific medical terms produce more precise results (e.g. "hemoglobin" rather than "blood test")
 - Patient context is applied automatically when a patient is selected in the sidebar
-- Results include documents across all patients you have access to when no patient is selected
+- With no patient selected, results include every patient you have access to
 
-## FTS5 Index
+## FTS5 index
 
 The FTS5 virtual table `documents_fts` indexes:
 

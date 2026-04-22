@@ -2,9 +2,9 @@
 
 ## Overview
 
-The Chat feature lets you ask questions about a patient's medical history using natural language. It uses RAG (Retrieval Augmented Generation) to query the structured database and provide accurate answers grounded in your actual medical records.
+Chat lets you ask questions about a patient's medical history in plain language. It uses RAG (Retrieval Augmented Generation) to query the structured database, so answers are grounded in your actual records rather than whatever the model decides to invent.
 
-## How It Works
+## How it works
 
 <iframe src="../../assets/diagrams/chat-flow.html" width="100%" height="480" style="border:0;border-radius:8px;" title="Chat flow"></iframe>
 
@@ -15,11 +15,11 @@ The Chat feature lets you ask questions about a patient's medical history using 
 
 ## Usage
 
-1. Select a patient from the sidebar (optional -- chat can work across all patients you have access to)
+1. Select a patient from the sidebar (optional — chat can work across all patients you have access to)
 2. Go to **Chat** in the sidebar
 3. Type your question and press Enter
 
-### Example Questions
+### Example questions
 
 - "What were my last cholesterol results?"
 - "When was my last blood test?"
@@ -29,11 +29,11 @@ The Chat feature lets you ask questions about a patient's medical history using 
 - "How has my hemoglobin changed over time?"
 - "When is my next follow-up appointment?"
 
-## Chat History
+## Chat history
 
-Chat history is persisted per user and per patient, including the source documents attached to each assistant reply — reloading the page restores the links exactly as they were. Click **Start new chat** in the header to clear the current conversation — it removes the chat history for the active user/patient pair on the server (`DELETE /api/chat/history`) and empties the visible message list.
+Chat history is persisted per user and per patient, including the source documents attached to each assistant reply, so reloading the page restores the links exactly as they were. Click **Start new chat** in the header to clear the current conversation. That removes the chat history for the active user/patient pair on the server (`DELETE /api/chat/history`) and empties the visible message list.
 
-## Custom System Prompt
+## Custom system prompt
 
 The chat system prompt and SQL generation prompt can be customized from **Settings → Document Analysis → Prompts**:
 

@@ -38,9 +38,9 @@ Concurrency is enforced by a process-wide gate keyed by `(credential, kind)`. Th
 !!! tip "Why per-credential instead of per-provider?"
     Two Ollama models on the same server compete for the same GPU. Setting a concurrency cap on each provider entry would let the physical server get overrun as soon as you enabled a second provider on it. A credential-scoped cap means adding a new model to an existing endpoint doesn't silently multiply load.
 
-## Recommended Stack
+## Recommended stack
 
-If you're setting up Asclepius for the first time and want a good default, here's the stack we recommend. It works well on a single workstation with ~12 GB of VRAM and gives strong results across Italian/English medical documents.
+If you're setting up Asclepius for the first time and want a reasonable default, here's what we run. It fits on a single workstation with ~12 GB of VRAM and produces solid results on Italian and English medical documents.
 
 ### Local (self-hosted, via Ollama)
 
@@ -50,7 +50,7 @@ If you're setting up Asclepius for the first time and want a good default, here'
 | Text LLM       | Qwen 2.5                           | `qwen2.5`                                 |
 | Vision-LLM     | Qwen 2.5-VL 7B                     | `qwen2.5vl:7b`                            |
 
-This trio runs comfortably on a **12 GB VRAM** GPU and the extraction quality is already quite good — enough that most users won't need to reach for a cloud model. Pull them with:
+This trio runs comfortably on a 12 GB VRAM GPU and extraction quality is good enough that most users won't need to reach for a cloud model. Pull them with:
 
 ```bash
 ollama pull fredrezones55/chandra-ocr-2
@@ -69,13 +69,13 @@ Because all three share the same credential, your Ollama server is never asked t
 
 ### Cloud (Anthropic)
 
-If you'd rather use a hosted model — or want a fallback for documents the local models struggle with — **Claude Haiku** yields good results both as the **text LLM** and as the **Vision-LLM**. It's fast, cheap, and handles the single-step image-to-JSON Vision-LLM flow cleanly. Add a single Claude credential (holds your API key + retry policy + concurrency cap for the Anthropic endpoint), then add two providers on top of it — one in the LLM section and one in the Vision-LLM section, both referencing the Claude credential. Set it as priority 1 or drop it to priority 2 as an escalation target behind the local stack.
+If you'd rather use a hosted model, or want a fallback for documents the local models struggle with, **Claude Haiku** works well both as the text LLM and as the Vision-LLM. It's fast, cheap, and handles the single-step image-to-JSON Vision-LLM flow cleanly. Add a single Claude credential (which holds your API key, retry policy, and concurrency cap for the Anthropic endpoint), then add two providers on top of it: one in the LLM section and one in the Vision-LLM section, both referencing the Claude credential. Set it as priority 1, or drop it to priority 2 as an escalation target behind the local stack.
 
-## LLM Providers
+## LLM providers
 
 LLM providers handle document classification, data extraction, chat, and search.
 
-### Supported Providers
+### Supported providers
 
 | Provider | Type | Description |
 |----------|------|-------------|
@@ -84,7 +84,7 @@ LLM providers handle document classification, data extraction, chat, and search.
 | **Claude** | `claude` | Anthropic Claude API. Best extraction quality. |
 | **OpenAI** | `openai` | OpenAI API (GPT-4o, etc.). |
 
-### Adding a Provider
+### Adding a provider
 
 1. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **LLM** section
 2. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline
@@ -92,7 +92,7 @@ LLM providers handle document classification, data extraction, chat, and search.
 4. Drag in the **Priority** sub-tab to reorder across all LLM providers (top = highest priority)
 5. Click **Save Changes**
 
-### Provider Priority & Escalation
+### Provider priority and escalation
 
 Providers are ordered by priority. The pipeline uses **priority 1** (topmost enabled provider) by default. If you're not satisfied with extraction results for a document, you can re-analyze it with the next provider from the document detail page.
 
@@ -100,7 +100,7 @@ Example setup:
 1. **Ollama** (llama3.1) -- fast, free, good for most documents
 2. **Claude** (claude-sonnet) -- higher quality, used for complex or failed documents
 
-### YAML Configuration
+### YAML configuration
 
 Providers can also be configured in `settings.yaml`:
 
@@ -146,7 +146,7 @@ llm:
 
 Legacy inline form (`base_url` + `api_key` directly on the provider, no `credential_id`) is still honoured for backwards compatibility — on startup, Asclepius synthesises a credential per unique (type, base_url, api_key) triple and rewrites `settings.yaml` to reference it.
 
-### Recommended Models
+### Recommended models
 
 **Ollama:**
 - `llama3.1` -- good balance of speed and quality
@@ -163,11 +163,11 @@ Legacy inline form (`base_url` + `api_key` directly on the provider, no `credent
 **vLLM:**
 - Any HuggingFace model served by vLLM (e.g. `meta-llama/Llama-3.1-8B-Instruct`)
 
-## OCR Providers
+## OCR providers
 
 OCR providers extract text from scanned documents and images.
 
-### Supported Providers
+### Supported providers
 
 | Provider | Type | Description |
 |----------|------|-------------|
@@ -181,26 +181,26 @@ OCR providers extract text from scanned documents and images.
 
 ### LLM Vision OCR
 
-The LLM Vision OCR engine sends page images directly to an LLM for text extraction. This produces the best results for handwritten documents, poorly scanned pages, complex layouts with tables, and mixed text/images.
+The LLM Vision OCR engine sends page images directly to an LLM for text extraction. It produces the best results on handwritten documents, poorly scanned pages, and complex mixed text/image layouts.
 
-Vision OCR can use a **different** LLM provider and model than the extraction LLM. For example: Chandra for OCR + llama3.1 for extraction.
+Vision OCR can use a different LLM provider and model than the extraction LLM — for example, Chandra for OCR plus llama3.1 for extraction.
 
-#### Supported Vision Backends
+#### Supported vision backends
 
-- **Ollama** -- use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
-- **Claude** -- uses Claude's native vision capability
-- **OpenAI** -- uses GPT-4o vision
+- **Ollama** — use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
+- **Claude** — uses Claude's native vision capability
+- **OpenAI** — uses GPT-4o vision
 
 #### Chandra OCR
 
-For the highest OCR quality, use **Chandra OCR** as the vision model:
+For the highest OCR quality, use Chandra OCR as the vision model:
 
 1. Pull the model: `ollama pull fredrezones55/chandra-ocr-2`
 2. Add an LLM Vision OCR provider
 3. Set Vision LLM Provider to **Ollama**
 4. Set Vision Model to `fredrezones55/chandra-ocr-2`
 
-### YAML Configuration
+### YAML configuration
 
 ```yaml
 ocr:
@@ -225,17 +225,17 @@ ocr:
 
 Tesseract-remote and Google Vision entries also accept `credential_id` (pointing at a credential of type `tesseract_remote` / `google_vision`). The old inline `remote_url` / `google_vision_key` fields are kept for backward compat and auto-migrated on startup.
 
-## Vision-LLM Providers
+## Vision-LLM providers
 
-Vision-LLM is an **alternative to the OCR + text-LLM flow**. Instead of running OCR and then passing the resulting text to a language model, each page image is sent directly to a vision-capable LLM that returns both the transcription and the structured extraction in a single call.
+Vision-LLM is an alternative to the OCR + text-LLM flow. Instead of running OCR and then passing the resulting text to a language model, each page image is sent directly to a vision-capable LLM that returns both the transcription and the structured extraction in a single call.
 
 This is useful when:
 
 - Your OCR engine struggles with dense tables, handwriting, or complex layouts.
-- You want to run a single model end-to-end (one pull, one GPU footprint).
+- You want to run a single model end to end (one pull, one GPU footprint).
 - You prefer to send images rather than the output of a lossy OCR step.
 
-### Supported Provider Types
+### Supported provider types
 
 | Provider | Type | Notes |
 |----------|------|-------|
@@ -243,7 +243,7 @@ This is useful when:
 | **OpenAI** | `openai` | GPT-4o / GPT-4 vision |
 | **Ollama** | `ollama` | Local vision model (e.g. `qwen2.5vl:7b`, `llama3.2-vision`, `minicpm-v`) |
 
-### Adding a Vision Provider
+### Adding a vision provider
 
 1. Pull a vision model (example for Ollama): `ollama pull qwen2.5vl:7b`.
 2. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **Vision-LLM** section.
@@ -252,7 +252,7 @@ This is useful when:
 5. Click **Test Connection** — a trivial image round-trip confirms the wiring.
 6. Drag to reorder priority in the **Priority** sub-tab and **Save Changes**.
 
-Asclepius also runs Phase 2 type-specific extraction after the vision call, reusing the **same provider you selected for vision** — that way Haiku-for-vision stays Haiku-for-extraction instead of silently falling back to the default text-LLM.
+Asclepius also runs Phase 2 type-specific extraction after the vision call, reusing the same provider you selected for vision. That way Haiku-for-vision stays Haiku-for-extraction instead of silently falling back to the default text-LLM.
 
 ### Turning on the Vision-LLM flow
 
@@ -267,7 +267,7 @@ Per-document override stays available in the document detail page's Reprocess me
 
 The vision prompt is editable under **Settings** > **Document Analysis** > **Prompts** with key `vision_extraction`. Keep the JSON schema intact — the pipeline parses the response into `ocr_text` plus classification fields.
 
-### YAML Configuration
+### YAML configuration
 
 ```yaml
 vision:
@@ -306,7 +306,7 @@ Retries and concurrency aren't configured on `vision.*` itself — they live on 
 
 ## General LLM
 
-The **General LLM** is a single model used for everything that isn't the document-analysis pipeline: chat, auto-merge suggestions, auto-rename, link suggestions, event extraction from document text, and AI-powered document edits. It's configured separately from the priority list — one credential, one model, no fallback chain.
+The **General LLM** is a single model used for everything that isn't the document-analysis pipeline: chat, auto-merge suggestions, auto-rename, link suggestions, event extraction from document text, and AI document edits. It's configured separately from the priority list: one credential, one model, no fallback chain.
 
 Set it under **Settings → Document Analysis → Providers → General LLM**, or in YAML:
 
@@ -330,11 +330,11 @@ Each provider has its own timeout setting (on the provider entry, not the creden
 
 Increase the provider timeout for very large documents, slow inference servers, or large models. For LLM-vision OCR the effective timeout is never lower than 300 seconds regardless of the configured value. Retries and backoff come from the **credential**, so two providers on the same endpoint share a retry policy.
 
-## Custom Prompts
+## Custom prompts
 
 All LLM prompts are editable from **Settings** > **Document Analysis** > **Prompts**.
 
-### Available Prompts
+### Available prompts
 
 | Key | Description |
 |-----|-------------|
@@ -353,7 +353,7 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
-### Editing & Resetting Prompts
+### Editing and resetting prompts
 
 1. Go to **Settings** > **Document Analysis** > **Prompts**
 2. Click a prompt to edit it
@@ -361,8 +361,8 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 4. Click **Reset to Default** to revert to the hardcoded default
 
 **Tips:**
-- Keep JSON output format instructions intact -- the pipeline depends on specific field names
-- Test changes with a single document before bulk reprocessing
+- Keep JSON output format instructions intact — the pipeline depends on specific field names
+- Test changes on a single document before bulk reprocessing
 
 ## Normalization
 
@@ -370,17 +370,17 @@ The Normalization sub-tab (under Document Analysis) manages canonical mappings f
 
 See [Normalization](../user-guide/normalization.md) for details.
 
-## Correction-Driven Learning
+## Correction-driven learning
 
-When you manually edit document metadata (doc_type, dates, doctor name, etc.) in the document detail page or via AI Edit, Asclepius captures the correction — what the LLM originally extracted vs. what you set. These corrections accumulate over time and are used to improve future extractions:
+When you manually edit document metadata (doc_type, dates, doctor name, etc.) from the document detail page or via AI Edit, Asclepius captures the correction — what the LLM originally extracted vs. what you set. These corrections accumulate over time and are used to improve future extractions:
 
-- Documents with user corrections are **preferred as few-shot examples** when processing new documents
-- Corrections from the same facility are especially valuable since documents from the same source share formatting patterns
-- The system automatically injects 1-2 relevant examples into the classification prompt based on similarity
+- Documents with user corrections are preferred as few-shot examples when processing new documents
+- Corrections from the same facility are especially valuable, since documents from the same source tend to share formatting
+- The system automatically injects 1–2 relevant examples into the classification prompt based on similarity
 
-This means extraction quality improves progressively as you correct more documents — no fine-tuning or model retraining needed.
+Extraction quality improves as you correct more documents. No fine-tuning or model retraining needed.
 
-## Backward Compatibility
+## Backward compatibility
 
 Asclepius auto-migrates older layouts on startup:
 

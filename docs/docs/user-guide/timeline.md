@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Timeline page shows all documents for the selected patient arranged chronologically on a vertical timeline. It provides a visual overview of a patient's medical history at a glance.
+The Timeline page shows all documents for the selected patient arranged chronologically on a vertical timeline.
 
 ## Features
 
-### Vertical Timeline
+### Vertical timeline
 
 Documents are displayed as cards on a vertical timeline, grouped by year. Each card shows:
 
@@ -19,7 +19,7 @@ Documents are displayed as cards on a vertical timeline, grouped by year. Each c
 
 Click any card to navigate to the document detail page. Middle-click or Ctrl+click opens in a new tab.
 
-### Mini-Map Sidebar
+### Mini-map sidebar
 
 A mini-map on the left side of the timeline provides navigation:
 
@@ -28,14 +28,14 @@ A mini-map on the left side of the timeline provides navigation:
 - **Click to navigate** -- click any year label to scroll to that section
 - **Hover tooltips** -- hover over a year to see the document count and month breakdown (e.g., "2025 -- 9 docs, Jun 2025, May 2025, Mar 2025")
 
-### Go to Date
+### Go to date
 
 A floating date picker in the bottom-right corner lets you jump to any date:
 
 1. Select a date using the date picker
 2. Click **Go to date** to scroll the timeline to that period
 
-### Color Coding
+### Color coding
 
 Timeline entries are color-coded by document type:
 
@@ -61,5 +61,5 @@ Medical events can have custom colors set when creating them, displayed as color
 
 - The timeline preserves your scroll position when you navigate to a document and return
 - Use the mini-map viewport indicator to orient yourself in large timelines
-- Color patterns can help you spot recurring visit types (e.g., regular blood tests)
+- Color patterns help you spot recurring visit types (e.g., regular blood tests)
 - Medical event banners group related documents visually

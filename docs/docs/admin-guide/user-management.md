@@ -1,37 +1,37 @@
-# User Management
+# User management
 
-## First-Time Setup
+## First-time setup
 
-On the very first launch — when no users exist in the database — Asclepius shows a **setup wizard** that creates:
+On the very first launch (when no users exist in the database) Asclepius shows a **setup wizard** that creates:
 
 1. Your **admin account** (username, password, display name)
 2. Your **first patient profile** (pre-filled from your display name, fully editable)
 
 The wizard automatically logs you in after completion. It only appears once.
 
-## Local Authentication
+## Local authentication
 
 Asclepius uses session-based authentication:
 
-- Passwords are hashed with **bcrypt**
-- Sessions are **server-side** — the cookie carries a signed session id that maps to a row in the `sessions` table. See [Session Management](session-management.md) for listing and revoking active logins.
+- Passwords are hashed with bcrypt
+- Sessions are server-side: the cookie carries a signed session id that maps to a row in the `sessions` table. See [Session Management](session-management.md) for listing and revoking active logins.
 - Session lifetime is configurable via `auth.session_ttl_hours` (default: 720 hours / 30 days)
 
-## Managing Users
+## Managing users
 
-### Creating Users
+### Creating users
 
 1. Go to **Settings** > **Users**
 2. Click **Add User**
 3. Enter username, password, and optional display name
 4. Click **Create**
 
-### Editing Users
+### Editing users
 
 - Change a user's display name or password from the Users list
 - Users cannot delete themselves
 
-### Deleting Users
+### Deleting users
 
 Deleting a user removes:
 
@@ -39,7 +39,7 @@ Deleting a user removes:
 - All patient access grants for that user
 - Chat history is preserved (orphaned)
 
-## Patient Access Control
+## Patient access control
 
 Each user must be explicitly granted access to each patient:
 
@@ -50,7 +50,7 @@ Each user must be explicitly granted access to each patient:
 | `owner` | Full access: view, edit, delete documents, reassign patients, manage events |
 | `viewer` | Read-only access to the patient's documents and data |
 
-### Granting Access
+### Granting access
 
 1. Go to **Settings → Users**
 2. Click the user's row to open the **Access** modal
@@ -61,9 +61,9 @@ Each user must be explicitly granted access to each patient:
 !!! note "Setup wizard grants owner access"
     The setup wizard automatically grants the first user `owner` access to the first patient.
 
-### Revoking Access
+### Revoking access
 
-Open the same Access modal, untick the patients you want to revoke, and save. Admins can also end a user's active sessions from **Settings → Sessions** — listing every active session (user, IP, user-agent, last-seen, expiry) with a per-row **Revoke** button.
+Open the same Access modal, untick the patients you want to revoke, and save. Admins can also end a user's active sessions from **Settings → Sessions**, which lists every active session (user, IP, user-agent, last-seen, expiry) with a per-row **Revoke** button.
 
 ## OIDC / SSO
 
@@ -89,7 +89,7 @@ oidc:
 
 All OIDC settings can also be changed from **Settings** > **OIDC/SSO** in the web UI.
 
-### How OIDC Works
+### How OIDC works
 
 1. User clicks "Sign in with SSO" on the login page
 2. Browser redirects to the OIDC provider's authorization endpoint
@@ -99,21 +99,21 @@ All OIDC settings can also be changed from **Settings** > **OIDC/SSO** in the we
 6. If the user exists, a session is created
 7. If the user does not exist and `auto_create_user` is enabled, a new user is created with a random password (OIDC users do not use password login)
 
-### OIDC Claims
+### OIDC claims
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `username_claim` | `preferred_username` | OIDC claim to use as the username |
 | `display_name_claim` | `name` | OIDC claim to use as the display name |
 
-### Setting Up Authentik
+### Setting up Authentik
 
 1. Create a new OAuth2/OpenID Provider in Authentik
 2. Set the redirect URI to `https://your-asclepius-url/api/auth/oidc/callback`
 3. Note the client ID and client secret
 4. Set `provider_url` to your Authentik application URL (e.g., `https://auth.example.com/application/o/asclepius/`)
 
-### Setting Up Keycloak
+### Setting up Keycloak
 
 1. Create a new client in your Keycloak realm
 2. Set the valid redirect URI to `https://your-asclepius-url/api/auth/oidc/callback`

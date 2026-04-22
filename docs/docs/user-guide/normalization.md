@@ -8,13 +8,13 @@ Medical documents use different names for the same concept depending on language
 - "Cardiology", "Kardiologie", "Cardiologia" are the same specialty
 - "Ibuprofen", "Brufen", "Advil" refer to the same medication
 
-Normalization maps these variations to a single canonical form, enabling:
+Normalization maps these variations to a single canonical form. That gives you:
 
-- Accurate trend tracking across lab results from different labs
+- Trend tracking that actually works across labs that name the same test differently
 - Consistent filtering by specialty or diagnosis
 - Cross-language search and reporting
 
-## Normalization Categories
+## Normalization categories
 
 Asclepius normalizes six categories of medical data:
 
@@ -34,55 +34,55 @@ Each canonical entry has:
 - **Standard code** (where applicable) -- LOINC, ICD-10, or ATC code
 - **Aliases** -- multiple alternative names in different languages
 
-### Doctors & Facilities
+### Doctors and facilities
 
 Doctors and facilities use the same normalization system as medical concepts. The existing `doctors` and `facilities` tables have been extended with `canonical_code` and `canonical_display` columns, and new alias tables (`doctor_aliases`, `facility_aliases`) enable the same alias management, merge, and review workflows.
 
 This is useful because the same doctor may appear under different name variations across documents (e.g., "Dr. M. Bianchi" vs. "Dr. Marco Bianchi"). Merging these entries consolidates all document references to a single record.
 
-## How Normalization Works
+## How normalization works
 
 1. During LLM extraction, the pipeline receives a raw name (e.g., "Emoglobina")
 2. The system searches the alias tables for a matching entry (case-insensitive)
 3. If found, the canonical ID is linked to the record
 4. If not found, the LLM may auto-create a new alias mapping
 
-### Auto-Mapped Aliases
+### Auto-mapped aliases
 
 When the LLM encounters a name it hasn't seen before, it can automatically create a new alias. These auto-mapped aliases have `auto_mapped = 1` in the database, distinguishing them from manually curated aliases — the row displays an `auto` badge and contributes to the entry's "unreviewed" count.
 
 A self-alias whose text matches the canonical display name exactly (case- and whitespace-insensitive) is auto-confirmed on insert because there's no normalization decision to audit — it's just the canonical form echoed back. A one-shot migration clears the `auto_mapped` flag on any existing self-alias of that kind.
 
-## Managing Normalization Data
+## Managing normalization data
 
 From **Settings → Document Analysis → Normalization**, you can:
 
-### View Canonical Entries
+### View canonical entries
 
 Browse all canonical entries for each category with their alias counts. The entry's `canonical_code` and `canonical_display` are both shown; long values truncate with a tooltip so rows stay on one line.
 
-### Add Aliases
+### Add aliases
 
 Add new aliases to map additional name variations to existing canonical entries. Each alias has:
 
 - **Alias text** -- the alternative name
 - **Language** -- optional language code (e.g., "it", "de", "en")
 
-### Edit Canonical Entries
+### Edit canonical entries
 
 Update the canonical code or display name of an entry. For **doctors** and **facilities** the edit also syncs the `name` column (used by document lists, filter dropdowns, and the extractor's slug matching) and pushes the new display into any denormalized `documents.doctor_name` / `facility_name` cells, so the rename is visible everywhere.
 
 If the new code collides with another entry's code you'll get a 409 with the message *"Another X already has code '…'. Use Merge to unify them instead of renaming."* That's almost always the right action: the two entries are duplicates, merge them.
 
-### View Linked Documents
+### View linked documents
 
 Click **Documents** on any row to list every document that references that entry — with patient, doc type, and date. If there are none, the modal offers a one-click **Delete** to clean up the orphan canonical.
 
-### Delete Entries
+### Delete entries
 
 Click **Delete** on a row (or from the linked-documents modal) to permanently remove a canonical entry. References in every linked table (`documents`, `encounters`, `imaging_studies`, `medications`, `lab_results`, `doctors.facility_id`, …) are set to `NULL`; the linked documents themselves stay intact, they just lose this particular classification. Aliases are also removed.
 
-### Merge Entries
+### Merge entries
 
 If two canonical entries represent the same concept, merge them. Three flows:
 
@@ -101,7 +101,7 @@ Every merge:
 
 Batch merges run every step inside a single transaction.
 
-## Seed Data
+## Seed data
 
 Asclepius ships with seed data for common medical terms across multiple languages. The seed data is loaded on first database initialization and covers:
 
@@ -110,7 +110,7 @@ Asclepius ships with seed data for common medical terms across multiple language
 - Common diagnoses
 - Common medications
 
-## API Endpoints
+## API endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|

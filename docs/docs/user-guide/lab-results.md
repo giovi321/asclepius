@@ -50,7 +50,7 @@ Lab test names are normalized to canonical forms using the normalization system,
 
 See [Normalization](normalization.md) for managing canonical names and aliases.
 
-## Data Model
+## Data model
 
 Each lab result record contains:
 

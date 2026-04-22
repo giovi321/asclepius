@@ -1,17 +1,17 @@
-# Backup & Restore
+# Backup and restore
 
-## What to Back Up
+## What to back up
 
 Two things make up the entire Asclepius state:
 
-1. **`vault/` directory** -- all documents, organized files, imaging studies, and the SQLite database
-2. **`config/settings.yaml`** -- your configuration file
+1. **`vault/` directory** — all documents, organized files, imaging studies, and the SQLite database
+2. **`config/settings.yaml`** — your configuration file
 
-Back up both regularly to protect against data loss.
+Back up both regularly.
 
-## Backup Methods
+## Backup methods
 
-### Web UI Backup (Database Only)
+### Web UI backup (database only)
 
 Download a SQLite backup directly from the web UI:
 
@@ -21,7 +21,7 @@ Download a SQLite backup directly from the web UI:
 
 This uses SQLite's online backup API, which creates a consistent snapshot even while the application is running. The backup includes all structured data (documents, patients, lab results, etc.) but **not** the actual document files on disk.
 
-### Full Backup (Recommended)
+### Full backup (recommended)
 
 For a complete backup, copy the entire `vault/` directory and `config/settings.yaml`:
 
@@ -37,7 +37,7 @@ cp config/settings.yaml /backup/asclepius/settings.yaml
 docker compose up -d
 ```
 
-### Live Backup (No Downtime)
+### Live backup (no downtime)
 
 SQLite with WAL mode supports live backups. You can copy the database while the application is running:
 
@@ -55,7 +55,7 @@ rsync -av vault/unclassified/ /backup/unclassified/
 
 ## Restore
 
-### From Web UI Backup
+### From web UI backup
 
 1. Stop the application: `docker compose stop`
 2. Replace the database file: `cp backup.sqlite vault/asclepius.sqlite`
@@ -64,14 +64,14 @@ rsync -av vault/unclassified/ /backup/unclassified/
 !!! note
     A database-only restore will restore all metadata but the actual document files must be present in the `vault/` directory for file serving to work.
 
-### From Full Backup
+### From full backup
 
 1. Stop the application: `docker compose stop`
 2. Restore the vault: `cp -r /backup/asclepius/vault/ vault/`
 3. Restore the config: `cp /backup/asclepius/settings.yaml config/settings.yaml`
 4. Start the application: `docker compose up -d`
 
-## Automated Backups
+## Automated backups
 
 Set up a cron job for automated backups:
 

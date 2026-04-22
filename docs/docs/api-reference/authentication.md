@@ -2,11 +2,11 @@
 
 Asclepius uses session-based authentication with signed cookies. All API endpoints (except login, setup, and health check) require a valid session.
 
-## First-Time Setup
+## First-time setup
 
 On a fresh installation (no users in the database), the `/api/setup/status` endpoint returns `{"needs_setup": true}`. The frontend detects this and redirects to the setup wizard, which calls `/api/setup/complete` to create the first admin user and patient. This endpoint only works when no users exist — it returns `400` once setup is complete.
 
-## Session Authentication
+## Session authentication
 
 ### Login
 
@@ -32,8 +32,8 @@ Content-Type: application/json
 
 On success, a signed session cookie (`asclepius_session`) is set with:
 
-- `httponly: true` -- not accessible from JavaScript
-- `samesite: lax` -- CSRF protection
+- `httponly: true` — not accessible from JavaScript
+- `samesite: lax` — CSRF protection
 - `path: /`
 
 The cookie carries a signed opaque **session id** (via itsdangerous `URLSafeTimedSerializer`). The session id maps to a row in the `sessions` table that stores the owning user, IP, User-Agent, `last_active_at`, and `expires_at`. Admins can list and revoke active sessions from **Settings → Sessions** or via the endpoints below. The session is valid for `auth.session_ttl_hours` (default: 720 hours / 30 days) unless revoked earlier.
@@ -46,7 +46,7 @@ POST /api/auth/logout
 
 Revokes the current session server-side (sets `revoked_at = now` on its `sessions` row) and clears the cookie. A stolen cookie is invalidated immediately.
 
-### Get Current User
+### Get current user
 
 ```
 GET /api/auth/me
@@ -72,11 +72,11 @@ GET /api/auth/me
 
 Returns the current user with their accessible patients and roles.
 
-## OIDC Authentication
+## OIDC authentication
 
 When OIDC is enabled, an additional authentication flow is available:
 
-### Check OIDC Status
+### Check OIDC status
 
 ```
 GET /api/auth/oidc/enabled
@@ -91,7 +91,7 @@ GET /api/auth/oidc/enabled
 }
 ```
 
-### Initiate OIDC Login
+### Initiate OIDC login
 
 ```
 GET /api/auth/oidc/login
@@ -99,7 +99,7 @@ GET /api/auth/oidc/login
 
 Redirects the browser to the OIDC provider's authorization endpoint. A signed state cookie is set for CSRF protection.
 
-### OIDC Callback
+### OIDC callback
 
 ```
 GET /api/auth/oidc/callback?code=...&state=...
@@ -123,7 +123,7 @@ After authentication, access to patient data is controlled by the `user_patient_
 - All document and patient endpoints check access before returning data
 - Users without access to a patient receive a `403 Forbidden` response
 
-## Session Management (admin)
+## Session management (admin)
 
 Admins can enumerate and revoke every active session.
 
@@ -166,7 +166,7 @@ DELETE /api/settings/sessions/{session_id}
 
 Marks the session revoked. The owning user is signed out on their next request. Revoking your own session returns `200` and the frontend redirects to login. An audit-log entry is written under the action `session.revoke`.
 
-## Error Responses
+## Error responses
 
 | Status | Meaning |
 |--------|---------|

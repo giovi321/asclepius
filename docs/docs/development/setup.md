@@ -1,4 +1,4 @@
-# Development Setup
+# Development setup
 
 ## Prerequisites
 
@@ -34,7 +34,7 @@ pip install -e ".[dev]"
 
     Download from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) and add to PATH.
 
-### Run the Backend
+### Run the backend
 
 ```bash
 # Create config
@@ -60,7 +60,7 @@ npm run dev
 
 The frontend dev server runs on `http://localhost:5173` and proxies API calls to `http://localhost:8000` (configured in `vite.config.ts`).
 
-## Project Structure
+## Project structure
 
 ```
 asclepius/
@@ -106,12 +106,12 @@ asclepius/
 └── Dockerfile
 ```
 
-## Building for Production
+## Building for production
 
 The Dockerfile handles the full build:
 
-1. **Stage 1:** Build the React frontend (`npm run build`)
-2. **Stage 2:** Set up the Python backend with the built frontend as static files
+1. Stage 1: build the React frontend (`npm run build`)
+2. Stage 2: set up the Python backend with the built frontend as static files
 
 ```bash
 docker compose build
@@ -140,7 +140,7 @@ cd backend
 pytest
 ```
 
-## Useful Commands
+## Useful commands
 
 ```bash
 # Rebuild and restart

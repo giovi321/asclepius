@@ -2,7 +2,7 @@
 
 ## Overview
 
-Medical events are the central organizing concept in Asclepius. They represent a medical story -- a diagnosis, treatment course, surgery, hospitalization, or any significant medical episode -- and group related documents together.
+Medical events group related documents under a single medical story: a diagnosis, a treatment course, a surgery, a hospitalization, anything that spans more than one document.
 
 For example, a "Sleep Apnea Diagnosis & Treatment" event might link together:
 
@@ -12,7 +12,7 @@ For example, a "Sleep Apnea Diagnosis & Treatment" event might link together:
 - Follow-up visits
 - Insurance invoices
 
-## Event Types
+## Event types
 
 | Type | Description |
 |------|-------------|
@@ -29,7 +29,7 @@ For example, a "Sleep Apnea Diagnosis & Treatment" event might link together:
 | `screening` | Preventive screening |
 | `other` | Other medical event |
 
-## Creating an Event
+## Creating an event
 
 1. Go to **Medical Events** in the sidebar
 2. Click **Create Event**
@@ -48,11 +48,11 @@ For example, a "Sleep Apnea Diagnosis & Treatment" event might link together:
     - **Notes** -- additional notes
     - **Color** -- hex color for timeline display
 
-## Linking Documents to Events
+## Linking documents to events
 
 Documents can be linked to events in several ways:
 
-### From the Event Detail Page
+### From the event detail page
 
 1. Open an event
 2. Use the document linking interface to search for and add documents
@@ -61,13 +61,13 @@ Documents can be linked to events in several ways:
     - **Secondary** -- tangentially related
     - **Background** -- provides context
 
-### From the Document Detail Page
+### From the document detail page
 
 1. Open a document
 2. In the Medical Event section, select an existing event or create a new one
 3. The document's `event_id` field is set to the primary event
 
-## Event Detail Page
+## Event detail page
 
 The event detail page shows:
 
@@ -76,7 +76,7 @@ The event detail page shows:
 - Document count
 - Whether each link was created manually or by the LLM (auto-linked)
 
-## Managing Events
+## Managing events
 
 ### Editing
 
@@ -98,9 +98,9 @@ On the Medical Events list page, filter by:
 - **Patient** (automatically applied when a patient is selected)
 - **Event type**
 
-## Data Model
+## Data model
 
-### Medical Events Table
+### Medical events table
 
 | Field | Description |
 |-------|-------------|
@@ -118,7 +118,7 @@ On the Medical Events list page, filter by:
 | `notes` | User notes |
 | `color` | Hex color for timeline display |
 
-### Document-Event Links Table
+### Document-event links table
 
 | Field | Description |
 |-------|-------------|

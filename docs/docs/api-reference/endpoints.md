@@ -2,20 +2,20 @@
 
 All endpoints require authentication unless noted. Base prefix: `/api`
 
-## Health Check
+## Health check
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/health` | No | Returns `{"status": "ok"}` |
 
-## Setup (First Launch)
+## Setup (first launch)
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/setup/status` | No | Returns `{"needs_setup": true/false}` — true when no users exist |
 | `POST` | `/api/setup/complete` | No | Create first admin user + first patient (only works when no users exist) |
 
-### Setup Request
+### Setup request
 
 ```json
 {
@@ -74,7 +74,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `DELETE` | `/api/documents/{id}/links/{link_id}` | Yes | Remove a document link |
 | `POST` | `/api/documents/{id}/suggest-links` | Yes | AI-suggest related documents |
 
-### Document List Query Parameters
+### Document list query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -90,13 +90,13 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `limit` | int | Results per page (default: 50) |
 | `offset` | int | Pagination offset |
 
-### Document Update Fields
+### Document update fields
 
 `patient_id`, `doc_type`, `doc_date`, `date_issued`, `date_visit`, `doctor_id`, `doctor_name`, `facility_id`, `facility_name`, `specialty_original`, `summary_en`, `event_id`, `notes`, `tags`, `user_notes`, `original_filename`
 
 When a request sends `doctor_name` or `facility_name` without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically — a name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears both the text and the id.
 
-### AI Edit Request
+### AI Edit request
 
 ```json
 {
@@ -104,7 +104,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 }
 ```
 
-### Reprocess Request
+### Reprocess request
 
 ```json
 {
@@ -122,11 +122,11 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `ocr_provider_id` | string | null | Specific OCR provider ID (null = default highest-priority). Used when `mode` is `ocr` or `both`. |
 | `vision_provider_id` | string | null | Specific Vision-LLM provider ID (null = default highest-priority). Used when `mode` is `vision_llm`. |
 
-### Document Link Types
+### Document link types
 
 `invoice_for`, `report_for`, `imaging_for`, `follow_up`, `related`
 
-## Medical Events
+## Medical events
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -139,15 +139,15 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `DELETE` | `/api/events/{id}/link/{doc_id}` | Yes | Unlink a document from the event |
 | `POST` | `/api/events/suggest-for-document/{doc_id}` | Yes | AI-suggest event for a document |
 
-### Event Create/Update Fields
+### Event create/update fields
 
 `patient_id`, `title`, `event_type`, `description`, `date_start`, `date_end`, `is_ongoing`, `severity`, `diagnosis_text`, `icd10_code`, `specialty_text`, `notes`, `color`
 
-### Event Types
+### Event types
 
 `symptom`, `diagnosis`, `hospitalization`, `surgery`, `treatment`, `follow_up`, `emergency`, `pregnancy`, `chronic_condition`, `injury`, `screening`, `other`
 
-## Lab Results
+## Lab results
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -158,7 +158,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `PATCH` | `/api/lab-results/{id}` | Yes | Update editable fields (value, unit, reference range, test_date, …). Viewers are blocked. |
 | `DELETE` | `/api/lab-results/{id}` | Yes | Delete a single lab result. |
 
-### Lab Results Query Parameters
+### Lab results query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -178,7 +178,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `GET` | `/api/imaging/{id}/series/{series_id}/frames` | Yes | List DICOM frames in a series |
 | `GET` | `/api/imaging/{id}/series/{series_id}/frames/{frame}` | Yes | Serve a DICOM frame image |
 
-### Imaging Query Parameters
+### Imaging query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -195,7 +195,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `GET` | `/api/chat/history` | Yes | Get chat history |
 | `DELETE` | `/api/chat/history` | Yes | Clear chat history |
 
-### Chat Request
+### Chat request
 
 ```json
 {
@@ -230,7 +230,7 @@ When a request sends `doctor_name` or `facility_name` without the matching `doct
 | `POST` | `/api/pipeline/start` | Admin | Start the processing pipeline |
 | `POST` | `/api/pipeline/stop` | Admin | Stop the processing pipeline |
 
-### Pipeline Status Response
+### Pipeline status response
 
 ```json
 {
@@ -283,7 +283,7 @@ All three test endpoints accept the same request body:
 
 The inline `provider` form is what the UI uses so the **Test Connection** button works with unsaved edits. Secret fields (`api_key`, `remote_api_key`, etc.) left blank are merged from the saved entry with the same `id` if one exists.
 
-### Settings Update Fields
+### Settings update fields
 
 Sent to `PATCH /api/settings`. Any subset of these may be included in a single request.
 

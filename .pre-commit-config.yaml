@@ -22,3 +22,16 @@ repos:
       - id: prettier
         types_or: [ts, tsx, css, json, yaml, markdown]
         exclude: ^(docs/|CHANGELOG\.md$)
+
+  # Regenerate the OpenAPI schema + frontend schema.ts whenever a backend
+  # Python file changes, and fail if either regenerated file differs from
+  # what's committed. Mirrored by the openapi-drift CI job so the check is
+  # authoritative even if a contributor skips the hook (see issue #15).
+  - repo: local
+    hooks:
+      - id: openapi-drift
+        name: OpenAPI / schema.ts drift
+        language: system
+        entry: bash -c 'python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git diff --exit-status -- frontend/src/openapi.json frontend/src/api/schema.ts'
+        files: ^backend/.*\.py$
+        pass_filenames: false

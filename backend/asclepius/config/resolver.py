@@ -362,6 +362,12 @@ def load_config() -> AppConfig:
         config.vault.inbox_path = f"{vault_path}/inbox"
         config.vault.patients_path = f"{vault_path}/patients"
         config.vault.unclassified_path = f"{vault_path}/unclassified"
+        # Rebase the backup directory when it still points at the legacy
+        # hardcoded default. Without this, running the backup tries to
+        # mkdir /vault and fails with EACCES because the container user
+        # has no write access to the filesystem root.
+        if config.backup.directory == "/vault/backups":
+            config.backup.directory = f"{vault_path}/backups"
     if db_path := os.environ.get("ASCLEPIUS_DB_PATH"):
         config.database.path = db_path
     if ollama_url := os.environ.get("ASCLEPIUS_OLLAMA_URL"):

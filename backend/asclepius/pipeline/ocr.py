@@ -211,15 +211,12 @@ async def _extract_from_pdf(path: Path, config: AppConfig, provider_entry: OcrPr
     total_confidence = 0.0
     page_count = 0
 
-    # For large documents (>20 pages), process page by page with progress tracking
     from asclepius.pipeline.processor import pipeline_status
 
-    if total_pages > 20:
-        pipeline_status["processing_pages"] = total_pages
+    pipeline_status["processing_pages"] = total_pages
 
     for page_idx, page in enumerate(doc):
-        if total_pages > 20:
-            pipeline_status["processing_page_current"] = page_idx + 1
+        pipeline_status["processing_page_current"] = page_idx + 1
 
         pix = page.get_pixmap(dpi=300)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)

@@ -302,6 +302,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     return
 
                 pipeline_status["processing_step"] = "llm_extraction"
+                pipeline_status["processing_pages"] = None
+                pipeline_status["processing_page_current"] = None
                 from asclepius.pipeline.extractor import (
                     extract_and_store, _salvage_classification, _normalize_doc_type,
                     _extract_type_specific, build_extraction_context,
@@ -399,6 +401,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
                 # ── Standard LLM extraction phase ─────────────────────────────
                 pipeline_status["processing_step"] = "llm_extraction"
+                pipeline_status["processing_pages"] = None
+                pipeline_status["processing_page_current"] = None
                 logger.info("Running LLM extraction on doc %d", doc_id)
                 llm = get_llm_provider(config)
 

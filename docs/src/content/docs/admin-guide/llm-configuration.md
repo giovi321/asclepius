@@ -365,6 +365,8 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
+**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_bloodtest`, `extraction_prescription`, …) only receive `{ocr_text}` — canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat — the SQL-generation prompt is the tool-call.
+
 ### Available variables
 
 Prompts are Python `str.format()` templates. Each prompt supports a specific set of `{placeholder}` variables that are substituted when the prompt is executed. **Using a placeholder not listed for a given prompt will raise a `KeyError` at runtime and break that extraction path** — stick to the variables below for each prompt.
@@ -395,7 +397,7 @@ The Prompts settings page shows the exact variables available for each prompt as
 | `{schema}` | SQLite schema (tables + columns) for SQL generation |
 | `{context}` | Patient context snippet used by chat / SQL generation |
 | `{question}` | User's natural-language question (chat) |
-| `{patient_context}` | Formatted patient demographics + recent history (chat system prompt) |
+| `{patient_context}` | Bounded patient rollup built on every chat turn: identity (name, DOB, sex) + last 10 documents + last 20 lab results + last 10 medications. Does **not** include the full patient / facility / doctor lists. |
 | `{current_data}` | Current document extraction rendered as JSON (document_edit) |
 | `{user_instruction}` | User's correction/edit instruction (document_edit) |
 | `{json_schema}` | Expected JSON-schema response shape (document_edit) |

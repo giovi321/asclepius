@@ -4,7 +4,7 @@ title: "Chat"
 
 ## Overview
 
-Chat lets you ask questions about a patient's medical history in plain language. It uses RAG (Retrieval Augmented Generation) to query the structured database, so answers are grounded in your actual records rather than whatever the model decides to invent.
+Chat lets you ask questions about a patient's medical history in plain language. Answers are grounded in your actual records rather than whatever the model decides to invent: each turn prepends a bounded summary of the active patient's recent history to the system prompt, and the LLM can author a scoped SQLite `SELECT` to pull anything else it needs. There is no vector retrieval and no MCP server — the SQL path is the tool-call.
 
 ## How it works
 
@@ -80,10 +80,11 @@ Chat lets you ask questions about a patient's medical history in plain language.
   </svg>
 </div>
 
-1. **SQL generation**. The LLM turns your natural-language question into a SQL query against the structured tables (`documents`, `lab_results`, `encounters`, `medications`, …).
-2. **Query execution**. The SQL runs against SQLite, scoped to patients you have access to.
-3. **Answer generation**. The LLM uses the rows it got back to compose a natural-language reply.
-4. **Source documents**. Every document referenced in the conversation is listed in the **Source documents** sidebar to the right, newest answer first. Click a row to jump to its detail page. When the LLM's SQL touches the `documents` table but forgets to select `documents.id`, the backend falls back to matching the result rows against the documents table by `original_filename` / `doc_date` / `doc_type` (scoped to the active patient) so the sidebar still populates.
+1. **Patient context rollup**. Before the LLM sees the question, `build_patient_context` assembles a short summary of the active patient and attaches it to the system prompt: identity (name, DOB, sex), the last 10 documents, the last 20 lab results, and the last 10 medications. This runs on every turn so simple questions ("what's my date of birth?", "what was my last blood test?") never need a SQL round-trip.
+2. **SQL generation**. For anything outside the rollup, the LLM turns your natural-language question into a SQL query against the structured tables (`documents`, `lab_results`, `encounters`, `medications`, …).
+3. **Query execution**. The SQL runs against SQLite, scoped to patients you have access to.
+4. **Answer generation**. The LLM uses the patient rollup and any rows it got back to compose a natural-language reply.
+5. **Source documents**. Every document referenced in the conversation is listed in the **Source documents** sidebar to the right, newest answer first. Click a row to jump to its detail page. When the LLM's SQL touches the `documents` table but forgets to select `documents.id`, the backend falls back to matching the result rows against the documents table by `original_filename` / `doc_date` / `doc_type` (scoped to the active patient) so the sidebar still populates.
 
 ### Example questions
 
@@ -111,5 +112,6 @@ See [LLM Configuration](../admin-guide/llm-configuration.md#custom-prompts) for 
 ## Limitations
 
 - The chat queries structured data only -- it does not search raw OCR text (use Search for that)
+- The patient-context rollup is bounded (10 most recent documents, 20 most recent labs, 10 most recent medications). Older items are only reachable through the SQL path.
 - Complex analytical questions may produce incorrect SQL queries
 - Response quality depends on the LLM model used (larger models produce better SQL)

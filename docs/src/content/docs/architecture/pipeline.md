@@ -431,11 +431,15 @@ Everything that references a canonical table — lab tests, medications, diagnos
 1. Exact case-insensitive match against the alias table.
 2. Fuzzy match via `rapidfuzz.process.extractOne` (WRatio ≥ 85). Catches OCR drift and minor language variants.
 3. Auto-create a new canonical row if nothing matches, with the original wording as `canonical_display` and as an `auto_mapped=1` alias for user review in the Normalization UI.
+4. Document type names are also normalized against fuzzy alias tables.
 
 Doctors and facilities still go through their dedicated `_upsert_*` helpers (slug matching + alias-aware upsert), which predate the resolver but behave the same way.
 
 Before this refactor the prompt carried every `(canonical_code, alias)` pair inline so the LLM could pick. On a real install that payload reached 437 kB and broke schema adherence on smaller models. Doing the match in Python cut the extraction prompt to ~15-20 kB and made qwen2.5:14b viable end-to-end.
-5. Document type names are also normalized against fuzzy alias tables
+
+### Chat context
+
+The chat system prompt uses the same philosophy: no full entity tables in the prompt. `build_patient_context` (`backend/asclepius/chat/message_builder.py`) assembles a bounded per-patient rollup — identity plus the last 10 documents, 20 lab results, and 10 medications — and substitutes it into `{patient_context}`. Anything outside that window is reachable through the LLM-generated SQL path, not through more prompt stuffing. There is no MCP server and no vector retrieval; the SQL-generation prompt is the tool-call. Only `classification`, `document_edit`, and the legacy `extraction_legacy` prompt still ship the full `patient_list` / `facility_list` / `doctor_list` JSON — every other path is either deterministic (normalization) or bounded (chat rollup).
 
 ## Progress Tracking
 

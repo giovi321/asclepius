@@ -32,6 +32,6 @@ repos:
       - id: openapi-drift
         name: OpenAPI / schema.ts drift
         language: system
-        entry: bash -c 'python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git diff --exit-status -- frontend/src/openapi.json frontend/src/api/schema.ts'
+        entry: bash -c 'python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git diff --exit-code -- frontend/src/openapi.json frontend/src/api/schema.ts'
         files: ^backend/.*\.py$
         pass_filenames: false

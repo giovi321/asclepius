@@ -292,18 +292,14 @@ async def _fetch_entries(
     db: aiosqlite.Connection, main_table: str, alias_table: str, fk_col: str
 ) -> list[dict]:
     """Fetch id/canonical fields + aliases for every row in the norm table."""
+    from .alias_lookup import load_aliases_by_parent
+
     cursor = await db.execute(
         f"SELECT id, canonical_code, canonical_display FROM {main_table} ORDER BY canonical_display"
     )
     rows = [dict(r) for r in await cursor.fetchall()]
 
-    # Load aliases in one pass
-    alias_cursor = await db.execute(
-        f"SELECT {fk_col} AS parent_id, alias FROM {alias_table}"
-    )
-    alias_map: dict[int, list[str]] = {}
-    for r in await alias_cursor.fetchall():
-        alias_map.setdefault(r[0], []).append(r[1])
+    alias_map = await load_aliases_by_parent(db, alias_table, fk_col)
 
     for row in rows:
         row["aliases"] = alias_map.get(row["id"], [])

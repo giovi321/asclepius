@@ -14,6 +14,7 @@ from asclepius.config import AppConfig
 from asclepius.documents.service import compute_file_hash
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.organizer import build_organized_path, move_file
+from asclepius.util.dates import best_date_with_received
 
 # Re-export from sub-modules for backward compatibility
 from asclepius.pipeline.provider_factory import (  # noqa: F401
@@ -32,69 +33,29 @@ from asclepius.pipeline.chunked_extraction import (  # noqa: F401
     merge_extractions as _merge_extractions,
 )
 from asclepius.pipeline.reprocessor import reprocess_document  # noqa: F401
+from asclepius.pipeline.state import PIPELINE_STATE
 
 logger = logging.getLogger(__name__)
 
 
-# Pipeline status tracking (in-memory)
-pipeline_status = {
-    "queue_depth": 0,
-    "processing": None,
-    "processing_step": None,  # 'ocr', 'llm_extraction', 'organizing'
-    "processing_doc_id": None,
-    "processing_pages": None,
-    "processing_page_current": None,
-    "last_processed": None,
-    "total_processed": 0,
-    "total_errors": 0,
-    "recent_errors": [],
-    "queued_files": [],  # list of {filename, size} in queue
-}
-
-# Set of doc IDs that have been requested for cancellation. Checked
-# cooperatively between pipeline steps so a mid-step cancel takes effect at
-# the next checkpoint even if the asyncio task can't be hard-cancelled.
-cancelled_docs: set[int] = set()
-
-
-# Registry of in-flight asyncio tasks by doc id. When a cancel request comes
-# in, we call ``.cancel()`` on the task in addition to adding the id to
-# ``cancelled_docs`` — this aborts any running ``await`` (httpx POST, DB
-# write, etc.) immediately via CancelledError instead of having to wait for
-# the LLM to finish on its own. The gate slots and DB connections release
-# through their ``async with`` finalizers, so the chip in the UI and the
-# concurrency counters clear right away.
-_running_tasks: dict[int, "asyncio.Task"] = {}
+# Backward-compatible aliases. The containers are the same mutable objects
+# PIPELINE_STATE owns, so every `.append(...)` / `[key] = ...` call site in
+# the rest of the pipeline still writes through to the singleton.
+pipeline_status = PIPELINE_STATE.pipeline_status
+cancelled_docs: set[int] = PIPELINE_STATE.cancelled_docs
+_running_tasks: dict[int, "asyncio.Task"] = PIPELINE_STATE.running_tasks
 
 
 def register_running_task(doc_id: int, task: "asyncio.Task") -> None:
-    """Record the asyncio task handling ``doc_id`` so ``cancel_running_task``
-    can interrupt it. Safe to call multiple times — the latest task wins."""
-    _running_tasks[doc_id] = task
+    PIPELINE_STATE.register_running_task(doc_id, task)
 
 
 def unregister_running_task(doc_id: int, task: "asyncio.Task | None" = None) -> None:
-    """Drop the registered task for ``doc_id``. If ``task`` is given, only
-    unregister when it matches (prevents a stale entry from clobbering a
-    newer reprocess that ran after)."""
-    current = _running_tasks.get(doc_id)
-    if current is None:
-        return
-    if task is not None and current is not task:
-        return
-    _running_tasks.pop(doc_id, None)
+    PIPELINE_STATE.unregister_running_task(doc_id, task)
 
 
 def cancel_running_task(doc_id: int) -> bool:
-    """Cancel the registered asyncio task for ``doc_id``. Returns True when
-    a task was found and cancel was issued, False otherwise. The task's own
-    finalizers (gate release, DB commit, status update) run before the
-    CancelledError propagates out."""
-    task = _running_tasks.get(doc_id)
-    if task is None or task.done():
-        return False
-    task.cancel()
-    return True
+    return PIPELINE_STATE.cancel_running_task(doc_id)
 
 
 def _count_pages(file_path: str) -> int | None:
@@ -472,6 +433,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 extraction.get("doc_type"),
                 extraction.get("summary_en"),
                 extraction.get("summary_original"),
+                extraction.get("event_date"),
+                extraction.get("issued_date"),
                 extraction.get("date_visit"),
                 extraction.get("date_issued"),
                 extraction.get("doc_date"),
@@ -513,7 +476,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Get document metadata for file organization
             cursor = await db.execute(
-                """SELECT d.patient_id, d.doc_type, d.doc_date, d.date_visit, d.date_issued,
+                """SELECT d.patient_id, d.doc_type, d.event_date, d.issued_date,
                           d.date_received, d.doctor_id, d.facility_id,
                           d.event_id, d.summary_en, d.uploaded_by_user_id,
                           p.slug as patient_slug,
@@ -544,7 +507,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 try:
                     doc_meta = {
                         "doc_type": doc["doc_type"],
-                        "doc_date": doc["doc_date"],
+                        "event_date": doc["event_date"],
                         "doctor_name": doc["doctor_slug"],
                         "facility_name": doc["facility_slug"],
                         "summary_en": doc["summary_en"],
@@ -559,10 +522,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
                     summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
 
-            # Use the best available date: date_visit > date_issued > doc_date > date_received
-            best_date = None
-            if doc:
-                best_date = doc["date_visit"] or doc["date_issued"] or doc["doc_date"] or doc["date_received"]
+            best_date = best_date_with_received(doc) if doc else None
 
             # Organize file
             dest_path = build_organized_path(

@@ -1,0 +1,18 @@
+description: 'Vision-LLM flow: single-step image -> OCR + classification + metadata'
+default: |-
+  Look at this medical document image carefully. First, read ALL the text you can see. Then classify the document.
+
+  IMPORTANT: Respond with ONLY this exact JSON structure. No markdown, no extra keys.
+
+  {
+    "ocr_text": "ALL text you can read from the document, preserving structure",
+    "patient_name": "string or null",
+    "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",
+    "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened)",
+    "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
+    "language_detected": "ISO 639-1 code",
+    "doctor": { "name": "string or null", "title": "string or null", "specialty_original": "string or null" },
+    "facility": { "name": "string or null", "type": "hospital|clinic|lab|pharmacy|other|null", "address": "string or null", "city": "string or null" },
+    "summary_en": "1-3 sentence English summary",
+    "summary_original": "1-3 sentence summary in source language"
+  }

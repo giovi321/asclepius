@@ -150,8 +150,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     # Sweep existing doctor names: strip honorific titles (Dr., Dott.ssa,
     # Prof., etc.) so stored names hold the raw person-name only. The sweep
     # is idempotent — re-running the migration against already-cleaned rows
-    # produces no writes. Applied to doctors.name, doctors.canonical_display,
-    # and the denormalised documents.doctor_name column.
+    # produces no writes. Applied to doctors.name and doctors.canonical_display.
     from asclepius.pipeline.extractor import strip_doctor_title, normalize_name
     cursor = await db.execute("SELECT id, name, canonical_display FROM doctors")
     _doc_updates = 0
@@ -169,32 +168,40 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             )
             _doc_updates += 1
 
-    cursor = await db.execute(
-        "SELECT id, doctor_name FROM documents WHERE doctor_name IS NOT NULL AND doctor_name <> ''"
-    )
-    _denorm_updates = 0
-    for r in await cursor.fetchall():
-        new_name = normalize_name(strip_doctor_title(r[1]))
-        if new_name != r[1]:
-            await db.execute(
-                "UPDATE documents SET doctor_name = ? WHERE id = ?",
-                (new_name, r[0]),
-            )
-            _denorm_updates += 1
-
-    if _doc_updates or _denorm_updates:
+    if _doc_updates:
         await db.commit()
         logger.info(
-            "Migration: stripped titles from %d doctor rows and %d document.doctor_name values",
-            _doc_updates, _denorm_updates,
+            "Migration: stripped titles from %d doctor rows", _doc_updates,
         )
 
-    # Resync child rows whose doctor_id / facility_id drifted from the owning
-    # document. Happens when a user corrected the doctor / facility on a
-    # document before the cascade in update_document_fields existed — the
-    # parent pointed to the right canonical entry, the children still pointed
-    # to the old one, and the normalization view showed stale references.
-    # Idempotent.
+    # Keep encounters.{doctor_id,facility_id} and imaging_studies.{...} in
+    # lockstep with the parent document via AFTER UPDATE triggers. Replaces
+    # the belt-and-braces periodic re-sync that used to run on every startup
+    # — the service layer already cascades on edits, and this catches any
+    # direct SQL that bypasses it.
+    for table in ("encounters", "imaging_studies"):
+        await db.execute(f"""
+            CREATE TRIGGER IF NOT EXISTS {table}_doctor_sync
+            AFTER UPDATE OF doctor_id ON documents
+            FOR EACH ROW
+            WHEN NEW.doctor_id IS NOT OLD.doctor_id
+            BEGIN
+                UPDATE {table} SET doctor_id = NEW.doctor_id WHERE document_id = NEW.id;
+            END
+        """)
+        await db.execute(f"""
+            CREATE TRIGGER IF NOT EXISTS {table}_facility_sync
+            AFTER UPDATE OF facility_id ON documents
+            FOR EACH ROW
+            WHEN NEW.facility_id IS NOT OLD.facility_id
+            BEGIN
+                UPDATE {table} SET facility_id = NEW.facility_id WHERE document_id = NEW.id;
+            END
+        """)
+
+    # One-shot backfill for databases created before the triggers existed:
+    # resolve any remaining drift so the two tables start clean. Idempotent
+    # — the WHERE clauses short-circuit once everything is in sync.
     await db.execute("""
         UPDATE encounters
         SET facility_id = (SELECT d.facility_id FROM documents d WHERE d.id = encounters.document_id)
@@ -380,18 +387,29 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         """)
 
     # Backfill NULL lab_results.test_date from the parent document's best
-    # available date (date_visit > date_issued > doc_date). Historically the
-    # extractor only propagated the LLM-emitted doc_date, so rows created
-    # before the extraction fix landed can have NULL test_date even though
-    # their document has a date. Idempotent — only touches NULL rows.
-    await db.execute("""
-        UPDATE lab_results
-        SET test_date = (
-            SELECT COALESCE(d.date_visit, d.date_issued, d.doc_date)
-            FROM documents d WHERE d.id = lab_results.document_id
-        )
-        WHERE test_date IS NULL
-    """)
+    # available date. Post-rename, every document has a single event_date so
+    # we just copy it forward. Idempotent — only touches NULL rows. Guarded
+    # against databases that haven't run the event_date rename migration yet
+    # (event_date is only available after the rename step below executes).
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    _doc_cols_for_labs = [row[1] for row in await cursor.fetchall()]
+    if "event_date" in _doc_cols_for_labs:
+        await db.execute("""
+            UPDATE lab_results
+            SET test_date = (
+                SELECT d.event_date FROM documents d WHERE d.id = lab_results.document_id
+            )
+            WHERE test_date IS NULL
+        """)
+    elif "doc_date" in _doc_cols_for_labs:
+        await db.execute("""
+            UPDATE lab_results
+            SET test_date = (
+                SELECT COALESCE(d.date_visit, d.date_issued, d.doc_date)
+                FROM documents d WHERE d.id = lab_results.document_id
+            )
+            WHERE test_date IS NULL
+        """)
 
     # Extraction corrections table (correction-driven learning)
     await db.execute("""
@@ -409,6 +427,112 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_doc ON extraction_corrections(document_id)")
     await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_facility ON extraction_corrections(facility_id)")
     await db.execute("CREATE INDEX IF NOT EXISTS idx_corrections_type ON extraction_corrections(doc_type)")
+
+    # Phase 2 refactor: drop the denormalized doctor_name / facility_name columns
+    # from documents. Readers now JOIN doctors / facilities on the FK. Idempotent
+    # via the PRAGMA check below.
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    doc_cols_now = [row[1] for row in await cursor.fetchall()]
+    _denorm_dropped = 0
+    if "doctor_name" in doc_cols_now:
+        await db.execute("ALTER TABLE documents DROP COLUMN doctor_name")
+        _denorm_dropped += 1
+    if "facility_name" in doc_cols_now:
+        await db.execute("ALTER TABLE documents DROP COLUMN facility_name")
+        _denorm_dropped += 1
+    if _denorm_dropped:
+        await db.commit()
+        logger.info("Migration: dropped %d denormalized name columns from documents", _denorm_dropped)
+
+    # Phase 2 refactor: collapse date_visit / date_issued / doc_date into
+    # event_date (canonical timeline anchor) + issued_date (administrative).
+    # event_date takes the first non-null in the historic priority order.
+    # Idempotent: only runs while the old columns still exist.
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    doc_cols_now = [row[1] for row in await cursor.fetchall()]
+    legacy_date_cols = {"doc_date", "date_visit", "date_issued"}
+    if legacy_date_cols & set(doc_cols_now):
+        # Drop FTS triggers + the virtual table FIRST. Otherwise the
+        # backfill UPDATEs below fire the ``documents_au`` trigger, which
+        # tries to delete-then-insert rows from a possibly-empty FTS index
+        # (schema.sql's ``CREATE VIRTUAL TABLE IF NOT EXISTS`` just created
+        # it blank on DBs that predate FTS5) and can corrupt it. We rebuild
+        # the index at the end of this block.
+        await db.execute("DROP TRIGGER IF EXISTS documents_ai")
+        await db.execute("DROP TRIGGER IF EXISTS documents_au")
+        await db.execute("DROP TRIGGER IF EXISTS documents_ad")
+        await db.execute("DROP TABLE IF EXISTS documents_fts")
+
+        if "event_date" not in doc_cols_now:
+            await db.execute("ALTER TABLE documents ADD COLUMN event_date DATE")
+        if "issued_date" not in doc_cols_now:
+            await db.execute("ALTER TABLE documents ADD COLUMN issued_date DATE")
+        await db.execute(
+            "UPDATE documents SET event_date = COALESCE(date_visit, date_issued, doc_date) "
+            "WHERE event_date IS NULL"
+        )
+        await db.execute(
+            "UPDATE documents SET issued_date = date_issued WHERE issued_date IS NULL"
+        )
+        # SQLite refuses to drop a column an index still references. Drop
+        # any legacy indexes on the doomed columns first — idx_documents_doc_date
+        # comes from the pre-0.9 schema but other user-created indexes may
+        # also be floating around, so discover them via sqlite_master.
+        for col in ("doc_date", "date_visit", "date_issued"):
+            idx_cursor = await db.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='documents' "
+                "AND sql LIKE ?",
+                (f"%({col})%",),
+            )
+            for (idx_name,) in await idx_cursor.fetchall():
+                await db.execute(f"DROP INDEX IF EXISTS {idx_name}")
+        for col in ("doc_date", "date_visit", "date_issued"):
+            if col in doc_cols_now:
+                await db.execute(f"ALTER TABLE documents DROP COLUMN {col}")
+        await db.execute("DROP INDEX IF EXISTS idx_documents_doc_date")
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
+        )
+        # Rebuild FTS5 virtual table + sync triggers
+        await db.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+                ocr_text,
+                raw_extraction,
+                content='documents',
+                content_rowid='id'
+            )
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_ai AFTER INSERT ON documents BEGIN
+                INSERT INTO documents_fts(rowid, ocr_text, raw_extraction)
+                VALUES (new.id, new.ocr_text, new.raw_extraction);
+            END
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, ocr_text, raw_extraction)
+                VALUES ('delete', old.id, old.ocr_text, old.raw_extraction);
+            END
+        """)
+        await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
+                INSERT INTO documents_fts(documents_fts, rowid, ocr_text, raw_extraction)
+                VALUES ('delete', old.id, old.ocr_text, old.raw_extraction);
+                INSERT INTO documents_fts(rowid, ocr_text, raw_extraction)
+                VALUES (new.id, new.ocr_text, new.raw_extraction);
+            END
+        """)
+        await db.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
+        await db.commit()
+        logger.info("Migration: unified date columns into event_date + issued_date, rebuilt FTS5")
+
+    # Always create the event_date index after the migration has had a
+    # chance to add the column. Cannot live in schema.sql because
+    # executescript() runs before this migration, and on a legacy DB the
+    # column doesn't exist yet when the index statement fires.
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
+    )
 
     await db.commit()
 

@@ -17,6 +17,7 @@ from asclepius.auth.session import get_current_user, require_role
 from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.util.dates import best_date_with_received
 from asclepius.documents.service import (
     get_document, list_documents, get_failed_documents,
     get_related_records, get_document_sections, get_document_links,
@@ -48,9 +49,8 @@ class DocumentUpdate(BaseModel):
     """Partial update payload. Unset fields are left untouched."""
     patient_id: int | None = None
     doc_type: str | None = Field(default=None, max_length=120)
-    doc_date: str | None = Field(default=None, max_length=40)
-    date_issued: str | None = Field(default=None, max_length=40)
-    date_visit: str | None = Field(default=None, max_length=40)
+    event_date: str | None = Field(default=None, max_length=40)
+    issued_date: str | None = Field(default=None, max_length=40)
     doctor_id: int | None = None
     doctor_name: str | None = Field(default=None, max_length=200)
     facility_id: int | None = None
@@ -234,28 +234,17 @@ async def update_doc(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # If the user changed doctor_name / facility_name without also specifying the
-    # corresponding id, resolve (or create) the canonical entry so the document
-    # keeps a proper FK instead of a dangling text-only value. Goes through the
-    # alias-aware _upsert_* helpers so merges stay sticky.
-    from asclepius.pipeline.extractor import (
-        _upsert_doctor, _upsert_facility, strip_doctor_title, normalize_name,
-    )
+    # doctor_name / facility_name are no longer columns — they're accepted as
+    # convenience API inputs that resolve to the corresponding FK via the
+    # alias-aware _upsert_* helpers. Log the raw text as a correction first,
+    # then drop the fields before they reach the UPDATE statement.
+    from asclepius.pipeline.extractor import _upsert_doctor, _upsert_facility
     if "doctor_name" in updates and "doctor_id" not in updates:
         name = (updates["doctor_name"] or "").strip()
-        if name:
-            # Strip honorific titles before we store the user-supplied name —
-            # the DB should hold the raw person-name only.
-            updates["doctor_name"] = normalize_name(strip_doctor_title(name))
-            updates["doctor_id"] = await _upsert_doctor(db, {"name": name})
-        else:
-            updates["doctor_id"] = None
+        updates["doctor_id"] = await _upsert_doctor(db, {"name": name}) if name else None
     if "facility_name" in updates and "facility_id" not in updates:
         name = (updates["facility_name"] or "").strip()
-        if name:
-            updates["facility_id"] = await _upsert_facility(db, {"name": name})
-        else:
-            updates["facility_id"] = None
+        updates["facility_id"] = await _upsert_facility(db, {"name": name}) if name else None
 
     # Clearing the free-text specialty should also drop its normalized FK;
     # otherwise the normalization page and detail view disagree (empty text
@@ -269,6 +258,11 @@ async def update_doc(
     # Log corrections before applying updates (compares against raw_extraction)
     from asclepius.documents.corrections import log_corrections
     await log_corrections(db, doc_id, updates)
+
+    # Strip API-only convenience fields before they reach the UPDATE statement
+    # — doctor_name / facility_name resolve via FK, they are no longer columns.
+    updates.pop("doctor_name", None)
+    updates.pop("facility_name", None)
 
     await update_document_fields(db, doc_id, updates)
     await audit_log(
@@ -445,9 +439,9 @@ async def move_doc(
             _summary = re.sub(r"-+", "-", _summary).strip("-")
             summary_slug = _summary
 
-        best_date = doc.get("date_visit") or doc.get("date_issued") or doc.get("doc_date") or doc.get("date_received")
+        best = best_date_with_received(doc)
         new_relative = build_organized_path(
-            config, target_slug, best_date, provider_slug,
+            config, target_slug, best, provider_slug,
             doc.get("doc_type"), doc["original_filename"],
             event_slug=event_slug,
             summary_slug=summary_slug,

@@ -1,0 +1,17 @@
+description: 'Phase 2: Extract cost totals from receipts'
+default: |-
+  You are a medical receipt parser. Extract cost totals.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "cost": {{
+      "total_amount": null,
+      "currency": "ISO 4217 code"
+    }}
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

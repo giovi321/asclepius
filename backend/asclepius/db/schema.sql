@@ -85,13 +85,10 @@ CREATE TABLE IF NOT EXISTS documents (
     file_path TEXT NOT NULL,
     original_filename TEXT NOT NULL,
     doc_type TEXT,
-    doc_date DATE,
+    event_date DATE,  -- canonical timeline anchor (date the medical event happened)
     doctor_id INTEGER REFERENCES doctors(id),
-    doctor_name TEXT,  -- denormalized: doctor name as extracted
     facility_id INTEGER REFERENCES facilities(id),
-    facility_name TEXT,  -- denormalized: facility name as extracted
-    date_issued DATE,
-    date_visit DATE,
+    issued_date DATE,  -- administrative: when the document was produced
     date_received DATE,
     summary_en TEXT,
     summary_original TEXT,
@@ -245,7 +242,7 @@ CREATE TABLE IF NOT EXISTS chat_history (
     patient_id INTEGER REFERENCES patients(id),
     role TEXT NOT NULL,  -- 'user' or 'assistant'
     content TEXT NOT NULL,
-    sources TEXT,  -- JSON list of {id, filename, doc_type, doc_date} populated on assistant messages
+    sources TEXT,  -- JSON list of {id, filename, doc_type, event_date} populated on assistant messages
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -460,7 +457,8 @@ CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id)
 CREATE INDEX IF NOT EXISTS idx_documents_patient_id ON documents(patient_id);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_type ON documents(doc_type);
-CREATE INDEX IF NOT EXISTS idx_documents_doc_date ON documents(doc_date);
+-- idx_documents_event_date is created in db/init.py after the date-column
+-- migration has had a chance to add event_date on legacy databases.
 CREATE INDEX IF NOT EXISTS idx_documents_doctor_id ON documents(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_documents_facility_id ON documents(facility_id);
 CREATE INDEX IF NOT EXISTS idx_documents_file_hash ON documents(file_hash);

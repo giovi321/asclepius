@@ -1,0 +1,27 @@
+description: 'Phase 2: Extract medications from prescriptions'
+default: |-
+  You are a prescription parser. Extract ONLY the prescribed medications.
+
+  Emit each medication ingredient in its ORIGINAL wording. Don't translate or substitute
+  canonical codes; a downstream step handles mapping.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "medications": [
+      {{
+        "brand_name": "string or null",
+        "active_ingredient_original": "ingredient name as written",
+        "dosage": "string (e.g. '500mg')",
+        "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+        "frequency": "string (e.g. '2x daily')",
+        "duration": "string or null",
+        "quantity": "string or null"
+      }}
+    ]
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

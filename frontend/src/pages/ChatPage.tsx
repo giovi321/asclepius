@@ -10,7 +10,7 @@ interface ChatSource {
   id: number;
   filename: string | null;
   doc_type: string | null;
-  doc_date: string | null;
+  event_date: string | null;
 }
 
 interface Message {
@@ -200,7 +200,7 @@ export default function ChatPage() {
                       key={src.id}
                       to={`/documents/${src.id}`}
                       className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-xs hover:bg-accent"
-                      title={[src.doc_type, src.doc_date].filter(Boolean).join(" • ") || "Open document"}
+                      title={[src.doc_type, src.event_date].filter(Boolean).join(" • ") || "Open document"}
                     >
                       <FileText className="h-3 w-3 text-primary" />
                       <span className="truncate max-w-[240px]">{src.filename || `Document #${src.id}`}</span>
@@ -270,9 +270,9 @@ export default function ChatPage() {
                         {src.filename || `Document #${src.id}`}
                       </span>
                     </span>
-                    {(src.doc_type || src.doc_date) && (
+                    {(src.doc_type || src.event_date) && (
                       <span className="pl-4 text-[10px] text-muted-foreground">
-                        {[src.doc_type, src.doc_date].filter(Boolean).join(" • ")}
+                        {[src.doc_type, src.event_date].filter(Boolean).join(" • ")}
                       </span>
                     )}
                   </Link>

@@ -124,13 +124,13 @@ async def suggest_document_links(
 
     # Get all other documents for the same patient
     cursor = await db.execute(
-        """SELECT d.id, d.doc_type, d.doc_date, d.summary_en, d.original_filename,
+        """SELECT d.id, d.doc_type, d.event_date, d.summary_en, d.original_filename,
                   doc.name as doctor_name, f.name as facility_name
            FROM documents d
            LEFT JOIN doctors doc ON d.doctor_id = doc.id
            LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE d.patient_id = ? AND d.id != ? AND d.status = 'done'
-           ORDER BY d.doc_date DESC
+           ORDER BY d.event_date DESC
            LIMIT 50""",
         (doc["patient_id"], doc_id),
     )
@@ -142,7 +142,7 @@ async def suggest_document_links(
 
     # Format other documents for the prompt
     other_docs_text = "\n".join(
-        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('doc_date', 'unknown')}, "
+        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('event_date', 'unknown')}, "
         f"Doctor: {d.get('doctor_name', 'unknown')}, Facility: {d.get('facility_name', 'unknown')}, "
         f"Summary: {d.get('summary_en', 'N/A')}"
         for d in other_docs
@@ -162,7 +162,7 @@ async def suggest_document_links(
     prompt = LINK_SUGGESTION_PROMPT.format(
         doc_id=doc_id,
         doc_type=doc.get("doc_type", "unknown"),
-        doc_date=doc.get("doc_date", "unknown"),
+        doc_date=doc.get("event_date", "unknown"),
         doctor_name=doc.get("doctor_name", "unknown"),
         facility_name=doc.get("facility_name", "unknown"),
         summary=doc.get("summary_en", "N/A"),
@@ -194,7 +194,7 @@ async def suggest_document_links(
         info = docs_by_id.get(s["document_id"], {})
         s["filename"] = info.get("original_filename")
         s["doc_type"] = info.get("doc_type")
-        s["doc_date"] = info.get("doc_date")
+        s["event_date"] = info.get("event_date")
         s["summary_en"] = info.get("summary_en")
         s["doctor_name"] = info.get("doctor_name")
         s["facility_name"] = info.get("facility_name")
@@ -230,13 +230,13 @@ async def get_relevant_documents(
 
     # Get all other documents for the same patient
     cursor = await db.execute(
-        """SELECT d.id, d.doc_type, d.doc_date, d.summary_en, d.original_filename,
+        """SELECT d.id, d.doc_type, d.event_date, d.summary_en, d.original_filename,
                   doc.name as doctor_name, f.name as facility_name
            FROM documents d
            LEFT JOIN doctors doc ON d.doctor_id = doc.id
            LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE d.patient_id = ? AND d.id != ? AND d.status = 'done'
-           ORDER BY d.doc_date DESC
+           ORDER BY d.event_date DESC
            LIMIT 50""",
         (doc["patient_id"], doc_id),
     )
@@ -247,7 +247,7 @@ async def get_relevant_documents(
         return {"suggestions": []}
 
     other_docs_text = "\n".join(
-        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('doc_date', 'unknown')}, "
+        f"- ID: {d['id']}, Type: {d.get('doc_type', 'unknown')}, Date: {d.get('event_date', 'unknown')}, "
         f"Doctor: {d.get('doctor_name', 'unknown')}, Facility: {d.get('facility_name', 'unknown')}, "
         f"Summary: {d.get('summary_en', 'N/A')}"
         for d in other_docs
@@ -267,7 +267,7 @@ async def get_relevant_documents(
     prompt = LINK_SUGGESTION_PROMPT.format(
         doc_id=doc_id,
         doc_type=doc.get("doc_type", "unknown"),
-        doc_date=doc.get("doc_date", "unknown"),
+        doc_date=doc.get("event_date", "unknown"),
         doctor_name=doc.get("doctor_name", "unknown"),
         facility_name=doc.get("facility_name", "unknown"),
         summary=doc.get("summary_en", "N/A"),
@@ -291,7 +291,7 @@ async def get_relevant_documents(
             d = docs_by_id.get(s["document_id"], {})
             s["filename"] = d.get("original_filename")
             s["doc_type"] = d.get("doc_type")
-            s["doc_date"] = d.get("doc_date")
+            s["event_date"] = d.get("event_date")
             s["doctor_name"] = d.get("doctor_name")
             s["facility_name"] = d.get("facility_name")
             s["summary_en"] = d.get("summary_en")

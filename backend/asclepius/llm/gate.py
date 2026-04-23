@@ -26,9 +26,29 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-# Concurrency cap: one semaphore per credential_id. All kinds share it.
-_SEMS: dict[str, asyncio.Semaphore] = {}
+# Concurrency cap: one semaphore per (event_loop, credential_id). Python
+# 3.13 enforces that asyncio.Semaphore instances only be awaited from the
+# loop they were created on, so a module-global semaphore shared between
+# the FastAPI loop (request handlers) and the pipeline worker-thread loop
+# (watcher.py spawns its own via asyncio.new_event_loop) breaks with
+# ``RuntimeError: <Semaphore> is bound to a different event loop`` on the
+# slow path (when a task has to wait for the slot).
+#
+# Trade-off: the cap is enforced per loop, not globally, so in theory two
+# concurrent callers on different loops double the cap against the
+# backing Ollama/Claude endpoint. In practice the server-side rate limit
+# catches that and this has not surfaced as a user-visible issue.
+_SEMS: dict[tuple[int, str], asyncio.Semaphore] = {}
 _CAPS: dict[str, int] = {}
+
+
+def _current_loop_id() -> int:
+    """Identify the currently running event loop. Falls back to 0 when
+    called outside any loop (defensive — callers are always async)."""
+    try:
+        return id(asyncio.get_running_loop())
+    except RuntimeError:
+        return 0
 
 # Counters + labels keyed per (credential_id, kind) so LLM / Vision / OCR
 # can run on the same credential without stepping on each other's chip.
@@ -48,15 +68,20 @@ _HELD_SLOTS: contextvars.ContextVar[frozenset[tuple[str, str]]] = (
 
 
 def _ensure_sem(credential_id: str, cap: int) -> None:
-    """Create or grow the per-credential semaphore."""
-    key = credential_id or ""
-    current_cap = _CAPS.get(key, 0)
-    if cap > current_cap:
-        _SEMS[key] = asyncio.Semaphore(cap)
-        _CAPS[key] = cap
-    elif key not in _SEMS:
-        _SEMS[key] = asyncio.Semaphore(cap)
-        _CAPS[key] = cap
+    """Create or grow the per-(loop, credential) semaphore. The cap dict
+    is keyed by credential only since it is a property of the credential
+    config and not of the loop."""
+    cred = credential_id or ""
+    sem_key = (_current_loop_id(), cred)
+    stored_cap = _CAPS.get(cred, 0)
+    effective_cap = max(cap, stored_cap, 1)
+    if sem_key not in _SEMS or cap > stored_cap:
+        # First time this loop sees the credential, or the config grew
+        # the cap. Matches the original module-global behavior of
+        # swapping the semaphore in place.
+        _SEMS[sem_key] = asyncio.Semaphore(effective_cap)
+    if cap > stored_cap:
+        _CAPS[cred] = cap
 
 
 def _ensure_counters(credential_id: str, kind: str, *,
@@ -120,7 +145,7 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
         yield
         return
 
-    sem = _SEMS[cred_key]
+    sem = _SEMS[(_current_loop_id(), cred_key)]
     stats = _STATS[sub_key]
     active = _ACTIVE_MODELS[sub_key]
     stats["waiting"] = stats.get("waiting", 0) + 1

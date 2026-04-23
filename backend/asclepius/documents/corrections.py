@@ -16,9 +16,8 @@ logger = logging.getLogger(__name__)
 # Tuple means nested: ("doctor", "name") → raw_extraction["doctor"]["name"]
 CORRECTABLE_FIELDS = {
     "doc_type": ("doc_type",),
-    "doc_date": ("doc_date",),
-    "date_issued": ("date_issued",),
-    "date_visit": ("date_visit",),
+    "event_date": ("event_date",),
+    "issued_date": ("issued_date",),
     "doctor_name": ("doctor", "name"),
     "facility_name": ("facility", "name"),
     "specialty_original": ("specialty", "original"),

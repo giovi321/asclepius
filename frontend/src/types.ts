@@ -1,4 +1,19 @@
 // ─── Shared type definitions for Asclepius frontend ───
+//
+// Request payloads and the few fully-typed response bodies are generated
+// from the backend OpenAPI schema (see `api/schema.ts`). Hand-written
+// interfaces below cover response shapes the backend still returns as
+// `dict` — migrate them to Pydantic models over time and replace the
+// hand-written interface with a re-export from `api/schema.ts`.
+//
+// Regenerate the schema after any API change:
+//   python backend/scripts/export_openapi.py
+//   npm --prefix frontend run gen:api
+
+import type { components } from "./api/schema";
+
+export type DocumentUpdate = components["schemas"]["DocumentUpdate"];
+export type DocumentMoveRequest = components["schemas"]["DocumentMoveRequest"];
 
 // ─── Document ──────────────────────────────────────────
 
@@ -18,9 +33,8 @@ export interface Document {
   file_path: string;
   original_filename: string;
   doc_type: string | null;
-  doc_date: string | null;
-  date_visit: string | null;
-  date_issued: string | null;
+  event_date: string | null;
+  issued_date: string | null;
   date_received: string | null;
   doctor_id: number | null;
   doctor_name: string | null;
@@ -72,7 +86,7 @@ export interface DocumentLink {
   // Joined fields
   original_filename?: string;
   doc_type?: string;
-  doc_date?: string | null;
+  event_date?: string | null;
 }
 
 export interface DocumentSection {

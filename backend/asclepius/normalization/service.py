@@ -19,7 +19,6 @@ VALID_COLUMNS = {
     "norm_lab_test_id", "norm_specialty_id",
     "norm_diagnosis_id", "norm_medication_id",
     "doctor_id", "facility_id",
-    "doctor_name", "facility_name",
     "name",
 }
 
@@ -58,13 +57,6 @@ class NormService:
             self.ref_tables = [
                 (_validate_table(tables["ref_table"]), _validate_column(tables["ref_col"]))
             ]
-        # Optional denormalized text columns to update on merge (e.g. documents.doctor_name)
-        self.denorm_updates = [
-            {"table": _validate_table(u["table"]),
-             "fk_col": _validate_column(u["fk_col"]),
-             "text_col": _validate_column(u["text_col"])}
-            for u in tables.get("denorm_updates", [])
-        ]
         # Tables to walk to find documents referencing this norm entry.
         # Each entry is (table, fk_col). `documents` is queried by its own id;
         # other tables must have a `document_id` column linking back to documents.
@@ -151,14 +143,6 @@ class NormService:
             await self.db.execute(
                 f"UPDATE {self.main_table} SET {set_clause} WHERE id = ?", values
             )
-            # Also propagate the rename to denormalized text fields on documents
-            # (documents.doctor_name / facility_name), same pattern as merge.
-            if canonical_display is not None and self.denorm_updates:
-                for upd in self.denorm_updates:
-                    await self.db.execute(
-                        f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
-                        (canonical_display, norm_id),
-                    )
             await self.db.commit()
 
         return await self.get_with_aliases(norm_id)
@@ -216,18 +200,10 @@ class NormService:
     async def delete_entry(self, norm_id: int) -> None:
         """Delete a canonical entry.
 
-        Clears every referencing FK back to NULL, blanks any denormalized
-        text fields that mirrored this entry, removes aliases, then deletes
-        the main row. Commits once.
+        Clears every referencing FK back to NULL, removes aliases, then
+        deletes the main row. Commits once.
         """
-        # 1. Clear denormalized text columns first — they're keyed off the FK,
-        #    which we're about to null.
-        for upd in self.denorm_updates:
-            await self.db.execute(
-                f"UPDATE {upd['table']} SET {upd['text_col']} = NULL WHERE {upd['fk_col']} = ?",
-                (norm_id,),
-            )
-        # 2. Null the FKs on every referencing table.
+        # Null the FKs on every referencing table.
         for ref_table, ref_col in self.ref_tables:
             await self.db.execute(
                 f"UPDATE {ref_table} SET {ref_col} = NULL WHERE {ref_col} = ?",
@@ -268,12 +244,12 @@ class NormService:
 
         placeholders = ",".join("?" * len(doc_ids))
         cursor = await self.db.execute(
-            f"""SELECT d.id, d.original_filename, d.doc_type, d.doc_date,
+            f"""SELECT d.id, d.original_filename, d.doc_type, d.event_date,
                        d.patient_id, p.display_name AS patient_name
                 FROM documents d
                 LEFT JOIN patients p ON p.id = d.patient_id
                 WHERE d.id IN ({placeholders})
-                ORDER BY d.doc_date DESC, d.id DESC""",
+                ORDER BY d.event_date DESC, d.id DESC""",
             list(doc_ids),
         )
         return [dict(r) for r in await cursor.fetchall()]
@@ -343,14 +319,6 @@ class NormService:
                 (target_id, source_id),
             )
 
-        # Update denormalized text fields (e.g. documents.doctor_name → target's canonical_display)
-        if self.denorm_updates and target_display:
-            for upd in self.denorm_updates:
-                await self.db.execute(
-                    f"UPDATE {upd['table']} SET {upd['text_col']} = ? WHERE {upd['fk_col']} = ?",
-                    (target_display, target_id),
-                )
-
         # Delete source
         await self.db.execute(
             f"DELETE FROM {self.main_table} WHERE id = ?", (source_id,)
@@ -385,31 +353,49 @@ class NormService:
     async def _log_merge_corrections(self, source_id: int, target_display: str | None) -> None:
         """Log extraction_corrections for documents affected by this merge.
 
-        Mirrors the learning signal produced when a user renames a doctor/facility from
-        the document view — each affected document gets a correction row that future
-        few-shot retrieval can surface to the LLM.
+        Only applies to doctor / facility merges — other norm tables don't
+        surface free-text values on documents. The LLM value is recovered
+        from raw_extraction JSON (which survived the denormalized-column
+        drop) so the few-shot retriever can still learn from the merge.
         """
+        import json
         if not target_display:
             return
-        for upd in self.denorm_updates:
-            if upd["table"] != "documents":
+        if self.main_table == "doctors":
+            field_name = "doctor_name"
+            fk_col = "doctor_id"
+            raw_path = ("doctor", "name")
+        elif self.main_table == "facilities":
+            field_name = "facility_name"
+            fk_col = "facility_id"
+            raw_path = ("facility", "name")
+        else:
+            return
+        cursor = await self.db.execute(
+            f"""SELECT id, raw_extraction, doc_type, facility_id
+                FROM documents
+                WHERE {fk_col} = ? AND raw_extraction IS NOT NULL""",
+            (source_id,),
+        )
+        rows = await cursor.fetchall()
+        for r in rows:
+            doc_id, raw_value, doc_type, facility_id = r[0], r[1], r[2], r[3]
+            try:
+                raw = json.loads(raw_value) if isinstance(raw_value, str) else raw_value
+            except (TypeError, ValueError):
                 continue
-            if upd["text_col"] not in ("doctor_name", "facility_name"):
+            llm_value = raw
+            for key in raw_path:
+                if not isinstance(llm_value, dict):
+                    llm_value = None
+                    break
+                llm_value = llm_value.get(key)
+            llm_value_str = str(llm_value) if llm_value is not None else None
+            if llm_value_str == target_display:
                 continue
-            cursor = await self.db.execute(
-                f"""SELECT id, {upd['text_col']}, doc_type, facility_id
-                    FROM {upd['table']}
-                    WHERE {upd['fk_col']} = ? AND raw_extraction IS NOT NULL""",
-                (source_id,),
+            await self.db.execute(
+                """INSERT INTO extraction_corrections
+                   (document_id, field_name, llm_value, corrected_value, facility_id, doc_type)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (doc_id, field_name, llm_value_str, target_display, facility_id, doc_type),
             )
-            rows = await cursor.fetchall()
-            for r in rows:
-                doc_id, llm_value, doc_type, facility_id = r[0], r[1], r[2], r[3]
-                if llm_value == target_display:
-                    continue
-                await self.db.execute(
-                    """INSERT INTO extraction_corrections
-                       (document_id, field_name, llm_value, corrected_value, facility_id, doc_type)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (doc_id, upd["text_col"], llm_value, target_display, facility_id, doc_type),
-                )

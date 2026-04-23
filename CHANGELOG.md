@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-22 - refactor
+
+Major refactor release. No user-visible behavior changes planned, but the
+internal layout changes significantly.
+
+### Changed
+
+- Backend module splits: `settings/routes.py`, `pipeline/extractor.py`,
+  `config.py`, and `chat/service.py` broken into focused sub-modules.
+- Pipeline globals (`pipeline_status`, `cancelled_docs`, `_running_tasks`)
+  wrapped in a single `PipelineState` dataclass.
+- Normalization alias lookup consolidated into
+  `normalization/alias_lookup.py`.
+- DB schema: dropped denormalized `documents.doctor_name` and
+  `documents.facility_name`; readers now JOIN doctors / facilities.
+- DB schema: unified `date_visit` / `date_issued` / `doc_date` into
+  `event_date` (canonical timeline anchor) and `issued_date`
+  (administrative). Migration copies forward with the historic priority
+  rule and rebuilds the FTS5 index.
+- Encounters / imaging_studies `doctor_id` / `facility_id` now stay in
+  lockstep with the parent document via AFTER UPDATE triggers; the
+  periodic re-sync migration is gone.
+- LLM prompts moved from a monolithic `llm/prompts.py` (876 LOC) into
+  per-prompt YAML files under `llm/prompts_data/` with a thin loader
+  that preserves the legacy module-level constants.
+- Frontend: shared API types generated from the FastAPI OpenAPI spec.
+  Request payloads in `types.ts` now re-export from the generated
+  `api/schema.ts`. Regenerate with `python backend/scripts/export_openapi.py`
+  then `npm --prefix frontend run gen:api`.
+- Frontend: shared data hooks under `hooks/data/` (useDoctors,
+  useFacilities, useSpecialties, usePatients, …) cache results
+  per-session. `DocumentsPage` migrated off three per-page refetches.
+- Frontend: every routed page wrapped in its own `ErrorBoundary`.
+- Backend: 4xx/5xx responses on `/api/*` now write a row to `audit_log`.
+- Frontend: four mega-components split into focused sub-components:
+  - `ProvidersTab` (612 -> 251 LOC) split into CredentialDialog,
+    CredentialCard, AttachedModelRow, ModelForm, shared types.
+  - `DocumentDetailPage` (826 -> 208 LOC) split into DocumentViewer,
+    ReprocessMenu, MetadataEditor, NotesEditor, AiEditForm, LinksSection,
+    and child-record sections.
+  - `DocumentsPage` (869 -> 379 LOC) split into DocumentFilters,
+    BulkActionsBar, DocumentTable, InlineRenameCell, shared column defs.
+  - `NormalizationTab` (917 -> 495 LOC) split into NormalizationToolbar,
+    AutoMergePanel, LinkedDocumentsModal, BatchMergeBar, NormalizationRow,
+    shared types.
+
+### Removed
+
+- Trivial UI walkthrough sections from user-guide docs (timeline,
+  documents, medical-events, imaging, normalization, chat, first-steps).
+
 ## [Unreleased]
 
 ### Added

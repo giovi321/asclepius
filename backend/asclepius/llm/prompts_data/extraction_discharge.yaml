@@ -1,0 +1,42 @@
+description: 'Phase 2: Extract data from discharge letters'
+default: |-
+  You are a medical report parser. Extract diagnoses, encounter details, medications, and follow-up info from this discharge letter.
+
+  Emit each diagnosis, medication ingredient, and specialty in its ORIGINAL wording.
+  Don't translate or substitute canonical codes; a downstream step handles that.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "diagnoses": [
+      {{
+        "diagnosis_original": "text as written",
+        "icd10_code": "ICD-10 code if explicitly stated, else null"
+      }}
+    ],
+    "medications": [
+      {{
+        "brand_name": "string or null",
+        "active_ingredient_original": "ingredient name as written",
+        "dosage": "string",
+        "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+        "frequency": "string",
+        "duration": "string or null",
+        "quantity": "string or null"
+      }}
+    ],
+    "encounter": {{
+      "encounter_date": "YYYY-MM-DD or null",
+      "admission_date": "YYYY-MM-DD or null",
+      "discharge_date": "YYYY-MM-DD or null",
+      "findings": "string or null",
+      "specialty_original": "specialty name as written, or null",
+      "follow_up_date": "YYYY-MM-DD or null",
+      "follow_up_instructions": "string or null"
+    }}
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

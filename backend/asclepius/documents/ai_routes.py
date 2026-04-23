@@ -56,9 +56,8 @@ async def edit_document_with_ai(
     current_data = {k: v for k, v in {
         "patient_name": doc.get("patient_name"),
         "doc_type": doc.get("doc_type"),
-        "doc_date": doc.get("doc_date"),
-        "date_issued": doc.get("date_issued"),
-        "date_visit": doc.get("date_visit"),
+        "event_date": doc.get("event_date"),
+        "issued_date": doc.get("issued_date"),
         "doctor_name": doc.get("doctor_name"),
         "facility_name": doc.get("facility_name"),
         "specialty_original": doc.get("specialty_original"),
@@ -72,7 +71,7 @@ async def edit_document_with_ai(
         f"Known patients: {_json.dumps([p.get('name','') for p in context.get('patient_list', [])[:20]])}\n\n"
         f'User instruction: "{body.instruction}"\n\n'
         "Return ONLY a JSON object with the fields that should change. Use these field names:\n"
-        "- patient_name, doc_type, doc_date (YYYY-MM-DD), date_issued, date_visit\n"
+        "- patient_name, doc_type, event_date (YYYY-MM-DD), issued_date (YYYY-MM-DD)\n"
         '- doctor_name (string, e.g. "Dr. Bianchi")\n'
         '- facility_name (string, e.g. "Ospedale Civico")\n'
         "- specialty_original\n"
@@ -105,12 +104,19 @@ async def edit_document_with_ai(
     updates = {}
     if "doc_type" in changes:
         updates["doc_type"] = changes["doc_type"]
-    if "doc_date" in changes:
-        updates["doc_date"] = changes["doc_date"]
-    if "date_issued" in changes:
-        updates["date_issued"] = changes["date_issued"]
-    if "date_visit" in changes:
-        updates["date_visit"] = changes["date_visit"]
+    # Accept both new (event_date/issued_date) and legacy (doc_date/date_visit/
+    # date_issued) LLM outputs, collapsing the three-field schema with the
+    # historic priority rule: date_visit > date_issued > doc_date.
+    if "event_date" in changes:
+        updates["event_date"] = changes["event_date"]
+    elif any(k in changes for k in ("date_visit", "date_issued", "doc_date")):
+        updates["event_date"] = (
+            changes.get("date_visit") or changes.get("date_issued") or changes.get("doc_date")
+        )
+    if "issued_date" in changes:
+        updates["issued_date"] = changes["issued_date"]
+    elif "date_issued" in changes:
+        updates["issued_date"] = changes["date_issued"]
     if "summary_en" in changes:
         updates["summary_en"] = changes["summary_en"]
     if "summary_original" in changes:
@@ -132,15 +138,11 @@ async def edit_document_with_ai(
         doctor_name_str = doctor_data
         doctor_data = None
     if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
-        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
-        doctor_id = await _upsert_doctor(db, doctor_data)
-        updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_data["name"]))
+        from asclepius.pipeline.extractor import _upsert_doctor
+        updates["doctor_id"] = await _upsert_doctor(db, doctor_data)
     elif doctor_name_str:
-        from asclepius.pipeline.extractor import _upsert_doctor, strip_doctor_title, normalize_name
-        doctor_id = await _upsert_doctor(db, {"name": doctor_name_str})
-        updates["doctor_id"] = doctor_id
-        updates["doctor_name"] = normalize_name(strip_doctor_title(doctor_name_str))
+        from asclepius.pipeline.extractor import _upsert_doctor
+        updates["doctor_id"] = await _upsert_doctor(db, {"name": doctor_name_str})
 
     # Handle facility change
     facility_data = changes.get("facility")
@@ -150,14 +152,10 @@ async def edit_document_with_ai(
         facility_data = None
     if facility_data and isinstance(facility_data, dict) and facility_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_facility
-        facility_id = await _upsert_facility(db, facility_data)
-        updates["facility_id"] = facility_id
-        updates["facility_name"] = facility_data["name"]
+        updates["facility_id"] = await _upsert_facility(db, facility_data)
     elif facility_name_str:
         from asclepius.pipeline.extractor import _upsert_facility
-        facility_id = await _upsert_facility(db, {"name": facility_name_str})
-        updates["facility_id"] = facility_id
-        updates["facility_name"] = facility_name_str
+        updates["facility_id"] = await _upsert_facility(db, {"name": facility_name_str})
 
     if updates:
         # Log corrections before applying updates
@@ -182,12 +180,13 @@ async def generate_filename(
 
     ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
 
-    # Look for a date across every plausible source. raw_extraction is the last
-    # resort — LLM output that never landed on a dedicated column.
+    # Look for a date across every plausible source. raw_extraction is the
+    # last resort — LLM output that never landed on a dedicated column. The
+    # raw_extraction JSON can carry either the new event_date or the legacy
+    # date_visit / date_issued / doc_date trio.
     doc_date = (
-        doc.get("date_visit")
-        or doc.get("date_issued")
-        or doc.get("doc_date")
+        doc.get("event_date")
+        or doc.get("issued_date")
         or doc.get("date_received")
         or ""
     )
@@ -197,7 +196,7 @@ async def generate_filename(
             raw = doc["raw_extraction"]
             if isinstance(raw, str):
                 raw = _json.loads(raw)
-            for k in ("date_visit", "date_issued", "doc_date"):
+            for k in ("event_date", "date_visit", "date_issued", "doc_date", "issued_date"):
                 v = raw.get(k) if isinstance(raw, dict) else None
                 if v:
                     doc_date = v
@@ -226,7 +225,7 @@ async def generate_filename(
 
     doc_meta = {
         "doc_type": doc.get("doc_type"),
-        "doc_date": doc_date,
+        "event_date": doc_date,
         "doctor_name": doc.get("doctor_name"),
         "facility_name": doc.get("facility_name"),
         "summary_en": doc.get("summary_en"),

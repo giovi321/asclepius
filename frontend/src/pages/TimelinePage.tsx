@@ -8,9 +8,8 @@ import { getBestDate, formatDate, formatDocType } from "@/lib/utils";
 interface TimelineDoc {
   id: number;
   doc_type: string;
-  doc_date: string | null;
-  date_visit: string | null;
-  date_issued: string | null;
+  event_date: string | null;
+  issued_date: string | null;
   original_filename: string;
   doctor_name: string | null;
   facility_name: string | null;

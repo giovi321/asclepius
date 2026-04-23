@@ -9,15 +9,13 @@ export function cn(...inputs: ClassValue[]) {
 // ─── Document helpers (used across 5+ pages) ──────────
 
 /**
- * Return the best available date from a document object.
- * Priority: date_visit > date_issued > doc_date.
+ * Return the canonical event date from a document object.
  */
 export function getBestDate(doc: {
-  date_visit?: string | null;
-  date_issued?: string | null;
-  doc_date?: string | null;
+  event_date?: string | null;
+  issued_date?: string | null;
 }): string {
-  return doc.date_visit || doc.date_issued || doc.doc_date || "";
+  return doc.event_date || doc.issued_date || "";
 }
 
 /**

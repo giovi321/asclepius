@@ -63,7 +63,7 @@ export default function SearchPage() {
               <span className="font-medium">{doc.original_filename}</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {doc.doc_type?.replace(/_/g, " ")} | {doc.doc_date || "—"} | {doc.patient_name || "Unclassified"}
+              {doc.doc_type?.replace(/_/g, " ")} | {doc.event_date || "no date"} | {doc.patient_name || "Unclassified"}
             </p>
             {doc.ocr_text && (
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">

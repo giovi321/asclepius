@@ -19,6 +19,7 @@ from asclepius.config import get_config
 from asclepius.db.init import initialize_database
 from asclepius.middleware import (
     CsrfMiddleware,
+    ErrorAuditMiddleware,
     MaxBodySizeMiddleware,
     SecurityHeadersMiddleware,
 )
@@ -119,7 +120,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Asclepius",
         description="Self-hosted medical records manager",
-        version="0.7",
+        version="0.9.0",
         lifespan=lifespan,
     )
 
@@ -127,8 +128,9 @@ def create_app() -> FastAPI:
 
     # Middleware order matters — ASGI executes them in reverse-registration
     # order, so the *last* added middleware runs first on the way in. We
-    # want: size-cap → CSRF → security headers → app.
+    # want: size-cap → CSRF → error-audit → security headers → app.
     app.add_middleware(SecurityHeadersMiddleware, config=config)
+    app.add_middleware(ErrorAuditMiddleware)
     app.add_middleware(CsrfMiddleware)
     app.add_middleware(MaxBodySizeMiddleware, max_bytes=config.server.max_upload_bytes)
 

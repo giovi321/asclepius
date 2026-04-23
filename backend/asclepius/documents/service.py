@@ -5,6 +5,8 @@ from pathlib import Path
 
 import aiosqlite
 
+from asclepius.util.dates import BEST_DATE_SQL, BEST_DATE_SQL_WITH_CREATED
+
 
 async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     """Get a single document by ID.
@@ -16,8 +18,8 @@ async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:
     cursor = await db.execute(
         """SELECT d.*,
                   p.display_name as patient_name, p.slug as patient_slug,
-                  COALESCE(d.doctor_name, doc.name) as doctor_name,
-                  COALESCE(d.facility_name, f.name) as facility_name,
+                  doc.name as doctor_name,
+                  f.name as facility_name,
                   ns.canonical_display as specialty_canonical_display,
                   ns.canonical_code as specialty_canonical_code,
                   COALESCE(ns.canonical_display, d.specialty_original) as specialty_display
@@ -41,9 +43,9 @@ _SORT_COLUMNS: dict[str, str] = {
     # prevents SQL injection via untrusted sort params.
     "file":       "d.original_filename",
     "type":       "d.doc_type",
-    "date":       "COALESCE(d.date_visit, d.date_issued, d.doc_date)",
-    "doctor":     "d.doctor_name",
-    "facility":   "d.facility_name",
+    "date":       BEST_DATE_SQL,
+    "doctor":     "doc.name",
+    "facility":   "f.name",
     "patient":    "p.display_name",
     "specialty":  "COALESCE(ns.canonical_display, d.specialty_original)",
     "status":     "d.status",
@@ -108,11 +110,10 @@ async def list_documents(
         if clauses:
             conditions.append("(" + " OR ".join(clauses) + ")")
     if date_from:
-        # Use the best available date
-        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) >= ?")
+        conditions.append(f"{BEST_DATE_SQL} >= ?")
         params.append(date_from)
     if date_to:
-        conditions.append("COALESCE(d.date_visit, d.date_issued, d.doc_date) <= ?")
+        conditions.append(f"{BEST_DATE_SQL} <= ?")
         params.append(date_to)
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
@@ -180,8 +181,8 @@ async def list_documents(
         conditions.append(
             """(d.original_filename LIKE ? COLLATE NOCASE
                 OR d.doc_type LIKE ? COLLATE NOCASE
-                OR d.doctor_name LIKE ? COLLATE NOCASE
-                OR d.facility_name LIKE ? COLLATE NOCASE
+                OR doc.name LIKE ? COLLATE NOCASE
+                OR f.name LIKE ? COLLATE NOCASE
                 OR d.summary_en LIKE ? COLLATE NOCASE
                 OR d.summary_original LIKE ? COLLATE NOCASE
                 OR d.specialty_original LIKE ? COLLATE NOCASE
@@ -194,8 +195,8 @@ async def list_documents(
 
     select_cols = """d.*,
                      p.display_name as patient_name,
-                     COALESCE(d.doctor_name, doc.name) as doctor_name,
-                     COALESCE(d.facility_name, f.name) as facility_name,
+                     doc.name as doctor_name,
+                     f.name as facility_name,
                      ns.canonical_display as specialty_canonical_display,
                      ns.canonical_code as specialty_canonical_code,
                      COALESCE(ns.canonical_display, d.specialty_original) as specialty_display,
@@ -213,7 +214,7 @@ async def list_documents(
     sort_col = _SORT_COLUMNS.get((sort or "").strip())
     sort_dir = "ASC" if (order or "").strip().lower() == "asc" else "DESC"
     if sort_col is None:
-        order_by = "COALESCE(d.date_visit, d.date_issued, d.doc_date, d.created_at) DESC"
+        order_by = f"{BEST_DATE_SQL_WITH_CREATED} DESC"
     else:
         # NULL-LAST regardless of direction so empty cells never steal the
         # top of the list when sorting by e.g. Doctor.
@@ -277,12 +278,9 @@ async def update_document_fields(
 ) -> None:
     """Generic field update on a document row.
 
-    Also cascades ``doctor_id`` / ``facility_id`` to this document's
-    children (``encounters`` and ``imaging_studies``). Those tables carry
-    their own FK copies, and the normalization view counts documents as
-    'referenced' through any of them — without the cascade, renaming a
-    doctor/facility on a document leaves the child rows pointing at the
-    old canonical entry and the stale reference shows up in the norm view.
+    Changes to ``doctor_id`` / ``facility_id`` cascade to this document's
+    children (``encounters`` and ``imaging_studies``) via AFTER UPDATE
+    triggers installed by db.init — no manual cascade needed here.
     """
     if not updates:
         return
@@ -292,41 +290,15 @@ async def update_document_fields(
         f"UPDATE documents SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         values,
     )
-    if "facility_id" in updates:
+    # Cascade date changes to lab_results. When the document's event_date
+    # shifts, every lab row attached to the document moves with it. Per-row
+    # manual overrides are overwritten on purpose - the user edited the
+    # document-level date, so their expectation is that the children follow.
+    if "event_date" in updates:
         await db.execute(
-            "UPDATE encounters SET facility_id = ? WHERE document_id = ?",
-            (updates["facility_id"], doc_id),
+            "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
+            (updates["event_date"], doc_id),
         )
-        await db.execute(
-            "UPDATE imaging_studies SET facility_id = ? WHERE document_id = ?",
-            (updates["facility_id"], doc_id),
-        )
-    if "doctor_id" in updates:
-        await db.execute(
-            "UPDATE encounters SET doctor_id = ? WHERE document_id = ?",
-            (updates["doctor_id"], doc_id),
-        )
-        await db.execute(
-            "UPDATE imaging_studies SET doctor_id = ? WHERE document_id = ?",
-            (updates["doctor_id"], doc_id),
-        )
-    # Cascade date changes to lab_results. When the document's best date
-    # (date_visit > date_issued > doc_date) shifts, every lab row attached to
-    # the document moves with it. Per-row manual overrides are overwritten on
-    # purpose — the user edited the document-level date, so their expectation
-    # is that the children follow.
-    if any(k in updates for k in ("doc_date", "date_issued", "date_visit")):
-        cursor = await db.execute(
-            "SELECT date_visit, date_issued, doc_date FROM documents WHERE id = ?",
-            (doc_id,),
-        )
-        drow = await cursor.fetchone()
-        if drow:
-            best_date = drow[0] or drow[1] or drow[2]
-            await db.execute(
-                "UPDATE lab_results SET test_date = ? WHERE document_id = ?",
-                (best_date, doc_id),
-            )
     await db.commit()
 
 

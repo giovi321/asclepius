@@ -103,7 +103,7 @@ async def process_dicom(
     # Create document record
     cursor = await db.execute(
         """INSERT INTO documents
-           (patient_id, file_path, original_filename, doc_type, doc_date,
+           (patient_id, file_path, original_filename, doc_type, event_date,
             doctor_id, facility_id, status, ocr_engine, ocr_text)
            VALUES (?, ?, ?, 'imaging_dicom', ?, ?, ?, 'done', 'dicom', ?)""",
         (patient_id, relative_path, path.name, study_date,

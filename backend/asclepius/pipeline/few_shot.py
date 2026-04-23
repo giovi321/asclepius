@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 
 # Compact subset of raw_extraction keys to include in examples
 _EXAMPLE_KEYS = {
-    "doc_type", "doc_date", "date_issued", "date_visit", "language_detected",
-    "doctor", "facility", "specialty", "summary_en",
+    "doc_type", "event_date", "issued_date",
+    "doc_date", "date_issued", "date_visit",  # legacy keys from older extractions
+    "language_detected", "doctor", "facility", "specialty", "summary_en",
 }
 
 # Common words to skip when building FTS5 search queries

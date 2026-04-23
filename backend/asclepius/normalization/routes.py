@@ -63,9 +63,6 @@ NORM_TABLES = {
             {"table": "encounters", "col": "doctor_id"},
             {"table": "imaging_studies", "col": "doctor_id"},
         ],
-        "denorm_updates": [
-            {"table": "documents", "fk_col": "doctor_id", "text_col": "doctor_name"},
-        ],
         "doc_sources": [
             ("documents", "doctor_id"),
             ("encounters", "doctor_id"),
@@ -81,9 +78,6 @@ NORM_TABLES = {
             {"table": "encounters", "col": "facility_id"},
             {"table": "imaging_studies", "col": "facility_id"},
             {"table": "doctors", "col": "facility_id"},
-        ],
-        "denorm_updates": [
-            {"table": "documents", "fk_col": "facility_id", "text_col": "facility_name"},
         ],
         "doc_sources": [
             ("documents", "facility_id"),

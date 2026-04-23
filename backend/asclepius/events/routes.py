@@ -9,6 +9,7 @@ import aiosqlite
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.util.dates import BEST_DATE_SQL, best_date
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -111,14 +112,16 @@ async def get_event(
 
     # Get linked documents
     cursor = await db.execute(
-        """SELECT del.id as link_id, del.relevance, del.auto_linked,
+        f"""SELECT del.id as link_id, del.relevance, del.auto_linked,
                   d.id as document_id, d.original_filename, d.doc_type,
-                  COALESCE(d.date_visit, d.date_issued, d.doc_date) as doc_date,
-                  d.doctor_name, d.facility_name, d.summary_en
+                  {BEST_DATE_SQL} as event_date,
+                  doc.name as doctor_name, f.name as facility_name, d.summary_en
            FROM document_event_links del
            JOIN documents d ON del.document_id = d.id
+           LEFT JOIN doctors doc ON d.doctor_id = doc.id
+           LEFT JOIN facilities f ON d.facility_id = f.id
            WHERE del.event_id = ?
-           ORDER BY doc_date DESC""",
+           ORDER BY event_date DESC""",
         (event_id,),
     )
     event["documents"] = [dict(r) for r in await cursor.fetchall()]
@@ -295,7 +298,7 @@ async def suggest_events_for_document(
 
 Document info:
 - Type: {doc.get('doc_type', 'unknown')}
-- Date: {doc.get('date_visit') or doc.get('date_issued') or doc.get('doc_date', 'unknown')}
+- Date: {best_date(doc) or 'unknown'}
 - Doctor: {doc.get('doctor_name', 'unknown')}
 - Facility: {doc.get('facility_name', 'unknown')}
 - Summary: {doc.get('summary_en', 'N/A')}

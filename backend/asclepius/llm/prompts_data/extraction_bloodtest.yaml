@@ -1,0 +1,30 @@
+description: 'Phase 2: Extract lab results from blood test documents'
+default: |-
+  You are a medical lab result parser. Extract ONLY the lab test results from this document.
+
+  Emit each test's name in the ORIGINAL wording used in the document (e.g. "Emoglobina",
+  "Cholesterol LDL", "Transaminasi GPT"). Do not translate or substitute canonical codes —
+  a downstream step matches names to the canonical table.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "lab_results": [
+      {{
+        "test_name_original": "name exactly as written in the document",
+        "value": null,
+        "value_text": "string for non-numeric (e.g. 'positive', 'reactive')",
+        "unit": "string",
+        "reference_range_low": null,
+        "reference_range_high": null,
+        "is_abnormal": false,
+        "sample_type": "blood|urine|stool|saliva|csf|other|null",
+        "panel_name": "string or null (e.g. 'CBC', 'lipid panel')"
+      }}
+    ]
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

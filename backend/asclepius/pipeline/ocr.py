@@ -9,7 +9,8 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig, OcrProviderEntry, _first_enabled_llm, resolve_credential
+from asclepius.config import AppConfig, OcrProviderEntry, resolve_credential
+from asclepius.config.resolver import _first_enabled_llm
 from asclepius.llm.gate import credential_slot, register_credential
 
 logger = logging.getLogger(__name__)

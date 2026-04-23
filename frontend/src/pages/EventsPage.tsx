@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { Plus, Trash2, FileText, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { useEvents } from "@/hooks/data";
 
 const EVENT_TYPES = [
   "symptom", "diagnosis", "hospitalization", "surgery", "treatment",
@@ -29,8 +30,8 @@ const EVENT_COLORS: Record<string, string> = {
 export default function EventsPage() {
   const { selectedPatient } = usePatient();
   const confirm = useConfirm();
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: eventsData, loading, refetch } = useEvents({ patientId: selectedPatient?.id });
+  const events = Array.isArray(eventsData) ? eventsData : [];
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [eventDetail, setEventDetail] = useState<any>(null);
@@ -42,17 +43,7 @@ export default function EventsPage() {
     severity: "", diagnosis_text: "", notes: "",
   });
 
-  const loadEvents = () => {
-    setLoading(true);
-    const params: Record<string, any> = {};
-    if (selectedPatient) params.patient_id = selectedPatient.id;
-    api.get("/events", { params })
-      .then((res) => setEvents(res.data || []))
-      .catch(() => setEvents([]))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { loadEvents(); }, [selectedPatient]);
+  const loadEvents = () => refetch();
 
   const handleCreate = async () => {
     if (!newEvent.title.trim() || !selectedPatient) return;

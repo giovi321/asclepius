@@ -1,42 +1,30 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/api/client";
 import { Plus, Trash2, ChevronDown, ChevronUp, Save, X } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { usePatients } from "@/hooks/data";
 
 interface Patient {
   id: number;
   slug: string;
   display_name: string;
-  date_of_birth?: string;
-  sex?: string;
+  date_of_birth?: string | null;
+  sex?: string | null;
 }
 
 export default function PatientsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, refetch } = usePatients();
+  const patients: Patient[] = Array.isArray(data) ? (data as Patient[]) : [];
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<Patient>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [newPatient, setNewPatient] = useState<Partial<Patient>>({});
   const [saving, setSaving] = useState(false);
 
-  const loadPatients = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/patients");
-      setPatients(Array.isArray(res.data) ? res.data : res.data.items || []);
-    } catch {
-      setPatients([]);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    loadPatients();
-  }, []);
+  const loadPatients = () => refetch();
 
   const handleExpand = (patient: Patient) => {
     if (expandedId === patient.id) {

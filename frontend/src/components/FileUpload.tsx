@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Upload, CheckCircle, AlertCircle, X, Calendar } from "lucide-react";
 import SearchableSelect from "@/components/SearchableSelect";
+import { usePatients, useEvents } from "@/hooks/data";
 
 interface FileUploadProps {
   onUploadComplete?: () => void;
@@ -23,28 +24,19 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [showPatientPrompt, setShowPatientPrompt] = useState(false);
-  const [patients, setPatients] = useState<any[]>([]);
+  const { data: patientsData } = usePatients();
+  const patients = Array.isArray(patientsData) ? patientsData : [];
   const [chosenPatientId, setChosenPatientId] = useState<string>("");
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [uploadedDocIds, setUploadedDocIds] = useState<number[]>([]);
   const [uploadedCount, setUploadedCount] = useState(0);
 
-  useEffect(() => {
-    api.get("/patients").then((res) => {
-      setPatients(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
-  }, []);
-
-  const [events, setEvents] = useState<any[]>([]);
+  const { data: eventsData } = useEvents({
+    patientId: selectedPatient?.id,
+    enabled: !!selectedPatient,
+  });
+  const events = Array.isArray(eventsData) ? eventsData : [];
   const [chosenEventId, setChosenEventId] = useState<string>("");
-
-  useEffect(() => {
-    if (selectedPatient) {
-      api.get("/events", { params: { patient_id: selectedPatient.id } })
-        .then((res) => setEvents(res.data || []))
-        .catch(() => {});
-    }
-  }, [selectedPatient]);
 
   const scheduleBatch = useCallback(
     async (processAt: string | null) => {

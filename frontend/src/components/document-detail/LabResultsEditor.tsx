@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import api from "@/api/client";
 import { TestTube, Pencil, Trash2, Plus, Search } from "lucide-react";
 import { Section } from "./DocumentDetailHelpers";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { useLabTests } from "@/hooks/data";
 
 type LabRow = {
   id?: number;
@@ -54,20 +55,22 @@ function TestPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value || "");
-  const [options, setOptions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data: labTests, loading } = useLabTests();
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setQuery(value || ""); }, [value]);
 
-  useEffect(() => {
-    if (!open) return;
-    setLoading(true);
-    api.get("/normalization/lab_tests", { params: query ? { search: query } : {} })
-      .then((res: any) => setOptions(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setOptions([]))
-      .finally(() => setLoading(false));
-  }, [open, query]);
+  // Filter client-side — the normalization table is bounded (seeded list,
+  // plus user-added aliases) so pulling it once and matching in JS is fast.
+  const options = useMemo(() => {
+    const list = Array.isArray(labTests) ? labTests : [];
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((o: any) =>
+      (o.canonical_display || "").toLowerCase().includes(q) ||
+      (o.canonical_code || "").toLowerCase().includes(q),
+    );
+  }, [labTests, query]);
 
   useEffect(() => {
     if (!open) return;

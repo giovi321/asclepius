@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import api from "@/api/client";
+import {
+  useLlmProviders, useOcrProviders, useVisionProviders,
+} from "@/hooks/data";
 
 export interface ReprocessMenuProps {
   docId: number | string;
@@ -17,31 +20,30 @@ interface Provider {
 
 /**
  * "Reprocess" button + dropdown on the Document Detail header. Owns its
- * own provider lists and menu-open state so the parent page doesn't have
- * to babysit them.
+ * own menu-open state so the parent page doesn't have to babysit it.
  */
 export default function ReprocessMenu({ docId, onBeforeReprocess, onReprocessed }: ReprocessMenuProps) {
   const [open, setOpen] = useState(false);
-  const [llmProviders, setLlmProviders] = useState<Provider[]>([]);
-  const [ocrProviders, setOcrProviders] = useState<Provider[]>([]);
-  const [visionProviders, setVisionProviders] = useState<Provider[]>([]);
+  const { data: llmAll } = useLlmProviders();
+  const { data: ocrAll } = useOcrProviders();
+  const { data: visionAll } = useVisionProviders();
+  const llmProviders: Provider[] = useMemo(
+    () => (Array.isArray(llmAll) ? llmAll : []).filter((p: Provider) => p.enabled),
+    [llmAll],
+  );
+  const ocrProviders: Provider[] = useMemo(
+    () => (Array.isArray(ocrAll) ? ocrAll : []).filter((p: Provider) => p.enabled),
+    [ocrAll],
+  );
+  const visionProviders: Provider[] = useMemo(
+    () => (Array.isArray(visionAll) ? visionAll : []).filter((p: Provider) => p.enabled),
+    [visionAll],
+  );
   const [mode, setMode] = useState("both");
   const [llmId, setLlmId] = useState("");
   const [ocrId, setOcrId] = useState("");
   const [visionId, setVisionId] = useState("");
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    api.get("/settings/llm-providers").then((res: any) => {
-      setLlmProviders((res.data || []).filter((p: Provider) => p.enabled));
-    }).catch(() => {});
-    api.get("/settings/ocr-providers").then((res: any) => {
-      setOcrProviders((res.data || []).filter((p: Provider) => p.enabled));
-    }).catch(() => {});
-    api.get("/settings/vision-providers").then((res: any) => {
-      setVisionProviders((res.data || []).filter((p: Provider) => p.enabled));
-    }).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!open) return;

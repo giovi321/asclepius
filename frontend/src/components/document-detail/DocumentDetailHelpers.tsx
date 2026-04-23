@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import { Eye, EyeOff, Pencil, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
+import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
 
 // ─── Section wrapper ───────────────────────────────────────────
 
@@ -166,19 +167,16 @@ export function EditableCombobox({
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const [options, setOptions] = useState<any[]>([]);
-  const [loadingOptions, setLoadingOptions] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Fetch options when entering edit mode
-  useEffect(() => {
-    if (!editing) return;
-    setLoadingOptions(true);
-    api.get(`/normalization/${normType}`)
-      .then((res: any) => setOptions(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setOptions([]))
-      .finally(() => setLoadingOptions(false));
-  }, [editing, normType]);
+  const doctors = useDoctors();
+  const facilities = useFacilities();
+  const specialties = useSpecialties();
+  const source = normType === "doctors" ? doctors
+    : normType === "facilities" ? facilities
+    : specialties;
+  const options = Array.isArray(source.data) ? source.data : [];
+  const loadingOptions = source.loading;
 
   // Close on outside click
   useEffect(() => {

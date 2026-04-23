@@ -3,6 +3,7 @@ import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { Plus, Trash2, ScrollText, UserCog, X, Check } from "lucide-react";
+import { usePatients } from "@/hooks/data";
 
 interface Patient {
   id: number;
@@ -22,7 +23,8 @@ export default function UsersTab() {
   const [users, setUsers] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", password: "", display_name: "", role: "editor" });
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const { data: patientsData } = usePatients();
+  const patients: Patient[] = Array.isArray(patientsData) ? (patientsData as Patient[]) : [];
   // Map of user_id → their current access grants. Loaded in parallel on mount.
   const [grants, setGrants] = useState<Record<number, Grant[]>>({});
   const [auditLog, setAuditLog] = useState<any[]>([]);
@@ -52,7 +54,6 @@ export default function UsersTab() {
 
   useEffect(() => {
     loadUsers().catch(() => {});
-    api.get("/patients").then((res) => setPatients(Array.isArray(res.data) ? res.data : [])).catch(() => {});
   }, []);
 
   const loadAuditLog = async () => {

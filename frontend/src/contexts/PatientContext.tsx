@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import api from "@/api/client";
 import type { Patient } from "@/types";
+import { usePatients } from "@/hooks/data";
 
 interface PatientContextType {
   selectedPatient: Patient | null;
@@ -15,19 +15,19 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     return stored ? JSON.parse(stored) : null;
   });
 
-  // Validate stored patient still exists in DB
+  // Validate the stored patient still exists in DB. We read from the shared
+  // /patients cache — once it loads the first time on any page, this check
+  // is a no-op.
+  const { data: patients } = usePatients();
   useEffect(() => {
-    if (selectedPatient) {
-      api.get("/patients").then((res) => {
-        const patients = Array.isArray(res.data) ? res.data : [];
-        const exists = patients.some((p: Patient) => p.id === selectedPatient.id);
-        if (!exists) {
-          setSelectedPatient(null);
-          localStorage.removeItem("asclepius_patient");
-        }
-      }).catch(() => {});
+    if (selectedPatient && Array.isArray(patients)) {
+      const exists = patients.some((p: Patient) => p.id === selectedPatient.id);
+      if (!exists) {
+        setSelectedPatient(null);
+        localStorage.removeItem("asclepius_patient");
+      }
     }
-  }, []);
+  }, [patients, selectedPatient]);
 
   const handleSet = (p: Patient | null) => {
     setSelectedPatient(p);

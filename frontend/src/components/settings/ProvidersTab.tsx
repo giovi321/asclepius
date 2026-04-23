@@ -3,41 +3,35 @@ import { KeyRound, Plus } from "lucide-react";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
 import type { Credential, LlmProvider, OcrProvider, VisionLlmProvider } from "@/types";
+import {
+  useCredentials, useLlmProviders, useVisionProviders, useOcrProviders,
+} from "@/hooks/data";
 import CredentialDialog from "./providers/CredentialDialog";
 import CredentialCard, { modelKey } from "./providers/CredentialCard";
 import type { AttachedModel, ModelKind } from "./providers/types";
 
 export default function ProvidersTab() {
   const { toast } = useToast();
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [llm, setLlm] = useState<LlmProvider[]>([]);
-  const [vision, setVision] = useState<VisionLlmProvider[]>([]);
-  const [ocr, setOcr] = useState<OcrProvider[]>([]);
+  const { data: credData, error: credErr, refetch: refetchCred } = useCredentials();
+  const { data: llmData, refetch: refetchLlm } = useLlmProviders();
+  const { data: visionData, refetch: refetchVision } = useVisionProviders();
+  const { data: ocrData, refetch: refetchOcr } = useOcrProviders();
+  const credentials: Credential[] = Array.isArray(credData) ? credData : [];
+  const llm: LlmProvider[] = Array.isArray(llmData) ? llmData : [];
+  const vision: VisionLlmProvider[] = Array.isArray(visionData) ? visionData : [];
+  const ocr: OcrProvider[] = Array.isArray(ocrData) ? ocrData : [];
   const [editingCred, setEditingCred] = useState<Partial<Credential> | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [editingModelKey, setEditingModelKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reloadAll = async () => {
-    try {
-      const [c, l, v, o] = await Promise.all([
-        api.get("/settings/credentials"),
-        api.get("/settings/llm-providers"),
-        api.get("/settings/vision-providers"),
-        api.get("/settings/ocr-providers"),
-      ]);
-      setCredentials(Array.isArray(c.data) ? c.data : []);
-      setLlm(Array.isArray(l.data) ? l.data : []);
-      setVision(Array.isArray(v.data) ? v.data : []);
-      setOcr(Array.isArray(o.data) ? o.data : []);
-    } catch {
-      toast({ title: "Failed to load providers", variant: "error" });
-    }
+    await Promise.all([refetchCred(), refetchLlm(), refetchVision(), refetchOcr()]);
   };
 
   useEffect(() => {
-    reloadAll();
-  }, []);
+    if (credErr) toast({ title: "Failed to load providers", variant: "error" });
+  }, [credErr, toast]);
 
   // Group attached models by credential_id.
   const attachedByCred = useMemo(() => {

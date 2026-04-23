@@ -6,8 +6,10 @@ import {
 import { SettingsForm, NumberField, SelectField, useSettingsSave } from "./SettingsFormHelpers";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { useSettings } from "@/hooks/data";
 
 export default function PipelineTab() {
+  const { data: settingsData } = useSettings();
   const [s, setS] = useState<any>(null);
   const [f, setF] = useState<any>({});
   const { toast } = useToast();
@@ -23,17 +25,19 @@ export default function PipelineTab() {
   };
 
   useEffect(() => {
-    api.get("/settings").then((res) => {
-      setS(res.data);
-      setF({
-        pipeline_watch_enabled: res.data.pipeline.watch_enabled,
-        pipeline_poll_interval: res.data.pipeline.poll_interval_seconds,
-        pipeline_retry_interval: res.data.pipeline.retry_interval_seconds,
-        pipeline_max_retries: res.data.pipeline.max_retries,
-        pipeline_default_flow: res.data.pipeline.default_flow || "ocr_llm",
-        session_ttl_hours: res.data.auth.session_ttl_hours,
-      });
+    if (!settingsData) return;
+    setS(settingsData);
+    setF({
+      pipeline_watch_enabled: settingsData.pipeline.watch_enabled,
+      pipeline_poll_interval: settingsData.pipeline.poll_interval_seconds,
+      pipeline_retry_interval: settingsData.pipeline.retry_interval_seconds,
+      pipeline_max_retries: settingsData.pipeline.max_retries,
+      pipeline_default_flow: settingsData.pipeline.default_flow || "ocr_llm",
+      session_ttl_hours: settingsData.auth.session_ttl_hours,
     });
+  }, [settingsData]);
+
+  useEffect(() => {
     loadFailed();
     loadStatus();
     const interval = setInterval(loadStatus, 5000);

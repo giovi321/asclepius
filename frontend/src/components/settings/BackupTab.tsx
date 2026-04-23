@@ -6,6 +6,7 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import {
   SettingsForm, NumberField, SelectField, ToggleField, useSettingsSave,
 } from "./SettingsFormHelpers";
+import { useSettings } from "@/hooks/data";
 
 type JobKind = "db" | "vault" | "full";
 type Schedule = "hourly" | "daily" | "weekly";
@@ -67,12 +68,17 @@ export default function BackupTab() {
   const [files, setFiles] = useState<BackupFile[]>([]);
   const [running, setRunning] = useState(false);
   const [downloadingOneShot, setDownloadingOneShot] = useState(false);
+  const { data: settingsData, refetch: refetchSettings } = useSettings();
 
-  const loadSettings = async () => {
-    const res = await api.get("/settings");
-    const b: BackupState = res.data.backup;
+  useEffect(() => {
+    if (!settingsData) return;
+    const b: BackupState = settingsData.backup;
     setState(b);
     setForm(structuredClone(b));
+  }, [settingsData]);
+
+  const loadSettings = async () => {
+    await refetchSettings();
   };
 
   const loadFiles = async () => {
@@ -85,7 +91,6 @@ export default function BackupTab() {
   };
 
   useEffect(() => {
-    loadSettings();
     loadFiles();
   }, []);
 

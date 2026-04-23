@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
 import {
@@ -7,6 +7,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import type { Credential, LlmProvider, OcrProvider, VisionLlmProvider, GeneralLlmSettings } from "@/types";
+import {
+  useCredentials, useLlmProviders, useVisionProviders, useOcrProviders,
+} from "@/hooks/data";
 
 // ─── Generic priority section ─────────────────────────────────────
 
@@ -223,28 +226,22 @@ function GeneralLlmCard({ credentials, llm }: { credentials: Credential[]; llm: 
 
 export default function PriorityTab() {
   const { toast } = useToast();
-  const [credentials, setCredentials] = useState<Credential[]>([]);
-  const [llm, setLlm] = useState<LlmProvider[]>([]);
-  const [vision, setVision] = useState<VisionLlmProvider[]>([]);
-  const [ocr, setOcr] = useState<OcrProvider[]>([]);
+  const { data: credData, error: credErr, refetch: refetchCred } = useCredentials();
+  const { data: llmData, refetch: refetchLlm } = useLlmProviders();
+  const { data: visionData, refetch: refetchVision } = useVisionProviders();
+  const { data: ocrData, refetch: refetchOcr } = useOcrProviders();
+  const credentials: Credential[] = Array.isArray(credData) ? credData : [];
+  const llm = useMemo(() => asSorted(llmData), [llmData]) as LlmProvider[];
+  const vision = useMemo(() => asSorted(visionData), [visionData]) as VisionLlmProvider[];
+  const ocr = useMemo(() => asSorted(ocrData), [ocrData]) as OcrProvider[];
+
+  useEffect(() => {
+    if (credErr) toast({ title: "Failed to load routing", variant: "error" });
+  }, [credErr, toast]);
 
   const reloadAll = async () => {
-    try {
-      const [c, l, v, o] = await Promise.all([
-        api.get("/settings/credentials"),
-        api.get("/settings/llm-providers"),
-        api.get("/settings/vision-providers"),
-        api.get("/settings/ocr-providers"),
-      ]);
-      setCredentials(Array.isArray(c.data) ? c.data : []);
-      setLlm(asSorted(l.data));
-      setVision(asSorted(v.data));
-      setOcr(asSorted(o.data));
-    } catch {
-      toast({ title: "Failed to load routing", variant: "error" });
-    }
+    await Promise.all([refetchCred(), refetchLlm(), refetchVision(), refetchOcr()]);
   };
-  useEffect(() => { reloadAll(); }, []);
 
   const persistLlm = async (next: LlmProvider[]) => {
     await api.put("/settings/llm-providers", next);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import api from "@/api/client";
 import { SettingsForm, TextField, ToggleField, useSettingsSave } from "./SettingsFormHelpers";
+import { useSettings } from "@/hooks/data";
 
 const parseRoleList = (v: string): string[] =>
   v.split(",").map((s) => s.trim()).filter(Boolean);
@@ -15,28 +15,28 @@ export default function OidcTab() {
   const [s, setS] = useState<any>(null);
   const [f, setF] = useState<any>({});
   const { saving, saved, save } = useSettingsSave();
+  const { data: settingsData } = useSettings();
 
   useEffect(() => {
-    api.get("/settings").then((res) => {
-      setS(res.data);
-      setF({
-        oidc_enabled: res.data.oidc.enabled,
-        oidc_provider_url: res.data.oidc.provider_url || "",
-        oidc_client_id: res.data.oidc.client_id || "",
-        oidc_client_secret: "",
-        oidc_scopes: res.data.oidc.scopes || "openid profile email",
-        oidc_auto_create_user: res.data.oidc.auto_create_user,
-        oidc_username_claim: res.data.oidc.username_claim || "preferred_username",
-        oidc_display_name_claim: res.data.oidc.display_name_claim || "name",
-        oidc_sync_roles: !!res.data.oidc.sync_roles,
-        oidc_roles_claim: res.data.oidc.roles_claim || "groups",
-        oidc_admin_roles: (res.data.oidc.admin_roles || []).join(", "),
-        oidc_editor_roles: (res.data.oidc.editor_roles || []).join(", "),
-        oidc_viewer_roles: (res.data.oidc.viewer_roles || []).join(", "),
-        oidc_default_role: res.data.oidc.default_role || "viewer",
-      });
+    if (!settingsData) return;
+    setS(settingsData);
+    setF({
+      oidc_enabled: settingsData.oidc.enabled,
+      oidc_provider_url: settingsData.oidc.provider_url || "",
+      oidc_client_id: settingsData.oidc.client_id || "",
+      oidc_client_secret: "",
+      oidc_scopes: settingsData.oidc.scopes || "openid profile email",
+      oidc_auto_create_user: settingsData.oidc.auto_create_user,
+      oidc_username_claim: settingsData.oidc.username_claim || "preferred_username",
+      oidc_display_name_claim: settingsData.oidc.display_name_claim || "name",
+      oidc_sync_roles: !!settingsData.oidc.sync_roles,
+      oidc_roles_claim: settingsData.oidc.roles_claim || "groups",
+      oidc_admin_roles: (settingsData.oidc.admin_roles || []).join(", "),
+      oidc_editor_roles: (settingsData.oidc.editor_roles || []).join(", "),
+      oidc_viewer_roles: (settingsData.oidc.viewer_roles || []).join(", "),
+      oidc_default_role: settingsData.oidc.default_role || "viewer",
     });
-  }, []);
+  }, [settingsData]);
 
   if (!s) return <div className="text-muted-foreground">Loading...</div>;
 

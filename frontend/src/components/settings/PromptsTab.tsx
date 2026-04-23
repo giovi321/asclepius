@@ -3,6 +3,7 @@ import api from "@/api/client";
 import { Save, RotateCcw, Languages } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { useSettings } from "@/hooks/data";
 
 // Canonical output languages. Extend freely — the backend accepts any string
 // and embeds it verbatim into the LLM language directive.
@@ -21,14 +22,17 @@ export default function PromptsTab() {
   const [canonicalLanguage, setCanonicalLanguage] = useState<string>("English");
   const [savingLanguage, setSavingLanguage] = useState(false);
 
+  const { data: settingsData } = useSettings();
+
   const load = () => {
     api.get("/settings/prompts").then((res) => setPrompts(res.data || []));
-    api.get("/settings").then((res) => {
-      setCanonicalLanguage(res.data?.llm?.canonical_language || "English");
-    });
   };
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (settingsData) setCanonicalLanguage(settingsData?.llm?.canonical_language || "English");
+  }, [settingsData]);
 
   const saveLanguage = async (value: string) => {
     setSavingLanguage(true);

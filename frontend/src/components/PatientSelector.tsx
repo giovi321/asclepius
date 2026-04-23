@@ -1,29 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { usePatient } from "@/contexts/PatientContext";
-import api from "@/api/client";
 import { User, Users as UsersIcon, Check, ChevronsUpDown, Search, X } from "lucide-react";
 import type { Patient } from "@/types";
+import { usePatients } from "@/hooks/data";
 
 type PatientRow = Patient;
 
 export default function PatientSelector() {
   const { selectedPatient, setSelectedPatient } = usePatient();
-  const [patients, setPatients] = useState<PatientRow[]>([]);
+  const { data, refetch } = usePatients();
+  const patients: PatientRow[] = Array.isArray(data) ? data : [];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Keep the list fresh so newly-added patients show up without a page reload.
   useEffect(() => {
-    const load = () => {
-      api.get("/patients").then((res) => {
-        setPatients(Array.isArray(res.data) ? res.data : []);
-      }).catch(() => {});
-    };
-    load();
-    const interval = setInterval(load, 10000);
+    const interval = setInterval(() => refetch(), 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refetch]);
 
   useEffect(() => {
     if (!open) return;

@@ -1,23 +1,21 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "@/api/client";
 import { Stethoscope } from "lucide-react";
 import { Section } from "./DocumentDetailHelpers";
 import { useToast } from "@/contexts/ToastContext";
+import { useEvents } from "@/hooks/data";
 
 export default function EventSelector({ docId, patientId, currentEventId, onUpdate }: {
   docId: number; patientId: number | null; currentEventId: number | null; onUpdate: (eventId: number) => void;
 }) {
   const { toast } = useToast();
-  const [events, setEvents] = useState<any[]>([]);
+  const { data: eventsData, refetch: refetchEvents } = useEvents({
+    patientId,
+    enabled: !!patientId,
+  });
+  const events = Array.isArray(eventsData) ? eventsData : [];
   const [suggesting, setSuggesting] = useState(false);
   const [suggestion, setSuggestion] = useState<any>(null);
-
-  useEffect(() => {
-    if (!patientId) return;
-    api.get("/events", { params: { patient_id: patientId } })
-      .then((res) => setEvents(res.data || []))
-      .catch(() => {});
-  }, [patientId]);
 
   const handleAssign = async (eventId: number) => {
     await api.post(`/events/${eventId}/link`, { document_id: docId });
@@ -46,9 +44,7 @@ export default function EventSelector({ docId, patientId, currentEventId, onUpda
     await api.post(`/events/${res.data.id}/link`, { document_id: docId });
     setSuggestion(null);
     onUpdate(res.data.id);
-    // Reload events list
-    api.get("/events", { params: { patient_id: patientId } })
-      .then((r) => setEvents(r.data || []));
+    refetchEvents();
   };
 
   if (!patientId) return null;

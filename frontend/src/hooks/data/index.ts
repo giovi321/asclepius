@@ -1,4 +1,5 @@
 import { createResource } from "./createResource";
+import type { Patient } from "@/types";
 
 /**
  * Canonical normalization-table entries. Shape mirrors the
@@ -16,13 +17,7 @@ export interface NormEntry {
   unreviewed_count?: number;
 }
 
-export interface PatientSummary {
-  id: number;
-  slug: string;
-  display_name: string;
-  date_of_birth?: string | null;
-  sex?: string | null;
-}
+export type PatientSummary = Patient;
 
 export const useDoctors = createResource<NormEntry[]>("/normalization/doctors");
 export const useFacilities = createResource<NormEntry[]>("/normalization/facilities");
@@ -30,4 +25,11 @@ export const useSpecialties = createResource<NormEntry[]>("/normalization/specia
 export const useLabTests = createResource<NormEntry[]>("/normalization/lab_tests");
 export const useDiagnoses = createResource<NormEntry[]>("/normalization/diagnoses");
 export const useMedications = createResource<NormEntry[]>("/normalization/medications");
-export const usePatients = createResource<PatientSummary[]>("/patients");
+export const usePatients = createResource<Patient[]>("/patients");
+
+export {
+  useCredentials, useLlmProviders, useVisionProviders, useOcrProviders,
+} from "./providers";
+export { useSettings } from "./useSettings";
+export { useEvents } from "./useEvents";
+export { useDocumentList } from "./useDocumentList";

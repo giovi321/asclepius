@@ -6,7 +6,27 @@ helpers here small and side-effect-free beyond the single DB write they
 advertise: callers rely on them being idempotent.
 """
 
+import re
+
 import aiosqlite
+
+
+def canonicalize_code(code: str | None) -> str | None:
+    """Normalize a canonical_code to kebab-case.
+
+    Rule: lowercase; every run of whitespace or underscores becomes a
+    single hyphen; anything outside [a-z0-9-] is dropped. Used both at
+    insert time (entity_matching helpers, normalization routes) and by
+    the one-shot migration that rewrites legacy snake_case codes in
+    existing databases.
+    """
+    if code is None:
+        return None
+    s = code.strip().lower()
+    s = re.sub(r"[\s_]+", "-", s)
+    s = re.sub(r"[^a-z0-9-]", "", s)
+    s = re.sub(r"-+", "-", s)
+    return s.strip("-")
 
 # Honorific / title tokens to strip from doctor names before storing them.
 # We want the raw person-name in the database — the display layer can add

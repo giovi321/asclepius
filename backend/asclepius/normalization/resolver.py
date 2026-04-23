@@ -47,10 +47,10 @@ _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
 def _slugify(text: str) -> str:
-    """Produce a stable lowercase slug usable as canonical_code fallback."""
+    """Produce a stable lowercase kebab-case slug usable as canonical_code fallback."""
     if not text:
         return ""
-    return _SLUG_RE.sub("_", text.lower()).strip("_")
+    return _SLUG_RE.sub("-", text.lower()).strip("-")
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ async def _resolve_one(
     # 3. Auto-create. canonical_display keeps the source wording so the user
     # can recognise it in the normalization UI; canonical_code is a slug of
     # the original — stable enough to be unique, short enough to be useful.
-    canonical_code = _slugify(cleaned) or f"auto_{abs(hash(cleaned)) & 0xFFFFFF:06x}"
+    canonical_code = _slugify(cleaned) or f"auto-{abs(hash(cleaned)) & 0xFFFFFF:06x}"
     tables = _ENTITIES[entity]
 
     # Guard against collisions with an existing canonical_code (UNIQUE).

@@ -2,6 +2,8 @@
 
 import aiosqlite
 
+from asclepius.pipeline.entity_matching import canonicalize_code
+
 # Whitelist of valid table and column names for normalization queries.
 # All f-string SQL uses ONLY these validated names — never user input.
 VALID_TABLES = {
@@ -128,7 +130,7 @@ class NormService:
     ) -> dict:
         updates = {}
         if canonical_code is not None:
-            updates["canonical_code"] = canonical_code
+            updates["canonical_code"] = canonicalize_code(canonical_code) or canonical_code
         if canonical_display is not None:
             updates["canonical_display"] = canonical_display
             # For doctors/facilities the rest of the app reads the `name` column
@@ -157,7 +159,8 @@ class NormService:
         """
         from asclepius.patients.service import slugify
 
-        code = (canonical_code or "").strip() or slugify(canonical_display)
+        raw_code = (canonical_code or "").strip() or slugify(canonical_display)
+        code = canonicalize_code(raw_code) or raw_code
         display = canonical_display.strip()
 
         if self.main_table in ("doctors", "facilities"):

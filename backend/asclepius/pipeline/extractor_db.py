@@ -9,10 +9,12 @@ lab-results / diagnoses / medications machinery.
 
 import aiosqlite
 
+from asclepius.pipeline.entity_matching import canonicalize_code
+
 
 async def _resolve_specialty_from_data(db: aiosqlite.Connection, specialty_data: dict) -> int | None:
     """Resolve specialty to norm_specialties ID from specialty extraction data."""
-    canonical = specialty_data.get("canonical", "")
+    canonical = canonicalize_code(specialty_data.get("canonical", "")) or ""
 
     if canonical:
         cursor = await db.execute(
@@ -27,7 +29,7 @@ async def _resolve_specialty_from_data(db: aiosqlite.Connection, specialty_data:
 
 async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
     """Resolve lab test to norm_lab_tests ID, creating if needed."""
-    canonical = lab.get("test_name_canonical", "")
+    canonical = canonicalize_code(lab.get("test_name_canonical", "")) or ""
     original = lab.get("test_name_original", "")
     mapped = lab.get("test_mapped", False)
 
@@ -48,7 +50,7 @@ async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
         return row[0]
 
     if canonical:
-        display = canonical.replace("_", " ").title()
+        display = canonical.replace("-", " ").replace("_", " ").title()
         cursor = await db.execute(
             "INSERT OR IGNORE INTO norm_lab_tests (canonical_code, canonical_display) VALUES (?, ?)",
             (canonical, display),
@@ -71,7 +73,7 @@ async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
 
 async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None:
     """Resolve diagnosis to norm_diagnoses ID."""
-    canonical = diag.get("diagnosis_canonical", "")
+    canonical = canonicalize_code(diag.get("diagnosis_canonical", "")) or ""
     original = diag.get("diagnosis_original", "")
 
     if canonical:
@@ -91,7 +93,7 @@ async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None
         return row[0]
 
     if canonical:
-        display = canonical.replace("_", " ").title()
+        display = canonical.replace("-", " ").replace("_", " ").title()
         cursor = await db.execute(
             "INSERT OR IGNORE INTO norm_diagnoses (canonical_code, canonical_display, icd10_code) VALUES (?, ?, ?)",
             (canonical, display, diag.get("icd10_code")),
@@ -109,7 +111,7 @@ async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None
 
 async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None:
     """Resolve medication to norm_medications ID."""
-    canonical = med.get("active_ingredient_canonical", "")
+    canonical = canonicalize_code(med.get("active_ingredient_canonical", "")) or ""
     original = med.get("active_ingredient_original", "")
 
     if canonical:
@@ -129,7 +131,7 @@ async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None
         return row[0]
 
     if canonical:
-        display = canonical.replace("_", " ").title()
+        display = canonical.replace("-", " ").replace("_", " ").title()
         cursor = await db.execute(
             "INSERT OR IGNORE INTO norm_medications (canonical_code, canonical_display) VALUES (?, ?)",
             (canonical, display),

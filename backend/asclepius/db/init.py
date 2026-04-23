@@ -174,6 +174,37 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             "Migration: stripped titles from %d doctor rows", _doc_updates,
         )
 
+    # Also sweep doctor_aliases.alias — historically a row could be inserted
+    # with an honorific ("Dr. Smith") as its alias even after the doctor's
+    # own name had been cleaned, so the filter / autocomplete dropdowns kept
+    # showing the uncleaned form. Guarded by an idempotent equality check,
+    # so re-runs produce zero writes.
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='doctor_aliases'"
+    )
+    if await cursor.fetchone():
+        cursor = await db.execute("SELECT id, alias FROM doctor_aliases")
+        _alias_updates = 0
+        for r in await cursor.fetchall():
+            alias_id, cur_alias = r[0], r[1] or ""
+            new_alias = normalize_name(strip_doctor_title(cur_alias))
+            if new_alias and new_alias != cur_alias:
+                try:
+                    await db.execute(
+                        "UPDATE doctor_aliases SET alias = ? WHERE id = ?",
+                        (new_alias, alias_id),
+                    )
+                    _alias_updates += 1
+                except aiosqlite.IntegrityError:
+                    # Another alias row already holds the cleaned form — drop
+                    # the duplicate instead of failing the whole migration.
+                    await db.execute("DELETE FROM doctor_aliases WHERE id = ?", (alias_id,))
+        if _alias_updates:
+            await db.commit()
+            logger.info(
+                "Migration: stripped titles from %d doctor_aliases rows", _alias_updates,
+            )
+
     # Keep encounters.{doctor_id,facility_id} and imaging_studies.{...} in
     # lockstep with the parent document via AFTER UPDATE triggers. Replaces
     # the belt-and-braces periodic re-sync that used to run on every startup
@@ -533,6 +564,49 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await db.execute(
         "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
     )
+
+    # Normalize every canonical_code to kebab-case (lowercase, `-` as the
+    # only word separator). Legacy seeds and LLM-emitted codes used
+    # snake_case, so the Normalization settings UI showed a mix of
+    # "essential_hypertension" and "25_hydroxy_vitamin_d" next to freshly
+    # auto-created kebab entries. Idempotent — only touches rows that
+    # actually need rewriting. Skips rows whose cleaned code would collide
+    # with an existing row (UNIQUE constraint); the user can merge those
+    # via the Normalization UI.
+    from asclepius.pipeline.entity_matching import canonicalize_code
+    _code_tables = (
+        "norm_lab_tests",
+        "norm_specialties",
+        "norm_diagnoses",
+        "norm_medications",
+        "doctors",
+        "facilities",
+    )
+    _code_updates = 0
+    _code_skipped = 0
+    for tbl in _code_tables:
+        cursor = await db.execute(
+            f"SELECT id, canonical_code FROM {tbl} WHERE canonical_code IS NOT NULL"
+        )
+        for r in await cursor.fetchall():
+            row_id, cur_code = r[0], r[1] or ""
+            new_code = canonicalize_code(cur_code)
+            if not new_code or new_code == cur_code:
+                continue
+            try:
+                await db.execute(
+                    f"UPDATE {tbl} SET canonical_code = ? WHERE id = ?",
+                    (new_code, row_id),
+                )
+                _code_updates += 1
+            except aiosqlite.IntegrityError:
+                _code_skipped += 1
+    if _code_updates or _code_skipped:
+        await db.commit()
+        logger.info(
+            "Migration: rewrote %d canonical_code values to kebab-case (%d skipped due to existing collision)",
+            _code_updates, _code_skipped,
+        )
 
     # Compat view for external tooling that still expects the old
     # doctor_name / facility_name columns (see issue #16). Dropped and

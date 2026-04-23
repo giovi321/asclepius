@@ -134,7 +134,7 @@ async def test_list_diagnoses(client):
     resp = await client.get("/api/normalization/diagnoses")
     assert resp.status_code == 200
     data = resp.json()
-    assert any(item["canonical_code"] == "essential_hypertension" for item in data)
+    assert any(item["canonical_code"] == "essential-hypertension" for item in data)
 
 
 @pytest.mark.asyncio

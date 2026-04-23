@@ -84,7 +84,7 @@ confidence, and LLM provider/model.
 ### AI Edit
 
 Apply natural-language instructions to the metadata, e.g. "Change the
-doctor to Dr. Bianchi" or "This is a prescription, not a specialist
+doctor to Dr. Mueller" or "This is a prescription, not a specialist
 report". The LLM updates only the relevant fields.
 
 ### Tags, notes, sections

@@ -6,12 +6,12 @@ import pytest
 @pytest.mark.asyncio
 async def test_create_patient(client):
     resp = await client.post(
-        "/api/patients", json={"display_name": "Giovanni Crapelli", "date_of_birth": "1990-01-15"}
+        "/api/patients", json={"display_name": "Alex Smith", "date_of_birth": "1990-01-15"}
     )
     assert resp.status_code == 201
     data = resp.json()
-    assert data["display_name"] == "Giovanni Crapelli"
-    assert data["slug"] == "giovanni-crapelli"
+    assert data["display_name"] == "Alex Smith"
+    assert data["slug"] == "alex-smith"
     assert data["date_of_birth"] == "1990-01-15"
 
 

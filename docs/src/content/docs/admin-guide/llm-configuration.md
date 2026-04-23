@@ -44,7 +44,7 @@ Two Ollama models on the same server compete for the same GPU. Setting a concurr
 
 ## Recommended stack
 
-If you're setting up Asclepius for the first time and want a reasonable default, here's what we run. It fits on a single workstation with ~12 GB of VRAM and produces solid results on Italian and English medical documents.
+If you're setting up Asclepius for the first time and want a reasonable default, here's what we run. It fits on a single workstation with ~12 GB of VRAM and produces solid results on English and other European-language medical documents.
 
 ### Local (self-hosted, via Ollama)
 
@@ -436,7 +436,7 @@ Variables suffixed with `?` are optional.
 
 ## Normalization
 
-The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms, doctors, and facilities. When the LLM extracts terms like lab test names, diagnoses, medications, specialties, doctor names, and facility names, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed. Use "Merge" to consolidate duplicate entries (e.g., "Dr. M. Bianchi" and "Dr. Marco Bianchi").
+The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms, doctors, and facilities. When the LLM extracts terms like lab test names, diagnoses, medications, specialties, doctor names, and facility names, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed. Use "Merge" to consolidate duplicate entries (e.g., "Dr. H. Mueller" and "Dr. Hans Mueller").
 
 See [Normalization](../user-guide/normalization.md) for details.
 

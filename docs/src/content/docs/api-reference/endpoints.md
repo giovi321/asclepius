@@ -104,7 +104,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 ```json
 {
-  "instruction": "Change the doctor to Dr. Bianchi and set the date to 2024-03-15"
+  "instruction": "Change the doctor to Dr. Mueller and set the date to 2024-03-15"
 }
 ```
 

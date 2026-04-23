@@ -33,22 +33,22 @@ Columns:
 - **Unit** / **Reference** / **Date** — as extracted.
 - **Actions** — inline **Edit** turns the row into input fields (test name, value, unit, reference low/high, test date). **Delete** removes the row after a confirmation; the source document is untouched.
 
-### OGTT curve ("curva glicemica")
+### OGTT curve
 
 When a group of results on the same document contains at least three parseable glucose time-offset readings, the group's collapsed view renders an OGTT badge and, once expanded, a recharts line chart plotting glucose concentration over minutes from the glucose load. The parser recognizes:
 
 - `T0`, `T+30`, `T-60`, `T 120`
 - `30'`, `60′`, `90'`
-- `30 min`, `60 minutes`, `2 h`, `2 hour`, `1 ora`
-- `basale`, `basal`, `fasting`, `a digiuno`, `pre` (all treated as T0)
+- `30 min`, `60 minutes`, `2 h`, `2 hour`
+- `basal`, `fasting`, `pre` (all treated as T0)
 
-A glucose keyword must appear in the same test name (English/Italian/German/OGTT) so a random `T90 HbA1c` row doesn't trigger the curve. WHO/ADA two-hour thresholds (140 mg/dL impaired glucose tolerance, 200 mg/dL diabetes) are drawn as dashed reference lines when the unit is mg/dL.
+A glucose keyword must appear in the same test name so a random `T90 HbA1c` row doesn't trigger the curve. WHO/ADA two-hour thresholds (140 mg/dL impaired glucose tolerance, 200 mg/dL diabetes) are drawn as dashed reference lines when the unit is mg/dL.
 
 ## Normalization
 
 Lab test names are normalized to canonical forms using the normalization system, so the same test is recognized regardless of language or naming convention:
 
-- "Emoglobina" (Italian), "Haemoglobin" (British English), "Hemoglobin" (American English) all map to the canonical `HEMOGLOBIN`
+- "Hämoglobin" (German), "Haemoglobin" (British English), "Hemoglobin" (American English) all map to the canonical `HEMOGLOBIN`
 
 See [Normalization](normalization.md) for managing canonical names and aliases.
 

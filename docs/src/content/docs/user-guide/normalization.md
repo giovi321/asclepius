@@ -6,8 +6,8 @@ title: "Normalization"
 
 Medical documents use different names for the same concept depending on language, provider, and region:
 
-- "Hemoglobin", "Haemoglobin", "Emoglobina", "Haemoglobin (Hb)" are all the same lab test
-- "Cardiology", "Kardiologie", "Cardiologia" are the same specialty
+- "Hemoglobin", "Haemoglobin", "Hämoglobin", "Haemoglobin (Hb)" are all the same lab test
+- "Cardiology", "Kardiologie", "Cardiologie" are the same specialty
 - "Ibuprofen", "Brufen", "Advil" refer to the same medication
 
 Normalization maps these variations to a single canonical form. That gives you:
@@ -40,11 +40,11 @@ Each canonical entry has:
 
 Doctors and facilities use the same normalization system as medical concepts. The existing `doctors` and `facilities` tables have been extended with `canonical_code` and `canonical_display` columns, and new alias tables (`doctor_aliases`, `facility_aliases`) enable the same alias management, merge, and review workflows.
 
-This is useful because the same doctor may appear under different name variations across documents (e.g., "Dr. M. Bianchi" vs. "Dr. Marco Bianchi"). Merging these entries consolidates all document references to a single record.
+This is useful because the same doctor may appear under different name variations across documents (e.g., "Dr. H. Mueller" vs. "Dr. Hans Mueller"). Merging these entries consolidates all document references to a single record.
 
 ## How normalization works
 
-The LLM's only job is to copy the test / medication / diagnosis / specialty name exactly as the document writes it (e.g., "Emoglobina"). A Python resolver then maps that raw name to a canonical ID:
+The LLM's only job is to copy the test / medication / diagnosis / specialty name exactly as the document writes it (e.g., "Hämoglobin"). A Python resolver then maps that raw name to a canonical ID:
 
 1. **Exact alias match** — case-insensitive lookup against the alias table. Covered by the seed data for common tests, specialties, diagnoses, and medications.
 2. **Fuzzy match** — if no exact hit, run `rapidfuzz.process.extractOne` with a score threshold of 85. Catches OCR drift, typos, and minor language variants ("Hepatite C" vs "Hepatitis C", "S-Creatinina" vs "Creatinina"). The matching original text is inserted as a new alias on the canonical entry so the next document with the same phrasing lands on step 1.

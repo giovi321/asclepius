@@ -8,7 +8,7 @@ from asclepius.patients.service import slugify
 
 
 def test_slugify():
-    assert slugify("Giovanni Crapelli") == "giovanni-crapelli"
+    assert slugify("Alex Smith") == "alex-smith"
     assert slugify("Dr. Hans Müller") == "dr-hans-mller"
     assert slugify("  Spaces  Everywhere  ") == "spaces-everywhere"
     assert slugify("already-slugged") == "already-slugged"
@@ -19,9 +19,9 @@ def test_build_organized_path():
     config = AppConfig()
 
     path = build_organized_path(
-        config, "giovanni-crapelli", "2024-03-15", "drhouse", "bloodtest", "report.pdf"
+        config, "alex-smith", "2024-03-15", "drhouse", "bloodtest", "report.pdf"
     )
-    assert path == "patients/giovanni-crapelli/2024/20240315_bloodtest.pdf"
+    assert path == "patients/alex-smith/2024/20240315_bloodtest.pdf"
 
 
 def test_build_organized_path_unclassified():
@@ -50,10 +50,10 @@ def test_build_organized_path_with_event():
     config = AppConfig()
 
     path = build_organized_path(
-        config, "giovanni-crapelli", "2024-03-15", "drhouse", "bloodtest", "report.pdf",
+        config, "alex-smith", "2024-03-15", "drhouse", "bloodtest", "report.pdf",
         event_slug="sleep-apnea-treatment",
     )
-    assert path == "patients/giovanni-crapelli/2024/sleep-apnea-treatment/20240315_bloodtest.pdf"
+    assert path == "patients/alex-smith/2024/sleep-apnea-treatment/20240315_bloodtest.pdf"
 
 
 def test_slugify_event():

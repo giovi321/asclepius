@@ -39,18 +39,22 @@ internal layout changes significantly.
   per-session. `DocumentsPage` migrated off three per-page refetches.
 - Frontend: every routed page wrapped in its own `ErrorBoundary`.
 - Backend: 4xx/5xx responses on `/api/*` now write a row to `audit_log`.
+- Frontend: four mega-components split into focused sub-components:
+  - `ProvidersTab` (612 -> 251 LOC) split into CredentialDialog,
+    CredentialCard, AttachedModelRow, ModelForm, shared types.
+  - `DocumentDetailPage` (826 -> 208 LOC) split into DocumentViewer,
+    ReprocessMenu, MetadataEditor, NotesEditor, AiEditForm, LinksSection,
+    and child-record sections.
+  - `DocumentsPage` (869 -> 379 LOC) split into DocumentFilters,
+    BulkActionsBar, DocumentTable, InlineRenameCell, shared column defs.
+  - `NormalizationTab` (917 -> 495 LOC) split into NormalizationToolbar,
+    AutoMergePanel, LinkedDocumentsModal, BatchMergeBar, NormalizationRow,
+    shared types.
 
 ### Removed
 
 - Trivial UI walkthrough sections from user-guide docs (timeline,
   documents, medical-events, imaging, normalization, chat, first-steps).
-
-### Deferred
-
-- Splits of the four remaining mega-components (`NormalizationTab`,
-  `DocumentDetailPage`, `DocumentsPage`, `ProvidersTab`). The shared
-  hooks + ErrorBoundary + generated types are in place so these can be
-  tackled incrementally without further plumbing.
 
 ## [Unreleased]
 

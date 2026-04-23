@@ -474,6 +474,18 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.execute(
             "UPDATE documents SET issued_date = date_issued WHERE issued_date IS NULL"
         )
+        # SQLite refuses to drop a column an index still references. Drop
+        # any legacy indexes on the doomed columns first — idx_documents_doc_date
+        # comes from the pre-0.9 schema but other user-created indexes may
+        # also be floating around, so discover them via sqlite_master.
+        for col in ("doc_date", "date_visit", "date_issued"):
+            idx_cursor = await db.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='documents' "
+                "AND sql LIKE ?",
+                (f"%({col})%",),
+            )
+            for (idx_name,) in await idx_cursor.fetchall():
+                await db.execute(f"DROP INDEX IF EXISTS {idx_name}")
         for col in ("doc_date", "date_visit", "date_issued"):
             if col in doc_cols_now:
                 await db.execute(f"ALTER TABLE documents DROP COLUMN {col}")

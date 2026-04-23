@@ -75,6 +75,10 @@ def _seed_legacy(db_path: Path) -> None:
     """Create a legacy (pre-0.9) database with two representative rows."""
     with sqlite3.connect(db_path) as conn:
         conn.executescript(LEGACY_DOCUMENTS_DDL)
+        # Seed the pre-0.9 indexes on the soon-to-be-dropped columns so we
+        # verify the migration cleans them up before the DROP COLUMNs. SQLite
+        # refuses to drop a column an index still references.
+        conn.execute("CREATE INDEX idx_documents_doc_date ON documents(doc_date)")
         conn.executemany(
             """INSERT INTO documents
                (file_path, original_filename, doc_type, doc_date,
@@ -129,6 +133,9 @@ async def test_legacy_db_upgrades_cleanly(tmp_path: Path) -> None:
 
         indexes = {r[1] for r in conn.execute("PRAGMA index_list(documents)")}
         assert "idx_documents_event_date" in indexes
+        assert "idx_documents_doc_date" not in indexes, (
+            "legacy indexes on the dropped columns must be cleaned up"
+        )
 
         fts_tables = {
             r[0] for r in conn.execute(

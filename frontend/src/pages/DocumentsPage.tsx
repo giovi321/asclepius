@@ -1,70 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
-import { FileText, Search, Upload, Pencil, Check, X, ChevronDown, Columns3, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
-import MultiSelectFilter from "@/components/MultiSelectFilter";
-import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
 import type { PipelineStatus } from "@/types";
-import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
 import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
+import {
+  COLUMNS, COLUMN_STORAGE_KEY, loadVisibleColumns,
+  type ColumnKey, type SortKey,
+} from "@/components/documents/columns";
+import DocumentFilters from "@/components/documents/DocumentFilters";
+import BulkActionsBar, { type ReprocessMode } from "@/components/documents/BulkActionsBar";
+import DocumentTable from "@/components/documents/DocumentTable";
 
-const DOC_TYPES = [
-  "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
-  "insurance_claim", "referral", "discharge", "specialist_report",
-  "radiology_report", "surgical_report", "vaccination", "other",
-];
-
-// ─── Column config ────────────────────────────────────────────────
-//
-// The File column is always visible — it's the primary identifier. Everything
-// else is toggleable via the Columns popover and the user's choice is
-// persisted in localStorage.
-type ColumnKey = "type" | "date" | "doctor" | "facility" | "patient" | "specialty" | "status" | "date_added";
-type SortKey = ColumnKey | "file";
-interface ColumnDef {
-  key: ColumnKey;
-  label: string;
-  defaultVisible: boolean;
-  width: string;  // CSS width used in the colgroup
-}
-const COLUMNS: ColumnDef[] = [
-  { key: "type",       label: "Type",       defaultVisible: true,  width: "14%" },
-  { key: "date",       label: "Date",       defaultVisible: true,  width: "12%" },
-  { key: "facility",   label: "Facility",   defaultVisible: true,  width: "22%" },
-  { key: "doctor",     label: "Doctor",     defaultVisible: false, width: "16%" },
-  { key: "patient",    label: "Patient",    defaultVisible: false, width: "14%" },
-  { key: "specialty",  label: "Specialty",  defaultVisible: false, width: "14%" },
-  { key: "status",     label: "Status",     defaultVisible: true,  width: "16%" },
-  { key: "date_added", label: "Date added", defaultVisible: false, width: "14%" },
-];
-const COLUMN_STORAGE_KEY = "asclepius_documents_columns";
-
-function loadVisibleColumns(): Set<ColumnKey> {
-  try {
-    const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) {
-        // Filter against the current column list so a stale key from an
-        // older build doesn't linger.
-        const valid = new Set<ColumnKey>();
-        for (const k of arr) {
-          if (COLUMNS.some((c) => c.key === k)) valid.add(k as ColumnKey);
-        }
-        if (valid.size > 0) return valid;
-      }
-    }
-  } catch { /* fall through */ }
-  return new Set(COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key));
-}
-
-// Read URL params once at mount-time so every filter starts seeded from the
-// URL. We never re-sync on external URL changes; the component is the source
-// of truth while it's mounted and writes back via setSearchParams.
+// URL param helpers. Filter state is seeded from the URL at mount time and
+// written back via setSearchParams; we never re-sync on external URL changes.
 const readList = (sp: URLSearchParams, key: string): string[] => {
   const v = sp.get(key);
   return v ? v.split(",").filter(Boolean) : [];
@@ -80,9 +32,17 @@ const readInt = (sp: URLSearchParams, key: string, fallback: number): number => 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { toast } = useToast();
+  const confirm = useConfirm();
+  const limit = 20;
+
   const [documents, setDocuments] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
+
+  // Filters (seeded from URL)
   const [search, setSearch] = useState(() => readStr(searchParams, "q"));
   const [typeFilter, setTypeFilter] = useState<string[]>(() => readList(searchParams, "type"));
   const [statusFilter, setStatusFilter] = useState<string[]>(() => readList(searchParams, "status"));
@@ -92,87 +52,27 @@ export default function DocumentsPage() {
   const [dateFrom, setDateFrom] = useState(() => readStr(searchParams, "date_from"));
   const [dateTo, setDateTo] = useState(() => readStr(searchParams, "date_to"));
   const [page, setPage] = useState(() => readInt(searchParams, "page", 0));
-  const [showUpload, setShowUpload] = useState(false);
-  const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
-  const [reprocessOpen, setReprocessOpen] = useState(false);
-  const [reprocessMode, setReprocessMode] = useState<"both" | "ocr" | "llm">("both");
-  const [reprocessLlmProvider, setReprocessLlmProvider] = useState("");
-  const [reprocessOcrProvider, setReprocessOcrProvider] = useState("");
-  const [llmProviders, setLlmProviders] = useState<any[]>([]);
-  const [ocrProviders, setOcrProviders] = useState<any[]>([]);
-  const reprocessRef = useRef<HTMLDivElement>(null);
-  const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(() => loadVisibleColumns());
-  const [colsOpen, setColsOpen] = useState(false);
-  const colsRef = useRef<HTMLDivElement>(null);
+
+  // Sort + column visibility
   const [sortBy, setSortBy] = useState<SortKey | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const { toast } = useToast();
-  const confirm = useConfirm();
-  const limit = 20;
+  const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(() => loadVisibleColumns());
 
-  const toggleSort = (key: SortKey) => {
-    setPage(0);
-    // Natural direction per column. Date/status feel most useful newest-first;
-    // text columns feel most useful A→Z.
-    const naturalDesc = key === "date" || key === "date_added" || key === "status";
-    const naturalOrder: "asc" | "desc" = naturalDesc ? "desc" : "asc";
-
-    if (sortBy !== key) {
-      // New column → sort by it in its natural direction.
-      setSortBy(key);
-      setSortOrder(naturalOrder);
-      return;
-    }
-    // Same column: natural → flipped → cleared.
-    if (sortOrder === naturalOrder) {
-      setSortOrder(naturalOrder === "asc" ? "desc" : "asc");
-      return;
-    }
-    setSortBy(null);
-    setSortOrder(naturalOrder);
-  };
-
-  const sortArrow = (key: SortKey) => {
-    if (sortBy !== key) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
-    return sortOrder === "asc"
-      ? <ArrowUp className="h-3 w-3 text-primary" />
-      : <ArrowDown className="h-3 w-3 text-primary" />;
-  };
-
-  // Persist column choice.
-  useEffect(() => {
-    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(Array.from(visibleCols)));
-  }, [visibleCols]);
-
-  // Close columns popover on outside click.
-  useEffect(() => {
-    if (!colsOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (colsRef.current && !colsRef.current.contains(e.target as Node)) {
-        setColsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [colsOpen]);
+  // Selection + bulk state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [llmProviders, setLlmProviders] = useState<any[]>([]);
+  const [ocrProviders, setOcrProviders] = useState<any[]>([]);
 
   const orderedVisibleColumns = useMemo(
     () => COLUMNS.filter((c) => visibleCols.has(c.key)),
     [visibleCols],
   );
-  const tableColSpan = 2 + orderedVisibleColumns.length; // checkbox + File + dynamic
 
-  // Load filter options. Doctors/facilities/specialties come from shared
-  // resource hooks so navigating between pages hits one cached fetch
-  // instead of three per page.
-  const { data: specialtiesData } = useSpecialties();
-  const { data: doctorsData } = useDoctors();
-  const { data: facilitiesData } = useFacilities();
-  const specialties = specialtiesData ?? [];
-  const doctors = doctorsData ?? [];
-  const facilities = facilitiesData ?? [];
+  // Persist column choice.
+  useEffect(() => {
+    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(Array.from(visibleCols)));
+  }, [visibleCols]);
 
   useEffect(() => {
     api.get("/settings/llm-providers").then((res: any) => {
@@ -184,8 +84,7 @@ export default function DocumentsPage() {
   }, []);
 
   // Mirror filter state back to the URL so back-navigation from a document
-  // detail page restores the exact filter/search/page state. `replace: true`
-  // so keystrokes in the search box don't pollute browser history.
+  // detail page restores the exact filter/search/page state.
   useEffect(() => {
     const next = new URLSearchParams();
     if (search) next.set("q", search);
@@ -200,8 +99,7 @@ export default function DocumentsPage() {
     setSearchParams(next, { replace: true });
   }, [search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page, setSearchParams]);
 
-  useEffect(() => {
-    setLoading(true);
+  const buildListParams = (): Record<string, any> => {
     const params: Record<string, any> = { limit, offset: page * limit };
     if (selectedPatient) params.patient_id = selectedPatient.id;
     if (search) params.q = search;
@@ -213,8 +111,12 @@ export default function DocumentsPage() {
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
     if (sortBy) { params.sort = sortBy; params.order = sortOrder; }
+    return params;
+  };
 
-    api.get("/documents", { params }).then((res: any) => {
+  useEffect(() => {
+    setLoading(true);
+    api.get("/documents", { params: buildListParams() }).then((res: any) => {
       setDocuments(res.data.items || []);
       setTotal(res.data.total || 0);
       setLoading(false);
@@ -230,24 +132,11 @@ export default function DocumentsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Clear selection when filters / page / patient change — it'd be wrong to
+  // Clear selection when filters / page / patient change - it'd be wrong to
   // act on rows the user can no longer see.
   useEffect(() => {
     setSelectedIds(new Set());
-    setReprocessOpen(false);
   }, [selectedPatient, search, typeFilter, statusFilter, specialtyFilter, doctorFilter, facilityFilter, dateFrom, dateTo, page]);
-
-  // Close reprocess menu on outside click
-  useEffect(() => {
-    if (!reprocessOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (reprocessRef.current && !reprocessRef.current.contains(e.target as Node)) {
-        setReprocessOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [reprocessOpen]);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -266,29 +155,30 @@ export default function DocumentsPage() {
     }
   };
 
+  const toggleSort = (key: SortKey) => {
+    setPage(0);
+    const naturalDesc = key === "date" || key === "date_added" || key === "status";
+    const naturalOrder: "asc" | "desc" = naturalDesc ? "desc" : "asc";
+    if (sortBy !== key) {
+      setSortBy(key);
+      setSortOrder(naturalOrder);
+      return;
+    }
+    if (sortOrder === naturalOrder) {
+      setSortOrder(naturalOrder === "asc" ? "desc" : "asc");
+      return;
+    }
+    setSortBy(null);
+    setSortOrder(naturalOrder);
+  };
+
   const reloadDocuments = async () => {
-    const params: Record<string, any> = { limit, offset: page * limit };
-    if (selectedPatient) params.patient_id = selectedPatient.id;
-    if (search) params.q = search;
-    if (typeFilter.length) params.type = typeFilter.join(",");
-    if (statusFilter.length) params.status = statusFilter.join(",");
-    if (specialtyFilter.length) params.specialty = specialtyFilter.join(",");
-    if (doctorFilter.length) params.doctor_id = doctorFilter.join(",");
-    if (facilityFilter.length) params.facility_id = facilityFilter.join(",");
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    const res = await api.get("/documents", { params });
+    const res = await api.get("/documents", { params: buildListParams() });
     setDocuments(res.data.items || []);
     setTotal(res.data.total || 0);
   };
 
-  // Run a per-doc async action against every selected id. Collects failures
-  // and surfaces a single toast at the end so a run-through of 20 docs with
-  // two 403s doesn't spray twenty error toasts.
-  const runBulk = async (
-    label: string,
-    perDoc: (id: number) => Promise<void>,
-  ) => {
+  const runBulk = async (label: string, perDoc: (id: number) => Promise<void>) => {
     if (selectedIds.size === 0 || bulkBusy) return;
     setBulkBusy(label);
     const ids = Array.from(selectedIds);
@@ -305,7 +195,6 @@ export default function DocumentsPage() {
     }
     setBulkBusy(null);
     setSelectedIds(new Set());
-    setReprocessOpen(false);
     await reloadDocuments();
     if (failures.length === 0) {
       toast({ title: `${label}: ${ok}/${ids.length} done` });
@@ -329,9 +218,7 @@ export default function DocumentsPage() {
     await runBulk("Delete", (id) => api.delete(`/documents/${id}`).then(() => {}));
   };
 
-  const bulkReprocess = async () => {
-    const mode = reprocessMode;
-
+  const bulkReprocess = async (mode: ReprocessMode, llmProviderId: string, ocrProviderId: string) => {
     if (shouldConfirmBulk(selectedIds.size)) {
       const modeLabel = mode === "both" ? "OCR and LLM" : mode.toUpperCase();
       const ok = await confirm(buildBulkConfirm({
@@ -344,7 +231,7 @@ export default function DocumentsPage() {
       if (!ok) return;
     }
 
-    // Warn on long documents — reprocessing every page through OCR + LLM
+    // Warn on long documents - reprocessing every page through OCR + LLM
     // can take a while and burn paid-provider tokens.
     const longDocs = documents
       .filter((d) => selectedIds.has(d.id))
@@ -365,8 +252,8 @@ export default function DocumentsPage() {
     }
 
     const payload: Record<string, any> = { mode };
-    if (reprocessLlmProvider) payload.llm_provider_id = reprocessLlmProvider;
-    if (reprocessOcrProvider) payload.ocr_provider_id = reprocessOcrProvider;
+    if (llmProviderId) payload.llm_provider_id = llmProviderId;
+    if (ocrProviderId) payload.ocr_provider_id = ocrProviderId;
     await runBulk(
       mode === "both" ? "Reprocess" : `Reprocess (${mode.toUpperCase()})`,
       (id) => api.post(`/documents/${id}/reprocess`, payload).then(() => {}),
@@ -398,9 +285,9 @@ export default function DocumentsPage() {
         <FileUpload onUploadComplete={() => {
           setPage(0);
           setLoading(true);
-          const params: Record<string, any> = { limit, offset: 0 };
-          if (selectedPatient) params.patient_id = selectedPatient.id;
-          api.get("/documents", { params }).then((res: any) => {
+          api.get("/documents", {
+            params: { limit, offset: 0, ...(selectedPatient ? { patient_id: selectedPatient.id } : {}) },
+          }).then((res: any) => {
             setDocuments(res.data.items || []);
             setTotal(res.data.total || 0);
             setLoading(false);
@@ -408,462 +295,85 @@ export default function DocumentsPage() {
         }} />
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-start">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={search}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(0); }}
-            className="w-full rounded-md border bg-background pl-9 pr-3 py-2 text-sm"
-          />
-        </div>
+      <DocumentFilters
+        search={search}
+        typeFilter={typeFilter}
+        statusFilter={statusFilter}
+        specialtyFilter={specialtyFilter}
+        doctorFilter={doctorFilter}
+        facilityFilter={facilityFilter}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onChange={(patch) => {
+          setPage(0);
+          if ("search" in patch) setSearch(patch.search!);
+          if ("typeFilter" in patch) setTypeFilter(patch.typeFilter!);
+          if ("statusFilter" in patch) setStatusFilter(patch.statusFilter!);
+          if ("specialtyFilter" in patch) setSpecialtyFilter(patch.specialtyFilter!);
+          if ("doctorFilter" in patch) setDoctorFilter(patch.doctorFilter!);
+          if ("facilityFilter" in patch) setFacilityFilter(patch.facilityFilter!);
+          if ("dateFrom" in patch) setDateFrom(patch.dateFrom!);
+          if ("dateTo" in patch) setDateTo(patch.dateTo!);
+        }}
+        onClearAll={() => {
+          setDateFrom(""); setDateTo("");
+          setTypeFilter([]); setStatusFilter([]); setSpecialtyFilter([]);
+          setDoctorFilter([]); setFacilityFilter([]);
+          setPage(0);
+        }}
+        visibleCols={visibleCols}
+        onVisibleColsChange={setVisibleCols}
+        onUploadClick={() => setShowUpload(!showUpload)}
+      />
 
-        <MultiSelectFilter
-          label="Type"
-          options={[
-            { value: "__blank__", label: "(blank)" },
-            ...DOC_TYPES.map((t: string) => ({ value: t, label: t.replace(/_/g, " ") })),
-          ]}
-          selected={typeFilter}
-          onChange={(v: string[]) => { setTypeFilter(v); setPage(0); }}
-        />
+      <BulkActionsBar
+        selectedCount={selectedIds.size}
+        bulkBusy={bulkBusy}
+        llmProviders={llmProviders}
+        ocrProviders={ocrProviders}
+        onDelete={bulkDelete}
+        onReprocess={bulkReprocess}
+        onRegenerateFilename={bulkRegenerateFilename}
+        onClear={() => setSelectedIds(new Set())}
+      />
 
-        <MultiSelectFilter
-          label="Status"
-          options={[
-            { value: "__blank__", label: "(blank)" },
-            { value: "done", label: "Done" },
-            { value: "processing", label: "Processing" },
-            { value: "pending", label: "Pending" },
-            { value: "needs_review", label: "Needs Review" },
-            { value: "failed", label: "Failed" },
-            { value: "cancelled", label: "Cancelled" },
-          ]}
-          selected={statusFilter}
-          onChange={(v: string[]) => { setStatusFilter(v); setPage(0); }}
-          searchable={false}
-        />
+      <DocumentTable
+        documents={documents}
+        loading={loading}
+        orderedVisibleColumns={orderedVisibleColumns}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onToggleSelectAll={toggleSelectAllOnPage}
+        onRenamed={(updated) => {
+          setDocuments((prev) => prev.map((d: any) =>
+            d.id === updated.id ? { ...d, ...updated } : d,
+          ));
+        }}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortToggle={toggleSort}
+        pipeline={pipeline}
+      />
 
-        <MultiSelectFilter
-          label="Specialty"
-          options={[
-            { value: "__blank__", label: "(blank)" },
-            ...specialties.map((s: any) => ({
-              value: s.canonical_code || s.canonical_display,
-              label: s.canonical_display || s.canonical_code,
-            })),
-          ]}
-          selected={specialtyFilter}
-          onChange={(v: string[]) => { setSpecialtyFilter(v); setPage(0); }}
-        />
-
-        <MultiSelectFilter
-          label="Doctor"
-          options={[
-            { value: "__blank__", label: "(blank)" },
-            ...doctors.map((d: any) => ({
-              value: String(d.id),
-              label: `${d.title ? d.title + " " : ""}${d.name}`,
-            })),
-          ]}
-          selected={doctorFilter}
-          onChange={(v: string[]) => { setDoctorFilter(v); setPage(0); }}
-        />
-
-        <MultiSelectFilter
-          label="Facility"
-          options={[
-            { value: "__blank__", label: "(blank)" },
-            ...facilities.map((f: any) => ({
-              value: String(f.id),
-              label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
-            })),
-          ]}
-          selected={facilityFilter}
-          onChange={(v: string[]) => { setFacilityFilter(v); setPage(0); }}
-        />
-
-        <div ref={colsRef} className="relative ml-auto">
-          <button
-            onClick={() => setColsOpen((o) => !o)}
-            className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
-            title="Show/hide columns"
-          >
-            <Columns3 className="h-4 w-4" />
-            Columns
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {colsOpen && (
-            <div className="absolute right-0 top-full mt-1 z-30 w-52 rounded-lg border bg-background shadow-xl p-2">
-              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                Visible columns
-              </div>
-              {COLUMNS.map((c) => (
-                <label
-                  key={c.key}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={visibleCols.has(c.key)}
-                    onChange={() => {
-                      setVisibleCols((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(c.key)) next.delete(c.key);
-                        else next.add(c.key);
-                        return next;
-                      });
-                    }}
-                  />
-                  <span>{c.label}</span>
-                </label>
-              ))}
-              <div className="mt-1 border-t pt-1">
-                <button
-                  onClick={() => setVisibleCols(new Set(COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key)))}
-                  className="w-full rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                >
-                  Reset to defaults
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-        >
-          <Upload className="h-4 w-4" />
-          Upload
-        </button>
-      </div>
-
-      {/* Date range + clear */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Date from:</span>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setDateFrom(e.target.value); setPage(0); }}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">to:</span>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setDateTo(e.target.value); setPage(0); }}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        {(dateFrom || dateTo || typeFilter.length > 0 || statusFilter.length > 0 || specialtyFilter.length > 0 || doctorFilter.length > 0 || facilityFilter.length > 0) && (
-          <button
-            onClick={() => {
-              setDateFrom(""); setDateTo(""); setTypeFilter([]);
-              setStatusFilter([]); setSpecialtyFilter([]);
-              setDoctorFilter([]); setFacilityFilter([]); setPage(0);
-            }}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <X className="h-3 w-3" /> Clear all filters
-          </button>
-        )}
-      </div>
-
-      {/* Bulk-actions bar — intentionally subdued. Only visible when rows are selected. */}
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-dashed bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
-          <span>{selectedIds.size} selected</span>
-          <span className="text-muted-foreground/40">|</span>
-          <button
-            onClick={bulkDelete}
-            disabled={!!bulkBusy}
-            className="hover:text-destructive disabled:opacity-50"
-          >
-            {bulkBusy === "Delete" ? "Deleting..." : "Delete"}
-          </button>
-          <div ref={reprocessRef} className="relative">
-            <button
-              onClick={() => setReprocessOpen((o) => !o)}
-              disabled={!!bulkBusy}
-              className="inline-flex items-center gap-0.5 hover:text-foreground disabled:opacity-50"
-            >
-              {bulkBusy?.startsWith("Reprocess") ? bulkBusy + "..." : "Reprocess"}
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            {reprocessOpen && (
-              <div className="absolute left-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3 text-foreground">
-                <p className="text-xs font-medium text-muted-foreground">What to reprocess</p>
-                <div className="flex gap-1">
-                  {[
-                    { value: "both", label: "OCR + LLM" },
-                    { value: "ocr", label: "OCR only" },
-                    { value: "llm", label: "LLM only" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      onClick={() => setReprocessMode(opt.value as "both" | "ocr" | "llm")}
-                      className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                        reprocessMode === opt.value
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {reprocessMode !== "llm" && ocrProviders.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
-                    <select
-                      value={reprocessOcrProvider}
-                      onChange={(e) => setReprocessOcrProvider(e.target.value)}
-                      className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                    >
-                      <option value="">Default (highest priority)</option>
-                      {ocrProviders.map((p: any) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name || p.id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {reprocessMode !== "ocr" && llmProviders.length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
-                    <select
-                      value={reprocessLlmProvider}
-                      onChange={(e) => setReprocessLlmProvider(e.target.value)}
-                      className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                    >
-                      <option value="">Default (highest priority)</option>
-                      {llmProviders.map((p: any) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name || p.id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <button
-                  onClick={bulkReprocess}
-                  disabled={!!bulkBusy}
-                  className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                >
-                  Start Reprocessing ({selectedIds.size})
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={bulkRegenerateFilename}
-            disabled={!!bulkBusy}
-            className="hover:text-foreground disabled:opacity-50"
-          >
-            {bulkBusy === "Regenerate filename" ? "Renaming..." : "Regenerate filename"}
-          </button>
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            disabled={!!bulkBusy}
-            className="ml-auto hover:text-foreground disabled:opacity-50"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
-      {/* Table */}
-      <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm table-fixed">
-          <colgroup>
-            <col style={{ width: "32px" }} />
-            <col />
-            {orderedVisibleColumns.map((c) => (
-              <col key={c.key} style={{ width: c.width }} />
-            ))}
-          </colgroup>
-          <thead className="border-b bg-muted/50">
-            <tr>
-              <th className="px-2 py-2 text-left">
-                <input
-                  type="checkbox"
-                  checked={documents.length > 0 && selectedIds.size === documents.length}
-                  onChange={toggleSelectAllOnPage}
-                  aria-label="Select all on this page"
-                  className="align-middle"
-                />
-              </th>
-              <th
-                className="px-4 py-2 text-left font-medium cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("file")}
-              >
-                <span className="inline-flex items-center gap-1">File {sortArrow("file")}</span>
-              </th>
-              {orderedVisibleColumns.map((c) => (
-                <th
-                  key={c.key}
-                  className="px-4 py-2 text-left font-medium cursor-pointer select-none hover:text-foreground"
-                  onClick={() => toggleSort(c.key)}
-                >
-                  <span className="inline-flex items-center gap-1">{c.label} {sortArrow(c.key)}</span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr><td colSpan={tableColSpan} className="p-4 text-center text-muted-foreground">Loading...</td></tr>
-            ) : documents.length === 0 ? (
-              <tr><td colSpan={tableColSpan} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
-            ) : (
-              documents.map((doc: any) => (
-                <tr key={doc.id} className={`hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}>
-                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(doc.id)}
-                      onChange={() => toggleSelect(doc.id)}
-                      aria-label={`Select ${doc.original_filename || doc.id}`}
-                      className="align-middle"
-                    />
-                  </td>
-                  <td className="px-4 py-2 overflow-hidden">
-                    <InlineRenameCell doc={doc} onRenamed={(updated: any) => {
-                      setDocuments((prev: any[]) => prev.map((d: any) => d.id === doc.id ? { ...d, ...updated } : d));
-                    }} />
-                  </td>
-                  {orderedVisibleColumns.map((c) => {
-                    if (c.key === "type") {
-                      const t = formatDocType(doc.doc_type);
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={t}>{t}</td>;
-                    }
-                    if (c.key === "date") {
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate">{getBestDate(doc) || "—"}</td>;
-                    }
-                    if (c.key === "doctor") {
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.doctor_name || ""}>{doc.doctor_name || "—"}</td>;
-                    }
-                    if (c.key === "facility") {
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.facility_name || ""}>{doc.facility_name || "—"}</td>;
-                    }
-                    if (c.key === "patient") {
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.patient_name || ""}>{doc.patient_name || "—"}</td>;
-                    }
-                    if (c.key === "specialty") {
-                      const s = doc.specialty_original || "";
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={s}>{s || "—"}</td>;
-                    }
-                    if (c.key === "date_added") {
-                      const d = doc.created_at ? String(doc.created_at).slice(0, 10) : "";
-                      return <td key={c.key} className="px-4 py-2 text-muted-foreground truncate" title={doc.created_at || ""}>{d || "—"}</td>;
-                    }
-                    // status
-                    return (
-                      <td key={c.key} className="px-4 py-2">
-                        <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}>
-                          {doc.status === "processing" && pipeline?.processing_doc_id === doc.id
-                            && pipeline?.processing_pages && pipeline?.processing_page_current != null
-                            ? `${pipeline?.processing_step || "processing"} (${pipeline?.processing_page_current}/${pipeline?.processing_pages})`
-                            : doc.status}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
       {total > limit && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+            Showing {page * limit + 1}-{Math.min((page + 1) * limit, total)} of {total}
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage((p: number) => Math.max(0, p - 1))}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >Previous</button>
             <button
-              onClick={() => setPage((p: number) => p + 1)}
+              onClick={() => setPage((p) => p + 1)}
               disabled={(page + 1) * limit >= total}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >Next</button>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function InlineRenameCell({ doc, onRenamed }: { doc: any; onRenamed: (updated: any) => void }) {
-  const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(doc.original_filename || "");
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (!val.trim() || val === doc.original_filename) { setEditing(false); return; }
-    setSaving(true);
-    try {
-      const res = await api.post(`/documents/${doc.id}/rename`, { filename: val });
-      setEditing(false);
-      onRenamed(res.data);
-    } catch (e: any) {
-      toast({ title: "Rename failed", description: e.response?.data?.detail || e.message, variant: "error" });
-    }
-    setSaving(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1">
-        <input value={val} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVal(e.target.value)}
-          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(doc.original_filename); } }}
-          className="flex-1 rounded border bg-background px-2 py-0.5 text-sm min-w-0"
-          autoFocus disabled={saving}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        />
-        <button onClick={handleSave} disabled={saving}
-          className="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-50">
-          <Check className="h-3.5 w-3.5" />
-        </button>
-        <button onClick={() => { setEditing(false); setVal(doc.original_filename); }}
-          className="rounded p-1 text-muted-foreground hover:bg-accent">
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2 group">
-      <Link to={`/documents/${doc.id}`} className="flex items-center gap-2 text-primary hover:underline flex-1 min-w-0" title={doc.original_filename}>
-        <FileText className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate">{doc.original_filename}</span>
-      </Link>
-      <button
-        onClick={(e: React.MouseEvent) => { e.stopPropagation(); setVal(doc.original_filename); setEditing(true); }}
-        className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
-        title="Rename"
-      >
-        <Pencil className="h-3 w-3" />
-      </button>
     </div>
   );
 }

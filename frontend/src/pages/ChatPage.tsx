@@ -128,7 +128,22 @@ export default function ChatPage() {
               Ask a question about {selectedPatient.display_name}'s medical history
             </p>
           )}
-          {messages.map((msg, i) => (
+          {messages.map((msg, i) => {
+            // Resolve an LLM-emitted href back to /documents/<id> when the
+            // model produced a filename-only link. Keeps already-correct
+            // /documents/<id> links untouched.
+            const resolveHref = (href: string | undefined): string => {
+              if (!href) return "#";
+              if (/^\/documents\/\d+$/.test(href)) return href;
+              const sources = msg.sources || [];
+              const stripped = href.replace(/^\/+/, "").replace(/^documents\//, "");
+              const match = sources.find(
+                (s) => s.filename && (s.filename === href || s.filename === stripped),
+              );
+              if (match) return `/documents/${match.id}`;
+              return href;
+            };
+            return (
             <div
               key={i}
               className={`mb-4 ${msg.role === "user" ? "text-right" : ""}`}
@@ -165,11 +180,24 @@ export default function ChatPage() {
                         pre: ({ children }) => (
                           <pre className="my-2 overflow-x-auto rounded bg-background/60 p-2 text-xs">{children}</pre>
                         ),
-                        a: ({ href, children }) => (
-                          <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">
-                            {children}
-                          </a>
-                        ),
+                        a: ({ href, children }) => {
+                          const resolved = resolveHref(href);
+                          // Internal doc links route through the SPA so
+                          // clicking them lands on the document detail page
+                          // instead of full-page navigating away.
+                          if (/^\/documents\/\d+$/.test(resolved)) {
+                            return (
+                              <Link to={resolved} className="text-primary underline">
+                                {children}
+                              </Link>
+                            );
+                          }
+                          return (
+                            <a href={resolved} target="_blank" rel="noreferrer" className="text-primary underline">
+                              {children}
+                            </a>
+                          );
+                        },
                         table: ({ children }) => (
                           <div className="my-2 overflow-x-auto">
                             <table className="border-collapse text-xs">{children}</table>
@@ -209,7 +237,8 @@ export default function ChatPage() {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
           {loading && (
             <div className="mb-4">
               <div className="inline-block rounded-lg bg-muted px-4 py-2 text-sm text-muted-foreground">

@@ -11,15 +11,25 @@ import aiosqlite
 logger = logging.getLogger(__name__)
 
 
-async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> str:
-    """Build a context string with patient summary data."""
+async def build_patient_context(
+    db: aiosqlite.Connection, patient_id: int,
+) -> tuple[str, list[dict]]:
+    """Build a context string with patient summary data.
+
+    Returns ``(context_text, available_docs)`` where ``available_docs`` is
+    the set of documents the LLM was shown — used to (a) hand back an
+    id-keyed mapping so the LLM can emit proper ``/documents/<id>`` links
+    even on the non-SQL path, and (b) seed the sources sidebar so the
+    sidebar reflects what the LLM was citing from.
+    """
+    available_docs: list[dict] = []
     cursor = await db.execute(
         "SELECT display_name, date_of_birth, sex FROM patients WHERE id = ?",
         (patient_id,),
     )
     patient = await cursor.fetchone()
     if not patient:
-        return "No patient selected."
+        return "No patient selected.", available_docs
 
     parts = [f"Patient: {patient[0]}"]
     if patient[1]:
@@ -28,7 +38,7 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
         parts.append(f"Sex: {patient[2]}")
 
     cursor = await db.execute(
-        """SELECT d.doc_type, d.event_date, d.original_filename, d.summary_en,
+        """SELECT d.id, d.doc_type, d.event_date, d.original_filename, d.summary_en,
                   doc.name as doctor_name, f.name as facility_name
            FROM documents d
            LEFT JOIN doctors doc ON d.doctor_id = doc.id
@@ -42,12 +52,18 @@ async def build_patient_context(db: aiosqlite.Connection, patient_id: int) -> st
         parts.append(f"\nRecent documents ({len(docs)}):")
         for d in docs:
             provider_info = ""
-            if d[4]:
-                provider_info += f" Dr. {d[4]}"
             if d[5]:
-                provider_info += f" @ {d[5]}"
-            summary = f" - {d[3]}" if d[3] else ""
-            parts.append(f"  - {d[1] or '?'}: {d[0]} ({d[2]}){provider_info}{summary}")
+                provider_info += f" Dr. {d[5]}"
+            if d[6]:
+                provider_info += f" @ {d[6]}"
+            summary = f" - {d[4]}" if d[4] else ""
+            parts.append(f"  - {d[2] or '?'}: {d[1]} ({d[3]}){provider_info}{summary}")
+            available_docs.append({
+                "id": d[0],
+                "filename": d[3],
+                "doc_type": d[1],
+                "event_date": d[2],
+            })
 
     cursor = await db.execute(
         """SELECT lr.test_name_original, lr.value, lr.unit, lr.test_date, lr.is_abnormal,

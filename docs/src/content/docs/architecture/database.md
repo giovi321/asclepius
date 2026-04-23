@@ -72,7 +72,7 @@ Asclepius keeps all structured data in SQLite, with WAL (Write-Ahead Logging) fo
   <text x="460" y="184" class="db-name-lg" text-anchor="middle">documents</text>
   <text x="460" y="208" class="db-field" text-anchor="middle">id · patient_id · file_path</text>
   <text x="460" y="220" class="db-field" text-anchor="middle">file_hash · doc_type</text>
-  <text x="460" y="232" class="db-field" text-anchor="middle">doc_date · status</text>
+  <text x="460" y="232" class="db-field" text-anchor="middle">event_date · issued_date · status</text>
   <text x="460" y="244" class="db-field" text-anchor="middle">ocr_text · raw_extraction</text>
   <text x="460" y="256" class="db-field" text-anchor="middle">ocr_engine · llm_provider</text>
   <text x="460" y="268" class="db-field" text-anchor="middle">uploaded_by_user_id</text>
@@ -188,7 +188,9 @@ Shared credentials (URL + API key + concurrency + retry policy) and LLM/OCR/Visi
 ## Key Design Notes
 
 - **Deduplication.** Documents have a unique `file_hash` (SHA-256) to prevent duplicate imports.
-- **Denormalized names.** `documents.doctor_name` and `documents.facility_name` store the raw extracted names alongside normalized `doctor_id`/`facility_id` foreign keys.
+- **Names live in one place.** Doctor and facility names are stored only on `doctors` / `facilities`. `documents` just keeps `doctor_id` / `facility_id`, and readers JOIN to get the display name. Renaming a doctor once updates every document that references them.
+- **Dates.** Each document carries `event_date` (the canonical timeline anchor — when the medical event actually happened) and `issued_date` (when the document was produced administratively). The timeline, chart, and search views all key off `event_date`.
+- **Child rows stay in sync.** `encounters.doctor_id` / `encounters.facility_id` and `imaging_studies.doctor_id` / `imaging_studies.facility_id` are kept in lockstep with the parent document through AFTER UPDATE triggers, so moving a document to a different doctor updates its child rows in the same transaction.
 - **Cascading deletes.** Deleting a document cascades to all child records (lab results, encounters, medications, etc.).
 - **FTS triggers.** Insert/update/delete triggers keep the FTS5 index in sync with the documents table automatically.
 - **WAL mode.** Enabled at connection time for concurrent reads during pipeline writes.

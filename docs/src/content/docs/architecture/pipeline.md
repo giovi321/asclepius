@@ -243,7 +243,7 @@ A single prompt classifies the document and extracts basic metadata. The prompt 
 - **Patient name** (matched against existing patients)
 - **Doctor name** (matched/created in the doctors table, with alias)
 - **Facility name** (matched/created in the facilities table, with alias)
-- **Dates** (doc_date, date_issued, date_visit)
+- **Dates** (`event_date` for the medical event itself, `issued_date` for when the document was produced)
 - **Specialty** (normalized against the specialties table)
 - **Summary** (English + source language)
 

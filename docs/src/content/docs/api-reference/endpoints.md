@@ -82,8 +82,8 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 |-----------|------|-------------|
 | `patient_id` | int | Filter by patient |
 | `type` | string | Filter by document type (comma-separated for multiple) |
-| `date_from` | string | Filter by date (YYYY-MM-DD) |
-| `date_to` | string | Filter by date (YYYY-MM-DD) |
+| `date_from` | string | Earliest `event_date`, inclusive (YYYY-MM-DD) |
+| `date_to` | string | Latest `event_date`, inclusive (YYYY-MM-DD) |
 | `status` | string | Filter by status (comma-separated for multiple: pending, processing, done, failed, needs_review, cancelled) |
 | `q` | string | Full-text search query |
 | `specialty` | string | Filter by specialty (comma-separated for multiple) |
@@ -94,9 +94,11 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 ### Document update fields
 
-`patient_id`, `doc_type`, `doc_date`, `date_issued`, `date_visit`, `doctor_id`, `doctor_name`, `facility_id`, `facility_name`, `specialty_original`, `summary_en`, `event_id`, `notes`, `tags`, `user_notes`, `original_filename`
+`patient_id`, `doc_type`, `event_date`, `issued_date`, `doctor_id`, `doctor_name`, `facility_id`, `facility_name`, `specialty_original`, `summary_en`, `event_id`, `notes`, `tags`, `user_notes`, `original_filename`
 
-When a request sends `doctor_name` or `facility_name` without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically — a name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears both the text and the id.
+`event_date` is the canonical timeline anchor (when the medical event happened); `issued_date` is the administrative date the document itself carries. Both accept `YYYY-MM-DD` strings or `null`.
+
+`doctor_name` and `facility_name` are write-only convenience fields — they are not stored on the document, only on `doctors` / `facilities`. When a request sends a name without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically. A name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears the foreign key.
 
 ### AI Edit request
 

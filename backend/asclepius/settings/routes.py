@@ -93,6 +93,12 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "auto_create_user": config.oidc.auto_create_user,
             "username_claim": config.oidc.username_claim,
             "display_name_claim": config.oidc.display_name_claim,
+            "sync_roles": config.oidc.sync_roles,
+            "roles_claim": config.oidc.roles_claim,
+            "admin_roles": list(config.oidc.admin_roles),
+            "editor_roles": list(config.oidc.editor_roles),
+            "viewer_roles": list(config.oidc.viewer_roles),
+            "default_role": config.oidc.default_role,
         },
         "vault": {
             "root_path": config.vault.root_path,
@@ -143,6 +149,12 @@ class SettingsUpdate(BaseModel):
     oidc_auto_create_user: bool | None = None
     oidc_username_claim: str | None = None
     oidc_display_name_claim: str | None = None
+    oidc_sync_roles: bool | None = None
+    oidc_roles_claim: str | None = None
+    oidc_admin_roles: list[str] | None = None
+    oidc_editor_roles: list[str] | None = None
+    oidc_viewer_roles: list[str] | None = None
+    oidc_default_role: str | None = None
     # Backup scheduler
     backup_enabled: bool | None = None
     backup_include_database: bool | None = None
@@ -190,6 +202,12 @@ _SETTINGS_MAP = {
     "oidc_auto_create_user": ("oidc", "auto_create_user", "oidc.auto_create_user"),
     "oidc_username_claim": ("oidc", "username_claim", "oidc.username_claim"),
     "oidc_display_name_claim": ("oidc", "display_name_claim", "oidc.display_name_claim"),
+    "oidc_sync_roles": ("oidc", "sync_roles", "oidc.sync_roles"),
+    "oidc_roles_claim": ("oidc", "roles_claim", "oidc.roles_claim"),
+    "oidc_admin_roles": ("oidc", "admin_roles", "oidc.admin_roles"),
+    "oidc_editor_roles": ("oidc", "editor_roles", "oidc.editor_roles"),
+    "oidc_viewer_roles": ("oidc", "viewer_roles", "oidc.viewer_roles"),
+    "oidc_default_role": ("oidc", "default_role", "oidc.default_role"),
     "backup_enabled": ("backup", "enabled", "backup.enabled"),
     "backup_include_database": ("backup", "include_database", "backup.include_database"),
     "backup_include_vault": ("backup", "include_vault", "backup.include_vault"),

@@ -21,10 +21,27 @@ oidc:
   provider_url: ""  # e.g. https://auth.example.com/application/o/asclepius/
   client_id: ""
   client_secret: ""
+  # Add "groups" (Authentik / most Keycloak setups) when syncing roles so
+  # the userinfo endpoint actually returns the group membership.
   scopes: "openid profile email"
   auto_create_user: true  # create user on first OIDC login
   username_claim: "preferred_username"
   display_name_claim: "name"
+
+  # Role sync — when enabled, users.role is recomputed on every OIDC login
+  # from the provider's group/role claim. First match wins in the order
+  # admin → editor → viewer; if nothing matches, default_role is used.
+  #
+  # Authentik exposes group names under the "groups" claim (requires the
+  # "groups" scope). Keycloak's realm roles live at "realm_access.roles"
+  # (nested), and client-specific roles at e.g.
+  # "resource_access.<client-id>.roles".
+  sync_roles: false
+  roles_claim: "groups"
+  admin_roles: []    # e.g. ["asclepius-admins"]
+  editor_roles: []   # e.g. ["asclepius-editors"]
+  viewer_roles: []   # e.g. ["asclepius-viewers"]
+  default_role: "viewer"
 
 ocr:
   engine: "tesseract"  # tesseract, tesseract_remote, llm_vision, google_vision

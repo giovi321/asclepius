@@ -1,6 +1,7 @@
 """OIDC authentication flow for SSO (Authentik, Keycloak, etc.)."""
 
 import logging
+from typing import Any
 
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -9,6 +10,7 @@ import aiosqlite
 from asclepius.auth.cookies import clear_auth_cookie, set_auth_cookie
 from asclepius.auth.session import COOKIE_NAME, create_session, hash_password
 from asclepius.config import get_config
+from asclepius.config.models import OidcConfig
 from asclepius.db.connection import get_db
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,67 @@ router = APIRouter()
 
 # Well-known OIDC discovery suffix
 DISCOVERY_PATH = "/.well-known/openid-configuration"
+
+
+def _read_claim_path(payload: dict, dotted_path: str) -> Any:
+    """Descend ``dotted_path`` through a userinfo payload.
+
+    Works for simple claims (``"groups"``) and nested ones
+    (``"realm_access.roles"`` on Keycloak). Returns ``None`` if any segment
+    is missing or a non-mapping appears partway down.
+    """
+    cur: Any = payload
+    for seg in dotted_path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(seg)
+        if cur is None:
+            return None
+    return cur
+
+
+def _normalise_roles(raw: Any) -> list[str]:
+    """Coerce a roles claim to a list of stripped string values.
+
+    Providers may emit a JSON array (``["admin", "editor"]``), a single
+    space-separated string, or a single role. Anything unrecognised yields
+    an empty list.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [r.strip() for r in raw.split() if r.strip()]
+    if isinstance(raw, list):
+        out: list[str] = []
+        for r in raw:
+            if r is None or not isinstance(r, (str, int)):
+                continue
+            s = str(r).strip()
+            if s:
+                out.append(s)
+        return out
+    return []
+
+
+def _map_oidc_role(claims: dict, cfg: OidcConfig) -> str | None:
+    """Resolve an OIDC userinfo payload to a local users.role value.
+
+    Returns ``None`` when ``sync_roles`` is off, so callers can tell "do
+    nothing" apart from "map to default_role / viewer". Precedence is
+    admin → editor → viewer; first mapping hit wins. When sync is on but no
+    configured group matches, falls back to ``default_role``.
+    """
+    if not cfg.sync_roles:
+        return None
+    roles = set(_normalise_roles(_read_claim_path(claims, cfg.roles_claim)))
+    for candidate, local in (
+        (cfg.admin_roles, "admin"),
+        (cfg.editor_roles, "editor"),
+        (cfg.viewer_roles, "viewer"),
+    ):
+        if any(name in roles for name in candidate):
+            return local
+    return cfg.default_role or "viewer"
 
 
 def _get_oidc_client() -> AsyncOAuth2Client:
@@ -122,13 +185,14 @@ async def oidc_callback(
 
     username = userinfo.get(config.oidc.username_claim, "")
     display_name = userinfo.get(config.oidc.display_name_claim, username)
+    mapped_role = _map_oidc_role(userinfo, config.oidc)
 
     if not username:
         raise HTTPException(status_code=400, detail="No username in OIDC claims")
 
     # Find or create user
     cursor = await db.execute(
-        "SELECT id, username, display_name FROM users WHERE username = ?",
+        "SELECT id, username, display_name, role FROM users WHERE username = ?",
         (username,),
     )
     user = await cursor.fetchone()
@@ -143,22 +207,50 @@ async def oidc_callback(
         # Create user with a random password (OIDC users don't use password login)
         import secrets
         random_password = secrets.token_urlsafe(32)
-        cursor = await db.execute(
-            "INSERT INTO users (username, password_hash, display_name) VALUES (?, ?, ?)",
-            (username, hash_password(random_password), display_name),
-        )
+        # When role sync is off, fall through to the schema default (editor).
+        # When it's on, use the mapped role even on create so a newly
+        # auto-provisioned user lands in the right tier on first login.
+        if mapped_role is not None:
+            cursor = await db.execute(
+                "INSERT INTO users (username, password_hash, display_name, role) "
+                "VALUES (?, ?, ?, ?)",
+                (username, hash_password(random_password), display_name, mapped_role),
+            )
+        else:
+            cursor = await db.execute(
+                "INSERT INTO users (username, password_hash, display_name) "
+                "VALUES (?, ?, ?)",
+                (username, hash_password(random_password), display_name),
+            )
         user_id = cursor.lastrowid
         await db.commit()
-        logger.info("Created OIDC user: %s (id=%d)", username, user_id)
+        logger.info(
+            "Created OIDC user: %s (id=%d, role=%s)",
+            username, user_id, mapped_role or "default",
+        )
     else:
         user_id = user[0]
+        current_role = user[3]
         # Update display name if changed
         if display_name and display_name != user[2]:
             await db.execute(
                 "UPDATE users SET display_name = ? WHERE id = ?",
                 (display_name, user_id),
             )
-            await db.commit()
+        # Re-sync the local role on every login when enabled so central IAM
+        # changes (add/remove from the admins group) propagate without an
+        # admin having to edit the DB by hand. Only write when it actually
+        # changed to keep the log quiet.
+        if mapped_role is not None and mapped_role != current_role:
+            await db.execute(
+                "UPDATE users SET role = ? WHERE id = ?",
+                (mapped_role, user_id),
+            )
+            logger.info(
+                "OIDC role sync: user=%s id=%d %s → %s",
+                username, user_id, current_role, mapped_role,
+            )
+        await db.commit()
 
     # Create session
     session_token = await create_session(db, user_id, request)

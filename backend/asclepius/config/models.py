@@ -75,6 +75,24 @@ class OidcConfig(BaseModel):
     # Claim to use as display name
     display_name_claim: str = "name"
 
+    # Role / group synchronisation. When ``sync_roles`` is true, the local
+    # ``users.role`` is (re-)computed on every OIDC login from the groups or
+    # roles the provider asserts in ``roles_claim``. This keeps the admin
+    # cohort managed centrally in Authentik / Keycloak instead of getting
+    # out of sync in the local DB.
+    sync_roles: bool = False
+    # Dotted path into the userinfo payload that holds the list of roles /
+    # groups. Works for Authentik's default ``groups``, and for
+    # Keycloak-style ``realm_access.roles`` (nested list).
+    roles_claim: str = "groups"
+    # Names of OIDC roles/groups that map to each local role. First match
+    # wins in the order admin → editor → viewer. Case-sensitive.
+    admin_roles: list[str] = []
+    editor_roles: list[str] = []
+    viewer_roles: list[str] = []
+    # Local role granted when sync is on and no mapping matches.
+    default_role: str = "viewer"
+
 
 class CredentialEntry(BaseModel):
     """A shared connection/credential definition referenced by provider entries.

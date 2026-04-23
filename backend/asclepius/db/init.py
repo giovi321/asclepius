@@ -534,6 +534,24 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
     )
 
+    # Compat view for external tooling that still expects the old
+    # doctor_name / facility_name columns (see issue #16). Dropped and
+    # recreated every init so the view re-binds to the current documents
+    # columns after the date-unification migration above mutates them.
+    await db.execute("DROP VIEW IF EXISTS documents_with_names")
+    await db.execute("""
+        CREATE VIEW IF NOT EXISTS documents_with_names AS
+        SELECT d.*,
+               doc.name       AS doctor_name,
+               f.name         AS facility_name,
+               p.display_name AS patient_name,
+               p.slug         AS patient_slug
+        FROM documents d
+        LEFT JOIN doctors    doc ON d.doctor_id   = doc.id
+        LEFT JOIN facilities f   ON d.facility_id = f.id
+        LEFT JOIN patients   p   ON d.patient_id  = p.id
+    """)
+
     await db.commit()
 
 

@@ -483,3 +483,16 @@ CREATE INDEX IF NOT EXISTS idx_norm_specialty_aliases_alias ON norm_specialty_al
 CREATE INDEX IF NOT EXISTS idx_norm_diagnosis_aliases_alias ON norm_diagnosis_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_norm_medication_aliases_alias ON norm_medication_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_document ON invoice_items(document_id);
+
+-- Compat view for external tooling that expects doctor_name / facility_name / patient_name
+-- columns on the documents table (see issue #16).
+CREATE VIEW IF NOT EXISTS documents_with_names AS
+SELECT d.*,
+       doc.name       AS doctor_name,
+       f.name         AS facility_name,
+       p.display_name AS patient_name,
+       p.slug         AS patient_slug
+FROM documents d
+LEFT JOIN doctors    doc ON d.doctor_id   = doc.id
+LEFT JOIN facilities f   ON d.facility_id = f.id
+LEFT JOIN patients   p   ON d.patient_id  = p.id;

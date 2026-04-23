@@ -120,7 +120,7 @@ export default function DocumentFilters({
             { value: "__blank__", label: "(blank)" },
             ...doctors.map((d: any) => ({
               value: String(d.id),
-              label: `${d.title ? d.title + " " : ""}${d.name}`,
+              label: d.canonical_display || d.name,
             })),
           ]}
           selected={doctorFilter}
@@ -133,7 +133,7 @@ export default function DocumentFilters({
             { value: "__blank__", label: "(blank)" },
             ...facilities.map((f: any) => ({
               value: String(f.id),
-              label: `${f.name}${f.city ? ` (${f.city})` : ""}`,
+              label: f.canonical_display || f.name,
             })),
           ]}
           selected={facilityFilter}

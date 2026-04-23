@@ -64,20 +64,20 @@
   <line x1="660" y1="156" x2="660" y2="296" stroke="#a8a29e" stroke-width="1"/>
 
   <circle cx="660" cy="172" r="5" fill="#8E4449"/>
-  <text x="676" y="170" class="yr">2026</text>
-  <text x="708" y="170" class="item">Annual checkup · lipid panel</text>
+  <text x="676" y="172" class="yr" dominant-baseline="central">2026</text>
+  <text x="708" y="172" class="item" dominant-baseline="central">Annual checkup · lipid panel</text>
 
   <circle cx="660" cy="208" r="4" fill="#1c1917"/>
-  <text x="676" y="206" class="yr">2024</text>
-  <text x="708" y="206" class="item">Knee surgery · 6 follow-ups</text>
+  <text x="676" y="208" class="yr" dominant-baseline="central">2024</text>
+  <text x="708" y="208" class="item" dominant-baseline="central">Knee surgery · 6 follow-ups</text>
 
   <circle cx="660" cy="244" r="4" fill="#1c1917"/>
-  <text x="676" y="242" class="yr">2022</text>
-  <text x="708" y="242" class="item">MRI shoulder · physio plan</text>
+  <text x="676" y="244" class="yr" dominant-baseline="central">2022</text>
+  <text x="708" y="244" class="item" dominant-baseline="central">MRI shoulder · physio plan</text>
 
   <circle cx="660" cy="280" r="4" fill="#1c1917"/>
-  <text x="676" y="278" class="yr">2019</text>
-  <text x="708" y="278" class="item">Bloodwork · 14 markers normalized</text>
+  <text x="676" y="280" class="yr" dominant-baseline="central">2019</text>
+  <text x="708" y="280" class="item" dominant-baseline="central">Bloodwork · 14 markers normalized</text>
 
   <text x="620" y="332" class="cap">one searchable archive per patient</text>
 </svg>

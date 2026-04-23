@@ -28,7 +28,26 @@ class PatientUpdate(BaseModel):
     sex: str | None = None
 
 
-@router.get("")
+class PatientSummary(BaseModel):
+    id: int
+    slug: str
+    display_name: str
+    date_of_birth: str | None = None
+    sex: str | None = None
+    created_at: str | None = None
+    role: str | None = None
+
+
+class PatientDetail(PatientSummary):
+    document_count: int = 0
+
+
+class PatientDeleteResponse(BaseModel):
+    status: str
+    patient_id: int
+
+
+@router.get("", response_model=list[PatientSummary])
 async def list_patients(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
@@ -38,7 +57,7 @@ async def list_patients(
     )
 
 
-@router.get("/{patient_id}")
+@router.get("/{patient_id}", response_model=PatientDetail)
 async def get_patient(
     patient_id: int,
     current_user: dict = Depends(get_current_user),
@@ -73,7 +92,7 @@ async def get_patient(
     return patient
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=PatientSummary)
 async def create_patient(
     body: PatientCreate,
     current_user: dict = Depends(get_current_user),
@@ -115,10 +134,12 @@ async def create_patient(
         "slug": slug,
         "display_name": body.display_name,
         "date_of_birth": body.date_of_birth,
+        "sex": body.sex,
+        "role": "owner",
     }
 
 
-@router.patch("/{patient_id}")
+@router.patch("/{patient_id}", response_model=PatientSummary)
 async def update_patient(
     patient_id: int,
     body: PatientUpdate,
@@ -156,7 +177,7 @@ async def update_patient(
     return dict(row)
 
 
-@router.delete("/{patient_id}")
+@router.delete("/{patient_id}", response_model=PatientDeleteResponse)
 async def delete_patient(
     patient_id: int,
     current_user: dict = Depends(get_current_user),
@@ -185,3 +206,4 @@ async def delete_patient(
     await db.commit()
 
     return {"status": "deleted", "patient_id": patient_id}
+

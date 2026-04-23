@@ -1769,6 +1769,13 @@ export interface components {
             /** Color */
             color?: string | null;
         };
+        /** EventCreateResponse */
+        EventCreateResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+        };
         /** EventLinkRequest */
         EventLinkRequest: {
             /** Document Id */
@@ -1778,6 +1785,22 @@ export interface components {
              * @default primary
              */
             relevance: string;
+        };
+        /** EventOkResponse */
+        EventOkResponse: {
+            /** Ok */
+            ok: boolean;
+        };
+        /** EventSuggestion */
+        EventSuggestion: {
+            /** Existing Event Id */
+            existing_event_id?: number | null;
+            /** Confidence */
+            confidence?: string | null;
+            /** Reason */
+            reason?: string | null;
+            new_event_suggestion?: components["schemas"]["NewEventSuggestion"] | null;
+            matched_event?: components["schemas"]["MedicalEvent"] | null;
         };
         /** EventUpdate */
         EventUpdate: {
@@ -1886,12 +1909,141 @@ export interface components {
             /** Norm Lab Test Id */
             norm_lab_test_id?: number | null;
         };
+        /** LinkedDocument */
+        LinkedDocument: {
+            /** Link Id */
+            link_id: number;
+            /** Relevance */
+            relevance?: string | null;
+            /**
+             * Auto Linked
+             * @default false
+             */
+            auto_linked: boolean;
+            /** Document Id */
+            document_id: number;
+            /** Original Filename */
+            original_filename?: string | null;
+            /** Doc Type */
+            doc_type?: string | null;
+            /** Event Date */
+            event_date?: string | null;
+            /** Doctor Name */
+            doctor_name?: string | null;
+            /** Facility Name */
+            facility_name?: string | null;
+            /** Summary En */
+            summary_en?: string | null;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
             username: string;
             /** Password */
             password: string;
+        };
+        /** MedicalEvent */
+        MedicalEvent: {
+            /** Id */
+            id: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Title */
+            title: string;
+            /** Event Type */
+            event_type: string;
+            /** Description */
+            description?: string | null;
+            /** Date Start */
+            date_start?: string | null;
+            /** Date End */
+            date_end?: string | null;
+            /**
+             * Is Ongoing
+             * @default false
+             */
+            is_ongoing: boolean;
+            /** Severity */
+            severity?: string | null;
+            /** Norm Diagnosis Id */
+            norm_diagnosis_id?: number | null;
+            /** Diagnosis Text */
+            diagnosis_text?: string | null;
+            /** Icd10 Code */
+            icd10_code?: string | null;
+            /** Norm Specialty Id */
+            norm_specialty_id?: number | null;
+            /** Specialty Text */
+            specialty_text?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Patient Name */
+            patient_name?: string | null;
+            /**
+             * Document Count
+             * @default 0
+             */
+            document_count: number;
+        };
+        /** MedicalEventDetail */
+        MedicalEventDetail: {
+            /** Id */
+            id: number;
+            /** Patient Id */
+            patient_id: number;
+            /** Title */
+            title: string;
+            /** Event Type */
+            event_type: string;
+            /** Description */
+            description?: string | null;
+            /** Date Start */
+            date_start?: string | null;
+            /** Date End */
+            date_end?: string | null;
+            /**
+             * Is Ongoing
+             * @default false
+             */
+            is_ongoing: boolean;
+            /** Severity */
+            severity?: string | null;
+            /** Norm Diagnosis Id */
+            norm_diagnosis_id?: number | null;
+            /** Diagnosis Text */
+            diagnosis_text?: string | null;
+            /** Icd10 Code */
+            icd10_code?: string | null;
+            /** Norm Specialty Id */
+            norm_specialty_id?: number | null;
+            /** Specialty Text */
+            specialty_text?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Color */
+            color?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Patient Name */
+            patient_name?: string | null;
+            /**
+             * Document Count
+             * @default 0
+             */
+            document_count: number;
+            /**
+             * Documents
+             * @default []
+             */
+            documents: components["schemas"]["LinkedDocument"][];
         };
         /** MergeBatchRequest */
         MergeBatchRequest: {
@@ -1907,6 +2059,17 @@ export interface components {
             source_id: number;
             /** Target Id */
             target_id: number;
+        };
+        /** NewEventSuggestion */
+        NewEventSuggestion: {
+            /** Title */
+            title?: string | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Date Start */
+            date_start?: string | null;
         };
         /** NewTarget */
         NewTarget: {
@@ -1940,6 +2103,52 @@ export interface components {
             date_of_birth?: string | null;
             /** Sex */
             sex?: string | null;
+        };
+        /** PatientDeleteResponse */
+        PatientDeleteResponse: {
+            /** Status */
+            status: string;
+            /** Patient Id */
+            patient_id: number;
+        };
+        /** PatientDetail */
+        PatientDetail: {
+            /** Id */
+            id: number;
+            /** Slug */
+            slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Sex */
+            sex?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Role */
+            role?: string | null;
+            /**
+             * Document Count
+             * @default 0
+             */
+            document_count: number;
+        };
+        /** PatientSummary */
+        PatientSummary: {
+            /** Id */
+            id: number;
+            /** Slug */
+            slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Date Of Birth */
+            date_of_birth?: string | null;
+            /** Sex */
+            sex?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Role */
+            role?: string | null;
         };
         /** PatientUpdate */
         PatientUpdate: {
@@ -2055,6 +2264,18 @@ export interface components {
             oidc_username_claim?: string | null;
             /** Oidc Display Name Claim */
             oidc_display_name_claim?: string | null;
+            /** Oidc Sync Roles */
+            oidc_sync_roles?: boolean | null;
+            /** Oidc Roles Claim */
+            oidc_roles_claim?: string | null;
+            /** Oidc Admin Roles */
+            oidc_admin_roles?: string[] | null;
+            /** Oidc Editor Roles */
+            oidc_editor_roles?: string[] | null;
+            /** Oidc Viewer Roles */
+            oidc_viewer_roles?: string[] | null;
+            /** Oidc Default Role */
+            oidc_default_role?: string | null;
             /** Backup Enabled */
             backup_enabled?: boolean | null;
             /** Backup Include Database */
@@ -2315,7 +2536,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PatientSummary"][];
                 };
             };
         };
@@ -2339,7 +2560,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PatientSummary"];
                 };
             };
             /** @description Validation Error */
@@ -2370,7 +2591,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PatientDetail"];
                 };
             };
             /** @description Validation Error */
@@ -2401,7 +2622,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PatientDeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2436,7 +2657,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PatientSummary"];
                 };
             };
             /** @description Validation Error */
@@ -3158,7 +3379,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalEvent"][];
                 };
             };
             /** @description Validation Error */
@@ -3191,7 +3412,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventCreateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3222,7 +3443,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["MedicalEventDetail"];
                 };
             };
             /** @description Validation Error */
@@ -3255,7 +3476,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3290,7 +3511,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3325,7 +3546,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3357,7 +3578,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -3388,7 +3609,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventSuggestion"];
                 };
             };
             /** @description Validation Error */

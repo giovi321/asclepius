@@ -58,7 +58,71 @@ class EventLinkRequest(BaseModel):
     relevance: str = "primary"
 
 
-@router.get("")
+class MedicalEvent(BaseModel):
+    id: int
+    patient_id: int
+    title: str
+    event_type: str
+    description: str | None = None
+    date_start: str | None = None
+    date_end: str | None = None
+    is_ongoing: bool = False
+    severity: str | None = None
+    norm_diagnosis_id: int | None = None
+    diagnosis_text: str | None = None
+    icd10_code: str | None = None
+    norm_specialty_id: int | None = None
+    specialty_text: str | None = None
+    notes: str | None = None
+    color: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    patient_name: str | None = None
+    document_count: int = 0
+
+
+class LinkedDocument(BaseModel):
+    link_id: int
+    relevance: str | None = None
+    auto_linked: bool = False
+    document_id: int
+    original_filename: str | None = None
+    doc_type: str | None = None
+    event_date: str | None = None
+    doctor_name: str | None = None
+    facility_name: str | None = None
+    summary_en: str | None = None
+
+
+class MedicalEventDetail(MedicalEvent):
+    documents: list[LinkedDocument] = []
+
+
+class EventCreateResponse(BaseModel):
+    id: int
+    title: str
+
+
+class EventOkResponse(BaseModel):
+    ok: bool
+
+
+class NewEventSuggestion(BaseModel):
+    title: str | None = None
+    event_type: str | None = None
+    description: str | None = None
+    date_start: str | None = None
+
+
+class EventSuggestion(BaseModel):
+    existing_event_id: int | None = None
+    confidence: str | None = None
+    reason: str | None = None
+    new_event_suggestion: NewEventSuggestion | None = None
+    matched_event: MedicalEvent | None = None
+
+
+@router.get("", response_model=list[MedicalEvent])
 async def list_events(
     patient_id: int | None = None,
     event_type: str | None = None,
@@ -90,7 +154,7 @@ async def list_events(
     return [dict(r) for r in await cursor.fetchall()]
 
 
-@router.get("/{event_id}")
+@router.get("/{event_id}", response_model=MedicalEventDetail)
 async def get_event(
     event_id: int,
     current_user: dict = Depends(get_current_user),
@@ -129,7 +193,7 @@ async def get_event(
     return event
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=EventCreateResponse)
 async def create_event(
     body: EventCreate,
     current_user: dict = Depends(get_current_user),
@@ -150,7 +214,7 @@ async def create_event(
     return {"id": cursor.lastrowid, "title": body.title}
 
 
-@router.patch("/{event_id}")
+@router.patch("/{event_id}", response_model=EventOkResponse)
 async def update_event(
     event_id: int,
     body: EventUpdate,
@@ -176,7 +240,7 @@ async def update_event(
     return {"ok": True}
 
 
-@router.delete("/{event_id}")
+@router.delete("/{event_id}", response_model=EventOkResponse)
 async def delete_event(
     event_id: int,
     delete_documents: bool = False,
@@ -209,7 +273,7 @@ async def delete_event(
 
 # --- Document-Event linking ---
 
-@router.post("/{event_id}/link")
+@router.post("/{event_id}/link", response_model=EventOkResponse)
 async def link_document_to_event(
     event_id: int,
     body: EventLinkRequest,
@@ -234,7 +298,7 @@ async def link_document_to_event(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/{event_id}/link/{document_id}")
+@router.delete("/{event_id}/link/{document_id}", response_model=EventOkResponse)
 async def unlink_document_from_event(
     event_id: int,
     document_id: int,
@@ -256,7 +320,7 @@ async def unlink_document_from_event(
 
 # --- LLM auto-tagging ---
 
-@router.post("/suggest-for-document/{doc_id}")
+@router.post("/suggest-for-document/{doc_id}", response_model=EventSuggestion)
 async def suggest_events_for_document(
     doc_id: int,
     current_user: dict = Depends(get_current_user),

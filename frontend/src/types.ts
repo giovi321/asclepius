@@ -14,6 +14,11 @@ import type { components } from "./api/schema";
 
 export type DocumentUpdate = components["schemas"]["DocumentUpdate"];
 export type DocumentMoveRequest = components["schemas"]["DocumentMoveRequest"];
+export type PatientCreate = components["schemas"]["PatientCreate"];
+export type PatientUpdate = components["schemas"]["PatientUpdate"];
+export type EventCreate = components["schemas"]["EventCreate"];
+export type EventUpdate = components["schemas"]["EventUpdate"];
+export type EventLinkRequest = components["schemas"]["EventLinkRequest"];
 
 // ─── Document ──────────────────────────────────────────
 
@@ -221,32 +226,15 @@ export interface LlmQueueSnapshot {
 
 // ─── Patient ───────────────────────────────────────────
 
-export interface Patient {
-  id: number;
-  slug: string;
-  display_name: string;
-}
+export type Patient = components["schemas"]["PatientSummary"];
+export type PatientDetail = components["schemas"]["PatientDetail"];
 
 // ─── Medical Event ─────────────────────────────────────
 
-export interface MedicalEvent {
-  id: number;
-  patient_id: number;
-  title: string;
-  event_type: string;
-  description: string | null;
-  date_start: string | null;
-  date_end: string | null;
-  is_ongoing: boolean;
-  severity: string | null;
-  norm_diagnosis_id: number | null;
-  diagnosis_text: string | null;
-  icd10_code: string | null;
-  notes: string | null;
-  color: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type MedicalEvent = components["schemas"]["MedicalEvent"];
+export type MedicalEventDetail = components["schemas"]["MedicalEventDetail"];
+export type LinkedDocument = components["schemas"]["LinkedDocument"];
+export type EventSuggestion = components["schemas"]["EventSuggestion"];
 
 // ─── Lab Results ───────────────────────────────────────
 

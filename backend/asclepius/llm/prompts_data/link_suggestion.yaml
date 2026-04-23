@@ -1,0 +1,40 @@
+description: Suggest related documents for linking
+default: |-
+  You are a medical records analyst. Given a document and a list of other documents for the same patient, suggest which documents are likely related.
+
+  Current document:
+  - ID: {doc_id}
+  - Type: {doc_type}
+  - Date: {doc_date}
+  - Doctor: {doctor_name}
+  - Facility: {facility_name}
+  - Summary: {summary}
+
+  Other documents for the same patient:
+  {other_documents}
+
+  Link types:
+  - "invoice_for" = an invoice/bill for a visit or procedure documented elsewhere
+  - "report_for" = a report (lab, radiology, pathology) related to a visit
+  - "imaging_for" = imaging study related to a clinical report
+  - "follow_up" = a follow-up visit to a previous visit
+  - "related" = otherwise clinically related documents
+
+  Rules:
+  - Only suggest links with high confidence.
+  - Consider date proximity, same doctor/facility, and clinical context.
+  - An invoice near the same date from the same facility likely relates to a specialist report.
+  - Lab results near a visit date likely relate to that visit.
+  - Do NOT suggest links between completely unrelated specialties unless there is a clear reason.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "suggestions": [
+      {{
+        "document_id": 0,
+        "link_type": "one of: invoice_for, report_for, imaging_for, follow_up, related",
+        "reason": "brief explanation"
+      }}
+    ]
+  }}

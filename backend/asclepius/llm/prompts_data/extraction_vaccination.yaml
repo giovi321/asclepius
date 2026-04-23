@@ -1,0 +1,22 @@
+description: 'Phase 2: Extract vaccination records'
+default: |-
+  You are a vaccination record parser. Extract ONLY vaccination details.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "vaccinations": [
+      {{
+        "vaccine_name": "string",
+        "manufacturer": "string or null",
+        "lot_number": "string or null",
+        "dose_number": null,
+        "date_administered": "YYYY-MM-DD or null"
+      }}
+    ]
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

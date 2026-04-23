@@ -1,0 +1,35 @@
+description: 'Phase 2: Extract cost and insurance details from insurance claims'
+default: |-
+  You are an insurance claim parser. Extract cost and insurance details.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "cost": {{
+      "total_amount": null,
+      "currency": "ISO 4217 code",
+      "subtotal": null,
+      "tax_amount": null,
+      "tax_rate": null,
+      "line_items": [
+        {{
+          "description": "string",
+          "quantity": 1,
+          "unit_price": null,
+          "amount": 0,
+          "tariff_code": "string or null",
+          "category": "consultation|procedure|medication|lab|imaging|admin|other"
+        }}
+      ]
+    }},
+    "insurance": {{
+      "company": "string or null",
+      "policy_number": "string or null",
+      "claim_status": "approved|partially_approved|denied|pending|null"
+    }}
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

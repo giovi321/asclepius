@@ -15,9 +15,9 @@ from asclepius.config import (
     LlmProviderEntry,
     OcrProviderEntry,
     VisionLlmProviderEntry,
-    _new_credential_id,
     get_config,
 )
+from asclepius.config.resolver import _new_credential_id
 
 router = APIRouter()
 

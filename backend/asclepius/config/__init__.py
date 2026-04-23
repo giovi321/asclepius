@@ -25,19 +25,6 @@ from .models import (
     VisionLlmProviderEntry,
 )
 from .resolver import (
-    _apply_env_claude_key,
-    _apply_env_ollama_url,
-    _BASELESS_CREDENTIAL_TYPES,
-    _ensure_credential,
-    _first_enabled_llm,
-    _LEGACY_LLM_KEYS,
-    _migrate_credentials,
-    _migrate_legacy_llm_yaml,
-    _migrate_vision_extraction_ocr_yaml,
-    _new_credential_id,
-    _normalise_base_url,
-    _persist_yaml,
-    _validate_production_config,
     generate_secret_key,
     get_active_llm_provider_config,
     get_active_ocr_provider_config,
@@ -46,6 +33,9 @@ from .resolver import (
     load_config,
     resolve_credential,
 )
+# Private helpers (prefixed with ``_``) remain importable via
+# ``from asclepius.config.resolver import _first_enabled_llm`` etc; they are
+# deliberately not part of this module's public surface.
 
 __all__ = [
     "DEFAULT_SECRET_PLACEHOLDER",

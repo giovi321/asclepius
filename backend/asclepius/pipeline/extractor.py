@@ -18,7 +18,6 @@ from asclepius.llm.base import LLMProvider
 from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
 
 from .entity_matching import (
-    _DOCTOR_TITLE_TOKENS,
     _match_patient,
     _resolve_specialty_from_doctor,
     _upsert_doctor,

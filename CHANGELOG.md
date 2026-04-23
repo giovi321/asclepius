@@ -14,23 +14,43 @@ internal layout changes significantly.
 
 - Backend module splits: `settings/routes.py`, `pipeline/extractor.py`,
   `config.py`, and `chat/service.py` broken into focused sub-modules.
+- Pipeline globals (`pipeline_status`, `cancelled_docs`, `_running_tasks`)
+  wrapped in a single `PipelineState` dataclass.
+- Normalization alias lookup consolidated into
+  `normalization/alias_lookup.py`.
 - DB schema: dropped denormalized `documents.doctor_name` and
-  `documents.facility_name`. Unified `date_visit` / `date_issued` /
-  `doc_date` into `event_date` and `issued_date`.
-- LLM prompts moved from `llm/prompts.py` into YAML files under
-  `config/prompts/`.
-- Frontend: shared API types generated from the FastAPI OpenAPI spec;
-  hand-written interfaces in `types.ts` replaced with re-exports.
-  Mega-components (`NormalizationTab`, `DocumentDetailPage`,
-  `DocumentsPage`, `ProvidersTab`) split into focused pieces. Shared
-  fetch logic extracted into data hooks.
-- Error boundaries added at the page level. 4xx/5xx requests now logged
-  to the audit trail.
+  `documents.facility_name`; readers now JOIN doctors / facilities.
+- DB schema: unified `date_visit` / `date_issued` / `doc_date` into
+  `event_date` (canonical timeline anchor) and `issued_date`
+  (administrative). Migration copies forward with the historic priority
+  rule and rebuilds the FTS5 index.
+- Encounters / imaging_studies `doctor_id` / `facility_id` now stay in
+  lockstep with the parent document via AFTER UPDATE triggers; the
+  periodic re-sync migration is gone.
+- LLM prompts moved from a monolithic `llm/prompts.py` (876 LOC) into
+  per-prompt YAML files under `llm/prompts_data/` with a thin loader
+  that preserves the legacy module-level constants.
+- Frontend: shared API types generated from the FastAPI OpenAPI spec.
+  Request payloads in `types.ts` now re-export from the generated
+  `api/schema.ts`. Regenerate with `python backend/scripts/export_openapi.py`
+  then `npm --prefix frontend run gen:api`.
+- Frontend: shared data hooks under `hooks/data/` (useDoctors,
+  useFacilities, useSpecialties, usePatients, …) cache results
+  per-session. `DocumentsPage` migrated off three per-page refetches.
+- Frontend: every routed page wrapped in its own `ErrorBoundary`.
+- Backend: 4xx/5xx responses on `/api/*` now write a row to `audit_log`.
 
 ### Removed
 
 - Trivial UI walkthrough sections from user-guide docs (timeline,
   documents, medical-events, imaging, normalization, chat, first-steps).
+
+### Deferred
+
+- Splits of the four remaining mega-components (`NormalizationTab`,
+  `DocumentDetailPage`, `DocumentsPage`, `ProvidersTab`). The shared
+  hooks + ErrorBoundary + generated types are in place so these can be
+  tackled incrementally without further plumbing.
 
 ## [Unreleased]
 

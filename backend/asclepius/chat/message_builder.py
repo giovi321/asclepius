@@ -98,7 +98,7 @@ async def build_patient_context(
             name = m[4] or m[0]
             parts.append(f"  - {name} {m[1] or ''} {m[2] or ''} (from {m[3] or '?'})")
 
-    return "\n".join(parts)
+    return "\n".join(parts), available_docs
 
 
 # Columns unique enough to ``documents`` that their presence in a row tells

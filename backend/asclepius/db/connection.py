@@ -14,6 +14,12 @@ def set_db_path(path: str) -> None:
     _db_path = path
 
 
+def get_db_path() -> str:
+    """Return the active database path without opening a connection."""
+    config = get_config()
+    return _db_path or config.database.path
+
+
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     """FastAPI dependency that yields an async SQLite connection."""
     config = get_config()

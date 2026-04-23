@@ -6,6 +6,7 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { FileText, Search, Upload, Pencil, Check, X, ChevronDown, Columns3, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
+import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
 import type { PipelineStatus } from "@/types";
 import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
 import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
@@ -163,21 +164,17 @@ export default function DocumentsPage() {
   );
   const tableColSpan = 2 + orderedVisibleColumns.length; // checkbox + File + dynamic
 
-  // Load filter options
-  const [specialties, setSpecialties] = useState<any[]>([]);
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [facilities, setFacilities] = useState<any[]>([]);
+  // Load filter options. Doctors/facilities/specialties come from shared
+  // resource hooks so navigating between pages hits one cached fetch
+  // instead of three per page.
+  const { data: specialtiesData } = useSpecialties();
+  const { data: doctorsData } = useDoctors();
+  const { data: facilitiesData } = useFacilities();
+  const specialties = specialtiesData ?? [];
+  const doctors = doctorsData ?? [];
+  const facilities = facilitiesData ?? [];
 
   useEffect(() => {
-    api.get("/normalization/specialties").then((res: any) => {
-      setSpecialties(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
-    api.get("/normalization/doctors").then((res: any) => {
-      setDoctors(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
-    api.get("/normalization/facilities").then((res: any) => {
-      setFacilities(Array.isArray(res.data) ? res.data : []);
-    }).catch(() => {});
     api.get("/settings/llm-providers").then((res: any) => {
       setLlmProviders((res.data || []).filter((p: any) => p.enabled));
     }).catch(() => {});

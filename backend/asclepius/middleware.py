@@ -117,6 +117,55 @@ class CsrfMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class ErrorAuditMiddleware(BaseHTTPMiddleware):
+    """Record 4xx/5xx API responses to the audit_log table.
+
+    Feeds the existing audit trail with the same data we used to only see
+    in the application log: path, method, status, user id, and client IP.
+    Keeps the write non-fatal — an audit failure must never propagate back
+    to the response.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        status = response.status_code
+        # Only care about API error responses; 2xx/3xx and static-asset
+        # routes stay out of the audit log.
+        if status < 400 or not request.url.path.startswith("/api/"):
+            return response
+        try:
+            from asclepius.audit.service import audit_log as _audit_log, get_client_ip
+            from asclepius.db.connection import get_db_path
+            import aiosqlite
+
+            user_id: int | None = None
+            try:
+                user = getattr(request.state, "user", None)
+                if isinstance(user, dict):
+                    user_id = user.get("id")
+            except Exception:
+                user_id = None
+
+            details = {
+                "method": request.method,
+                "path": request.url.path,
+                "status": status,
+            }
+            async with aiosqlite.connect(get_db_path()) as db:
+                await _audit_log(
+                    db,
+                    user_id=user_id,
+                    action="http.error",
+                    resource_type="http",
+                    resource_id=None,
+                    details=details,
+                    ip_address=get_client_ip(request),
+                )
+        except Exception:
+            logger.debug("ErrorAuditMiddleware: non-fatal failure", exc_info=True)
+        return response
+
+
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
     """Reject requests whose Content-Length exceeds the configured limit.
 

@@ -452,6 +452,17 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     doc_cols_now = [row[1] for row in await cursor.fetchall()]
     legacy_date_cols = {"doc_date", "date_visit", "date_issued"}
     if legacy_date_cols & set(doc_cols_now):
+        # Drop FTS triggers + the virtual table FIRST. Otherwise the
+        # backfill UPDATEs below fire the ``documents_au`` trigger, which
+        # tries to delete-then-insert rows from a possibly-empty FTS index
+        # (schema.sql's ``CREATE VIRTUAL TABLE IF NOT EXISTS`` just created
+        # it blank on DBs that predate FTS5) and can corrupt it. We rebuild
+        # the index at the end of this block.
+        await db.execute("DROP TRIGGER IF EXISTS documents_ai")
+        await db.execute("DROP TRIGGER IF EXISTS documents_au")
+        await db.execute("DROP TRIGGER IF EXISTS documents_ad")
+        await db.execute("DROP TABLE IF EXISTS documents_fts")
+
         if "event_date" not in doc_cols_now:
             await db.execute("ALTER TABLE documents ADD COLUMN event_date DATE")
         if "issued_date" not in doc_cols_now:
@@ -463,12 +474,6 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.execute(
             "UPDATE documents SET issued_date = date_issued WHERE issued_date IS NULL"
         )
-        # Drop legacy FTS triggers + virtual table before removing base columns;
-        # rebuild afterwards so the index is in sync with the new schema.
-        await db.execute("DROP TRIGGER IF EXISTS documents_ai")
-        await db.execute("DROP TRIGGER IF EXISTS documents_au")
-        await db.execute("DROP TRIGGER IF EXISTS documents_ad")
-        await db.execute("DROP TABLE IF EXISTS documents_fts")
         for col in ("doc_date", "date_visit", "date_issued"):
             if col in doc_cols_now:
                 await db.execute(f"ALTER TABLE documents DROP COLUMN {col}")
@@ -508,6 +513,14 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         await db.execute("INSERT INTO documents_fts(documents_fts) VALUES('rebuild')")
         await db.commit()
         logger.info("Migration: unified date columns into event_date + issued_date, rebuilt FTS5")
+
+    # Always create the event_date index after the migration has had a
+    # chance to add the column. Cannot live in schema.sql because
+    # executescript() runs before this migration, and on a legacy DB the
+    # column doesn't exist yet when the index statement fires.
+    await db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date)"
+    )
 
     await db.commit()
 

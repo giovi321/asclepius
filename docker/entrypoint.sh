@@ -24,6 +24,28 @@ TARGET_USER="asclepius"
 DEFAULT_UID=1000
 DEFAULT_GID=1000
 
+# Append bind address overrides to uvicorn's argv so the user can pick
+# the interface and port via env without rewriting CMD. Only applied when
+# the first positional arg is "uvicorn" and the caller hasn't already
+# passed --host / --port (we won't clobber an explicit choice).
+args=("$@")
+if [ "${1:-}" = "uvicorn" ]; then
+    has_host=0
+    has_port=0
+    for a in "$@"; do
+        case "$a" in
+            --host|--host=*) has_host=1 ;;
+            --port|--port=*) has_port=1 ;;
+        esac
+    done
+    if [ "$has_host" -eq 0 ]; then
+        args+=("--host" "${ASCLEPIUS_BIND_HOST:-0.0.0.0}")
+    fi
+    if [ "$has_port" -eq 0 ]; then
+        args+=("--port" "${ASCLEPIUS_BIND_PORT:-8000}")
+    fi
+fi
+
 if [ "$(id -u)" -eq 0 ]; then
     PUID="${PUID:-$DEFAULT_UID}"
     PGID="${PGID:-$DEFAULT_GID}"
@@ -54,8 +76,8 @@ if [ "$(id -u)" -eq 0 ]; then
         fi
     done
 
-    exec gosu "$TARGET_USER" "$@"
+    exec gosu "$TARGET_USER" "${args[@]}"
 fi
 
 # Already unprivileged — just run the command.
-exec "$@"
+exec "${args[@]}"

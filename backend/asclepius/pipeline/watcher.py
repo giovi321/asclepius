@@ -167,6 +167,23 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 pipeline_status["processing"] = None
                 pipeline_status["processing_step"] = None
                 pipeline_status["processing_doc_id"] = None
+                # Walk up the inbox tree from the file we just handled and
+                # rmdir any empty directories. Without this, every zip
+                # upload leaves an empty ``inbox/{slug}/{zip_stem}/`` shell
+                # behind once its frames are processed. Stop at the inbox
+                # root itself.
+                try:
+                    inbox_root = Path(config.vault.inbox_path).resolve()
+                    parent = Path(file_path).parent.resolve()
+                    while inbox_root in parent.parents:
+                        try:
+                            parent.rmdir()
+                        except OSError:
+                            # Not empty (or already gone) — stop walking up.
+                            break
+                        parent = parent.parent
+                except Exception:
+                    pass
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

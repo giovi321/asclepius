@@ -265,13 +265,15 @@ async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        # Canonical doc rewritten.
+        # Canonical doc rewritten. The 0.9.6 layout migration also strips
+        # the legacy ``imaging/`` segment, so the final path is
+        # ``patients/giovi/foo`` rather than ``patients/giovi/imaging/foo``.
         canon = conn.execute(
             "SELECT file_path, original_filename, file_hash FROM documents WHERE id = ?",
             (canonical_doc,),
         ).fetchone()
         assert canon is not None
-        assert canon["file_path"] == "patients/giovi/imaging/foo"
+        assert canon["file_path"] == "patients/giovi/foo"
         assert canon["original_filename"] == "foo"
         assert canon["file_hash"] == expected_hash
 
@@ -295,7 +297,7 @@ async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
         ).fetchone()[0]
         assert unrelated == 1
 
-    # Idempotent — second run is a no-op.
+    # Idempotent — second run is a no-op (path stays ``patients/giovi/foo``).
     await initialize_database(str(db_path))
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -303,8 +305,88 @@ async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
             "SELECT file_path, file_hash FROM documents WHERE id = ?",
             (canonical_doc,),
         ).fetchone()
-        assert canon["file_path"] == "patients/giovi/imaging/foo"
+        assert canon["file_path"] == "patients/giovi/foo"
         assert canon["file_hash"] == expected_hash
+
+
+@pytest.mark.asyncio
+async def test_imaging_layout_migration_strips_imaging_segment(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """0.9.6 drops the legacy ``imaging/`` middle segment so a study folder
+    sits at the same level as document files (peer of a PDF). The
+    migration moves the on-disk folder and rewrites every database row
+    that referenced the old prefix.
+    """
+    # Point the config at a real vault root under tmp so the migration
+    # can perform the disk move.
+    vault = tmp_path / "vault"
+    (vault / "patients" / "giovi" / "2026" / "imaging" / "foo" / "series-1").mkdir(parents=True)
+    frame = vault / "patients" / "giovi" / "2026" / "imaging" / "foo" / "series-1" / "I1000000.dcm"
+    frame.write_bytes(b"fake-dicom")
+    monkeypatch.setenv("ASCLEPIUS_VAULT_PATH", str(vault))
+
+    # Reset the cached config so the migration sees the new vault.
+    from asclepius.config import get_config
+    get_config.cache_clear()
+
+    db_path = tmp_path / "layout.sqlite"
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        cur = conn.execute(
+            "INSERT INTO patients (slug, display_name) VALUES ('giovi', 'Giovi')"
+        )
+        patient_id = cur.lastrowid
+        cur = conn.execute(
+            """INSERT INTO documents (patient_id, file_path, original_filename,
+                                       doc_type, status, ocr_engine, file_hash)
+               VALUES (?, 'patients/giovi/2026/imaging/foo', 'foo',
+                       'imaging_dicom', 'done', 'dicom', 'study-hash')""",
+            (patient_id,),
+        )
+        doc_id = cur.lastrowid
+        cur = conn.execute(
+            """INSERT INTO imaging_studies
+               (document_id, patient_id, modality, num_series, num_images,
+                is_dicom, study_instance_uid, folder_path)
+               VALUES (?, ?, 'US', 1, 1, 1, 'STUDY-A',
+                       'patients/giovi/2026/imaging/foo')""",
+            (doc_id, patient_id),
+        )
+        study_id = cur.lastrowid
+        conn.execute(
+            """INSERT INTO imaging_series
+               (study_id, series_number, modality, num_images,
+                series_instance_uid, folder_path)
+               VALUES (?, 1, 'US', 1, 'SERIES-A',
+                       'patients/giovi/2026/imaging/foo/series-1')""",
+            (study_id,),
+        )
+        conn.commit()
+
+    # Run init: layout migration moves the folder and rewrites paths.
+    await initialize_database(str(db_path))
+
+    # Folder is at the new location.
+    assert not (vault / "patients" / "giovi" / "2026" / "imaging").exists()
+    assert (vault / "patients" / "giovi" / "2026" / "foo" / "series-1" / "I1000000.dcm").exists()
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        study = conn.execute(
+            "SELECT folder_path FROM imaging_studies WHERE id = ?", (study_id,)
+        ).fetchone()
+        assert study["folder_path"] == "patients/giovi/2026/foo"
+        series = conn.execute(
+            "SELECT folder_path FROM imaging_series WHERE study_id = ?", (study_id,)
+        ).fetchone()
+        assert series["folder_path"] == "patients/giovi/2026/foo/series-1"
+        doc = conn.execute(
+            "SELECT file_path FROM documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        assert doc["file_path"] == "patients/giovi/2026/foo"
 
 
 @pytest.mark.asyncio

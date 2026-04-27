@@ -263,15 +263,32 @@ async def get_frame(
 def _bundle_root_for_study(folder_path: str) -> str | None:
     """Return the imaging-bundles directory path for a given study folder.
 
-    Study folder layout: ``patients/{slug}/{year}/imaging/{study_folder}``.
-    Bundle layout:        ``patients/{slug}/imaging-bundles``.
-    Returns None if the path does not match the expected shape.
+    Study folder layouts handled:
+      - 0.9.5+ layout: ``patients/{slug}/{year}/{study_folder}`` →
+                       ``patients/{slug}/imaging-bundles``
+      - legacy 0.9.4: ``patients/{slug}/{year}/imaging/{study_folder}`` →
+                       ``patients/{slug}/imaging-bundles``
+      - unclassified: ``unclassified/{year}/{study_folder}`` (or with
+                       intermediate ``imaging/`` for legacy) →
+                       ``unclassified/imaging-bundles``
+
+    Returns None if the path does not match any of the above shapes.
     """
     parts = folder_path.split("/")
-    if "imaging" not in parts:
+    if not parts:
         return None
-    idx = parts.index("imaging")
-    return "/".join(parts[:idx] + ["imaging-bundles"])
+    # Legacy ``imaging`` segment: trim it off when present.
+    if "imaging" in parts:
+        idx = parts.index("imaging")
+        return "/".join(parts[:idx] + ["imaging-bundles"])
+    # New layout: drop the year + study segments.
+    # patients/{slug}/{year}/{study} → patients/{slug}/imaging-bundles
+    # unclassified/{year}/{study}    → unclassified/imaging-bundles
+    if parts[0] == "patients" and len(parts) >= 4:
+        return f"{parts[0]}/{parts[1]}/imaging-bundles"
+    if parts[0] == "unclassified" and len(parts) >= 3:
+        return "unclassified/imaging-bundles"
+    return None
 
 
 @router.get("/{study_id}/bundle-files")

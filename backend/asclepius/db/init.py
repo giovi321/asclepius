@@ -608,6 +608,105 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             _code_updates, _code_skipped,
         )
 
+    # Imaging-layout migration (0.9.5 → 0.9.6 shape). Studies used to live
+    # under an ``imaging/`` subfolder of the year directory:
+    #   patients/{slug}/{year}/imaging/{study}/...
+    # The new layout drops that segment so studies sit at the same level
+    # as document files (a study folder is a peer of a PDF):
+    #   patients/{slug}/{year}/{study}/...
+    # We move the on-disk folders and rewrite ``imaging_studies.folder_path``,
+    # ``imaging_series.folder_path``, and ``documents.file_path`` to match.
+    # Idempotent — paths that already lack ``imaging/`` are skipped.
+    try:
+        from asclepius.config import get_config as _get_config_for_layout
+        _vault_root = Path(_get_config_for_layout().vault.root_path)
+    except Exception:
+        _vault_root = None
+
+    if _vault_root is not None and _vault_root.exists():
+        cursor = await db.execute(
+            "SELECT id, folder_path FROM imaging_studies WHERE folder_path LIKE '%/imaging/%' OR folder_path LIKE 'unclassified/imaging/%'"
+        )
+        layout_rows = await cursor.fetchall()
+        _moved_studies = 0
+        import shutil as _shutil_layout
+        for lrow in layout_rows:
+            study_pk = lrow[0]
+            old_folder = lrow[1] or ""
+            if not old_folder:
+                continue
+            new_folder = old_folder.replace("/imaging/", "/", 1)
+            if new_folder == old_folder:
+                # Path didn't actually contain "/imaging/" (e.g. it begins
+                # with "imaging/" literally — leave it alone).
+                continue
+            old_abs = _vault_root / old_folder
+            new_abs = _vault_root / new_folder
+            try:
+                if old_abs.exists():
+                    new_abs.parent.mkdir(parents=True, exist_ok=True)
+                    if new_abs.exists():
+                        # New path already populated — merge by leaving the
+                        # legacy folder in place; admin can clean up later.
+                        logger.warning(
+                            "Migration: cannot move %s to %s — destination exists; skipping disk move",
+                            old_abs, new_abs,
+                        )
+                    else:
+                        _shutil_layout.move(str(old_abs), str(new_abs))
+                # Rewrite folder_path on the study + every series under it.
+                await db.execute(
+                    "UPDATE imaging_studies SET folder_path = ? WHERE id = ?",
+                    (new_folder, study_pk),
+                )
+                await db.execute(
+                    "UPDATE imaging_series SET folder_path = REPLACE(folder_path, ?, ?) "
+                    "WHERE study_id = ?",
+                    (old_folder, new_folder, study_pk),
+                )
+                # Rewrite the canonical documents.file_path AND any leftover
+                # per-frame paths in case the one-doc collapse runs after.
+                await db.execute(
+                    "UPDATE documents SET file_path = REPLACE(file_path, ?, ?) "
+                    "WHERE file_path LIKE ?",
+                    (old_folder, new_folder, old_folder + "%"),
+                )
+                _moved_studies += 1
+            except Exception:
+                logger.warning(
+                    "Migration: failed to relocate imaging study %d (%s)",
+                    study_pk, old_folder, exc_info=True,
+                )
+
+        # Sweep empty legacy ``imaging/`` directories left behind.
+        for patient_dir in (_vault_root / "patients").glob("*"):
+            if not patient_dir.is_dir():
+                continue
+            for year_dir in patient_dir.iterdir():
+                if not year_dir.is_dir():
+                    continue
+                imaging_legacy = year_dir / "imaging"
+                if imaging_legacy.exists() and imaging_legacy.is_dir():
+                    try:
+                        if not any(imaging_legacy.iterdir()):
+                            imaging_legacy.rmdir()
+                    except OSError:
+                        pass
+        legacy_unclass = _vault_root / "unclassified" / "imaging"
+        if legacy_unclass.exists() and legacy_unclass.is_dir():
+            try:
+                if not any(legacy_unclass.iterdir()):
+                    legacy_unclass.rmdir()
+            except OSError:
+                pass
+
+        if _moved_studies:
+            await db.commit()
+            logger.info(
+                "Migration: relocated %d imaging studies to drop the legacy 'imaging/' segment",
+                _moved_studies,
+            )
+
     # One-doc-per-imaging-study migration. The pre-0.9.5 ingest created a
     # documents row per DICOM frame (35 docs for a 35-frame ultrasound
     # study) and one per zip-member bundle file (DICOMDIR, JPEG previews,

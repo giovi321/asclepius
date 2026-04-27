@@ -1709,6 +1709,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vault/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Vault File
+         * @description Move a file (or imaging study folder) within the vault and keep the
+         *     matching document record's ``file_path`` in sync.
+         *
+         *     Use case: a file was misclassified by date / event and the user wants
+         *     to drag it into the right folder without losing the document reference
+         *     (so document-detail links, OCR cache, lab results etc. all keep
+         *     working). The DB row is updated atomically with the disk move; if the
+         *     destination already exists or the access check fails the move is
+         *     rejected.
+         */
+        post: operations["move_vault_file_api_vault_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/setup/status": {
         parameters: {
             query?: never;
@@ -2167,6 +2195,13 @@ export interface components {
             source_id: number;
             /** Target Id */
             target_id: number;
+        };
+        /** MoveRequest */
+        MoveRequest: {
+            /** From Path */
+            from_path: string;
+            /** To Path */
+            to_path: string;
         };
         /** NewEventSuggestion */
         NewEventSuggestion: {
@@ -5768,6 +5803,39 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_vault_file_api_vault_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

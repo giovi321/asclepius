@@ -157,10 +157,15 @@ async def process_dicom(
     facility_slug = slugify(institution) if institution else "unknown"
     study_folder_name = f"{study_date or 'unknown'}_{facility_slug}_{modality or 'unknown'}"
 
+    # Imaging studies live at the same level as document files: directly
+    # under the patient's ``{year}/`` folder. Each study is its own
+    # subfolder (peer to document PDFs / event subfolders), with frame
+    # files nested in ``series-N/`` and any auxiliary bundle files (the
+    # old DICOMDIR / JPEG previews) under ``bundle/``.
     if patient_slug:
-        base_path = f"patients/{patient_slug}/{year}/imaging/{study_folder_name}"
+        base_path = f"patients/{patient_slug}/{year}/{study_folder_name}"
     else:
-        base_path = f"unclassified/imaging/{study_folder_name}"
+        base_path = f"unclassified/{year}/{study_folder_name}"
 
     series_folder = f"series-{series_number or '001'}"
     relative_path = f"{base_path}/{series_folder}/{path.name}"

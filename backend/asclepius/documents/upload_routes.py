@@ -83,6 +83,7 @@ def _extract_zip(
     config,
     patient_id: int | None,
     event_id: int | None,
+    user_id: int | None = None,
 ) -> dict:
     """Extract a zip into a fresh inbox sub-folder.
 
@@ -208,6 +209,10 @@ def _extract_zip(
                     (member_parent / f"{final_name}.event_hint").write_text(
                         str(event_id)
                     )
+                if user_id is not None:
+                    (member_parent / f"{final_name}.user_hint").write_text(
+                        str(user_id)
+                    )
 
                 # Stream remaining bytes after the peeked head.
                 with open(final_path, "wb") as dst:
@@ -240,11 +245,25 @@ async def upload_document(
     user_id = int(current_user["id"])
     vault_root = Path(config.vault.root_path)
 
-    # Resolve the user-specific inbox under the vault root. This also
-    # guarantees the inbox stays inside the vault even if the config is
-    # edited by a user with shell access.
+    # Resolve the inbox sub-folder. When the upload form names a patient,
+    # we use the patient's slug so a shell-level ``ls inbox/`` reads as a
+    # human roster (``giovanni-crapelli/`` instead of ``user-1/``). When
+    # there is no patient yet we keep ``user-{id}/`` so each user's
+    # unclassified uploads stay isolated.
+    inbox_subfolder = f"user-{user_id}"
+    if patient_id:
+        try:
+            async with aiosqlite.connect(config.database.path) as _db:
+                cursor = await _db.execute(
+                    "SELECT slug FROM patients WHERE id = ?", (patient_id,),
+                )
+                row = await cursor.fetchone()
+            if row and row[0]:
+                inbox_subfolder = safe_filename(row[0]) or inbox_subfolder
+        except Exception:
+            logger.warning("Failed to look up patient slug for inbox folder", exc_info=True)
     try:
-        inbox = safe_vault_join(vault_root, f"inbox/user-{user_id}")
+        inbox = safe_vault_join(vault_root, f"inbox/{inbox_subfolder}")
     except UnsafePathError as exc:
         logger.error("Inbox path escapes vault root: %s", exc)
         raise HTTPException(status_code=500, detail="Misconfigured vault")
@@ -328,6 +347,7 @@ async def upload_document(
                 config=config,
                 patient_id=patient_id,
                 event_id=event_id,
+                user_id=user_id,
             )
         except HTTPException:
             dest.unlink(missing_ok=True)
@@ -359,6 +379,10 @@ async def upload_document(
         (dest.parent / f"{dest.name}.patient_hint").write_text(str(patient_id))
     if event_id:
         (dest.parent / f"{dest.name}.event_hint").write_text(str(event_id))
+    # User hint: stamp uploaded_by_user_id even when the inbox subfolder is
+    # the patient slug rather than ``user-{id}``. The pipeline reads this
+    # sidecar in addition to the path-based heuristic.
+    (dest.parent / f"{dest.name}.user_hint").write_text(str(user_id))
 
     # Create a DB record immediately so the document shows up in the UI.
     # The pipeline will find this row by file_hash rather than duplicating.

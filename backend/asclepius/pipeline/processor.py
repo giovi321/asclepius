@@ -143,38 +143,52 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # Read hint files from upload (if present)
             hint_patient_id = None
             hint_event_id = None
-            for hint_name, hint_var in [(".patient_hint", "patient"), (".event_hint", "event")]:
+            hint_user_id: int | None = None
+            for hint_name, hint_var in [
+                (".patient_hint", "patient"),
+                (".event_hint", "event"),
+                (".user_hint", "user"),
+            ]:
                 hint_path = Path(str(path) + hint_name)
                 if hint_path.exists():
                     try:
                         val = int(hint_path.read_text().strip())
                         if hint_var == "patient":
                             hint_patient_id = val
-                        else:
+                        elif hint_var == "event":
                             hint_event_id = val
+                        else:
+                            hint_user_id = val
                     except (ValueError, OSError):
                         pass
                     hint_path.unlink(missing_ok=True)
 
-            # Infer the uploader from the inbox subfolder segment "user-{id}".
-            # Pre-per-user uploads live directly under inbox/ and stay NULL.
-            hint_user_id: int | None = None
-            try:
-                vault_root = Path(config.vault.root_path).resolve()
-                relative_parts = path.resolve().relative_to(vault_root).parts
-                # relative_parts is ("inbox", "user-3", "foo.pdf") for new uploads
-                for part in relative_parts:
-                    if part.startswith("user-"):
-                        candidate = part[len("user-"):]
-                        if candidate.isdigit():
-                            hint_user_id = int(candidate)
-                            break
-            except (ValueError, OSError):
-                pass
+            # Fallback: when the .user_hint sidecar is absent (pre-0.9.5
+            # uploads, files dropped manually into inbox/user-{id}/), pull
+            # the uploader from the inbox subfolder name.
+            if hint_user_id is None:
+                try:
+                    vault_root = Path(config.vault.root_path).resolve()
+                    relative_parts = path.resolve().relative_to(vault_root).parts
+                    for part in relative_parts:
+                        if part.startswith("user-"):
+                            candidate = part[len("user-"):]
+                            if candidate.isdigit():
+                                hint_user_id = int(candidate)
+                                break
+                except (ValueError, OSError):
+                    pass
 
-            # Mirror where the file actually lives — preserve the per-user
-            # subfolder so a subsequent reprocess can find it.
-            inbox_rel = f"inbox/user-{hint_user_id}/{path.name}" if hint_user_id else f"inbox/{path.name}"
+            # Mirror where the file actually lives in the inbox so a
+            # later reprocess can find it. The subfolder may be a patient
+            # slug, ``user-{id}``, or any custom name — we just record
+            # whatever path was used.
+            try:
+                vault_root_rel = Path(config.vault.root_path).resolve()
+                rel = path.resolve().relative_to(vault_root_rel).as_posix()
+                inbox_rel = rel
+            except (ValueError, OSError):
+                inbox_rel = f"inbox/{path.name}"
 
             # Try to INSERT — if file_hash already exists (from upload), it'll be ignored
             await db.execute(

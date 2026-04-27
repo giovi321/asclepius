@@ -1,14 +1,18 @@
 """Vault file browser API routes."""
 
+import logging
+import shutil
 from pathlib import Path
 
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -239,4 +243,130 @@ async def delete_vault_file(
         "status": "deleted",
         "path": normalized_path,
         "document_id": deleted_doc_id,
+    }
+
+
+class MoveRequest(BaseModel):
+    from_path: str
+    to_path: str
+
+
+@router.post("/move")
+async def move_vault_file(
+    body: MoveRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Move a file (or imaging study folder) within the vault and keep the
+    matching document record's ``file_path`` in sync.
+
+    Use case: a file was misclassified by date / event and the user wants
+    to drag it into the right folder without losing the document reference
+    (so document-detail links, OCR cache, lab results etc. all keep
+    working). The DB row is updated atomically with the disk move; if the
+    destination already exists or the access check fails the move is
+    rejected.
+    """
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+
+    src_rel = body.from_path.replace("\\", "/").lstrip("/")
+    dst_rel = body.to_path.replace("\\", "/").lstrip("/")
+    if not src_rel or not dst_rel:
+        raise HTTPException(status_code=400, detail="Both from_path and to_path are required")
+    if src_rel == dst_rel:
+        return {"status": "noop", "path": dst_rel}
+
+    src = vault_root / src_rel
+    dst = vault_root / dst_rel
+
+    # Security: both paths must stay inside the vault.
+    try:
+        src.resolve().relative_to(vault_root.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Source is outside the vault")
+    # ``dst`` may not exist yet — resolve its parent instead.
+    try:
+        dst_parent = (dst.parent.resolve() if dst.parent.exists() else dst.parent)
+        # If parent doesn't exist yet, walk up until we find one that does
+        # so the relative-to check is meaningful.
+        check_target = dst_parent
+        while not check_target.exists() and check_target != check_target.parent:
+            check_target = check_target.parent
+        check_target.resolve().relative_to(vault_root.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Destination is outside the vault")
+
+    # Access control — both endpoints must be inside the user's scope.
+    scope = await _build_user_scope(db, current_user)
+    path_filter = _make_path_filter(scope)
+    if path_filter is not None:
+        is_dir = src.is_dir()
+        if not path_filter(src_rel, is_dir) or not path_filter(dst_rel, is_dir):
+            raise HTTPException(status_code=403, detail="You don't have access to one of these paths")
+
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Source not found")
+    if dst.exists():
+        raise HTTPException(status_code=409, detail="Destination already exists")
+
+    # Forbid moves that would land inside the source directory itself
+    # (would create an infinite loop / shutil.move quirk).
+    try:
+        dst.resolve().relative_to(src.resolve())
+        raise HTTPException(status_code=400, detail="Cannot move a directory into itself")
+    except ValueError:
+        pass
+
+    # Perform the move + update DB rows whose file_path is anchored at
+    # the source. We update both an exact match (a regular file or a
+    # study folder) and any ``file_path LIKE 'src/%'`` rows (per-frame
+    # documents pre-collapse, lab subfiles, etc.).
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.move(str(src), str(dst))
+    except Exception as exc:
+        logger.exception("Vault move failed: %s -> %s", src, dst)
+        raise HTTPException(status_code=500, detail=f"Move failed: {exc}")
+
+    affected_doc_ids: list[int] = []
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE file_path = ? OR file_path LIKE ?",
+        (src_rel, src_rel + "/%"),
+    )
+    affected_doc_ids = [r[0] for r in await cursor.fetchall()]
+
+    await db.execute(
+        "UPDATE documents SET file_path = ?, updated_at = CURRENT_TIMESTAMP "
+        "WHERE file_path = ?",
+        (dst_rel, src_rel),
+    )
+    await db.execute(
+        "UPDATE documents SET file_path = ? || SUBSTR(file_path, ?), "
+        "updated_at = CURRENT_TIMESTAMP "
+        "WHERE file_path LIKE ?",
+        (dst_rel, len(src_rel) + 1, src_rel + "/%"),
+    )
+    # Imaging study + series folder paths follow the same prefix update.
+    await db.execute(
+        "UPDATE imaging_studies SET folder_path = ? WHERE folder_path = ?",
+        (dst_rel, src_rel),
+    )
+    await db.execute(
+        "UPDATE imaging_studies SET folder_path = ? || SUBSTR(folder_path, ?) "
+        "WHERE folder_path LIKE ?",
+        (dst_rel, len(src_rel) + 1, src_rel + "/%"),
+    )
+    await db.execute(
+        "UPDATE imaging_series SET folder_path = ? || SUBSTR(folder_path, ?) "
+        "WHERE folder_path = ? OR folder_path LIKE ?",
+        (dst_rel, len(src_rel) + 1, src_rel, src_rel + "/%"),
+    )
+
+    await db.commit()
+    return {
+        "status": "moved",
+        "from": src_rel,
+        "to": dst_rel,
+        "affected_documents": affected_doc_ids,
     }

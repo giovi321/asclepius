@@ -4902,6 +4902,46 @@
         }
       }
     },
+    "/api/vault/move": {
+      "post": {
+        "tags": [
+          "vault"
+        ],
+        "summary": "Move Vault File",
+        "description": "Move a file (or imaging study folder) within the vault and keep the\nmatching document record's ``file_path`` in sync.\n\nUse case: a file was misclassified by date / event and the user wants\nto drag it into the right folder without losing the document reference\n(so document-detail links, OCR cache, lab results etc. all keep\nworking). The DB row is updated atomically with the disk move; if the\ndestination already exists or the access check fails the move is\nrejected.",
+        "operationId": "move_vault_file_api_vault_move_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup/status": {
       "get": {
         "tags": [
@@ -6536,6 +6576,24 @@
           "target_id"
         ],
         "title": "MergeRequest"
+      },
+      "MoveRequest": {
+        "properties": {
+          "from_path": {
+            "type": "string",
+            "title": "From Path"
+          },
+          "to_path": {
+            "type": "string",
+            "title": "To Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_path",
+          "to_path"
+        ],
+        "title": "MoveRequest"
       },
       "NewEventSuggestion": {
         "properties": {

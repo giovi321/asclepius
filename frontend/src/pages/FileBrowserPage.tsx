@@ -11,12 +11,19 @@ import {
   Search,
   RefreshCw,
   Home,
+  Move,
 } from "lucide-react";
 
 // Folders that are part of the app's own plumbing — never useful to a user
 // browsing their vault. Matched only at the top level so a patient-named
 // folder that happens to collide wouldn't be hidden.
 const ROOT_HIDDEN_FOLDERS = new Set(["config"]);
+
+// Per-patient plumbing folders. Hidden when the user navigates inside a
+// patient directory so the year folders (and their imaging study peers)
+// stay tidy. ``imaging-bundles`` holds DICOMDIR + JPEG previews extracted
+// from zip uploads — they are accessed via the imaging UI, not directly.
+const PATIENT_HIDDEN_FOLDERS = new Set(["imaging-bundles"]);
 
 interface TreeNode {
   name: string;
@@ -53,11 +60,13 @@ function TreeItem({
   depth,
   filter,
   onDelete,
+  onMove,
 }: {
   node: TreeNode;
   depth: number;
   filter: string;
   onDelete: (path: string, name: string) => void;
+  onMove: (path: string, name: string, isDir: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(depth < 1);
 
@@ -75,22 +84,36 @@ function TreeItem({
   if (node.type === "dir") {
     return (
       <div>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent transition-colors"
+        <div
+          className="group flex items-center gap-2 rounded-md hover:bg-accent transition-colors"
           style={{ paddingLeft: `${depth * 20 + 8}px` }}
         >
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          )}
-          <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <span className="font-medium truncate">{node.name}</span>
-          <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
-            {node.children.length} item(s)
-          </span>
-        </button>
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="flex flex-1 items-center gap-2 px-2 py-1.5 text-sm min-w-0"
+          >
+            {expanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            )}
+            <FolderOpen className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            <span className="font-medium truncate">{node.name}</span>
+            <span className="ml-auto text-xs text-muted-foreground flex-shrink-0">
+              {node.children.length} item(s)
+            </span>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove(node.path, node.name, true);
+            }}
+            className="opacity-0 group-hover:opacity-100 rounded p-1 mr-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+            title="Move folder"
+          >
+            <Move className="h-3.5 w-3.5" />
+          </button>
+        </div>
         {expanded && (
           <div>
             {node.children.map((child) => (
@@ -100,6 +123,7 @@ function TreeItem({
                 depth={depth + 1}
                 filter={filter}
                 onDelete={onDelete}
+                onMove={onMove}
               />
             ))}
           </div>
@@ -117,6 +141,16 @@ function TreeItem({
       <span className="truncate">{node.name}</span>
       <span className="ml-auto flex items-center gap-2 flex-shrink-0">
         <span className="text-xs text-muted-foreground">{formatSize(node.size)}</span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(node.path, node.name, false);
+          }}
+          className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-all"
+          title="Move file"
+        >
+          <Move className="h-3.5 w-3.5" />
+        </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -140,6 +174,9 @@ export default function FileBrowserPage() {
   const [confirmDelete, setConfirmDelete] = useState<{ path: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [breadcrumb, setBreadcrumb] = useState<string[]>([]);
+  const [moveDialog, setMoveDialog] = useState<{ path: string; name: string; isDir: boolean } | null>(null);
+  const [moveTarget, setMoveTarget] = useState("");
+  const [moving, setMoving] = useState(false);
 
   const fetchTree = useCallback(async (subpath?: string) => {
     setLoading(true);
@@ -177,6 +214,31 @@ export default function FileBrowserPage() {
       setError(err.response?.data?.detail || "Failed to delete file");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openMoveDialog = (path: string, name: string, isDir: boolean) => {
+    setMoveDialog({ path, name, isDir });
+    setMoveTarget(path);
+  };
+
+  const handleMove = async () => {
+    if (!moveDialog || !moveTarget || moveTarget === moveDialog.path) return;
+    setMoving(true);
+    setError(null);
+    try {
+      await api.post("/vault/move", {
+        from_path: moveDialog.path,
+        to_path: moveTarget,
+      });
+      setMoveDialog(null);
+      setMoveTarget("");
+      const currentPath = breadcrumb.length > 0 ? breadcrumb.join("/") : undefined;
+      fetchTree(currentPath);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Move failed");
+    } finally {
+      setMoving(false);
     }
   };
 
@@ -235,6 +297,54 @@ export default function FileBrowserPage() {
         ))}
       </div>
 
+      {/* Move dialog */}
+      {moveDialog && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <Move className="h-4 w-4" />
+            Move <span className="font-mono">{moveDialog.name}</span>
+            {moveDialog.isDir ? " (folder)" : ""}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Edit the destination path. The matching document record (and any
+            child rows) will follow the file so existing references stay intact.
+          </p>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">From</label>
+            <input
+              value={moveDialog.path}
+              readOnly
+              className="w-full rounded-md border bg-muted/30 px-3 py-2 text-sm font-mono"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">To</label>
+            <input
+              value={moveTarget}
+              onChange={(e) => setMoveTarget(e.target.value)}
+              autoFocus
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+              placeholder="patients/giovi/2026/20260101_consultation.pdf"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleMove}
+              disabled={moving || !moveTarget || moveTarget === moveDialog.path}
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
+            >
+              {moving ? "Moving..." : "Move"}
+            </button>
+            <button
+              onClick={() => { setMoveDialog(null); setMoveTarget(""); }}
+              className="rounded-md border px-4 py-2 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Delete confirmation */}
       {confirmDelete && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
@@ -274,10 +384,19 @@ export default function FileBrowserPage() {
         </div>
       ) : tree ? (
         (() => {
-          // Hide the app's plumbing folders from the root view only.
-          const visibleChildren = breadcrumb.length === 0
-            ? tree.children.filter((c) => !(c.type === "dir" && ROOT_HIDDEN_FOLDERS.has(c.name)))
-            : tree.children;
+          // Hide the app's plumbing folders. ROOT_HIDDEN_FOLDERS only when
+          // browsing the vault root; PATIENT_HIDDEN_FOLDERS when browsing
+          // inside a single patient directory (``patients/{slug}``).
+          let visibleChildren = tree.children;
+          if (breadcrumb.length === 0) {
+            visibleChildren = tree.children.filter(
+              (c) => !(c.type === "dir" && ROOT_HIDDEN_FOLDERS.has(c.name)),
+            );
+          } else if (breadcrumb.length === 2 && breadcrumb[0] === "patients") {
+            visibleChildren = tree.children.filter(
+              (c) => !(c.type === "dir" && PATIENT_HIDDEN_FOLDERS.has(c.name)),
+            );
+          }
           return (
             <div className="rounded-lg border bg-card">
               <div className="p-2">
@@ -293,6 +412,7 @@ export default function FileBrowserPage() {
                       depth={0}
                       filter={filter}
                       onDelete={(path, name) => setConfirmDelete({ path, name })}
+                      onMove={openMoveDialog}
                     />
                   ))
                 )}

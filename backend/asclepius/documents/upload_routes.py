@@ -148,56 +148,76 @@ def _extract_zip(
                 continue
             sanitised_parts = [safe_filename(p) for p in parts]
             try:
-                member_dest = safe_vault_join(extract_dir, *sanitised_parts)
+                member_parent = safe_vault_join(extract_dir, *sanitised_parts[:-1]) \
+                    if len(sanitised_parts) > 1 else extract_dir
+                # Sanity check the leaf name too.
+                _ = safe_vault_join(member_parent, sanitised_parts[-1])
             except UnsafePathError:
                 logger.warning("Skipping zip member with unsafe path: %r", info.filename)
                 continue
 
-            member_dest.parent.mkdir(parents=True, exist_ok=True)
-
-            # Stream the member to disk.
-            with zf.open(info, "r") as src, open(member_dest, "wb") as dst:
-                while True:
-                    chunk = src.read(_CHUNK)
-                    if not chunk:
-                        break
-                    dst.write(chunk)
-
             original_name = sanitised_parts[-1]
 
-            # Decide the final extension. We rename so the inbox watcher's
-            # ``SUPPORTED_EXTENSIONS`` filter accepts the file. DICOM frames
-            # go through the existing DICOM ingest (groups by Study/Series
-            # UID); everything else (DICOMDIR, JPEG previews, LOCKFILE,
-            # VERSION, …) is tagged ``.bin`` and filed next to the bundle
-            # via the passthrough handler — no OCR/LLM noise on what is
-            # often a duplicate of the DICOM pixel data.
-            ext = member_dest.suffix.lower()
-            if ext in {".dcm", ".dicom"} or _is_dicom_file(member_dest):
-                final_path = member_dest.with_suffix(".dcm")
-                if final_path != member_dest:
-                    if final_path.exists():
-                        final_path.unlink()
-                    member_dest.rename(final_path)
-                final_kind = "dicom"
-            else:
-                final_path = member_dest.with_name(member_dest.name + ".bin")
-                if final_path.exists():
-                    final_path.unlink()
-                member_dest.rename(final_path)
-                final_kind = "other"
-                meta = {"original_name": original_name, "zip_stem": zip_stem}
-                (final_path.parent / f"{final_path.name}.zip_member").write_text(
-                    json.dumps(meta)
+            # Peek the DICOM preamble from the zip stream so we can pick the
+            # final inbox filename BEFORE writing anything to disk. This is
+            # critical: the inbox watcher fires on file-create, and a
+            # subsequent rename would not produce a second ``on_created``
+            # event — so any file we write under its original name (e.g.
+            # ``I1000000``) would be skipped by the watcher's extension
+            # filter and then renamed out from under it.
+            with zf.open(info, "r") as src:
+                head = src.read(_DICM_OFFSET + 4)
+                ext = Path(original_name).suffix.lower()
+                is_dicom = ext in {".dcm", ".dicom"} or (
+                    len(head) >= _DICM_OFFSET + 4
+                    and head[_DICM_OFFSET:_DICM_OFFSET + 4] == _DICM_MAGIC
                 )
-            if patient_id:
-                (final_path.parent / f"{final_path.name}.patient_hint").write_text(
-                    str(patient_id)
-                )
-            if event_id:
-                (final_path.parent / f"{final_path.name}.event_hint").write_text(
-                    str(event_id)
-                )
+
+                # Final on-disk name. DICOM frames keep ``.dcm``; everything
+                # else gets ``.bin`` so the watcher's ``SUPPORTED_EXTENSIONS``
+                # filter accepts it and the zip-member passthrough handler
+                # restores the original name from the sidecar.
+                if is_dicom:
+                    if ext in {".dcm", ".dicom"}:
+                        final_name = original_name
+                    else:
+                        final_name = original_name + ".dcm"
+                    final_kind = "dicom"
+                else:
+                    final_name = original_name + ".bin"
+                    final_kind = "other"
+
+                member_parent.mkdir(parents=True, exist_ok=True)
+                final_path = member_parent / final_name
+
+                # Sidecars MUST exist before the data file is created so the
+                # pipeline worker (which sleeps 2s after the create event
+                # then reads sidecars) sees a coherent state even on slow
+                # disks. Also write them first because once the data file
+                # appears under a watched extension the worker will queue it.
+                if final_kind == "other":
+                    meta = {"original_name": original_name, "zip_stem": zip_stem}
+                    (member_parent / f"{final_name}.zip_member").write_text(
+                        json.dumps(meta)
+                    )
+                if patient_id:
+                    (member_parent / f"{final_name}.patient_hint").write_text(
+                        str(patient_id)
+                    )
+                if event_id:
+                    (member_parent / f"{final_name}.event_hint").write_text(
+                        str(event_id)
+                    )
+
+                # Stream remaining bytes after the peeked head.
+                with open(final_path, "wb") as dst:
+                    if head:
+                        dst.write(head)
+                    while True:
+                        chunk = src.read(_CHUNK)
+                        if not chunk:
+                            break
+                        dst.write(chunk)
 
             extracted += 1
             if final_kind == "dicom":

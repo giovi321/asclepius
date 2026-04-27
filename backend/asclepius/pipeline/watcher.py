@@ -7,7 +7,11 @@ import threading
 from pathlib import Path
 from queue import PriorityQueue, Empty
 
-from watchdog.events import FileSystemEventHandler, FileCreatedEvent
+from watchdog.events import (
+    FileCreatedEvent,
+    FileMovedEvent,
+    FileSystemEventHandler,
+)
 from watchdog.observers import Observer
 
 from asclepius.config import AppConfig
@@ -29,11 +33,8 @@ class InboxHandler(FileSystemEventHandler):
     def __init__(self, queue: PriorityQueue):
         self.queue = queue
 
-    def on_created(self, event: FileCreatedEvent) -> None:
-        if event.is_directory:
-            return
-
-        path = Path(event.src_path)
+    def _enqueue(self, src_path: str) -> None:
+        path = Path(src_path)
 
         # Skip hidden files and temp files
         if path.name.startswith(".") or path.name.startswith("~"):
@@ -56,10 +57,24 @@ class InboxHandler(FileSystemEventHandler):
 
         # Use file size as priority — smaller files processed first
         try:
-            file_size = os.path.getsize(event.src_path)
+            file_size = os.path.getsize(src_path)
         except OSError:
             file_size = 0
         self.queue.put((file_size, str(path)))
+
+    def on_created(self, event: FileCreatedEvent) -> None:
+        if event.is_directory:
+            return
+        self._enqueue(event.src_path)
+
+    def on_moved(self, event: FileMovedEvent) -> None:
+        # A rename inside the watched tree (or a move into it) shows up as
+        # ``moved`` rather than ``created``. We enqueue based on the
+        # destination so renamed files (e.g. an extracted DICOM frame
+        # being given its ``.dcm`` extension) still reach the pipeline.
+        if event.is_directory:
+            return
+        self._enqueue(event.dest_path)
 
 
 AUTO_STOP_THRESHOLD = 5  # consecutive provider failures before auto-stopping

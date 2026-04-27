@@ -31,10 +31,34 @@ async def process_dicom(
 
     path = Path(file_path)
 
+    # Sidecars from the upload route. ``patient_hint`` reflects an explicit
+    # user choice on the upload form and should outrank whatever PatientName
+    # the DICOM file carries (lab exports often store the name in a format
+    # that ``_match_patient`` cannot reconcile, which would otherwise leave
+    # the study in unclassified/).
+    patient_hint_path = Path(str(path) + ".patient_hint")
+    hinted_patient_id: int | None = None
+    if patient_hint_path.exists():
+        try:
+            hinted_patient_id = int(patient_hint_path.read_text().strip())
+        except (ValueError, OSError):
+            hinted_patient_id = None
+
+    event_hint_path = Path(str(path) + ".event_hint")
+    hinted_event_id: int | None = None
+    if event_hint_path.exists():
+        try:
+            hinted_event_id = int(event_hint_path.read_text().strip())
+        except (ValueError, OSError):
+            hinted_event_id = None
+
     try:
         ds = pydicom.dcmread(str(path), stop_before_pixels=True)
     except Exception:
         logger.exception("Failed to read DICOM file: %s", path.name)
+        # Drop the sidecars so they do not pile up in the inbox.
+        patient_hint_path.unlink(missing_ok=True)
+        event_hint_path.unlink(missing_ok=True)
         return None
 
     # Extract metadata
@@ -56,9 +80,16 @@ async def process_dicom(
     if study_date_raw and len(study_date_raw) == 8:
         study_date = f"{study_date_raw[:4]}-{study_date_raw[4:6]}-{study_date_raw[6:8]}"
 
-    # Try to match patient
-    patient_id = None
-    if patient_name:
+    # Try to match patient. An explicit upload-form selection wins over any
+    # heuristic match against the DICOM PatientName tag.
+    patient_id: int | None = None
+    if hinted_patient_id:
+        cursor = await db.execute(
+            "SELECT id FROM patients WHERE id = ?", (hinted_patient_id,),
+        )
+        if await cursor.fetchone():
+            patient_id = hinted_patient_id
+    if patient_id is None and patient_name:
         from asclepius.pipeline.extractor import _match_patient
         patient_id = await _match_patient(db, patient_name)
 
@@ -106,10 +137,10 @@ async def process_dicom(
     # Create document record
     cursor = await db.execute(
         """INSERT INTO documents
-           (patient_id, file_path, original_filename, doc_type, event_date,
+           (patient_id, event_id, file_path, original_filename, doc_type, event_date,
             doctor_id, facility_id, status, ocr_engine, ocr_text)
-           VALUES (?, ?, ?, 'imaging_dicom', ?, ?, ?, 'done', 'dicom', ?)""",
-        (patient_id, relative_path, path.name, study_date,
+           VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, 'done', 'dicom', ?)""",
+        (patient_id, hinted_event_id, relative_path, path.name, study_date,
          doctor_id, facility_id,
          f"DICOM: {modality} {body_part} {study_desc}"),
     )
@@ -168,6 +199,9 @@ async def process_dicom(
         )
 
     await db.commit()
+    # Clean up sidecars now that the file has been ingested.
+    patient_hint_path.unlink(missing_ok=True)
+    event_hint_path.unlink(missing_ok=True)
     logger.info("DICOM processed: doc=%d study=%d %s %s", doc_id, study_id, modality, body_part)
     return doc_id
 

@@ -1,12 +1,15 @@
 """DICOM file processing and metadata extraction."""
 
+import json
 import logging
+import os
 import shutil
 from pathlib import Path
 
 import aiosqlite
 
 from asclepius.config import AppConfig
+from asclepius.documents.service import compute_file_hash
 
 logger = logging.getLogger(__name__)
 
@@ -166,4 +169,134 @@ async def process_dicom(
 
     await db.commit()
     logger.info("DICOM processed: doc=%d study=%d %s %s", doc_id, study_id, modality, body_part)
+    return doc_id
+
+
+async def process_zip_member(
+    file_path: str,
+    config: AppConfig,
+    db: aiosqlite.Connection,
+) -> int | None:
+    """Store a non-DICOM file extracted from a zip upload.
+
+    Used for DICOMDIR manifests, JPEG previews, LOCKFILE, VERSION and any
+    other bundle bookkeeping the user wants kept alongside the imaging
+    study. We do not OCR or LLM-process them — they are filed under
+    ``imaging-bundles/{zip_stem}/`` next to the patient (or unclassified)
+    and the original filename is restored from the sidecar so e.g.
+    ``DICOMDIR.bin`` is saved back as ``DICOMDIR``.
+    """
+    path = Path(file_path)
+    sidecar_path = Path(str(path) + ".zip_member")
+    if not sidecar_path.exists():
+        logger.warning("zip_member sidecar missing for %s — skipping", path.name)
+        return None
+
+    try:
+        meta = json.loads(sidecar_path.read_text())
+    except Exception:
+        logger.exception("Failed to read zip_member sidecar for %s", path.name)
+        meta = {}
+
+    original_name = meta.get("original_name") or path.stem
+    zip_stem = meta.get("zip_stem") or "bundle"
+
+    # Patient hint sidecar (written by upload route, same format used by the
+    # standard pipeline path).
+    patient_hint_path = Path(str(path) + ".patient_hint")
+    patient_id: int | None = None
+    if patient_hint_path.exists():
+        try:
+            patient_id = int(patient_hint_path.read_text().strip())
+        except (ValueError, OSError):
+            patient_id = None
+
+    event_hint_path = Path(str(path) + ".event_hint")
+    event_id: int | None = None
+    if event_hint_path.exists():
+        try:
+            event_id = int(event_hint_path.read_text().strip())
+        except (ValueError, OSError):
+            event_id = None
+
+    # Resolve destination: alongside the imaging bundle for this study.
+    from asclepius.patients.service import slugify  # local import to avoid cycles
+
+    if patient_id:
+        cursor = await db.execute("SELECT slug FROM patients WHERE id = ?", (patient_id,))
+        row = await cursor.fetchone()
+        patient_slug = row[0] if row else None
+    else:
+        patient_slug = None
+
+    bundle_slug = slugify(zip_stem) or "bundle"
+    if patient_slug:
+        relative_dir = f"patients/{patient_slug}/imaging-bundles/{bundle_slug}"
+    else:
+        relative_dir = f"unclassified/imaging-bundles/{bundle_slug}"
+
+    vault_root = Path(config.vault.root_path)
+    dest_dir = vault_root / relative_dir
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # Restore original filename. If a same-named file already exists from a
+    # prior extraction, suffix-counter so we never overwrite.
+    safe_original = original_name.replace("/", "_").replace("\\", "_")
+    dest = dest_dir / safe_original
+    counter = 1
+    while dest.exists():
+        stem = Path(safe_original).stem
+        suffix = Path(safe_original).suffix
+        dest = dest_dir / f"{stem}_{counter}{suffix}"
+        counter += 1
+        if counter > 10_000:
+            logger.error("Could not allocate filename for %s", safe_original)
+            return None
+
+    relative_path = f"{relative_dir}/{dest.name}"
+
+    try:
+        file_hash = compute_file_hash(str(path))
+        file_size = os.path.getsize(str(path))
+    except OSError:
+        logger.exception("Could not stat zip member %s", path.name)
+        return None
+
+    # Dedup: if this exact file already exists as a document, skip.
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE file_hash = ?", (file_hash,)
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        logger.info("Zip member %s already ingested as doc=%d, skipping", path.name, existing[0])
+        path.unlink(missing_ok=True)
+        sidecar_path.unlink(missing_ok=True)
+        patient_hint_path.unlink(missing_ok=True)
+        event_hint_path.unlink(missing_ok=True)
+        return existing[0]
+
+    shutil.copy2(str(path), str(dest))
+    path.unlink(missing_ok=True)
+    sidecar_path.unlink(missing_ok=True)
+    patient_hint_path.unlink(missing_ok=True)
+    event_hint_path.unlink(missing_ok=True)
+
+    cursor = await db.execute(
+        """INSERT INTO documents
+           (patient_id, event_id, file_path, original_filename, doc_type,
+            file_hash, file_size, status, ocr_engine, summary_en)
+           VALUES (?, ?, ?, ?, 'unknown_binary', ?, ?, 'done', 'none', ?)""",
+        (
+            patient_id,
+            event_id,
+            relative_path,
+            safe_original,
+            file_hash,
+            file_size,
+            f"Imaging bundle file: {safe_original} (from {zip_stem})",
+        ),
+    )
+    doc_id = cursor.lastrowid
+    await db.commit()
+    logger.info("Zip member stored: doc=%d %s", doc_id, relative_path)
     return doc_id

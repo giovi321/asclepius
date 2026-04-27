@@ -14,10 +14,12 @@ from asclepius.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
-# Extensions the pipeline handles
+# Extensions the pipeline handles. ``.bin`` is reserved for opaque files
+# extracted from a zip upload (DICOMDIR, LOCKFILE, VERSION etc.) — they are
+# stored alongside the imaging study but not OCR/LLM-processed.
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
-    ".dcm", ".dicom", ".iso",
+    ".dcm", ".dicom", ".iso", ".bin",
 }
 
 

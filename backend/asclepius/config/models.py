@@ -23,15 +23,23 @@ class ServerConfig(BaseModel):
         "http://localhost:5173",
         "http://localhost:8070",
     ]
-    # Max upload size in bytes (default 100 MB).
-    max_upload_bytes: int = 100 * 1024 * 1024
+    # Max upload size in bytes (default 1 GB). DICOM studies routinely
+    # exceed 100 MB; raising the default lets a single zip carrying a full
+    # CT/MRI/US exam land in one request.
+    max_upload_bytes: int = 1024 * 1024 * 1024
     # Allowed MIME type prefixes for uploads (detected by python-magic).
     allowed_upload_mime_prefixes: list[str] = [
         "application/pdf",
         "image/",
         "application/dicom",
         "application/octet-stream",  # some DICOM files
+        "application/zip",
+        "application/x-zip-compressed",
     ]
+    # Max combined uncompressed size of a single zip upload, in bytes.
+    # Defends against zip-bomb DoS by capping expansion before extraction
+    # writes any member to disk.
+    max_zip_uncompressed_bytes: int = 4 * 1024 * 1024 * 1024
 
 
 class DatabaseConfig(BaseModel):

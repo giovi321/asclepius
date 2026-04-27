@@ -6,8 +6,10 @@ streamed to disk in capped chunks so a malicious client cannot use memory
 exhaustion as a DoS primitive.
 """
 
+import json
 import logging
 import os
+import zipfile
 from pathlib import Path
 
 import aiosqlite
@@ -28,6 +30,34 @@ router = APIRouter()
 # against peak memory.
 _CHUNK = 1024 * 1024
 
+# DICOM preamble magic at byte offset 128. Used to recognise files inside a
+# zip that have no extension (e.g. ``I1000000``) so the inbox watcher will
+# pick them up as ``.dcm``.
+_DICM_MAGIC = b"DICM"
+_DICM_OFFSET = 128
+
+# Mime detections that should be treated as a zip archive.
+_ZIP_MIMES = {"application/zip", "application/x-zip-compressed"}
+
+
+def _is_dicom_file(path: Path) -> bool:
+    """Return True iff ``path`` starts with the DICOM preamble + magic."""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(_DICM_OFFSET)
+            return fh.read(4) == _DICM_MAGIC
+    except OSError:
+        return False
+
+
+def _is_zip_upload(mime: str, path: Path) -> bool:
+    if mime in _ZIP_MIMES:
+        return True
+    if path.suffix.lower() == ".zip":
+        # libmagic occasionally classifies as application/octet-stream.
+        return zipfile.is_zipfile(str(path))
+    return False
+
 
 def _detect_mime(path: Path) -> str:
     """Best-effort MIME detection using libmagic; falls back to extension."""
@@ -44,6 +74,138 @@ def _detect_mime(path: Path) -> str:
             "jpeg": "image/jpeg",
             "dcm": "application/dicom",
         }.get(ext, "application/octet-stream")
+
+
+def _extract_zip(
+    *,
+    zip_path: Path,
+    inbox: Path,
+    config,
+    patient_id: int | None,
+    event_id: int | None,
+) -> dict:
+    """Extract a zip into a fresh inbox sub-folder.
+
+    For each member:
+    - sanitise the name (Zip Slip safe via ``safe_vault_join``);
+    - peek bytes 128–132 to detect the DICOM magic and rename to ``.dcm``;
+    - everything else is renamed to ``<name>.bin`` and gets a ``.zip_member``
+      sidecar so the pipeline can restore the original filename when it
+      files the bundle next to the imaging study;
+    - patient / event hints are written next to every extracted file so the
+      pipeline links them to the right patient.
+
+    Caps total uncompressed size at ``config.server.max_zip_uncompressed_bytes``
+    to defend against zip-bomb DoS.
+    """
+    if not zipfile.is_zipfile(str(zip_path)):
+        raise HTTPException(status_code=400, detail="Not a valid zip archive")
+
+    # Pick a unique extraction folder under the user's inbox.
+    zip_stem = safe_filename(zip_path.stem) or "bundle"
+    extract_dir = inbox / zip_stem
+    counter = 1
+    while extract_dir.exists():
+        extract_dir = inbox / f"{zip_stem}-{counter}"
+        counter += 1
+        if counter > 10_000:
+            raise HTTPException(status_code=409, detail="Could not allocate folder")
+    extract_dir.mkdir(parents=True)
+
+    max_uncompressed = getattr(
+        config.server, "max_zip_uncompressed_bytes", 4 * 1024 * 1024 * 1024,
+    )
+
+    extracted = 0
+    dicom_count = 0
+    other_count = 0
+    total_uncompressed = 0
+
+    with zipfile.ZipFile(str(zip_path), "r") as zf:
+        bad = zf.testzip()
+        if bad is not None:
+            raise HTTPException(status_code=400, detail=f"Corrupt zip member: {bad}")
+
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            # Reject explicit zip-bomb expansion before touching the disk.
+            total_uncompressed += info.file_size
+            if total_uncompressed > max_uncompressed:
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        f"Zip uncompressed size exceeds "
+                        f"{max_uncompressed} bytes"
+                    ),
+                )
+
+            # Build a safe destination preserving sub-folders but rejecting
+            # any traversal (``../etc/passwd`` etc.).
+            raw_name = info.filename.replace("\\", "/")
+            parts = [p for p in raw_name.split("/") if p and p not in (".", "..")]
+            if not parts:
+                continue
+            sanitised_parts = [safe_filename(p) for p in parts]
+            try:
+                member_dest = safe_vault_join(extract_dir, *sanitised_parts)
+            except UnsafePathError:
+                logger.warning("Skipping zip member with unsafe path: %r", info.filename)
+                continue
+
+            member_dest.parent.mkdir(parents=True, exist_ok=True)
+
+            # Stream the member to disk.
+            with zf.open(info, "r") as src, open(member_dest, "wb") as dst:
+                while True:
+                    chunk = src.read(_CHUNK)
+                    if not chunk:
+                        break
+                    dst.write(chunk)
+
+            original_name = sanitised_parts[-1]
+
+            # Decide the final extension. We rename so the inbox watcher's
+            # ``SUPPORTED_EXTENSIONS`` filter accepts the file. DICOM frames
+            # go through the existing DICOM ingest (groups by Study/Series
+            # UID); everything else (DICOMDIR, JPEG previews, LOCKFILE,
+            # VERSION, …) is tagged ``.bin`` and filed next to the bundle
+            # via the passthrough handler — no OCR/LLM noise on what is
+            # often a duplicate of the DICOM pixel data.
+            ext = member_dest.suffix.lower()
+            if ext in {".dcm", ".dicom"} or _is_dicom_file(member_dest):
+                final_path = member_dest.with_suffix(".dcm")
+                if final_path != member_dest:
+                    if final_path.exists():
+                        final_path.unlink()
+                    member_dest.rename(final_path)
+                final_kind = "dicom"
+            else:
+                final_path = member_dest.with_name(member_dest.name + ".bin")
+                if final_path.exists():
+                    final_path.unlink()
+                member_dest.rename(final_path)
+                final_kind = "other"
+                meta = {"original_name": original_name, "zip_stem": zip_stem}
+                (final_path.parent / f"{final_path.name}.zip_member").write_text(
+                    json.dumps(meta)
+                )
+            if patient_id:
+                (final_path.parent / f"{final_path.name}.patient_hint").write_text(
+                    str(patient_id)
+                )
+            if event_id:
+                (final_path.parent / f"{final_path.name}.event_hint").write_text(
+                    str(event_id)
+                )
+
+            extracted += 1
+            if final_kind == "dicom":
+                dicom_count += 1
+            else:
+                other_count += 1
+
+    return {"extracted": extracted, "dicom": dicom_count, "other": other_count}
 
 
 @router.post("/upload", status_code=201)
@@ -113,7 +275,7 @@ async def upload_document(
         raise
 
     # MIME check via libmagic — reject files whose content does not match
-    # one of the allowed prefixes (PDF / image / DICOM).
+    # one of the allowed prefixes (PDF / image / DICOM / ZIP).
     mime = _detect_mime(dest)
     if not any(mime.startswith(p) for p in config.server.allowed_upload_mime_prefixes):
         dest.unlink(missing_ok=True)
@@ -121,17 +283,59 @@ async def upload_document(
             status_code=415, detail=f"Unsupported file type: {mime or 'unknown'}",
         )
 
-    # Optional patient/event hints for the pipeline. These are trusted only
-    # after the upload handler checks the caller has access to them.
+    # Verify patient access up-front — both single uploads and zip bundles
+    # need this before any pipeline-visible side effect.
     if patient_id:
         from asclepius.patients.service import check_patient_access
-        # Open a short-lived connection (the outer request doesn't have one
-        # injected here because we're streaming the body).
         async with aiosqlite.connect(config.database.path) as db:
             role = await check_patient_access(db, user_id, patient_id)
         if not role:
             dest.unlink(missing_ok=True)
             raise HTTPException(status_code=403, detail="No access to patient")
+
+    # ── Zip-bundle branch ─────────────────────────────────────────────
+    # DICOM exam zips contain many extension-less files (e.g. ``I1000000``)
+    # plus DICOMDIR, JPEG previews and bookkeeping files. Extract all of
+    # them into the user inbox so the watcher picks each one up; tag
+    # extension-less DICOM files with ``.dcm`` (via magic-byte detection)
+    # and everything else with ``.bin`` (passthrough handler in the
+    # pipeline files them next to the imaging study).
+    if _is_zip_upload(mime, dest):
+        try:
+            summary = _extract_zip(
+                zip_path=dest,
+                inbox=inbox,
+                config=config,
+                patient_id=patient_id,
+                event_id=event_id,
+            )
+        except HTTPException:
+            dest.unlink(missing_ok=True)
+            raise
+        except Exception as exc:
+            logger.exception("Zip extraction failed for %s", dest.name)
+            dest.unlink(missing_ok=True)
+            raise HTTPException(
+                status_code=400, detail=f"Could not extract zip: {exc}"
+            )
+        # Original zip is no longer needed — its members live in the inbox.
+        dest.unlink(missing_ok=True)
+        result = {
+            "filename": dest.name,
+            "status": "pending",
+            "extracted": summary["extracted"],
+            "dicom": summary["dicom"],
+            "other": summary["other"],
+            "message": (
+                f"Extracted {summary['extracted']} files "
+                f"({summary['dicom']} DICOM frames, {summary['other']} other) "
+                f"and queued for processing"
+            ),
+        }
+        return result
+
+    # Optional patient/event hints for the pipeline.
+    if patient_id:
         (dest.parent / f"{dest.name}.patient_hint").write_text(str(patient_id))
     if event_id:
         (dest.parent / f"{dest.name}.event_hint").write_text(str(event_id))

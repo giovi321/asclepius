@@ -119,6 +119,18 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["last_processed"] = path.name
                 return
 
+            # Opaque zip-member passthrough: files extracted from a zip
+            # upload that aren't DICOM and have no OCR/LLM value (DICOMDIR,
+            # LOCKFILE, VERSION, etc.). Store them next to the study so the
+            # bundle stays lossless.
+            if ext == ".bin" and Path(str(path) + ".zip_member").exists():
+                from asclepius.pipeline.dicom_ingest import process_zip_member
+                doc_id = await process_zip_member(file_path, config, db)
+                if doc_id:
+                    pipeline_status["total_processed"] += 1
+                    pipeline_status["last_processed"] = path.name
+                return
+
             # Read hint files from upload (if present)
             hint_patient_id = None
             hint_event_id = None

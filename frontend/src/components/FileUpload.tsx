@@ -15,6 +15,11 @@ interface UploadResult {
   suggestion?: string;
   message?: string;
   queue_size?: number;
+  // Returned when the upload was a zip bundle (e.g. a DICOM exam):
+  // the server extracted N members and queued each one for processing.
+  extracted?: number;
+  dicom?: number;
+  other?: number;
 }
 
 export default function FileUpload({ onUploadComplete }: FileUploadProps) {
@@ -71,6 +76,10 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       let successCount = 0;
       let errorCount = 0;
       let hasSuggestion = false;
+      let zipExtracted = 0;
+      let zipDicom = 0;
+      let zipOther = 0;
+      let sawZip = false;
       for (const file of files) {
         try {
           const form = new FormData();
@@ -87,6 +96,12 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           if (data.suggestion === "batch_schedule") {
             hasSuggestion = true;
           }
+          if (typeof data.extracted === "number") {
+            sawZip = true;
+            zipExtracted += data.extracted;
+            zipDicom += data.dicom || 0;
+            zipOther += data.other || 0;
+          }
           // Try to get the doc ID from the response filename by looking it up
           // We'll collect IDs after all uploads complete
         } catch {
@@ -98,7 +113,10 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       setUploadedCount(successCount);
 
       if (errorCount === 0) {
-        setResult({ ok: true, message: `${successCount} file(s) uploaded` });
+        const baseMsg = sawZip
+          ? `Extracted ${zipExtracted} files (${zipDicom} DICOM frames, ${zipOther} other) and queued for processing`
+          : `${successCount} file(s) uploaded`;
+        setResult({ ok: true, message: baseMsg });
       } else {
         setResult({ ok: false, message: `${successCount} uploaded, ${errorCount} failed` });
       }
@@ -264,14 +282,14 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dcm"
+                  accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dcm,.zip"
                   className="hidden"
                   onChange={(e) => e.target.files && handleFiles(e.target.files)}
                 />
               </label>
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, JPEG, PNG, TIFF, DICOM
+              PDF, JPEG, PNG, TIFF, DICOM, ZIP (DICOM bundle)
               {selectedPatient && (
                 <span className="ml-1">
                   — assigning to <strong>{selectedPatient.display_name}</strong>

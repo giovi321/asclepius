@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Image } from "lucide-react";
 import DicomViewer from "@/components/DicomViewer";
+import FileUpload from "@/components/FileUpload";
 
 export default function ImagingPage() {
   const { selectedPatient } = usePatient();
@@ -11,7 +12,7 @@ export default function ImagingPage() {
   const [selectedStudy, setSelectedStudy] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     if (!selectedPatient) {
       setStudies([]);
       setLoading(false);
@@ -25,6 +26,10 @@ export default function ImagingPage() {
         setLoading(false);
       });
   }, [selectedPatient]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const loadStudy = async (studyId: number) => {
     const res = await api.get(`/imaging/${studyId}`);
@@ -42,6 +47,8 @@ export default function ImagingPage() {
 
   return (
     <div className="space-y-4">
+      <FileUpload onUploadComplete={refresh} />
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Study list */}
         <div className="space-y-3">

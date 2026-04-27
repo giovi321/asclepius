@@ -15,7 +15,7 @@ const DOC_TYPE_OPTIONS = [
   "surgical_report", "er_report", "vaccination", "allergy", "sick_leave",
   "medical_cert", "physio_report", "dental", "ophthalmology",
   "mental_health", "consent", "advance_directive", "correspondence",
-  "imaging_dicom", "other",
+  "imaging_report", "other",
 ];
 
 /**
@@ -30,7 +30,9 @@ const DOC_TYPE_OPTIONS = [
  * ``imaging_dicom`` because that pipeline does not produce them.
  */
 export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
-  const isImaging = doc.doc_type === "imaging_dicom";
+  // Both legacy ``imaging_dicom`` and 0.9.6 ``imaging_report`` are imaging
+  // documents — the metadata editor hides the same fields for both.
+  const isImaging = doc.doc_type === "imaging_dicom" || doc.doc_type === "imaging_report";
   return (
     <Section title="Document Info">
       <InfoRow label="Status" value={doc.status} />

@@ -265,22 +265,24 @@ async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
 
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
-        # Canonical doc rewritten. The 0.9.6 layout migration also strips
-        # the legacy ``imaging/`` segment, so the final path is
-        # ``patients/giovi/foo`` rather than ``patients/giovi/imaging/foo``.
+        # Canonical doc rewritten. The 0.9.6 model treats imaging documents
+        # as report PLACEHOLDERS — doc_type flips to ``imaging_report``,
+        # file_path is cleared (the radiology PDF takes its place when the
+        # user uploads/links one). The deterministic study hash is preserved.
         canon = conn.execute(
-            "SELECT file_path, original_filename, file_hash FROM documents WHERE id = ?",
+            "SELECT file_path, doc_type, file_hash FROM documents WHERE id = ?",
             (canonical_doc,),
         ).fetchone()
         assert canon is not None
-        assert canon["file_path"] == "patients/giovi/foo"
-        assert canon["original_filename"] == "foo"
+        assert canon["doc_type"] == "imaging_report"
+        assert (canon["file_path"] or "") == ""
         assert canon["file_hash"] == expected_hash
 
-        # Per-frame dupes gone.
+        # Per-frame dupes gone (doc_type may now be the new
+        # ``imaging_report`` after the 0.9.6 flip).
         per_frame = conn.execute(
             """SELECT COUNT(*) FROM documents
-               WHERE doc_type = 'imaging_dicom' AND id != ?""",
+               WHERE doc_type IN ('imaging_dicom', 'imaging_report') AND id != ?""",
             (canonical_doc,),
         ).fetchone()[0]
         assert per_frame == 0
@@ -297,16 +299,87 @@ async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
         ).fetchone()[0]
         assert unrelated == 1
 
-    # Idempotent — second run is a no-op (path stays ``patients/giovi/foo``).
+    # Idempotent — second run is a no-op. The placeholder remains a
+    # placeholder and the study hash is unchanged.
     await initialize_database(str(db_path))
     with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         canon = conn.execute(
-            "SELECT file_path, file_hash FROM documents WHERE id = ?",
+            "SELECT file_path, doc_type, file_hash FROM documents WHERE id = ?",
             (canonical_doc,),
         ).fetchone()
-        assert canon["file_path"] == "patients/giovi/foo"
+        assert (canon["file_path"] or "") == ""
+        assert canon["doc_type"] == "imaging_report"
         assert canon["file_hash"] == expected_hash
+
+
+@pytest.mark.asyncio
+async def test_imaging_report_migration_v0_9_6(tmp_path: Path) -> None:
+    """0.9.6: imaging documents flip from ``imaging_dicom`` (where
+    ``file_path`` pointed at the DICOM folder) to ``imaging_report``
+    placeholders (file_path NULL). ``imaging_studies.report_status`` is
+    a new column that records whether the parent doc has a real PDF
+    yet. The migration is idempotent.
+    """
+    db_path = tmp_path / "imaging-0.9.6.sqlite"
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        cur = conn.execute(
+            "INSERT INTO patients (slug, display_name) VALUES ('giovi', 'Giovi')"
+        )
+        patient_id = cur.lastrowid
+        # A pre-0.9.6 imaging document — file_path points at the study folder.
+        cur = conn.execute(
+            """INSERT INTO documents (patient_id, file_path, original_filename,
+                                       doc_type, status, ocr_engine, file_hash)
+               VALUES (?, 'patients/giovi/2026/2026-04-27_clinic_US', 'foo',
+                       'imaging_dicom', 'done', 'dicom', 'study-hash-x')""",
+            (patient_id,),
+        )
+        doc_id = cur.lastrowid
+        cur = conn.execute(
+            """INSERT INTO imaging_studies
+               (document_id, patient_id, modality, body_part, study_date,
+                num_series, num_images, is_dicom, study_instance_uid, folder_path)
+               VALUES (?, ?, 'US', 'ABDOMEN', '2026-04-27', 1, 35, 1, 'STUDY-A',
+                       'patients/giovi/2026/2026-04-27_clinic_US')""",
+            (doc_id, patient_id),
+        )
+        conn.commit()
+
+    # Re-run init: 0.9.6 migration runs.
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        # documents row flipped to imaging_report placeholder.
+        d = conn.execute(
+            "SELECT doc_type, file_path, original_filename FROM documents WHERE id = ?",
+            (doc_id,),
+        ).fetchone()
+        assert d["doc_type"] == "imaging_report"
+        # file_path is empty (placeholder marker) — schema declares the
+        # column NOT NULL so we use '' rather than NULL.
+        assert (d["file_path"] or "") == ""
+        assert "report pending" in d["original_filename"].lower()
+        # imaging_studies gained report_status, defaulted to placeholder.
+        s = conn.execute(
+            "SELECT report_status FROM imaging_studies WHERE document_id = ?",
+            (doc_id,),
+        ).fetchone()
+        assert s["report_status"] == "placeholder"
+
+    # Idempotent — second run is a no-op.
+    await initialize_database(str(db_path))
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        d = conn.execute(
+            "SELECT doc_type, file_path FROM documents WHERE id = ?", (doc_id,)
+        ).fetchone()
+        assert d["doc_type"] == "imaging_report"
+        assert (d["file_path"] or "") == ""
 
 
 @pytest.mark.asyncio
@@ -383,10 +456,14 @@ async def test_imaging_layout_migration_strips_imaging_segment(
             "SELECT folder_path FROM imaging_series WHERE study_id = ?", (study_id,)
         ).fetchone()
         assert series["folder_path"] == "patients/giovi/2026/foo/series-1"
+        # The 0.9.6 migration also flips this imaging_dicom doc to a
+        # placeholder imaging_report. The folder_path is on the study
+        # (asserted above); the documents row's file_path is now empty.
         doc = conn.execute(
-            "SELECT file_path FROM documents WHERE id = ?", (doc_id,)
+            "SELECT file_path, doc_type FROM documents WHERE id = ?", (doc_id,)
         ).fetchone()
-        assert doc["file_path"] == "patients/giovi/2026/foo"
+        assert doc["doc_type"] == "imaging_report"
+        assert (doc["file_path"] or "") == ""
 
 
 @pytest.mark.asyncio

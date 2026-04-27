@@ -10,6 +10,7 @@ import DocumentDetailPage from "@/pages/DocumentDetailPage";
 import UnclassifiedPage from "@/pages/UnclassifiedPage";
 import LabResultsPage from "@/pages/LabResultsPage";
 import ImagingPage from "@/pages/ImagingPage";
+import ImagingDetailPage from "@/pages/ImagingDetailPage";
 import ChatPage from "@/pages/ChatPage";
 import SearchPage from "@/pages/SearchPage";
 import SettingsPage from "@/pages/SettingsPage";
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="unclassified" element={page("Unclassified", <UnclassifiedPage />)} />
         <Route path="lab-results" element={page("Lab Results", <LabResultsPage />)} />
         <Route path="imaging" element={page("Imaging", <ImagingPage />)} />
+        <Route path="imaging/:studyId" element={page("Imaging Detail", <ImagingDetailPage />)} />
         <Route path="chat" element={page("Chat", <ChatPage />)} />
         <Route path="search" element={page("Search", <SearchPage />)} />
         <Route path="settings/*" element={page("Settings", <SettingsPage />)} />

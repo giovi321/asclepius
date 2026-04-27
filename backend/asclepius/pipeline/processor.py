@@ -144,10 +144,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             hint_patient_id = None
             hint_event_id = None
             hint_user_id: int | None = None
+            hint_imaging_study_id: int | None = None
             for hint_name, hint_var in [
                 (".patient_hint", "patient"),
                 (".event_hint", "event"),
                 (".user_hint", "user"),
+                (".imaging_study_hint", "imaging_study"),
             ]:
                 hint_path = Path(str(path) + hint_name)
                 if hint_path.exists():
@@ -157,8 +159,10 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                             hint_patient_id = val
                         elif hint_var == "event":
                             hint_event_id = val
-                        else:
+                        elif hint_var == "user":
                             hint_user_id = val
+                        else:
+                            hint_imaging_study_id = val
                     except (ValueError, OSError):
                         pass
                     hint_path.unlink(missing_ok=True)
@@ -585,6 +589,41 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                    WHERE id = ?""",
                 (final_path, new_filename, doc_id),
             )
+
+            # Imaging-report attach hint: a PDF uploaded via POST
+            # /api/imaging/{study_id}/report carries an
+            # ``.imaging_study_hint`` sidecar. Now that the doc is
+            # processed and has a real file_path, repoint the study at
+            # it and delete the placeholder it replaced.
+            if hint_imaging_study_id is not None:
+                cursor = await db.execute(
+                    "SELECT document_id FROM imaging_studies WHERE id = ?",
+                    (hint_imaging_study_id,),
+                )
+                study_row = await cursor.fetchone()
+                if study_row:
+                    placeholder_doc_id = study_row[0]
+                    await db.execute(
+                        "UPDATE imaging_studies SET document_id = ?, "
+                        "report_status = 'attached' WHERE id = ?",
+                        (doc_id, hint_imaging_study_id),
+                    )
+                    if placeholder_doc_id and placeholder_doc_id != doc_id:
+                        cursor = await db.execute(
+                            "SELECT file_path, doc_type FROM documents WHERE id = ?",
+                            (placeholder_doc_id,),
+                        )
+                        old = await cursor.fetchone()
+                        if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
+                            await db.execute(
+                                "DELETE FROM documents WHERE id = ?",
+                                (placeholder_doc_id,),
+                            )
+                    logger.info(
+                        "Imaging report attached: doc=%d -> study=%d",
+                        doc_id, hint_imaging_study_id,
+                    )
+
             await db.commit()
 
             pipeline_status["total_processed"] += 1

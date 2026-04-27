@@ -1,4 +1,5 @@
-import { FileText, Download } from "lucide-react";
+import { Link } from "react-router-dom";
+import { FileText, Download, Image as ImageIcon } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 
 export interface DocumentViewerProps {
@@ -6,13 +7,21 @@ export interface DocumentViewerProps {
   filePath: string | null | undefined;
   originalFilename: string | null | undefined;
   onRotate: (degrees: number, pages: number[] | null) => Promise<void>;
+  /** When set, this document is the parent of a DICOM imaging study —
+   * the preview fallback links into the Imaging view instead of just
+   * offering a download. */
+  imagingStudyId?: number | null;
 }
 
 /**
  * Left-column preview on the Document Detail page. Shows a PDF viewer,
- * an image, or a download fallback depending on the file extension.
+ * an image, or a download fallback depending on the file extension. When
+ * the document is the parent of an imaging study, the fallback turns
+ * into a "switch to the imaging view" hint with a deep link.
  */
-export default function DocumentViewer({ id, filePath, originalFilename, onRotate }: DocumentViewerProps) {
+export default function DocumentViewer({
+  id, filePath, originalFilename, onRotate, imagingStudyId,
+}: DocumentViewerProps) {
   const fp = (filePath || "").toLowerCase();
   const fn = (originalFilename || "").toLowerCase();
   if (fp.endsWith(".pdf") || fn.endsWith(".pdf")) {
@@ -30,6 +39,28 @@ export default function DocumentViewer({ id, filePath, originalFilename, onRotat
           alt={originalFilename || undefined}
           className="w-full object-contain max-h-[700px]"
         />
+      </div>
+    );
+  }
+  // Imaging-aware fallback: when this document represents the report-side
+  // of a DICOM study but no PDF is attached yet (or the file just isn't
+  // previewable), point the user at the Imaging view where the frames
+  // and the upload-report flow live.
+  if (imagingStudyId) {
+    return (
+      <div className="rounded-lg border p-8 text-center text-muted-foreground space-y-2">
+        <ImageIcon className="h-12 w-12 mx-auto mb-2 text-primary" />
+        <p className="text-foreground font-medium">This document is the report for an imaging study</p>
+        <p className="text-sm">
+          Open the Imaging view to scroll through the DICOM frames, attach a PDF report,
+          or change contrast on MRI series.
+        </p>
+        <Link
+          to={`/imaging/${imagingStudyId}`}
+          className="inline-flex items-center gap-1 mt-2 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
+        >
+          <ImageIcon className="h-4 w-4" /> Open in Imaging view
+        </Link>
       </div>
     );
   }

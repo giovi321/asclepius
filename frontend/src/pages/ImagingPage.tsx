@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { Image, Pencil, Trash2 } from "lucide-react";
-import FileUpload from "@/components/FileUpload";
-import MetadataEditor from "@/components/document-detail/MetadataEditor";
-import EventSelector from "@/components/document-detail/EventSelector";
-import LinksSection from "@/components/document-detail/LinksSection";
-import NotesEditor from "@/components/document-detail/NotesEditor";
 import {
-  ImagingStudiesSection,
-} from "@/components/document-detail/ChildRecordSections";
-import { EditableSummary } from "@/components/document-detail/DocumentDetailHelpers";
+  Image as ImageIcon, Search, ChevronUp, ChevronDown, FileText, FileX2,
+} from "lucide-react";
+import FileUpload from "@/components/FileUpload";
 
 const MODALITY_LABELS: Record<string, string> = {
   CT: "CT scan", MR: "MRI", US: "Ultrasound", XR: "X-ray", CR: "X-ray (computed)",
@@ -23,217 +17,243 @@ function modalityLabel(code: string | null | undefined): string {
   return MODALITY_LABELS[code.toUpperCase()] || code;
 }
 
+interface Study {
+  id: number;
+  document_id: number;
+  patient_id: number;
+  patient_name: string | null;
+  modality: string | null;
+  body_part: string | null;
+  study_date: string | null;
+  institution_name: string | null;
+  referring_physician: string | null;
+  doctor_name: string | null;
+  facility_name: string | null;
+  num_series: number;
+  num_images: number;
+  report_status: "placeholder" | "attached";
+  report_filename: string | null;
+  date_added: string | null;
+}
+
+const COLUMNS: { key: string; label: string; width: string }[] = [
+  { key: "modality", label: "Type", width: "12%" },
+  { key: "body_part", label: "Body part", width: "16%" },
+  { key: "study_date", label: "Date", width: "10%" },
+  { key: "institution", label: "Institution", width: "20%" },
+  { key: "doctor", label: "Doctor", width: "16%" },
+  { key: "report_status", label: "Report", width: "12%" },
+  { key: "date_added", label: "Added", width: "10%" },
+];
+
+const PAGE_SIZE = 20;
+
 /**
- * Imaging page. The list on the left is filtered to imaging studies; the
- * right-hand panel shows the SAME metadata + child-record stack used on
- * the document detail page (MetadataEditor, EventSelector, LinksSection,
- * NotesEditor) plus the imaging-specific block (ImagingStudiesSection)
- * with the embedded DICOM viewer + bundle files. Editing happens in
- * place, so a clinician can stay on this page to update metadata,
- * navigate frames, link a radiology report, etc.
+ * Imaging list page. Mirrors DocumentsPage's shape: search + filter chips,
+ * sortable columns, paginated results, upload zone at the top. Selecting a
+ * row navigates to /imaging/:studyId for the detail view.
  */
 export default function ImagingPage() {
   const { selectedPatient } = usePatient();
   const navigate = useNavigate();
-  const [studies, setStudies] = useState<any[]>([]);
-  const [selectedStudyId, setSelectedStudyId] = useState<number | null>(null);
-  const [doc, setDoc] = useState<any>(null);
-  const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
-  const [loadingDoc, setLoadingDoc] = useState(false);
+  const [items, setItems] = useState<Study[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [modalityFilter, setModalityFilter] = useState("");
+  const [reportStatusFilter, setReportStatusFilter] = useState<"" | "placeholder" | "attached">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sort, setSort] = useState<string>("study_date");
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(0);
+  const [showUpload, setShowUpload] = useState(false);
 
-  const refresh = useCallback(() => {
-    if (!selectedPatient) {
-      setStudies([]);
-      setLoadingList(false);
-      return;
-    }
-    setLoadingList(true);
-    api.get("/imaging", { params: { patient_id: selectedPatient.id } })
+  const params = useMemo(() => {
+    const p: Record<string, any> = {
+      limit: PAGE_SIZE,
+      offset: page * PAGE_SIZE,
+      sort,
+      order,
+    };
+    if (selectedPatient) p.patient_id = selectedPatient.id;
+    if (search) p.q = search;
+    if (modalityFilter) p.modality = modalityFilter;
+    if (reportStatusFilter) p.report_status = reportStatusFilter;
+    if (dateFrom) p.date_from = dateFrom;
+    if (dateTo) p.date_to = dateTo;
+    return p;
+  }, [selectedPatient, search, modalityFilter, reportStatusFilter, dateFrom, dateTo, sort, order, page]);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    api.get("/imaging", { params })
       .then((res) => {
-        setStudies(res.data.items || []);
-        setLoadingList(false);
-      });
-  }, [selectedPatient]);
+        setItems(res.data.items || []);
+        setTotal(res.data.total || 0);
+      })
+      .catch(() => {
+        setItems([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, [params]);
 
+  useEffect(() => { reload(); }, [reload]);
+
+  // Reset to first page when filters change.
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    setPage(0);
+  }, [selectedPatient, search, modalityFilter, reportStatusFilter, dateFrom, dateTo]);
 
-  // Lightweight doc update — merges fields without a full reload (preserves scroll).
-  const updateDocFields = (updated?: any) => {
-    if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
-  };
-
-  const reloadDoc = useCallback(async (documentId: number) => {
-    setLoadingDoc(true);
-    try {
-      const res = await api.get(`/documents/${documentId}`);
-      setDoc(res.data);
-      setLinkedDocs(res.data.links || []);
-    } finally {
-      setLoadingDoc(false);
-    }
-  }, []);
-
-  const loadStudy = async (studyId: number) => {
-    setSelectedStudyId(studyId);
-    const res = await api.get(`/imaging/${studyId}`);
-    if (res.data?.document_id) {
-      await reloadDoc(res.data.document_id);
+  const toggleSort = (key: string) => {
+    if (sort === key) {
+      setOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSort(key);
+      setOrder("desc");
     }
   };
 
-  const handleDelete = async () => {
-    if (!doc?.id) return;
-    if (!window.confirm(
-      "Delete this imaging study? All frames, bundle files, and links will be removed.",
-    )) return;
-    try {
-      await api.delete(`/documents/${doc.id}`);
-      setDoc(null);
-      setSelectedStudyId(null);
-      setLinkedDocs([]);
-      refresh();
-    } catch (e: any) {
-      alert(`Delete failed: ${e?.response?.data?.detail || e.message}`);
-    }
-  };
-
-  if (!selectedPatient) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-        <Image className="h-8 w-8" />
-        <p>Select a patient to view imaging studies</p>
-      </div>
-    );
-  }
-
-  const headlineStudy = doc?.imaging_studies?.[0];
+  const SortIcon = ({ active, dir }: { active: boolean; dir: "asc" | "desc" }) =>
+    !active ? null : dir === "asc" ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />;
 
   return (
     <div className="space-y-4">
-      <FileUpload onUploadComplete={refresh} />
+      {showUpload && (
+        <FileUpload onUploadComplete={() => { setShowUpload(false); reload(); }} />
+      )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        {/* Study list */}
-        <div className="space-y-3">
-          {loadingList ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : studies.length === 0 ? (
-            <p className="text-muted-foreground">No imaging studies found</p>
-          ) : (
-            studies.map((study) => (
-              <button
-                key={study.id}
-                onClick={() => loadStudy(study.id)}
-                className={`w-full rounded-lg border p-4 text-left transition-colors hover:bg-accent/50 ${
-                  selectedStudyId === study.id ? "border-primary bg-primary/5" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="font-medium">
-                      {modalityLabel(study.modality)} - {study.body_part || "Unknown"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {study.study_date || "Unknown date"} | {study.institution_name || "Unknown institution"}
-                    </p>
-                    {study.study_description && (
-                      <p className="text-xs text-muted-foreground truncate">{study.study_description}</p>
-                    )}
-                  </div>
-                  <div className="text-right text-sm text-muted-foreground flex-shrink-0 ml-2">
-                    <p>{study.num_series} series</p>
-                    <p>{study.num_images} images</p>
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search body part, institution, referring physician..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm"
+          />
         </div>
-
-        {/* Right column: identical to the right column of DocumentDetailPage,
-            so editing parity is exact. */}
-        {!doc ? (
-          selectedStudyId == null ? (
-            <div className="rounded-lg border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-              Select a study on the left to view and edit its metadata.
-            </div>
-          ) : (
-            <div className="text-muted-foreground p-4">
-              {loadingDoc ? "Loading study..." : "No document for this study"}
-            </div>
-          )
-        ) : (
-          <div className="space-y-4 min-w-0">
-            {/* Header line — modality + dates + manage actions, mirroring
-                the title row on DocumentDetailPage. */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium truncate">
-                  {modalityLabel(headlineStudy?.modality)}
-                  {headlineStudy?.body_part ? ` - ${headlineStudy.body_part}` : ""}
-                  {headlineStudy?.study_date ? ` - ${headlineStudy.study_date}` : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {doc.original_filename} | {doc.patient_name || "Unclassified"}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Link
-                  to={`/documents/${doc.id}`}
-                  title="Open full document view"
-                  className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Open in document view
-                </Link>
-                <button
-                  onClick={handleDelete}
-                  className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            <EditableSummary value={doc.summary_en} docId={doc.id} onSave={updateDocFields} />
-
-            <ImagingStudiesSection studies={doc.imaging_studies || []} />
-
-            <MetadataEditor doc={doc} onSave={updateDocFields} />
-
-            <EventSelector
-              docId={doc.id}
-              patientId={doc.patient_id}
-              currentEventId={doc.event_id}
-              onUpdate={(eventId) => setDoc((prev: any) => ({ ...prev, event_id: eventId }))}
-            />
-
-            <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />
-
-            <LinksSection
-              docId={doc.id}
-              patientId={doc.patient_id}
-              links={linkedDocs}
-              onLinksChange={setLinkedDocs}
-            />
-
-            <p className="text-xs text-muted-foreground">
-              Need to reprocess, rotate, or run AI edits? Use{" "}
-              <button
-                onClick={() => navigate(`/documents/${doc.id}`)}
-                className="underline hover:text-foreground"
-              >
-                the full document view
-              </button>
-              .
-            </p>
-          </div>
-        )}
+        <select
+          value={modalityFilter}
+          onChange={(e) => setModalityFilter(e.target.value)}
+          className="rounded-md border bg-background px-2 py-2 text-sm"
+        >
+          <option value="">All types</option>
+          {Object.entries(MODALITY_LABELS).map(([code, label]) => (
+            <option key={code} value={code}>{label} ({code})</option>
+          ))}
+        </select>
+        <select
+          value={reportStatusFilter}
+          onChange={(e) => setReportStatusFilter(e.target.value as any)}
+          className="rounded-md border bg-background px-2 py-2 text-sm"
+        >
+          <option value="">All reports</option>
+          <option value="attached">Report attached</option>
+          <option value="placeholder">Report pending</option>
+        </select>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="rounded-md border bg-background px-2 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="rounded-md border bg-background px-2 py-2 text-sm"
+        />
+        <button
+          onClick={() => setShowUpload((v) => !v)}
+          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
+        >
+          {showUpload ? "Hide upload" : "Upload"}
+        </button>
       </div>
+
+      {/* Table */}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+          </colgroup>
+          <thead className="bg-muted/30">
+            <tr className="border-b">
+              {COLUMNS.map((c) => (
+                <th
+                  key={c.key}
+                  className="text-left font-medium px-3 py-2 cursor-pointer select-none hover:bg-accent/30"
+                  onClick={() => toggleSort(c.key)}
+                >
+                  {c.label}{" "}
+                  <SortIcon active={sort === c.key} dir={order} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            ) : items.length === 0 ? (
+              <tr><td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">
+                <ImageIcon className="h-6 w-6 mx-auto mb-2" />
+                No imaging studies found
+              </td></tr>
+            ) : items.map((s) => (
+              <tr
+                key={s.id}
+                onClick={() => navigate(`/imaging/${s.id}`)}
+                className="border-b cursor-pointer hover:bg-accent/30 transition-colors"
+              >
+                <td className="px-3 py-2">{modalityLabel(s.modality)}</td>
+                <td className="px-3 py-2 text-muted-foreground">{s.body_part || "Unknown"}</td>
+                <td className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || "—"}</td>
+                <td className="px-3 py-2 text-muted-foreground truncate">{s.institution_name || "Unknown"}</td>
+                <td className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || s.referring_physician || "Unknown"}</td>
+                <td className="px-3 py-2">
+                  {s.report_status === "attached" ? (
+                    <span className="inline-flex items-center gap-1 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5">
+                      <FileText className="h-3 w-3" /> Attached
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5">
+                      <FileX2 className="h-3 w-3" /> Pending
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground tabular-nums">
+                  {s.date_added ? s.date_added.slice(0, 10) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">
+            Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+            >Previous</button>
+            <button
+              onClick={() => setPage(page + 1)}
+              disabled={(page + 1) * PAGE_SIZE >= total}
+              className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
+            >Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

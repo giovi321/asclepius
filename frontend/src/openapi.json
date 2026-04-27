@@ -2278,6 +2278,7 @@
           "imaging"
         ],
         "summary": "List Imaging Studies",
+        "description": "List imaging studies. Mirrors the documents-list shape: search,\nfilters, sort, paginated results with ``total`` count.",
         "operationId": "list_imaging_studies_api_imaging_get",
         "parameters": [
           {
@@ -2342,6 +2343,97 @@
                 }
               ],
               "title": "Date To"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Search across body part, institution, referring physician, study description",
+              "title": "Q"
+            },
+            "description": "Search across body part, institution, referring physician, study description"
+          },
+          {
+            "name": "report_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(placeholder|attached)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Report Status"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(asc|desc)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
             }
           }
         ],
@@ -2767,6 +2859,72 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/report": {
+      "post": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Attach Imaging Report",
+        "description": "Attach a radiology report PDF to an imaging study.\n\nTwo flows:\n  - **Link existing**: pass ``?document_id=<id>`` (or JSON body\n    ``{\"document_id\": <id>}``) \u2014 the study's parent document is\n    repointed at that PDF; the placeholder is deleted.\n  - **Upload new**: post a multipart ``file=<pdf>``. The PDF lands\n    in the inbox like any other upload and is processed by the\n    standard pipeline; on completion the placeholder is replaced\n    by the new document.\n\nPDF-only is enforced for uploads. The caller must have write access\nto the study's patient.",
+        "operationId": "attach_imaging_report_api_imaging__study_id__report_post",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_attach_imaging_report_api_imaging__study_id__report_post"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5055,6 +5213,24 @@
           "document_ids"
         ],
         "title": "BatchScheduleRequest"
+      },
+      "Body_attach_imaging_report_api_imaging__study_id__report_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "title": "Body_attach_imaging_report_api_imaging__study_id__report_post"
       },
       "Body_upload_document_api_documents_upload_post": {
         "properties": {

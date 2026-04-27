@@ -359,19 +359,20 @@ async def delete_doc(
         await asyncio.sleep(0.5)
 
     # Delete file from disk — handle case where file may have already been moved.
-    # Imaging documents store a STUDY FOLDER as their file_path, not a single
-    # file, so we use rmtree for directories. We also wipe the matching
-    # imaging-bundles folder (DICOMDIR + JPEG previews) when this is an
-    # imaging study.
+    # Imaging report-PDFs are normal files; pre-0.9.6 imaging-bundle docs that
+    # got migrated to placeholders have file_path=NULL (skip the disk step).
+    # Old-shape imaging documents (pre-migration) had file_path pointing at
+    # a folder, so we still ``rmtree`` for any path that resolves to a dir.
     import shutil as _shutil
     config = get_config()
-    file_path = Path(config.vault.root_path) / doc["file_path"]
-    if file_path.exists():
+    raw_file_path = doc.get("file_path")
+    file_path = (Path(config.vault.root_path) / raw_file_path) if raw_file_path else None
+    if file_path is not None and file_path.exists():
         if file_path.is_dir():
             _shutil.rmtree(file_path, ignore_errors=True)
         else:
             file_path.unlink()
-    else:
+    elif raw_file_path:
         # Try inbox with original filename
         inbox_path = Path(config.vault.inbox_path) / doc["original_filename"]
         if inbox_path.exists():
@@ -380,9 +381,10 @@ async def delete_doc(
             else:
                 inbox_path.unlink()
 
-    # If this is an imaging study, also remove the associated bundle folder
-    # (zip-extracted DICOMDIR / JPEG previews / LOCKFILE / VERSION).
-    if doc.get("doc_type") == "imaging_dicom":
+    # If this is an imaging study (legacy ``imaging_dicom`` or 0.9.6
+    # ``imaging_report``), also remove the on-disk DICOM folder and the
+    # auxiliary bundle folder (DICOMDIR / JPEG previews / LOCKFILE / VERSION).
+    if doc.get("doc_type") in ("imaging_dicom", "imaging_report"):
         # Look up the study's folder + bundle slug derivation. The bundle
         # folder lives under either patients/{slug}/imaging-bundles/{stem}
         # or unclassified/imaging-bundles/{stem}, where {stem} is the slug
@@ -396,26 +398,30 @@ async def delete_doc(
             )
             study_row = await cursor.fetchone()
             if study_row and study_row[0]:
-                # Re-derive the bundle root: replace ``imaging`` with
-                # ``imaging-bundles`` and strip the per-study suffix.
-                study_folder = study_row[0]  # e.g. patients/giovi/2026/imaging/foo
+                # 0.9.6 layout: patients/{slug}/{year}/{study_folder}.
+                # Pre-0.9.6: patients/{slug}/{year}/imaging/{study_folder}.
+                study_folder = study_row[0]
+                study_dir = Path(config.vault.root_path) / study_folder
+                if study_dir.exists() and study_dir.is_dir():
+                    _shutil.rmtree(study_dir, ignore_errors=True)
+                # Bundle folder lives at the patient root.
                 parts = study_folder.split("/")
-                if "imaging" in parts:
-                    idx = parts.index("imaging")
-                    bundle_root = "/".join(parts[:idx] + ["imaging-bundles"])
+                if parts and parts[0] in ("patients", "unclassified"):
+                    if parts[0] == "patients" and len(parts) >= 2:
+                        bundle_root = f"patients/{parts[1]}/imaging-bundles"
+                    else:
+                        bundle_root = "unclassified/imaging-bundles"
                     bundle_path = Path(config.vault.root_path) / bundle_root
                     if bundle_path.exists() and bundle_path.is_dir():
-                        # Remove every bundle folder that no longer has a
-                        # surviving study (the FK cascade already removed
-                        # imaging_studies rows tied to deleted documents).
-                        # Bundles do not appear in imaging_studies.folder_path,
-                        # so anything left under imaging-bundles whose stem
-                        # is not referenced by a surviving study is orphaned.
-                        # Pragmatic compromise: remove the whole bundle root
-                        # if NO studies remain for this patient.
+                        # Pragmatic compromise: drop the whole bundle root
+                        # if NO studies remain for this patient/scope.
+                        if parts[0] == "patients":
+                            scope_like = f"patients/{parts[1]}/%"
+                        else:
+                            scope_like = "unclassified/%"
                         cursor = await db.execute(
                             "SELECT COUNT(*) FROM imaging_studies WHERE folder_path LIKE ?",
-                            (f"{'/'.join(parts[:idx])}/imaging/%",),
+                            (scope_like,),
                         )
                         cnt_row = await cursor.fetchone()
                         if cnt_row and cnt_row[0] == 0:

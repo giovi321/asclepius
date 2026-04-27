@@ -876,6 +876,72 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         # Counter recompute may still have written rows; commit to flush.
         await db.commit()
 
+    # 0.9.6: the parent document of an imaging study is now the radiology
+    # REPORT, not the DICOM bundle. Existing rows with doc_type='imaging_dicom'
+    # are flipped to 'imaging_report' and have file_path nulled out so they
+    # become placeholders the user can populate by uploading the actual PDF.
+    # imaging_studies gains a denormalised report_status flag.
+    cursor = await db.execute("PRAGMA table_info(imaging_studies)")
+    is_cols = [row[1] for row in await cursor.fetchall()]
+    if "report_status" not in is_cols:
+        await db.execute(
+            "ALTER TABLE imaging_studies ADD COLUMN report_status TEXT NOT NULL DEFAULT 'placeholder'"
+        )
+        logger.info("Migration: added imaging_studies.report_status")
+
+    # Convert pre-0.9.6 imaging documents in place. Their file_path used
+    # to point at the DICOM study folder; from 0.9.6 onward that's a
+    # placeholder until the user attaches a real PDF report.
+    cursor = await db.execute(
+        """SELECT d.id, COALESCE(s.modality, '') AS modality,
+                  COALESCE(s.body_part, '') AS body_part,
+                  COALESCE(s.study_date, '') AS study_date
+           FROM documents d
+           LEFT JOIN imaging_studies s ON s.document_id = d.id
+           WHERE d.doc_type = 'imaging_dicom'"""
+    )
+    legacy_imaging_rows = await cursor.fetchall()
+    _flipped = 0
+    for r in legacy_imaging_rows:
+        doc_pk = r[0]
+        modality = (r[1] or "").strip()
+        body_part = (r[2] or "").strip()
+        study_date = (r[3] or "").strip()
+        # Build a readable placeholder filename ("US ABDOMEN 2026-04-27 — report pending")
+        bits = [b for b in (modality, body_part, study_date) if b]
+        label = " ".join(bits) if bits else "Imaging"
+        placeholder_name = f"{label} (report pending)"
+        # documents.file_path is NOT NULL in the schema, so a placeholder
+        # uses the empty string instead. Every consumer that checks for a
+        # placeholder treats ``not file_path`` as "no PDF attached yet".
+        await db.execute(
+            """UPDATE documents
+               SET doc_type = 'imaging_report',
+                   file_path = '',
+                   file_size = NULL,
+                   original_filename = ?,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (placeholder_name, doc_pk),
+        )
+        _flipped += 1
+    # Set report_status = 'placeholder' for the studies whose document is
+    # a placeholder (file_path is empty), 'attached' otherwise.
+    await db.execute(
+        """UPDATE imaging_studies SET report_status =
+              CASE
+                WHEN COALESCE((SELECT file_path FROM documents WHERE id = imaging_studies.document_id), '') = ''
+                THEN 'placeholder'
+                ELSE 'attached'
+              END"""
+    )
+    if _flipped:
+        await db.commit()
+        logger.info(
+            "Migration: flipped %d imaging_dicom documents to placeholder imaging_report rows",
+            _flipped,
+        )
+
     # Compat view for external tooling that still expects the old
     # doctor_name / facility_name columns (see issue #16). Dropped and
     # recreated every init so the view re-binds to the current documents

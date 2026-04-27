@@ -200,14 +200,17 @@ async def process_dicom(
     study_doc_hash = hashlib.sha256(
         f"asclepius-imaging-study:{study_key}".encode("utf-8")
     ).hexdigest()
-    study_folder_basename = base_path.rsplit("/", 1)[-1]
 
     if not frame_already_ingested:
         shutil.copy2(str(path), str(dest))
     path.unlink(missing_ok=True)
 
-    # Find or create the canonical document row for this study. The first
-    # frame creates it; every subsequent frame just looks it up.
+    # Find or create the canonical PARENT document row for this study.
+    # In 0.9.6 the parent document represents the radiology REPORT (PDF).
+    # For zip uploads that arrive without a report attached, the document
+    # is a placeholder: file_path stays NULL until the user uploads the
+    # PDF. The first DICOM frame creates the placeholder row; every
+    # subsequent frame just looks it up by the deterministic study hash.
     cursor = await db.execute(
         "SELECT id FROM documents WHERE file_hash = ?", (study_doc_hash,),
     )
@@ -215,13 +218,20 @@ async def process_dicom(
     if existing_doc:
         doc_id = existing_doc[0]
     else:
+        bits = [b for b in (modality or "", body_part or "", study_date or "") if b]
+        placeholder_label = " ".join(bits) or "Imaging"
+        placeholder_name = f"{placeholder_label} (report pending)"
+        # ``file_path`` is empty (not NULL) because schema.sql declares
+        # the column NOT NULL. Empty string is the placeholder marker; a
+        # real PDF arriving via POST /api/imaging/{id}/report rewrites
+        # it later.
         cursor = await db.execute(
             """INSERT INTO documents
                (patient_id, event_id, file_path, original_filename, doc_type, event_date,
                 doctor_id, facility_id, file_hash, file_size,
                 status, ocr_engine, ocr_text)
-               VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, ?, 0, 'done', 'dicom', ?)""",
-            (patient_id, hinted_event_id, base_path, study_folder_basename,
+               VALUES (?, ?, '', ?, 'imaging_report', ?, ?, ?, ?, NULL, 'done', 'dicom', ?)""",
+            (patient_id, hinted_event_id, placeholder_name,
              study_date, doctor_id, facility_id, study_doc_hash,
              f"DICOM: {modality or ''} {body_part or ''} {study_desc or ''}".strip()),
         )

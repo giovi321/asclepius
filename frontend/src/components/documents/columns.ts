@@ -57,5 +57,6 @@ export function loadVisibleColumns(): Set<ColumnKey> {
 export const DOC_TYPES = [
   "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
   "insurance_claim", "referral", "discharge", "specialist_report",
-  "radiology_report", "surgical_report", "vaccination", "other",
+  "radiology_report", "surgical_report", "vaccination",
+  "imaging_report", "other",
 ];

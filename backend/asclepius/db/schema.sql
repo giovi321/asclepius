@@ -196,6 +196,9 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     patient_id INTEGER NOT NULL REFERENCES patients(id),
     doctor_id INTEGER REFERENCES doctors(id),
     facility_id INTEGER REFERENCES facilities(id),
+    -- 'placeholder' (no PDF report attached yet) | 'attached' (the parent
+    -- documents row is a real PDF the user uploaded / linked).
+    report_status TEXT NOT NULL DEFAULT 'placeholder',
     study_date DATE,
     modality TEXT,
     body_part TEXT,

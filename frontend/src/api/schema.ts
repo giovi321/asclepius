@@ -782,7 +782,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Imaging Studies */
+        /**
+         * List Imaging Studies
+         * @description List imaging studies. Mirrors the documents-list shape: search,
+         *     filters, sort, paginated results with ``total`` count.
+         */
         get: operations["list_imaging_studies_api_imaging_get"];
         put?: never;
         post?: never;
@@ -936,6 +940,38 @@ export interface paths {
          * @description Remove a document_links row. Validates the link belongs to this study.
          */
         delete: operations["remove_imaging_link_api_imaging__study_id__links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach Imaging Report
+         * @description Attach a radiology report PDF to an imaging study.
+         *
+         *     Two flows:
+         *       - **Link existing**: pass ``?document_id=<id>`` (or JSON body
+         *         ``{"document_id": <id>}``) — the study's parent document is
+         *         repointed at that PDF; the placeholder is deleted.
+         *       - **Upload new**: post a multipart ``file=<pdf>``. The PDF lands
+         *         in the inbox like any other upload and is processed by the
+         *         standard pipeline; on completion the placeholder is replaced
+         *         by the new document.
+         *
+         *     PDF-only is enforced for uploads. The caller must have write access
+         *     to the study's patient.
+         */
+        post: operations["attach_imaging_report_api_imaging__study_id__report_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1794,6 +1830,11 @@ export interface components {
             document_ids: number[];
             /** Process At */
             process_at?: string | null;
+        };
+        /** Body_attach_imaging_report_api_imaging__study_id__report_post */
+        Body_attach_imaging_report_api_imaging__study_id__report_post: {
+            /** File */
+            file?: string | null;
         };
         /** Body_upload_document_api_documents_upload_post */
         Body_upload_document_api_documents_upload_post: {
@@ -3971,6 +4012,13 @@ export interface operations {
                 modality?: string | null;
                 date_from?: string | null;
                 date_to?: string | null;
+                /** @description Search across body part, institution, referring physician, study description */
+                q?: string | null;
+                report_status?: string | null;
+                sort?: string | null;
+                order?: string | null;
+                limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -4238,6 +4286,43 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_imaging_report_api_imaging__study_id__report_post: {
+        parameters: {
+            query?: {
+                document_id?: number | null;
+            };
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_attach_imaging_report_api_imaging__study_id__report_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

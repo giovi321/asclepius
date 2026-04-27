@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/api/client";
-import { FileText, Trash2, X } from "lucide-react";
+import { FileText, Trash2, X, Image as ImageIcon } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
   EditableSummary, EditableFilename, OcrSection,
@@ -20,6 +20,16 @@ import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+
+// Imaging documents (legacy ``imaging_dicom`` and 0.9.6 ``imaging_report``)
+// share most of the layout but skip OCR / AI-edit features that don't
+// apply to DICOM bundles.
+function isImagingDoc(doc: any): boolean {
+  return doc?.doc_type === "imaging_dicom" || doc?.doc_type === "imaging_report";
+}
+function isImagingPlaceholder(doc: any): boolean {
+  return isImagingDoc(doc) && !doc?.file_path;
+}
 
 export default function DocumentDetailPage() {
   const { id } = useParams();
@@ -122,14 +132,25 @@ export default function DocumentDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a
-            href={`/api/documents/${id}/file`}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
-            <FileText className="h-4 w-4" /> View file
-          </a>
+          {doc.imaging_studies?.[0]?.id && (
+            <Link
+              to={`/imaging/${doc.imaging_studies[0].id}`}
+              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              title="Open the DICOM viewer for this report's imaging study"
+            >
+              <ImageIcon className="h-4 w-4" /> Imaging view
+            </Link>
+          )}
+          {doc.file_path && (
+            <a
+              href={`/api/documents/${id}/file`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              <FileText className="h-4 w-4" /> View file
+            </a>
+          )}
           {(doc.status === "processing" || doc.status === "pending") && (
             <button
               onClick={handleCancel}
@@ -161,18 +182,19 @@ export default function DocumentDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         <div className="space-y-4 min-w-0">
-          {/* Document file viewer is for PDFs / images; for DICOM bundles
-              the viewer lives inside ImagingStudiesSection (right column)
-              and the file itself is a folder, not a single file. */}
-          {doc.doc_type !== "imaging_dicom" && (
-            <DocumentViewer
-              id={id!}
-              filePath={doc.file_path}
-              originalFilename={doc.original_filename}
-              onRotate={handleRotate}
-            />
-          )}
-          {doc.doc_type === "imaging_dicom" && (
+          {/* DocumentViewer renders the PDF / image when there is one;
+              when this is an imaging_report placeholder (no file_path)
+              its imaging-aware fallback links to /imaging/:studyId. */}
+          <DocumentViewer
+            id={id!}
+            filePath={doc.file_path}
+            originalFilename={doc.original_filename}
+            onRotate={handleRotate}
+            imagingStudyId={doc.imaging_studies?.[0]?.id || null}
+          />
+          {/* For imaging documents, the DICOM viewer + bundle files
+              + linked docs live below the report viewer. */}
+          {(doc.imaging_studies?.length ?? 0) > 0 && (
             <ImagingStudiesSection studies={doc.imaging_studies || []} />
           )}
         </div>
@@ -200,7 +222,7 @@ export default function DocumentDetailPage() {
           <VaccinationsSection vaccinations={doc.vaccinations || []} />
 
           <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />
-          {doc.doc_type !== "imaging_dicom" && (
+          {!isImagingDoc(doc) && (
             <AiEditForm docId={doc.id} onApplied={() => loadDoc(false)} />
           )}
 
@@ -213,9 +235,9 @@ export default function DocumentDetailPage() {
         </div>
       </div>
 
-      {/* OCR section never has anything for DICOM bundles, so hide it
-          entirely there to keep the page tidy. */}
-      {doc.doc_type !== "imaging_dicom" && <OcrSection text={doc.ocr_text} />}
+      {/* OCR section: hide for placeholder imaging reports (no PDF, no
+          OCR text). Real PDF reports go through OCR like any document. */}
+      {!isImagingPlaceholder(doc) && <OcrSection text={doc.ocr_text} />}
     </div>
   );
 }

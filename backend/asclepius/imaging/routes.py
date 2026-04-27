@@ -97,6 +97,37 @@ async def get_imaging_study(
     return study
 
 
+async def _series_folder_with_access(
+    study_id: int,
+    series_id: int,
+    current_user: dict,
+    db: aiosqlite.Connection,
+) -> str:
+    """Resolve the series folder after enforcing patient access.
+
+    Both ``list_frames`` and ``get_frame`` need the same lookup + access
+    check. Without the access check any authenticated user could fetch
+    DICOM frames for any patient by guessing study/series IDs.
+    """
+    cursor = await db.execute(
+        """SELECT se.folder_path AS folder_path, st.patient_id AS patient_id
+           FROM imaging_series se
+           JOIN imaging_studies st ON se.study_id = st.id
+           WHERE se.id = ? AND se.study_id = ?""",
+        (series_id, study_id),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Series not found")
+
+    patient_id = row["patient_id"]
+    if patient_id:
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+    return row["folder_path"]
+
+
 @router.get("/{study_id}/series/{series_id}/frames")
 async def list_frames(
     study_id: int,
@@ -104,19 +135,13 @@ async def list_frames(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    cursor = await db.execute(
-        "SELECT folder_path FROM imaging_series WHERE id = ? AND study_id = ?",
-        (series_id, study_id),
-    )
-    series = await cursor.fetchone()
-    if not series:
-        raise HTTPException(status_code=404, detail="Series not found")
+    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
 
     config = get_config()
-    series_path = Path(config.vault.root_path) / series[0]
+    series_path = Path(config.vault.root_path) / folder
 
     if not series_path.exists():
-        return {"frames": []}
+        return {"frames": [], "count": 0}
 
     frames = sorted(
         [f.name for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
@@ -133,16 +158,12 @@ async def get_frame(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    cursor = await db.execute(
-        "SELECT folder_path FROM imaging_series WHERE id = ? AND study_id = ?",
-        (series_id, study_id),
-    )
-    series = await cursor.fetchone()
-    if not series:
-        raise HTTPException(status_code=404, detail="Series not found")
+    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
 
     config = get_config()
-    series_path = Path(config.vault.root_path) / series[0]
+    series_path = Path(config.vault.root_path) / folder
+    if not series_path.exists():
+        raise HTTPException(status_code=404, detail="Frame not found")
     frames = sorted(
         [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
     )

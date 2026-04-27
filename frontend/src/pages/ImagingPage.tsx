@@ -68,10 +68,10 @@ export default function ImagingPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">
-                      {study.modality} — {study.body_part || "Unknown"}
+                      {study.modality || "Imaging"} - {study.body_part || "Unknown"}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {study.study_date} | {study.institution_name || "—"}
+                      {study.study_date || "Unknown date"} | {study.institution_name || "Unknown institution"}
                     </p>
                     {study.study_description && (
                       <p className="text-xs text-muted-foreground">{study.study_description}</p>
@@ -91,20 +91,20 @@ export default function ImagingPage() {
         {selectedStudy && (
           <div className="rounded-lg border p-4">
             <h3 className="mb-3 font-medium">
-              {selectedStudy.modality} — {selectedStudy.study_description || "Study Detail"}
+              {selectedStudy.modality || "Imaging"} - {selectedStudy.study_description || "Study Detail"}
             </h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{selectedStudy.study_date}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Modality</span><span>{selectedStudy.modality}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Body Part</span><span>{selectedStudy.body_part || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Institution</span><span>{selectedStudy.institution_name || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Referring</span><span>{selectedStudy.referring_physician || "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{selectedStudy.study_date || "Unknown"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Modality</span><span>{selectedStudy.modality || "Unknown"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Body Part</span><span>{selectedStudy.body_part || "Unknown"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Institution</span><span>{selectedStudy.institution_name || "Unknown"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Referring</span><span>{selectedStudy.referring_physician || "Unknown"}</span></div>
             </div>
 
             {selectedStudy.series?.length > 0 && (
               <div className="mt-4">
                 <h4 className="mb-2 font-medium">Series</h4>
-                {selectedStudy.series.map((s: any) => (
+                {selectedStudy.series.map((s: any, idx: number) => (
                   <button
                     key={s.id}
                     onClick={() => setViewingSeries({ studyId: selectedStudy.id, seriesId: s.id })}
@@ -112,7 +112,9 @@ export default function ImagingPage() {
                       viewingSeries?.seriesId === s.id ? "bg-primary/5 text-primary" : ""
                     }`}
                   >
-                    <span>Series {s.series_number}: {s.series_description || s.modality}</span>
+                    <span>
+                      Series {s.series_number ?? idx + 1}: {s.series_description || s.modality || "Untitled"}
+                    </span>
                     <span className="text-muted-foreground">{s.num_images} images</span>
                   </button>
                 ))}

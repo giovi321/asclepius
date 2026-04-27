@@ -131,6 +131,32 @@ async def process_dicom(
     dest = vault_root / relative_path
     dest.parent.mkdir(parents=True, exist_ok=True)
 
+    # Compute file hash for deduplication. If this exact frame is already
+    # ingested (re-uploaded zip, replayed inbox), skip the rest of the
+    # bookkeeping so num_images counters do not inflate.
+    try:
+        file_hash = compute_file_hash(str(path))
+        file_size = os.path.getsize(str(path))
+    except OSError:
+        logger.exception("Could not stat DICOM file %s", path.name)
+        patient_hint_path.unlink(missing_ok=True)
+        event_hint_path.unlink(missing_ok=True)
+        return None
+
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE file_hash = ?", (file_hash,),
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        logger.info(
+            "DICOM frame %s already ingested as doc=%d, skipping",
+            path.name, existing[0],
+        )
+        path.unlink(missing_ok=True)
+        patient_hint_path.unlink(missing_ok=True)
+        event_hint_path.unlink(missing_ok=True)
+        return existing[0]
+
     shutil.copy2(str(path), str(dest))
     path.unlink()
 
@@ -138,16 +164,18 @@ async def process_dicom(
     cursor = await db.execute(
         """INSERT INTO documents
            (patient_id, event_id, file_path, original_filename, doc_type, event_date,
-            doctor_id, facility_id, status, ocr_engine, ocr_text)
-           VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, 'done', 'dicom', ?)""",
+            doctor_id, facility_id, file_hash, file_size,
+            status, ocr_engine, ocr_text)
+           VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, ?, ?, 'done', 'dicom', ?)""",
         (patient_id, hinted_event_id, relative_path, path.name, study_date,
-         doctor_id, facility_id,
+         doctor_id, facility_id, file_hash, file_size,
          f"DICOM: {modality} {body_part} {study_desc}"),
     )
     doc_id = cursor.lastrowid
 
     # Create or find imaging study
-    study_id = None
+    study_id: int | None = None
+    study_is_new = False
     if study_uid:
         cursor = await db.execute(
             "SELECT id FROM imaging_studies WHERE study_instance_uid = ?", (study_uid,)
@@ -155,13 +183,16 @@ async def process_dicom(
         row = await cursor.fetchone()
         if row:
             study_id = row[0]
-            # Update counts
+            # Bump the image counter on the existing study row. ``num_series``
+            # is updated below only when the SERIES is new — never bump it
+            # here unconditionally (a 35-frame, 1-series study would
+            # otherwise report num_series=35).
             await db.execute(
                 "UPDATE imaging_studies SET num_images = num_images + 1 WHERE id = ?",
                 (study_id,),
             )
 
-    if not study_id:
+    if study_id is None:
         cursor = await db.execute(
             """INSERT INTO imaging_studies
                (document_id, patient_id, doctor_id, facility_id,
@@ -176,12 +207,23 @@ async def process_dicom(
              base_path),
         )
         study_id = cursor.lastrowid
+        study_is_new = True
 
-    # Create or find imaging series
-    cursor = await db.execute(
-        "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid = ?",
-        (study_id, series_uid),
-    )
+    # Create or find imaging series. Match on series_instance_uid when
+    # present; fall back to (study_id, series_number) when the DICOM lacks
+    # a SeriesInstanceUID — otherwise every frame would create its own
+    # series row because ``WHERE series_instance_uid = NULL`` never matches.
+    if series_uid:
+        cursor = await db.execute(
+            "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid = ?",
+            (study_id, series_uid),
+        )
+    else:
+        cursor = await db.execute(
+            "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid IS NULL "
+            "AND COALESCE(series_number, -1) = COALESCE(?, -1)",
+            (study_id, series_number),
+        )
     row = await cursor.fetchone()
     if row:
         await db.execute(
@@ -197,6 +239,14 @@ async def process_dicom(
             (study_id, series_number, series_desc, modality,
              series_uid, f"{base_path}/{series_folder}"),
         )
+        # First frame of a brand-new series under an EXISTING study — bump
+        # the parent's series counter. For a brand-new study the counter
+        # already starts at 1, so do not double-count.
+        if not study_is_new:
+            await db.execute(
+                "UPDATE imaging_studies SET num_series = num_series + 1 WHERE id = ?",
+                (study_id,),
+            )
 
     await db.commit()
     # Clean up sidecars now that the file has been ingested.

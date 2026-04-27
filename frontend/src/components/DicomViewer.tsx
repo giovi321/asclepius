@@ -8,17 +8,16 @@ interface DicomViewerProps {
 }
 
 /**
- * DICOM viewer using Cornerstone.js.
- * Falls back to frame-by-frame image display if Cornerstone fails to initialize.
+ * Frame-by-frame DICOM viewer. The backend renders each frame to PNG on
+ * demand at /api/imaging/{study}/series/{series}/frame/{i}, so the browser
+ * just shows an <img> and we paginate with keyboard / wheel / slider.
  */
 export default function DicomViewer({ studyId, seriesId }: DicomViewerProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const [, setFrames] = useState<string[]>([]);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [totalFrames, setTotalFrames] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [, setCornerstoneReady] = useState(false);
 
   // Load frame list
   useEffect(() => {
@@ -27,7 +26,6 @@ export default function DicomViewer({ studyId, seriesId }: DicomViewerProps) {
     api
       .get(`/imaging/${studyId}/series/${seriesId}/frames`)
       .then((res) => {
-        setFrames(res.data.frames || []);
         setTotalFrames(res.data.count || 0);
         setCurrentFrame(0);
         setLoading(false);
@@ -37,24 +35,6 @@ export default function DicomViewer({ studyId, seriesId }: DicomViewerProps) {
         setLoading(false);
       });
   }, [studyId, seriesId]);
-
-  // Try to initialize Cornerstone.js
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const cornerstone = await import("@cornerstonejs/core");
-        await cornerstone.init();
-        if (mounted) setCornerstoneReady(true);
-      } catch {
-        // Cornerstone not available — use fallback viewer
-        if (mounted) setCornerstoneReady(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   // Keyboard navigation
   useEffect(() => {

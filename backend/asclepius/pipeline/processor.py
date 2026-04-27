@@ -94,6 +94,14 @@ async def process_file(file_path: str, config: AppConfig) -> None:
     pipeline_status["processing_pages"] = None
     pipeline_status["processing_page_current"] = None
     pipeline_status["queue_depth"] = max(0, pipeline_status["queue_depth"] - 1)
+    # Pop this file out of the visible queued list so the topbar reflects
+    # the new processing target (which is shown via "processing", not the
+    # queue list).
+    queued_files = pipeline_status.get("queued_files") or []
+    for i, entry in enumerate(queued_files):
+        if entry.get("filename") == path.name:
+            del queued_files[i]
+            break
 
     logger.info("Processing: %s", path.name)
 

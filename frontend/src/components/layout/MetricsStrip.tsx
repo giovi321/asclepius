@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
-import { FileText, Brain, Eye, ScanText } from "lucide-react";
+import { FileText, Brain, Eye, ScanText, Activity } from "lucide-react";
 
 type ChipSpec = {
   key: string;
@@ -78,7 +78,38 @@ export default function MetricsStrip() {
     });
   }
 
-  if (chips.length === 0) return null;
+  // Always-visible idle chip. Without this the topbar goes blank between
+  // processing ticks (a fast-burst zip upload only flashes the file chip
+  // for a few hundred ms each) and looks broken even though the pipeline
+  // is busy. The chip summarises queue depth, total processed, and the
+  // last file the worker finished, so the user has a continuous "what is
+  // the system doing" indicator even when no LLM/OCR is active.
+  if (chips.length === 0) {
+    const queue = status.queue_depth || 0;
+    const total = status.total_processed || 0;
+    const last = status.last_processed;
+    let label: string;
+    let cardSubtitle: string | undefined;
+    if (queue > 0) {
+      label = `Pipeline: ${queue} queued`;
+      cardSubtitle = last ? `Last: ${last}` : undefined;
+    } else if (status.watcher_active === false) {
+      label = "Pipeline: stopped";
+    } else {
+      label = total > 0 ? `Pipeline: idle (${total} processed)` : "Pipeline: idle";
+      cardSubtitle = last ? `Last: ${last}` : undefined;
+    }
+    chips.push({
+      key: "pipeline-idle",
+      icon: Activity,
+      label,
+      cardTitle: "Pipeline status",
+      cardSubtitle,
+      colorClass: status.watcher_active === false
+        ? "text-muted-foreground bg-muted/40 border-muted"
+        : "text-muted-foreground bg-muted/30 border-muted/60 hover:bg-muted/50",
+    });
+  }
 
   return (
     <div className="flex items-center justify-end gap-2 whitespace-nowrap min-w-0 max-w-full">

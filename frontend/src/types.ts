@@ -114,6 +114,7 @@ export interface PipelineStatus {
   processing_page_current: number | null;
   total_processed: number;
   total_errors: number;
+  last_processed: string | null;
   recent_errors: { file: string; error: string }[];
   queued_files: { filename: string; size: number }[];
   watcher_active: boolean;

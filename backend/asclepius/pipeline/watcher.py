@@ -46,11 +46,30 @@ class InboxHandler(FileSystemEventHandler):
             return
 
         logger.info("New file detected: %s", path.name)
-        # Delay to let file finish writing (especially for large uploads)
-        import time
-        time.sleep(2)
 
-        # Verify file still exists and is not being written
+        # Wait for the file to finish being written. The previous code slept
+        # a flat 2 s; for files extracted from a zip the writer has already
+        # closed by the time the create event fires, so a size-stability
+        # poll usually exits in ~200 ms. Cap the total wait at 2 s so a
+        # genuinely slow uploader still works.
+        import time
+        deadline = time.monotonic() + 2.0
+        prev_size = -1
+        while time.monotonic() < deadline:
+            if not path.exists():
+                logger.warning("File disappeared before processing: %s", path.name)
+                return
+            try:
+                cur_size = path.stat().st_size
+            except OSError:
+                time.sleep(0.05)
+                continue
+            if cur_size > 0 and cur_size == prev_size:
+                break
+            prev_size = cur_size
+            time.sleep(0.1)
+
+        # Final existence check after the wait loop.
         if not path.exists():
             logger.warning("File disappeared before processing: %s", path.name)
             return
@@ -60,6 +79,20 @@ class InboxHandler(FileSystemEventHandler):
             file_size = os.path.getsize(src_path)
         except OSError:
             file_size = 0
+
+        # Reflect the new queue entry in pipeline_status so the topbar
+        # shows a non-zero queue depth between processing ticks. Without
+        # this the counter only ever decrements (in process_file) and
+        # stays clamped at 0 forever.
+        from asclepius.pipeline.processor import pipeline_status
+        pipeline_status["queue_depth"] = pipeline_status.get("queue_depth", 0) + 1
+        queued_files = pipeline_status.setdefault("queued_files", [])
+        queued_files.append({"filename": path.name, "size": file_size})
+        # Cap the visible list so a 1000-file zip doesn't grow the snapshot
+        # without bound; the depth counter is the source of truth.
+        if len(queued_files) > 50:
+            del queued_files[: len(queued_files) - 50]
+
         self.queue.put((file_size, str(path)))
 
     def on_created(self, event: FileCreatedEvent) -> None:

@@ -608,6 +608,103 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             _code_updates, _code_skipped,
         )
 
+    # One-doc-per-imaging-study migration. The pre-0.9.5 ingest created a
+    # documents row per DICOM frame (35 docs for a 35-frame ultrasound
+    # study) and one per zip-member bundle file (DICOMDIR, JPEG previews,
+    # LOCKFILE, VERSION). The new model is one canonical document per
+    # study; bundle files live on disk under imaging-bundles/ but are not
+    # separate documents. This migration collapses existing data:
+    #   1. for each imaging_studies row, keep the documents row that
+    #      study.document_id points to and rewrite its file_path to the
+    #      study folder + file_hash to the deterministic
+    #      ``asclepius-imaging-study:{uid_or_path}`` hash;
+    #   2. delete every other ``doc_type='imaging_dicom'`` row whose
+    #      file_path lives under that study's folder (the per-frame dupes);
+    #   3. delete every ``doc_type='unknown_binary'`` row that lives under
+    #      ``imaging-bundles/`` (the per-bundle-file dupes).
+    # Idempotent — re-running finds no rows to collapse and leaves
+    # already-cleaned canonical rows untouched.
+    import hashlib as _hashlib
+    cursor = await db.execute(
+        "SELECT id, document_id, study_instance_uid, folder_path FROM imaging_studies"
+    )
+    studies_for_collapse = await cursor.fetchall()
+    _collapsed_frames = 0
+    _collapsed_bundles = 0
+    _rewritten_docs = 0
+    for srow in studies_for_collapse:
+        study_id = srow[0]
+        canonical_doc_id = srow[1]
+        study_uid = srow[2]
+        folder_path = srow[3]
+        if not folder_path or not canonical_doc_id:
+            continue
+        # 1. Rewrite the canonical document's identifying fields.
+        study_key = study_uid or folder_path
+        study_doc_hash = _hashlib.sha256(
+            f"asclepius-imaging-study:{study_key}".encode("utf-8")
+        ).hexdigest()
+        study_folder_basename = folder_path.rsplit("/", 1)[-1] or folder_path
+        # Only rewrite if not already in the new shape (file_path == folder
+        # path AND file_hash == deterministic hash). Avoids unnecessary
+        # writes on idempotent re-run.
+        cursor = await db.execute(
+            "SELECT file_path, file_hash FROM documents WHERE id = ?",
+            (canonical_doc_id,),
+        )
+        cur_row = await cursor.fetchone()
+        if cur_row is not None and (
+            cur_row[0] != folder_path or cur_row[1] != study_doc_hash
+        ):
+            try:
+                await db.execute(
+                    """UPDATE documents
+                       SET file_path = ?, original_filename = ?, file_hash = ?,
+                           doc_type = 'imaging_dicom'
+                       WHERE id = ?""",
+                    (folder_path, study_folder_basename, study_doc_hash,
+                     canonical_doc_id),
+                )
+                _rewritten_docs += 1
+            except aiosqlite.IntegrityError:
+                # Another row already holds the deterministic hash (e.g. the
+                # migration was interrupted halfway). Skip — the duplicate
+                # frame rows below will get cleaned up regardless.
+                pass
+
+        # 2. Delete the per-frame documents whose file_path lives under
+        # this study's folder, except the canonical one.
+        await db.execute(
+            """DELETE FROM documents
+               WHERE doc_type = 'imaging_dicom'
+                 AND id != ?
+                 AND file_path LIKE ?""",
+            (canonical_doc_id, folder_path + "/%"),
+        )
+        _collapsed_frames += (await (await db.execute(
+            "SELECT changes()"
+        )).fetchone())[0]
+
+    # 3. Drop bundle-file documents wholesale; the files stay on disk and
+    # are now served via the imaging bundle-files endpoint.
+    await db.execute(
+        """DELETE FROM documents
+           WHERE doc_type = 'unknown_binary'
+             AND (file_path LIKE 'patients/%/imaging-bundles/%'
+                  OR file_path LIKE 'unclassified/imaging-bundles/%')"""
+    )
+    _collapsed_bundles = (await (await db.execute(
+        "SELECT changes()"
+    )).fetchone())[0]
+
+    if _rewritten_docs or _collapsed_frames or _collapsed_bundles:
+        await db.commit()
+        logger.info(
+            "Migration: collapsed imaging documents — rewrote %d canonical, "
+            "removed %d per-frame + %d bundle-file rows",
+            _rewritten_docs, _collapsed_frames, _collapsed_bundles,
+        )
+
     # Imaging-series cleanup. Two historical bugs corrupted the imaging
     # tables for any study ingested before the dicom_ingest fix:
     #   1. Frames whose DICOM file had no SeriesInstanceUID each created

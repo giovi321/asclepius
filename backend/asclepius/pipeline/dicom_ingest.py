@@ -1,5 +1,6 @@
 """DICOM file processing and metadata extraction."""
 
+import hashlib
 import json
 import logging
 import os
@@ -12,6 +13,34 @@ from asclepius.config import AppConfig
 from asclepius.documents.service import compute_file_hash
 
 logger = logging.getLogger(__name__)
+
+
+def parse_dicom_pn(raw: str) -> str:
+    """Convert DICOM Person Name (PN) syntax to a plain "First Last" string.
+
+    DICOM PN is ``Family^Given^Middle^Prefix^Suffix`` (each component is
+    optional; the caret separators are mandatory). pydicom returns the raw
+    string verbatim, so a name like ``WUILLERET^GUILLAUME^^DR. MED.^DR. MED.``
+    ends up stored exactly that way unless we parse it. We assemble
+    ``Given Middle Family`` (the natural Western order), drop the prefix /
+    suffix components (titles like "Dr. med." are handled by
+    ``strip_doctor_title`` later), and return an empty string when the
+    parse yields nothing.
+    """
+    if not raw:
+        return ""
+    # Some scanners use multiple `=` separators for ideographic / phonetic
+    # forms ("Alphabetic=Ideographic=Phonetic"). We only care about the
+    # alphabetic component (the first one).
+    raw = raw.split("=", 1)[0]
+    if "^" not in raw:
+        return raw.strip()
+    parts = raw.split("^")
+    # Pad to 5 components so indexing is safe regardless of trailing carets.
+    parts += [""] * (5 - len(parts))
+    family, given, middle = parts[0].strip(), parts[1].strip(), parts[2].strip()
+    pieces = [p for p in (given, middle, family) if p]
+    return " ".join(pieces)
 
 
 async def process_dicom(
@@ -61,14 +90,17 @@ async def process_dicom(
         event_hint_path.unlink(missing_ok=True)
         return None
 
-    # Extract metadata
-    patient_name = str(getattr(ds, "PatientName", "")) or None
+    # Extract metadata. PatientName and ReferringPhysicianName arrive in
+    # DICOM PN syntax (Family^Given^Middle^Prefix^Suffix); convert them to
+    # the natural "Given Family" form before downstream entity matching
+    # treats them as plain strings.
+    patient_name = parse_dicom_pn(str(getattr(ds, "PatientName", ""))) or None
     study_date_raw = str(getattr(ds, "StudyDate", "")) or None
     modality = str(getattr(ds, "Modality", "")) or None
     body_part = str(getattr(ds, "BodyPartExamined", "")) or None
     study_desc = str(getattr(ds, "StudyDescription", "")) or None
     institution = str(getattr(ds, "InstitutionName", "")) or None
-    referring = str(getattr(ds, "ReferringPhysicianName", "")) or None
+    referring = parse_dicom_pn(str(getattr(ds, "ReferringPhysicianName", ""))) or None
     accession = str(getattr(ds, "AccessionNumber", "")) or None
     study_uid = str(getattr(ds, "StudyInstanceUID", "")) or None
     series_uid = str(getattr(ds, "SeriesInstanceUID", "")) or None
@@ -99,11 +131,18 @@ async def process_dicom(
         from asclepius.pipeline.extractor import _upsert_facility
         facility_id = await _upsert_facility(db, {"name": institution, "type": "imaging_center"})
 
-    # Upsert doctor from referring physician
+    # Upsert doctor from referring physician. Strip honorific titles ("Dr.",
+    # "Dr. med.") and normalise capitalisation so the doctor table holds the
+    # raw person name only — matches the pattern used by the OCR/LLM path.
     doctor_id = None
     if referring:
         from asclepius.pipeline.extractor import _upsert_doctor
-        doctor_id = await _upsert_doctor(db, {"name": referring}, facility_id)
+        from asclepius.pipeline.entity_matching import (
+            strip_doctor_title, normalize_name,
+        )
+        cleaned = normalize_name(strip_doctor_title(referring))
+        if cleaned:
+            doctor_id = await _upsert_doctor(db, {"name": cleaned}, facility_id)
 
     # Determine destination path
     from asclepius.patients.service import slugify
@@ -131,47 +170,58 @@ async def process_dicom(
     dest = vault_root / relative_path
     dest.parent.mkdir(parents=True, exist_ok=True)
 
-    # Compute file hash for deduplication. If this exact frame is already
-    # ingested (re-uploaded zip, replayed inbox), skip the rest of the
-    # bookkeeping so num_images counters do not inflate.
     try:
-        file_hash = compute_file_hash(str(path))
-        file_size = os.path.getsize(str(path))
+        frame_size = os.path.getsize(str(path))
     except OSError:
         logger.exception("Could not stat DICOM file %s", path.name)
         patient_hint_path.unlink(missing_ok=True)
         event_hint_path.unlink(missing_ok=True)
         return None
 
-    cursor = await db.execute(
-        "SELECT id FROM documents WHERE file_hash = ?", (file_hash,),
+    # Idempotent re-ingest: a frame that is already at its destination with
+    # the same byte count was almost certainly written by a previous run of
+    # this pipeline (re-uploaded zip, replayed inbox). Skip the counter
+    # bumps so num_images does not inflate on repeat ingest.
+    frame_already_ingested = (
+        dest.exists() and dest.stat().st_size == frame_size
     )
-    existing = await cursor.fetchone()
-    if existing:
-        logger.info(
-            "DICOM frame %s already ingested as doc=%d, skipping",
-            path.name, existing[0],
+
+    # Deterministic ``file_hash`` for the documents row. We model an imaging
+    # study as ONE document (regardless of how many frames it carries), so
+    # subsequent frames must find the same row instead of creating a new
+    # one. Hashing the StudyInstanceUID gives a stable key; for the rare
+    # case where a DICOM file has no UID we fall back to a hash of the
+    # study folder, which is also unique per study.
+    study_key = study_uid or base_path
+    study_doc_hash = hashlib.sha256(
+        f"asclepius-imaging-study:{study_key}".encode("utf-8")
+    ).hexdigest()
+    study_folder_basename = base_path.rsplit("/", 1)[-1]
+
+    if not frame_already_ingested:
+        shutil.copy2(str(path), str(dest))
+    path.unlink(missing_ok=True)
+
+    # Find or create the canonical document row for this study. The first
+    # frame creates it; every subsequent frame just looks it up.
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE file_hash = ?", (study_doc_hash,),
+    )
+    existing_doc = await cursor.fetchone()
+    if existing_doc:
+        doc_id = existing_doc[0]
+    else:
+        cursor = await db.execute(
+            """INSERT INTO documents
+               (patient_id, event_id, file_path, original_filename, doc_type, event_date,
+                doctor_id, facility_id, file_hash, file_size,
+                status, ocr_engine, ocr_text)
+               VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, ?, 0, 'done', 'dicom', ?)""",
+            (patient_id, hinted_event_id, base_path, study_folder_basename,
+             study_date, doctor_id, facility_id, study_doc_hash,
+             f"DICOM: {modality or ''} {body_part or ''} {study_desc or ''}".strip()),
         )
-        path.unlink(missing_ok=True)
-        patient_hint_path.unlink(missing_ok=True)
-        event_hint_path.unlink(missing_ok=True)
-        return existing[0]
-
-    shutil.copy2(str(path), str(dest))
-    path.unlink()
-
-    # Create document record
-    cursor = await db.execute(
-        """INSERT INTO documents
-           (patient_id, event_id, file_path, original_filename, doc_type, event_date,
-            doctor_id, facility_id, file_hash, file_size,
-            status, ocr_engine, ocr_text)
-           VALUES (?, ?, ?, ?, 'imaging_dicom', ?, ?, ?, ?, ?, 'done', 'dicom', ?)""",
-        (patient_id, hinted_event_id, relative_path, path.name, study_date,
-         doctor_id, facility_id, file_hash, file_size,
-         f"DICOM: {modality} {body_part} {study_desc}"),
-    )
-    doc_id = cursor.lastrowid
+        doc_id = cursor.lastrowid
 
     # Create or find imaging study
     study_id: int | None = None
@@ -183,14 +233,15 @@ async def process_dicom(
         row = await cursor.fetchone()
         if row:
             study_id = row[0]
-            # Bump the image counter on the existing study row. ``num_series``
-            # is updated below only when the SERIES is new — never bump it
-            # here unconditionally (a 35-frame, 1-series study would
-            # otherwise report num_series=35).
-            await db.execute(
-                "UPDATE imaging_studies SET num_images = num_images + 1 WHERE id = ?",
-                (study_id,),
-            )
+            # Bump the image counter on the existing study row only for
+            # FIRST-TIME frames — never on a repeat-ingest of an existing
+            # frame. ``num_series`` is updated below when a NEW series row
+            # appears.
+            if not frame_already_ingested:
+                await db.execute(
+                    "UPDATE imaging_studies SET num_images = num_images + 1 WHERE id = ?",
+                    (study_id,),
+                )
 
     if study_id is None:
         cursor = await db.execute(
@@ -226,10 +277,12 @@ async def process_dicom(
         )
     row = await cursor.fetchone()
     if row:
-        await db.execute(
-            "UPDATE imaging_series SET num_images = num_images + 1 WHERE id = ?",
-            (row[0],),
-        )
+        # Only bump per-series image counter for FIRST-TIME frames.
+        if not frame_already_ingested:
+            await db.execute(
+                "UPDATE imaging_series SET num_images = num_images + 1 WHERE id = ?",
+                (row[0],),
+            )
     else:
         await db.execute(
             """INSERT INTO imaging_series
@@ -264,11 +317,11 @@ async def process_zip_member(
     """Store a non-DICOM file extracted from a zip upload.
 
     Used for DICOMDIR manifests, JPEG previews, LOCKFILE, VERSION and any
-    other bundle bookkeeping the user wants kept alongside the imaging
-    study. We do not OCR or LLM-process them — they are filed under
-    ``imaging-bundles/{zip_stem}/`` next to the patient (or unclassified)
-    and the original filename is restored from the sidecar so e.g.
-    ``DICOMDIR.bin`` is saved back as ``DICOMDIR``.
+    other bundle bookkeeping kept alongside the imaging study. These files
+    are NOT given their own ``documents`` row (one DICOM bundle = one
+    document; the DICOM frames already cover that) — they live on disk
+    under ``imaging-bundles/{zip_stem}/`` and the imaging detail UI lists
+    them via a dedicated bundle-files endpoint.
     """
     path = Path(file_path)
     sidecar_path = Path(str(path) + ".zip_member")
@@ -339,25 +392,16 @@ async def process_zip_member(
 
     relative_path = f"{relative_dir}/{dest.name}"
 
-    try:
-        file_hash = compute_file_hash(str(path))
-        file_size = os.path.getsize(str(path))
-    except OSError:
-        logger.exception("Could not stat zip member %s", path.name)
-        return None
-
-    # Dedup: if this exact file already exists as a document, skip.
-    cursor = await db.execute(
-        "SELECT id FROM documents WHERE file_hash = ?", (file_hash,)
-    )
-    existing = await cursor.fetchone()
-    if existing:
-        logger.info("Zip member %s already ingested as doc=%d, skipping", path.name, existing[0])
+    # Bundle files are NOT given a documents row; they belong to the
+    # parent imaging study and are listed via the imaging detail UI.
+    # The destination still needs a stable copy on disk so the UI can
+    # serve them (e.g. JPEG previews next to the DICOM frames).
+    if dest.exists():
         path.unlink(missing_ok=True)
         sidecar_path.unlink(missing_ok=True)
         patient_hint_path.unlink(missing_ok=True)
         event_hint_path.unlink(missing_ok=True)
-        return existing[0]
+        return None
 
     shutil.copy2(str(path), str(dest))
     path.unlink(missing_ok=True)
@@ -365,22 +409,5 @@ async def process_zip_member(
     patient_hint_path.unlink(missing_ok=True)
     event_hint_path.unlink(missing_ok=True)
 
-    cursor = await db.execute(
-        """INSERT INTO documents
-           (patient_id, event_id, file_path, original_filename, doc_type,
-            file_hash, file_size, status, ocr_engine, summary_en)
-           VALUES (?, ?, ?, ?, 'unknown_binary', ?, ?, 'done', 'none', ?)""",
-        (
-            patient_id,
-            event_id,
-            relative_path,
-            safe_original,
-            file_hash,
-            file_size,
-            f"Imaging bundle file: {safe_original} (from {zip_stem})",
-        ),
-    )
-    doc_id = cursor.lastrowid
-    await db.commit()
-    logger.info("Zip member stored: doc=%d %s", doc_id, relative_path)
-    return doc_id
+    logger.info("Zip member stored: %s", relative_path)
+    return None

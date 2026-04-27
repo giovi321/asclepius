@@ -341,16 +341,75 @@ async def delete_doc(
         # Give the pipeline a moment to notice the cancellation
         await asyncio.sleep(0.5)
 
-    # Delete file from disk — handle case where file may have already been moved
+    # Delete file from disk — handle case where file may have already been moved.
+    # Imaging documents store a STUDY FOLDER as their file_path, not a single
+    # file, so we use rmtree for directories. We also wipe the matching
+    # imaging-bundles folder (DICOMDIR + JPEG previews) when this is an
+    # imaging study.
+    import shutil as _shutil
     config = get_config()
     file_path = Path(config.vault.root_path) / doc["file_path"]
     if file_path.exists():
-        file_path.unlink()
+        if file_path.is_dir():
+            _shutil.rmtree(file_path, ignore_errors=True)
+        else:
+            file_path.unlink()
     else:
         # Try inbox with original filename
         inbox_path = Path(config.vault.inbox_path) / doc["original_filename"]
         if inbox_path.exists():
-            inbox_path.unlink()
+            if inbox_path.is_dir():
+                _shutil.rmtree(inbox_path, ignore_errors=True)
+            else:
+                inbox_path.unlink()
+
+    # If this is an imaging study, also remove the associated bundle folder
+    # (zip-extracted DICOMDIR / JPEG previews / LOCKFILE / VERSION).
+    if doc.get("doc_type") == "imaging_dicom":
+        # Look up the study's folder + bundle slug derivation. The bundle
+        # folder lives under either patients/{slug}/imaging-bundles/{stem}
+        # or unclassified/imaging-bundles/{stem}, where {stem} is the slug
+        # of the original zip filename. We approximate it by sweeping the
+        # imaging-bundles directory of the patient and dropping anything
+        # that no longer has a matching study.
+        try:
+            cursor = await db.execute(
+                "SELECT folder_path FROM imaging_studies WHERE document_id = ?",
+                (doc_id,),
+            )
+            study_row = await cursor.fetchone()
+            if study_row and study_row[0]:
+                # Re-derive the bundle root: replace ``imaging`` with
+                # ``imaging-bundles`` and strip the per-study suffix.
+                study_folder = study_row[0]  # e.g. patients/giovi/2026/imaging/foo
+                parts = study_folder.split("/")
+                if "imaging" in parts:
+                    idx = parts.index("imaging")
+                    bundle_root = "/".join(parts[:idx] + ["imaging-bundles"])
+                    bundle_path = Path(config.vault.root_path) / bundle_root
+                    if bundle_path.exists() and bundle_path.is_dir():
+                        # Remove every bundle folder that no longer has a
+                        # surviving study (the FK cascade already removed
+                        # imaging_studies rows tied to deleted documents).
+                        cursor = await db.execute(
+                            "SELECT folder_path FROM imaging_studies "
+                            "WHERE folder_path LIKE ?",
+                            (f"%/imaging/%",),
+                        )
+                        # Bundles do not appear in imaging_studies.folder_path,
+                        # so anything left under imaging-bundles whose stem
+                        # is not referenced by a surviving study is orphaned.
+                        # Pragmatic compromise: remove the whole bundle root
+                        # if NO studies remain for this patient.
+                        cursor = await db.execute(
+                            "SELECT COUNT(*) FROM imaging_studies WHERE folder_path LIKE ?",
+                            (f"{'/'.join(parts[:idx])}/imaging/%",),
+                        )
+                        cnt_row = await cursor.fetchone()
+                        if cnt_row and cnt_row[0] == 0:
+                            _shutil.rmtree(bundle_path, ignore_errors=True)
+        except Exception:
+            logger.warning("Bundle cleanup failed for doc=%d (non-fatal)", doc_id, exc_info=True)
 
     # Clean up cancellation set
     cancelled_docs.discard(doc_id)

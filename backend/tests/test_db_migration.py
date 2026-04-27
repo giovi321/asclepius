@@ -164,6 +164,150 @@ async def test_legacy_db_upgrade_is_idempotent(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_imaging_one_doc_per_study_migration(tmp_path: Path) -> None:
+    """The 0.9.5 model is "one documents row per imaging study". Existing
+    pre-0.9.5 databases have N documents per study (one per DICOM frame)
+    plus M ``unknown_binary`` rows for zip-member bundle files. The
+    migration must:
+
+      1. keep the canonical document (the one ``imaging_studies.document_id``
+         points to), rewrite its ``file_path`` to the study folder and its
+         ``file_hash`` to ``asclepius-imaging-study:{uid_or_path}`` SHA-256;
+      2. delete the per-frame duplicate ``imaging_dicom`` rows;
+      3. delete the per-bundle-file ``unknown_binary`` rows.
+
+    Idempotent — running init twice produces no further changes.
+    """
+    import hashlib
+
+    db_path = tmp_path / "imaging-collapse.sqlite"
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        cur = conn.execute(
+            "INSERT INTO patients (slug, display_name) VALUES ('giovi', 'Giovi')"
+        )
+        patient_id = cur.lastrowid
+
+        # Canonical document — the one imaging_studies.document_id will point at.
+        cur = conn.execute(
+            """INSERT INTO documents (patient_id, file_path, original_filename,
+                                       doc_type, status, ocr_engine, file_hash)
+               VALUES (?, 'patients/giovi/imaging/foo/series-1/I1000000.dcm',
+                       'I1000000.dcm', 'imaging_dicom', 'done', 'dicom', 'frame-hash-a')""",
+            (patient_id,),
+        )
+        canonical_doc = cur.lastrowid
+
+        # Two extra per-frame docs that the migration should delete.
+        for n in (1, 2):
+            conn.execute(
+                """INSERT INTO documents (patient_id, file_path, original_filename,
+                                           doc_type, status, ocr_engine, file_hash)
+                   VALUES (?, ?, ?, 'imaging_dicom', 'done', 'dicom', ?)""",
+                (
+                    patient_id,
+                    f"patients/giovi/imaging/foo/series-1/I100000{n}.dcm",
+                    f"I100000{n}.dcm",
+                    f"frame-hash-{n}",
+                ),
+            )
+
+        # Bundle-file rows that the migration should delete.
+        for n in (1, 2, 3):
+            conn.execute(
+                """INSERT INTO documents (patient_id, file_path, original_filename,
+                                           doc_type, status, ocr_engine, file_hash)
+                   VALUES (?, ?, ?, 'unknown_binary', 'done', 'none', ?)""",
+                (
+                    patient_id,
+                    f"patients/giovi/imaging-bundles/foo/preview_{n}.jpg",
+                    f"preview_{n}.jpg",
+                    f"bundle-hash-{n}",
+                ),
+            )
+
+        # Unrelated document that must NOT be touched by the migration.
+        conn.execute(
+            """INSERT INTO documents (patient_id, file_path, original_filename,
+                                       doc_type, status, ocr_engine, file_hash)
+               VALUES (?, 'patients/giovi/2024/labs/cbc.pdf', 'cbc.pdf',
+                       'lab_report', 'done', 'tesseract', 'unrelated-hash')""",
+            (patient_id,),
+        )
+
+        cur = conn.execute(
+            """INSERT INTO imaging_studies
+               (document_id, patient_id, modality, num_series, num_images,
+                is_dicom, study_instance_uid, folder_path)
+               VALUES (?, ?, 'US', 1, 3, 1, '1.2.3.STUDY-UID',
+                       'patients/giovi/imaging/foo')""",
+            (canonical_doc, patient_id),
+        )
+        study_id = cur.lastrowid
+        conn.execute(
+            """INSERT INTO imaging_series
+               (study_id, series_number, modality, num_images,
+                series_instance_uid, folder_path)
+               VALUES (?, 1, 'US', 3, '1.2.3.SERIES-UID',
+                       'patients/giovi/imaging/foo/series-1')""",
+            (study_id,),
+        )
+        conn.commit()
+
+    # Run init: the migration block runs.
+    await initialize_database(str(db_path))
+
+    expected_hash = hashlib.sha256(
+        b"asclepius-imaging-study:1.2.3.STUDY-UID"
+    ).hexdigest()
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        # Canonical doc rewritten.
+        canon = conn.execute(
+            "SELECT file_path, original_filename, file_hash FROM documents WHERE id = ?",
+            (canonical_doc,),
+        ).fetchone()
+        assert canon is not None
+        assert canon["file_path"] == "patients/giovi/imaging/foo"
+        assert canon["original_filename"] == "foo"
+        assert canon["file_hash"] == expected_hash
+
+        # Per-frame dupes gone.
+        per_frame = conn.execute(
+            """SELECT COUNT(*) FROM documents
+               WHERE doc_type = 'imaging_dicom' AND id != ?""",
+            (canonical_doc,),
+        ).fetchone()[0]
+        assert per_frame == 0
+
+        # Bundle-file rows gone.
+        bundle = conn.execute(
+            "SELECT COUNT(*) FROM documents WHERE doc_type = 'unknown_binary'"
+        ).fetchone()[0]
+        assert bundle == 0
+
+        # Unrelated lab_report row untouched.
+        unrelated = conn.execute(
+            "SELECT COUNT(*) FROM documents WHERE doc_type = 'lab_report'"
+        ).fetchone()[0]
+        assert unrelated == 1
+
+    # Idempotent — second run is a no-op.
+    await initialize_database(str(db_path))
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        canon = conn.execute(
+            "SELECT file_path, file_hash FROM documents WHERE id = ?",
+            (canonical_doc,),
+        ).fetchone()
+        assert canon["file_path"] == "patients/giovi/imaging/foo"
+        assert canon["file_hash"] == expected_hash
+
+
+@pytest.mark.asyncio
 async def test_imaging_series_dedup_migration(tmp_path: Path) -> None:
     """Existing databases corrupted by the NULL series_instance_uid bug
     must be cleaned up: duplicate imaging_series rows are merged (summing

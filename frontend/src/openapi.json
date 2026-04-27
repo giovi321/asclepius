@@ -2462,6 +2462,7 @@
           "imaging"
         ],
         "summary": "Get Frame",
+        "description": "Serve a frame as PNG (default) or raw DICOM.\n\n``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth\nso MRI users can adjust contrast / brightness from the viewer without\nre-decoding pixel data on the client. Both must be supplied together;\notherwise the file's own VOI LUT is used (or a default min-max\nnormalisation when none is present).",
         "operationId": "get_frame_api_imaging__study_id__series__series_id__frame__index__get",
         "parameters": [
           {
@@ -2500,6 +2501,269 @@
               "pattern": "^(png|dicom)$",
               "default": "png",
               "title": "Format"
+            }
+          },
+          {
+            "name": "wc",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Wc"
+            }
+          },
+          {
+            "name": "ww",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ww"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/bundle-files": {
+      "get": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "List Bundle Files",
+        "description": "List the auxiliary files (DICOMDIR, JPEG previews, LOCKFILE, etc.)\nthat came in the same zip bundle as this study's DICOM frames.\n\nReturns ``[{name, size, kind}]`` entries the UI can render and link to\nvia the ``GET .../bundle-file/{name}`` route.",
+        "operationId": "list_bundle_files_api_imaging__study_id__bundle_files_get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/bundle-file/{name}": {
+      "get": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Get Bundle File",
+        "description": "Download a bundle file by name (the same string returned by the\nlist endpoint). Path traversal is rejected via ``safe_vault_join``.",
+        "operationId": "get_bundle_file_api_imaging__study_id__bundle_file__name__get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/links": {
+      "get": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "List Imaging Links",
+        "description": "Documents linked to this imaging study (e.g. a radiology report PDF).",
+        "operationId": "list_imaging_links_api_imaging__study_id__links_get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Add Imaging Link",
+        "description": "Link an existing document (e.g. a radiology report) to this study.",
+        "operationId": "add_imaging_link_api_imaging__study_id__links_post",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/links/{link_id}": {
+      "delete": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Remove Imaging Link",
+        "description": "Remove a document_links row. Validates the link belongs to this study.",
+        "operationId": "remove_imaging_link_api_imaging__study_id__links__link_id__delete",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "link_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Link Id"
             }
           }
         ],
@@ -5685,6 +5949,24 @@
         },
         "type": "object",
         "title": "LabResultUpdate"
+      },
+      "LinkRequest": {
+        "properties": {
+          "target_document_id": {
+            "type": "integer",
+            "title": "Target Document Id"
+          },
+          "link_type": {
+            "type": "string",
+            "title": "Link Type",
+            "default": "imaging_for"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_document_id"
+        ],
+        "title": "LinkRequest"
       },
       "LinkedDocument": {
         "properties": {

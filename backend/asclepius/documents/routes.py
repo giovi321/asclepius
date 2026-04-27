@@ -391,11 +391,6 @@ async def delete_doc(
                         # Remove every bundle folder that no longer has a
                         # surviving study (the FK cascade already removed
                         # imaging_studies rows tied to deleted documents).
-                        cursor = await db.execute(
-                            "SELECT folder_path FROM imaging_studies "
-                            "WHERE folder_path LIKE ?",
-                            (f"%/imaging/%",),
-                        )
                         # Bundles do not appear in imaging_studies.folder_path,
                         # so anything left under imaging-bundles whose stem
                         # is not referenced by a surviving study is orphaned.

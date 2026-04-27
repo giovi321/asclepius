@@ -10,7 +10,6 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig
-from asclepius.documents.service import compute_file_hash
 
 logger = logging.getLogger(__name__)
 
@@ -348,13 +347,10 @@ async def process_zip_member(
         except (ValueError, OSError):
             patient_id = None
 
+    # The event-hint sidecar is read by process_dicom on the parent
+    # study; bundle files do not get their own documents row, so we
+    # only need the path for cleanup at the end.
     event_hint_path = Path(str(path) + ".event_hint")
-    event_id: int | None = None
-    if event_hint_path.exists():
-        try:
-            event_id = int(event_hint_path.read_text().strip())
-        except (ValueError, OSError):
-            event_id = None
 
     # Resolve destination: alongside the imaging bundle for this study.
     from asclepius.patients.service import slugify  # local import to avoid cycles

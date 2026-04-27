@@ -633,7 +633,6 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     _collapsed_bundles = 0
     _rewritten_docs = 0
     for srow in studies_for_collapse:
-        study_id = srow[0]
         canonical_doc_id = srow[1]
         study_uid = srow[2]
         folder_path = srow[3]

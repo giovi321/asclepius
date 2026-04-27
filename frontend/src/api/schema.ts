@@ -833,11 +833,109 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Frame */
+        /**
+         * Get Frame
+         * @description Serve a frame as PNG (default) or raw DICOM.
+         *
+         *     ``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth
+         *     so MRI users can adjust contrast / brightness from the viewer without
+         *     re-decoding pixel data on the client. Both must be supplied together;
+         *     otherwise the file's own VOI LUT is used (or a default min-max
+         *     normalisation when none is present).
+         */
         get: operations["get_frame_api_imaging__study_id__series__series_id__frame__index__get"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/bundle-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bundle Files
+         * @description List the auxiliary files (DICOMDIR, JPEG previews, LOCKFILE, etc.)
+         *     that came in the same zip bundle as this study's DICOM frames.
+         *
+         *     Returns ``[{name, size, kind}]`` entries the UI can render and link to
+         *     via the ``GET .../bundle-file/{name}`` route.
+         */
+        get: operations["list_bundle_files_api_imaging__study_id__bundle_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/bundle-file/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Bundle File
+         * @description Download a bundle file by name (the same string returned by the
+         *     list endpoint). Path traversal is rejected via ``safe_vault_join``.
+         */
+        get: operations["get_bundle_file_api_imaging__study_id__bundle_file__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Imaging Links
+         * @description Documents linked to this imaging study (e.g. a radiology report PDF).
+         */
+        get: operations["list_imaging_links_api_imaging__study_id__links_get"];
+        put?: never;
+        /**
+         * Add Imaging Link
+         * @description Link an existing document (e.g. a radiology report) to this study.
+         */
+        post: operations["add_imaging_link_api_imaging__study_id__links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Imaging Link
+         * @description Remove a document_links row. Validates the link belongs to this study.
+         */
+        delete: operations["remove_imaging_link_api_imaging__study_id__links__link_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1908,6 +2006,16 @@ export interface components {
             test_date?: string | null;
             /** Norm Lab Test Id */
             norm_lab_test_id?: number | null;
+        };
+        /** LinkRequest */
+        LinkRequest: {
+            /** Target Document Id */
+            target_document_id: number;
+            /**
+             * Link Type
+             * @default imaging_for
+             */
+            link_type: string;
         };
         /** LinkedDocument */
         LinkedDocument: {
@@ -3922,12 +4030,175 @@ export interface operations {
         parameters: {
             query?: {
                 format?: string;
+                wc?: number | null;
+                ww?: number | null;
             };
             header?: never;
             path: {
                 study_id: number;
                 series_id: number;
                 index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bundle_files_api_imaging__study_id__bundle_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_bundle_file_api_imaging__study_id__bundle_file__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_imaging_links_api_imaging__study_id__links_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_imaging_link_api_imaging__study_id__links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_imaging_link_api_imaging__study_id__links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+                link_id: number;
             };
             cookie?: never;
         };

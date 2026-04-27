@@ -161,3 +161,99 @@ async def test_legacy_db_upgrade_is_idempotent(tmp_path: Path) -> None:
     _seed_legacy(db_path)
     await initialize_database(str(db_path))
     await initialize_database(str(db_path))  # second run = no-op
+
+
+@pytest.mark.asyncio
+async def test_imaging_series_dedup_migration(tmp_path: Path) -> None:
+    """Existing databases corrupted by the NULL series_instance_uid bug
+    must be cleaned up: duplicate imaging_series rows are merged (summing
+    num_images), and each parent imaging_studies row's num_series and
+    num_images are recomputed from the merged children."""
+    db_path = tmp_path / "imaging.sqlite"
+
+    # First run: create a clean schema so we can seed valid rows that
+    # respect the foreign-key constraints (patients, documents).
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("PRAGMA foreign_keys=ON")
+        cur = conn.execute(
+            "INSERT INTO patients (slug, display_name) VALUES ('mig-pat', 'Mig Patient')"
+        )
+        patient_id = cur.lastrowid
+        cur = conn.execute(
+            """INSERT INTO documents (patient_id, file_path, original_filename,
+                                       doc_type, status, ocr_engine)
+               VALUES (?, 'imaging/test.dcm', 'test.dcm', 'imaging_dicom', 'done', 'dicom')""",
+            (patient_id,),
+        )
+        doc_id = cur.lastrowid
+
+        # Study with a wrong num_series (bug 2): says 1, will actually have 2 series.
+        cur = conn.execute(
+            """INSERT INTO imaging_studies
+               (document_id, patient_id, modality, num_series, num_images,
+                is_dicom, study_instance_uid, folder_path)
+               VALUES (?, ?, 'US', 1, 0, 1, 'study-uid-A', 'patients/mig-pat/imaging')""",
+            (doc_id, patient_id),
+        )
+        study_id = cur.lastrowid
+
+        # Bug 3 reproduction: 5 duplicate series rows for the same physical
+        # series (NULL series_instance_uid + same series_number=1), each
+        # with num_images=1.
+        for _ in range(5):
+            conn.execute(
+                """INSERT INTO imaging_series
+                   (study_id, series_number, series_description, modality,
+                    num_images, series_instance_uid, folder_path)
+                   VALUES (?, 1, 'US Abdomen', 'US', 1, NULL,
+                           'patients/mig-pat/imaging/series-1')""",
+                (study_id,),
+            )
+
+        # A second legitimate series with a non-NULL UID and 3 frames.
+        conn.execute(
+            """INSERT INTO imaging_series
+               (study_id, series_number, series_description, modality,
+                num_images, series_instance_uid, folder_path)
+               VALUES (?, 2, 'US Pelvis', 'US', 3, 'series-uid-B',
+                       'patients/mig-pat/imaging/series-2')""",
+            (study_id,),
+        )
+        conn.commit()
+
+    # Re-run init — the migration block runs and merges + recomputes.
+    await initialize_database(str(db_path))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        # 5 duplicate NULL-uid rows collapse to 1 with num_images=5.
+        rows = list(conn.execute(
+            "SELECT series_instance_uid, num_images FROM imaging_series "
+            "WHERE study_id = (SELECT id FROM imaging_studies WHERE study_instance_uid = 'study-uid-A') "
+            "ORDER BY id"
+        ))
+        assert len(rows) == 2, f"Expected 2 series after merge, got {len(rows)}"
+        # The merged null-UID series should now hold the summed count.
+        null_row = next(r for r in rows if r["series_instance_uid"] is None)
+        assert null_row["num_images"] == 5
+        uid_row = next(r for r in rows if r["series_instance_uid"] == "series-uid-B")
+        assert uid_row["num_images"] == 3
+
+        # Parent counters were recomputed.
+        study = conn.execute(
+            "SELECT num_series, num_images FROM imaging_studies WHERE study_instance_uid = 'study-uid-A'"
+        ).fetchone()
+        assert study["num_series"] == 2
+        assert study["num_images"] == 8  # 5 + 3
+
+    # Idempotent — running once more must not change anything.
+    await initialize_database(str(db_path))
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        study = conn.execute(
+            "SELECT num_series, num_images FROM imaging_studies WHERE study_instance_uid = 'study-uid-A'"
+        ).fetchone()
+        assert study["num_series"] == 2
+        assert study["num_images"] == 8

@@ -608,6 +608,79 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
             _code_updates, _code_skipped,
         )
 
+    # Imaging-series cleanup. Two historical bugs corrupted the imaging
+    # tables for any study ingested before the dicom_ingest fix:
+    #   1. Frames whose DICOM file had no SeriesInstanceUID each created
+    #      their own row in imaging_series (because ``WHERE
+    #      series_instance_uid = NULL`` never matches in SQL), so a 35-
+    #      frame ultrasound series ended up as 35 series of 1 frame.
+    #   2. ``num_series`` on imaging_studies was set to 1 on study INSERT
+    #      and never bumped, so a multi-series study still reported 1.
+    # This block merges duplicate series rows (summing num_images into
+    # the lowest-id keeper) and then recomputes both counters on every
+    # parent study from the merged children. Idempotent — a clean DB
+    # finds no duplicates and the counter recompute is a no-op.
+    cursor = await db.execute(
+        """SELECT study_id, COALESCE(series_number, -1) AS sn,
+                  GROUP_CONCAT(id) AS ids, SUM(num_images) AS total
+           FROM imaging_series
+           WHERE series_instance_uid IS NULL
+           GROUP BY study_id, COALESCE(series_number, -1)
+           HAVING COUNT(*) > 1"""
+    )
+    null_uid_groups = await cursor.fetchall()
+    cursor = await db.execute(
+        """SELECT study_id, series_instance_uid,
+                  GROUP_CONCAT(id) AS ids, SUM(num_images) AS total
+           FROM imaging_series
+           WHERE series_instance_uid IS NOT NULL
+           GROUP BY study_id, series_instance_uid
+           HAVING COUNT(*) > 1"""
+    )
+    uid_groups = await cursor.fetchall()
+
+    _merged_series = 0
+    for grp in (*null_uid_groups, *uid_groups):
+        # ``grp`` is a Row when row_factory is set, otherwise a tuple. Both
+        # support index access. ids is a comma-separated list of row ids.
+        ids_str = grp[2]
+        total = grp[3] or 0
+        ids = sorted(int(s) for s in str(ids_str).split(",") if s)
+        if len(ids) < 2:
+            continue
+        keeper, *drops = ids
+        await db.execute(
+            "UPDATE imaging_series SET num_images = ? WHERE id = ?",
+            (total, keeper),
+        )
+        for d in drops:
+            await db.execute("DELETE FROM imaging_series WHERE id = ?", (d,))
+            _merged_series += 1
+
+    # Recompute parent counters from the cleaned children. Run unconditionally
+    # — re-running the migration after a fresh app version has been logging
+    # correct counts is still a safe no-op.
+    await db.execute(
+        """UPDATE imaging_studies
+           SET num_series = (
+               SELECT COUNT(*) FROM imaging_series WHERE study_id = imaging_studies.id
+           ),
+               num_images = (
+               SELECT COALESCE(SUM(num_images), 0) FROM imaging_series
+               WHERE study_id = imaging_studies.id
+           )"""
+    )
+
+    if _merged_series:
+        await db.commit()
+        logger.info(
+            "Migration: merged %d duplicate imaging_series rows and recomputed study counters",
+            _merged_series,
+        )
+    else:
+        # Counter recompute may still have written rows; commit to flush.
+        await db.commit()
+
     # Compat view for external tooling that still expects the old
     # doctor_name / facility_name columns (see issue #16). Dropped and
     # recreated every init so the view re-binds to the current documents

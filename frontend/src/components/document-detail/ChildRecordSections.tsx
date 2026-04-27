@@ -1,7 +1,21 @@
-import { Pill, Stethoscope, Syringe } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "@/api/client";
+import { Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage } from "lucide-react";
+import DicomViewer from "@/components/DicomViewer";
 import {
   Section, InfoRow, MedFormBadge, getSectionTypeStyle,
 } from "@/components/document-detail/DocumentDetailHelpers";
+
+// Same DICOM modality → readable label map used in ImagingPage. Keeping
+// it co-located with the section avoids a dependency on the imaging page.
+const MODALITY_LABELS: Record<string, string> = {
+  CT: "CT scan", MR: "MRI", US: "Ultrasound", XR: "X-ray", CR: "X-ray (computed)",
+  DX: "X-ray (digital)", MG: "Mammography", PT: "PET", NM: "Nuclear medicine",
+  RF: "Fluoroscopy", OT: "Other",
+};
+const modalityLabel = (code: string | null | undefined) =>
+  !code ? "Unknown" : (MODALITY_LABELS[code.toUpperCase()] || code);
 
 export function EncountersSection({ encounters }: { encounters: any[] }) {
   if (!encounters?.length) return null;
@@ -96,5 +110,132 @@ export function DocumentSectionsList({ sections }: { sections: any[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * Imaging block on the Document Detail page. Mirrors how lab results are
+ * shown for blood-test documents: it only appears when the document is a
+ * DICOM bundle, and surfaces the imaging-specific fields (modality, body
+ * part, study date, institution, referring physician, accession number,
+ * StudyInstanceUID), the series breakdown, the embedded DICOM frame
+ * viewer, and the auxiliary bundle files (DICOMDIR, JPEG previews, etc.)
+ * that were extracted from the same zip.
+ */
+export function ImagingStudiesSection({ studies }: { studies: any[] }) {
+  if (!studies?.length) return null;
+  return (
+    <>
+      {studies.map((study) => (
+        <ImagingStudyBlock key={study.id} study={study} />
+      ))}
+    </>
+  );
+}
+
+function ImagingStudyBlock({ study }: { study: any }) {
+  const navigate = useNavigate();
+  const series = study.series || [];
+  const [activeSeriesId, setActiveSeriesId] = useState<number | null>(
+    series.length > 0 ? series[0].id : null,
+  );
+  const [bundleFiles, setBundleFiles] = useState<{ name: string; size: number; kind: string }[]>([]);
+  const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.get(`/imaging/${study.id}/bundle-files`).then((r) => {
+      setBundleFiles(r.data.items || []);
+    }).catch(() => setBundleFiles([]));
+    api.get(`/imaging/${study.id}/links`).then((r) => {
+      setLinkedDocs(r.data.items || []);
+    }).catch(() => setLinkedDocs([]));
+  }, [study.id]);
+
+  return (
+    <Section title="Imaging" icon={ImageIcon}>
+      <InfoRow label="Type" value={`${modalityLabel(study.modality)}${study.modality ? ` (${study.modality})` : ""}`} />
+      <InfoRow label="Body Part" value={study.body_part || "Unknown"} />
+      <InfoRow label="Study Date" value={study.study_date || "Unknown"} />
+      <InfoRow label="Institution" value={study.institution_name || "Unknown"} />
+      <InfoRow label="Referring" value={study.referring_physician || "Unknown"} />
+      <InfoRow label="Accession" value={study.accession_number || "Unknown"} />
+      <InfoRow label="Study UID" value={study.study_instance_uid || "Unknown"} />
+      <InfoRow label="Series" value={`${study.num_series ?? series.length} | ${study.num_images} images`} />
+
+      {series.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground mt-2">Series</p>
+          {series.map((s: any, idx: number) => (
+            <button
+              key={s.id}
+              onClick={() => setActiveSeriesId(s.id)}
+              className={`flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-left text-sm hover:bg-accent/50 ${
+                activeSeriesId === s.id ? "border-primary bg-primary/5" : ""
+              }`}
+            >
+              <span className="truncate">
+                Series {s.series_number ?? idx + 1}: {s.series_description || s.modality || "Untitled"}
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">{s.num_images} images</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeSeriesId != null && (
+        <div className="rounded-md border overflow-hidden h-[500px] mt-2">
+          <DicomViewer
+            studyId={study.id}
+            seriesId={activeSeriesId}
+            modality={study.modality || null}
+          />
+        </div>
+      )}
+
+      {linkedDocs.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mt-3 mb-1">Linked documents</p>
+          <ul className="space-y-1">
+            {linkedDocs.map((d) => (
+              <li key={d.link_id} className="flex items-center justify-between text-sm">
+                <button
+                  onClick={() => navigate(`/documents/${d.id}`)}
+                  className="truncate hover:underline text-primary text-left"
+                >
+                  {d.original_filename}
+                </button>
+                <span className="text-xs text-muted-foreground ml-2">{d.doc_type}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {bundleFiles.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mt-3 mb-1 flex items-center gap-1.5">
+            <FileImage className="h-3.5 w-3.5" />
+            Bundle files
+          </p>
+          <ul className="max-h-40 overflow-y-auto space-y-0.5 text-xs">
+            {bundleFiles.map((f) => (
+              <li key={f.name} className="flex items-center justify-between">
+                <a
+                  href={`/api/imaging/${study.id}/bundle-file/${encodeURI(f.name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate hover:underline text-primary"
+                >
+                  {f.name}
+                </a>
+                <span className="text-muted-foreground tabular-nums ml-2">
+                  {(f.size / 1024).toFixed(0)} KB
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Section>
   );
 }

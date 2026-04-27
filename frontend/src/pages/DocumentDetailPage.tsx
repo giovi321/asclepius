@@ -13,6 +13,7 @@ import ReprocessMenu from "@/components/document-detail/ReprocessMenu";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import {
   EncountersSection, MedicationsSection, VaccinationsSection, DocumentSectionsList,
+  ImagingStudiesSection,
 } from "@/components/document-detail/ChildRecordSections";
 import NotesEditor from "@/components/document-detail/NotesEditor";
 import AiEditForm from "@/components/document-detail/AiEditForm";
@@ -160,12 +161,20 @@ export default function DocumentDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         <div className="space-y-4 min-w-0">
-          <DocumentViewer
-            id={id!}
-            filePath={doc.file_path}
-            originalFilename={doc.original_filename}
-            onRotate={handleRotate}
-          />
+          {/* Document file viewer is for PDFs / images; for DICOM bundles
+              the viewer lives inside ImagingStudiesSection (right column)
+              and the file itself is a folder, not a single file. */}
+          {doc.doc_type !== "imaging_dicom" && (
+            <DocumentViewer
+              id={id!}
+              filePath={doc.file_path}
+              originalFilename={doc.original_filename}
+              onRotate={handleRotate}
+            />
+          )}
+          {doc.doc_type === "imaging_dicom" && (
+            <ImagingStudiesSection studies={doc.imaging_studies || []} />
+          )}
         </div>
 
         <div className="space-y-4 min-w-0">
@@ -191,7 +200,9 @@ export default function DocumentDetailPage() {
           <VaccinationsSection vaccinations={doc.vaccinations || []} />
 
           <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />
-          <AiEditForm docId={doc.id} onApplied={() => loadDoc(false)} />
+          {doc.doc_type !== "imaging_dicom" && (
+            <AiEditForm docId={doc.id} onApplied={() => loadDoc(false)} />
+          )}
 
           <LinksSection
             docId={Number(id)}
@@ -202,7 +213,9 @@ export default function DocumentDetailPage() {
         </div>
       </div>
 
-      <OcrSection text={doc.ocr_text} />
+      {/* OCR section never has anything for DICOM bundles, so hide it
+          entirely there to keep the page tidy. */}
+      {doc.doc_type !== "imaging_dicom" && <OcrSection text={doc.ocr_text} />}
     </div>
   );
 }

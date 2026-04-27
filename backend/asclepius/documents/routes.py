@@ -184,6 +184,22 @@ async def get_doc(
     medications = await get_related_records(db, "medications", doc_id)
     vaccinations = await get_related_records(db, "vaccinations", doc_id)
 
+    # Imaging studies attached to this document (an imaging_dicom doc has
+    # exactly one study; other doc types have zero — we just return an
+    # empty list and the UI hides the section). Series are nested per-study.
+    cursor = await db.execute(
+        "SELECT * FROM imaging_studies WHERE document_id = ?", (doc_id,),
+    )
+    imaging_studies: list[dict] = []
+    for srow in await cursor.fetchall():
+        srow = dict(srow)
+        cur2 = await db.execute(
+            "SELECT * FROM imaging_series WHERE study_id = ? ORDER BY series_number",
+            (srow["id"],),
+        )
+        srow["series"] = [dict(r) for r in await cur2.fetchall()]
+        imaging_studies.append(srow)
+
     # Get linked documents
     links = await get_document_links(db, doc_id)
 
@@ -196,6 +212,7 @@ async def get_doc(
         "encounters": encounters,
         "medications": medications,
         "vaccinations": vaccinations,
+        "imaging_studies": imaging_studies,
         "links": links,
         "sections": sections,
     }

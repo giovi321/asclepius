@@ -35,7 +35,7 @@ Key fields (per credential):
 | `max_retries` | `3` | Retries on transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) |
 | `retry_backoff_seconds` | `[30, 60, 120]` | Sleep between successive attempts; last value reused if list is shorter than `max_retries` |
 
-Concurrency is enforced by a process-wide gate keyed by `(credential, kind)`. The Dashboard shows a live chip for each active credential×kind pair, so you can see at a glance which model is currently talking to which endpoint and how many slots are in-flight / waiting.
+Concurrency is enforced by a process-wide semaphore keyed by `credential_id`, **not** by `(credential, kind)`. `max_concurrent` is the absolute number of inflight calls allowed against a credential — `max_concurrent: 1` means at most one call total across LLM, Vision, and OCR purposes that share the credential, *not* "one extra per kind". The Dashboard renders a separate chip per `(credential, kind)` for visibility, so when both an LLM and an OCR call are pending against the same Ollama server you see two chips, but only one is actually inflight at any moment — the other is queued (annotated `(queued)` in the chip label since 0.9.12).
 
 :::tip[Why per-credential instead of per-provider?]
 Two Ollama models on the same server compete for the same GPU. Setting a concurrency cap on each provider entry would let the physical server get overrun as soon as you enabled a second provider on it. A credential-scoped cap means adding a new model to an existing endpoint doesn't silently multiply load.
@@ -50,16 +50,21 @@ If you're setting up Asclepius for the first time and want a reasonable default,
 
 | Role           | Model                              | Ollama tag                                |
 |----------------|------------------------------------|-------------------------------------------|
-| OCR            | Chandra OCR                        | `fredrezones55/chandra-ocr-2`             |
-| Text LLM       | Qwen 2.5                           | `qwen2.5`                                 |
+| OCR primary    | Chandra OCR                        | `fredrezones55/chandra-ocr-2`             |
+| OCR fallback   | Tesseract                          | `tesseract` (system package, no GPU)      |
+| Text LLM       | Qwen 2.5 14B                       | `qwen2.5:14b`                             |
 | Vision-LLM     | Qwen 2.5-VL 7B                     | `qwen2.5vl:7b`                            |
+| Cloud fallback | Claude Haiku                       | `claude-haiku` (Anthropic API)            |
 
-This trio runs comfortably on a 12 GB VRAM GPU and extraction quality is good enough that most users won't need to reach for a cloud model. Pull them with:
+This four-tier stack runs comfortably on a 12 GB VRAM GPU. Tesseract sits as a CPU-only OCR fallback for the rare scan that throws Chandra (or for hosts without a GPU). Claude Haiku is wired as the lowest-priority LLM provider so anything the local Qwen 2.5 fails to extract cleanly can still escalate to a hosted model without manual retries. Pull the local models with:
 
 ```bash
 ollama pull fredrezones55/chandra-ocr-2
-ollama pull qwen2.5
+ollama pull qwen2.5:14b
 ollama pull qwen2.5vl:7b
+# Tesseract is a system package, install via your distro:
+#   apt install tesseract-ocr   (Debian / Ubuntu)
+#   brew install tesseract      (macOS)
 ```
 
 Wire them up under **Settings → Document Analysis → Providers**:

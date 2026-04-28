@@ -6,6 +6,7 @@ import {
   Image as ImageIcon, Search, ChevronUp, ChevronDown, FileText, FileX2,
 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
+import { useColumnPrefs } from "@/lib/columnPrefs";
 
 const MODALITY_LABELS: Record<string, string> = {
   CT: "CT scan", MR: "MRI", US: "Ultrasound", XR: "X-ray", CR: "X-ray (computed)",
@@ -46,15 +47,13 @@ interface Study {
   date_added: string | null;
 }
 
-const COLUMNS: { key: string; label: string; width: string }[] = [
-  { key: "modality", label: "Type", width: "12%" },
-  { key: "body_part", label: "Body part", width: "16%" },
-  { key: "study_date", label: "Date", width: "10%" },
-  { key: "institution", label: "Institution", width: "20%" },
-  { key: "doctor", label: "Doctor", width: "16%" },
-  { key: "report_status", label: "Report", width: "12%" },
-  { key: "date_added", label: "Added", width: "10%" },
-];
+// Column registry moved to components/imaging/columns.ts so the Settings page
+// can drive visibility/ordering through the same useColumnPrefs hook the
+// Documents page uses. The IMAGING_COLUMNS source of truth now lives there.
+import { IMAGING_COLUMNS, IMAGING_DEFAULTS } from "@/components/imaging/columns";
+const COLUMNS: { key: string; label: string; width: string }[] = IMAGING_COLUMNS.map((c) => ({
+  key: c.key, label: c.label, width: c.width,
+}));
 
 const PAGE_SIZE = 20;
 
@@ -125,9 +124,6 @@ export default function ImagingPage() {
     }
   };
 
-  const SortIcon = ({ active, dir }: { active: boolean; dir: "asc" | "desc" }) =>
-    !active ? null : dir === "asc" ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />;
-
   return (
     <div className="space-y-4">
       {showUpload && (
@@ -185,64 +181,18 @@ export default function ImagingPage() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <colgroup>
-            {COLUMNS.map((c) => <col key={c.key} style={{ width: c.width }} />)}
-          </colgroup>
-          <thead className="bg-muted/30">
-            <tr className="border-b">
-              {COLUMNS.map((c) => (
-                <th
-                  key={c.key}
-                  className="text-left font-medium px-3 py-2 cursor-pointer select-none hover:bg-accent/30"
-                  onClick={() => toggleSort(c.key)}
-                >
-                  {c.label}{" "}
-                  <SortIcon active={sort === c.key} dir={order} />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            ) : items.length === 0 ? (
-              <tr><td colSpan={COLUMNS.length} className="px-3 py-8 text-center text-muted-foreground">
-                <ImageIcon className="h-6 w-6 mx-auto mb-2" />
-                No imaging studies found
-              </td></tr>
-            ) : items.map((s) => (
-              <tr
-                key={s.id}
-                onClick={() => navigate(`/imaging/${s.id}`)}
-                className="border-b cursor-pointer hover:bg-accent/30 transition-colors"
-              >
-                <td className="px-3 py-2">{modalityLabel(s.modality)}</td>
-                <td className="px-3 py-2 text-muted-foreground">{niceCase(s.body_part) || "Unknown"}</td>
-                <td className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || "—"}</td>
-                <td className="px-3 py-2 text-muted-foreground truncate">{s.institution_name || "Unknown"}</td>
-                <td className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || s.referring_physician || "Unknown"}</td>
-                <td className="px-3 py-2">
-                  {s.report_status === "attached" ? (
-                    <span className="inline-flex items-center gap-1 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5">
-                      <FileText className="h-3 w-3" /> Attached
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5">
-                      <FileX2 className="h-3 w-3" /> Pending
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground tabular-nums">
-                  {s.date_added ? s.date_added.slice(0, 10) : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Table — column visibility/order is driven by the Settings page
+          (Table columns tab). We resolve the user's prefs once here and
+          render each column key by name so visibility and reordering both
+          work without the body falling out of sync with the headers. */}
+      <ImagingTable
+        items={items}
+        loading={loading}
+        sort={sort}
+        order={order}
+        toggleSort={toggleSort}
+        navigate={navigate}
+      />
 
       {/* Pagination */}
       {total > PAGE_SIZE && (
@@ -267,3 +217,97 @@ export default function ImagingPage() {
     </div>
   );
 }
+
+const SortIcon = ({ active, dir }: { active: boolean; dir: "asc" | "desc" }) =>
+  !active ? null : dir === "asc" ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />;
+
+function ImagingTable({ items, loading, sort, order, toggleSort, navigate }: {
+  items: Study[]; loading: boolean; sort: string; order: "asc" | "desc";
+  toggleSort: (k: string) => void; navigate: (p: string) => void;
+}) {
+  const prefs = useColumnPrefs("imaging", IMAGING_DEFAULTS);
+  const ordered = [
+    ...prefs.order.filter((k) => COLUMNS.some((c) => c.key === k)),
+    ...COLUMNS.map((c) => c.key).filter((k) => !prefs.order.includes(k)),
+  ];
+  const visibleCols = ordered
+    .filter((k) => prefs.visible.includes(k))
+    .map((k) => COLUMNS.find((c) => c.key === k))
+    .filter((c): c is NonNullable<typeof c> => !!c);
+
+  const renderCell = (key: string, s: Study) => {
+    switch (key) {
+      case "modality":
+        return <td key={key} className="px-3 py-2">{modalityLabel(s.modality)}</td>;
+      case "body_part":
+        return <td key={key} className="px-3 py-2 text-muted-foreground">{niceCase(s.body_part) || "Unknown"}</td>;
+      case "study_date":
+        return <td key={key} className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || "—"}</td>;
+      case "institution":
+        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.institution_name || "Unknown"}</td>;
+      case "doctor":
+        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || s.referring_physician || "Unknown"}</td>;
+      case "report_status":
+        return (
+          <td key={key} className="px-3 py-2">
+            {s.report_status === "attached" ? (
+              <span className="inline-flex items-center gap-1 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5">
+                <FileText className="h-3 w-3" /> Attached
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5">
+                <FileX2 className="h-3 w-3" /> Pending
+              </span>
+            )}
+          </td>
+        );
+      case "date_added":
+        return <td key={key} className="px-3 py-2 text-muted-foreground tabular-nums">{s.date_added ? s.date_added.slice(0, 10) : "—"}</td>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="rounded-lg border bg-card overflow-hidden">
+      <table className="w-full text-sm">
+        <colgroup>
+          {visibleCols.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+        </colgroup>
+        <thead className="bg-muted/30">
+          <tr className="border-b">
+            {visibleCols.map((c) => (
+              <th
+                key={c.key}
+                className="text-left font-medium px-3 py-2 cursor-pointer select-none hover:bg-accent/30"
+                onClick={() => toggleSort(c.key)}
+              >
+                {c.label}{" "}
+                <SortIcon active={sort === c.key} dir={order} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {loading ? (
+            <tr><td colSpan={visibleCols.length} className="px-3 py-8 text-center text-muted-foreground">Loading...</td></tr>
+          ) : items.length === 0 ? (
+            <tr><td colSpan={visibleCols.length} className="px-3 py-8 text-center text-muted-foreground">
+              <ImageIcon className="h-6 w-6 mx-auto mb-2" />
+              No imaging studies found
+            </td></tr>
+          ) : items.map((s) => (
+            <tr
+              key={s.id}
+              onClick={() => navigate(`/imaging/${s.id}`)}
+              className="border-b cursor-pointer hover:bg-accent/30 transition-colors"
+            >
+              {visibleCols.map((c) => renderCell(c.key, s))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+

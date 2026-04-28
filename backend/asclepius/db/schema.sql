@@ -464,6 +464,19 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(revoked_at, expires_at);
 
+-- Per-user UI preferences for list views (Documents / Imaging / Lab).
+-- visible_json + order_json are JSON arrays of column ids defined in the
+-- frontend column registry. Defaults live in the frontend; an absent row
+-- means "use defaults". Synchronizes column choices across devices.
+CREATE TABLE IF NOT EXISTS user_view_prefs (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    view_key TEXT NOT NULL,
+    visible_json TEXT NOT NULL,
+    order_json TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, view_key)
+);
+
 -- Per-page OCR text cache (avoids re-processing on reprocess/sectioning)
 CREATE TABLE IF NOT EXISTS ocr_page_cache (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

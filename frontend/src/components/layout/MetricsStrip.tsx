@@ -65,10 +65,21 @@ export default function MetricsStrip() {
       q.kind === "vision" ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800" :
       q.kind === "ocr" ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800" :
       "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800";
+    // The semaphore in backend/asclepius/llm/gate.py is per-credential, not
+    // per-kind: an Ollama server set to ``max_concurrent=1`` runs at most
+    // one request total across LLM and OCR purposes. The chips are still
+    // rendered separately because the gate tracks (credential_id, kind)
+    // for visibility, but only one of the same-credential chips actually
+    // shows ``running=1`` at any moment — the others queue. The status
+    // suffix below makes that explicit so the user doesn't read the dual
+    // chips as parallel calls.
+    const statusSuffix = q.in_flight > 0
+      ? ""  // running — colour + cap already say everything
+      : q.waiting > 0 ? " (queued)" : "";
     chips.push({
       key: `${q.kind}-${q.credential_id}`,
       icon,
-      label: modelsLabel ? `${shortName} · ${modelsLabel}` : shortName,
+      label: modelsLabel ? `${shortName} · ${modelsLabel}${statusSuffix}` : `${shortName}${statusSuffix}`,
       cardTitle: `${shortName} · ${kindLabel}`,
       cardSubtitle: modelsLabel || undefined,
       running: q.in_flight,

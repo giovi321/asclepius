@@ -31,6 +31,7 @@ from .logs_routes import router as logs_router
 from .prompts_routes import router as prompts_router
 from .provider_routes import router as provider_router
 from .users_routes import router as users_router
+from .view_prefs_routes import router as view_prefs_router
 
 router = APIRouter()
 router.include_router(logs_router)
@@ -38,6 +39,7 @@ router.include_router(backup_router)
 router.include_router(prompts_router)
 router.include_router(provider_router)
 router.include_router(users_router)
+router.include_router(view_prefs_router)
 
 
 # --- Top-level settings blob ---

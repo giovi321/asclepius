@@ -31,6 +31,13 @@ export const COLUMNS: ColumnDef[] = [
 
 export const COLUMN_STORAGE_KEY = "asclepius_documents_columns";
 
+/** Defaults consumed by useColumnPrefs (lib/columnPrefs.ts) so SettingsPage
+ * and DocumentsPage agree on the ordering / visibility baseline. */
+export const DOCUMENTS_DEFAULTS = {
+  visible: COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key as string),
+  order: COLUMNS.map((c) => c.key as string),
+};
+
 /**
  * Read the user's column choice from localStorage, falling back to the
  * defaults. Invalid / stale keys from older builds are filtered out.

@@ -170,7 +170,7 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
 // documents will resolve it to an id via the alias-aware _upsert_* helpers.
 
 export function EditableCombobox({
-  label, value, field, docId, onSave, normType,
+  label, value, field, docId, onSave, normType, currentEntityId,
 }: {
   label: string;
   value: any;
@@ -178,11 +178,18 @@ export function EditableCombobox({
   docId: number;
   onSave: (updated?: any) => void;
   normType: "doctors" | "facilities" | "specialties";
+  /** If set, the user can choose to rename this canonical entry globally
+   * instead of just fixing the current document. The two-button confirm
+   * appears when the typed value is different from the current display
+   * AND lacks an exact match in the existing options (i.e. it would be
+   * a real rename, not a switch to a sibling entry). */
+  currentEntityId?: number | null;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingRename, setPendingRename] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const doctors = useDoctors();
@@ -214,11 +221,62 @@ export function EditableCombobox({
       onSave(res.data);
       setEditing(false);
       setQuery("");
+      setPendingRename(null);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Failed to save";
       toast({ title: typeof d === "string" ? d : "Failed to save", variant: "error" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /** Rename the canonical entry globally (all linked documents follow).
+   * Used by the "Rename everywhere" button when ``currentEntityId`` is
+   * known and the user typed a real rename rather than picking a sibling
+   * entry from the dropdown. */
+  const renameGlobally = async (newDisplay: string) => {
+    if (!currentEntityId) return;
+    setSaving(true);
+    try {
+      await api.patch(`/normalization/${normType}/${currentEntityId}`, {
+        canonical_display: newDisplay,
+      });
+      // No PATCH on the document — the FK already points at this entry,
+      // and the canonical_display change cascades to every doc that joins
+      // through the same FK.
+      onSave();
+      setEditing(false);
+      setQuery("");
+      setPendingRename(null);
+    } catch (err: any) {
+      const d = err?.response?.data?.detail || err?.message || "Failed to rename";
+      toast({ title: typeof d === "string" ? d : "Failed to rename", variant: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Returns true when a typed value would be a real "rename this entry"
+   * action (vs picking a sibling entry from the existing options). Only
+   * gates the scope picker — exact matches commit the doc-only path
+   * directly. */
+  const isRenameCandidate = (typed: string): boolean => {
+    if (!currentEntityId) return false;
+    const t = typed.trim();
+    if (!t) return false;
+    if (t.toLowerCase() === String(value || "").toLowerCase()) return false;
+    // Only ask when the typed value doesn't match an existing canonical
+    // entry — otherwise the user is switching to a sibling, not renaming.
+    return !options.some((o: any) =>
+      (o.canonical_display || o.name || "").toLowerCase() === t.toLowerCase()
+    );
+  };
+
+  const handleEnterCommit = (typed: string) => {
+    if (isRenameCandidate(typed)) {
+      setPendingRename(typed.trim());
+    } else {
+      commit(typed.trim());
     }
   };
 
@@ -249,10 +307,10 @@ export function EditableCombobox({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") { setEditing(false); setQuery(""); }
+                  if (e.key === "Escape") { setEditing(false); setQuery(""); setPendingRename(null); }
                   if (e.key === "Enter") {
                     if (filtered.length === 1) commit(displayOf(filtered[0]));
-                    else if (canCreate) commit(query.trim());
+                    else if (canCreate) handleEnterCommit(query);
                   }
                 }}
                 placeholder={`Search ${normType}...`}
@@ -301,15 +359,56 @@ export function EditableCombobox({
                     </button>
                   );
                 })}
-                {canCreate && (
+                {canCreate && !pendingRename && (
                   <button
-                    onClick={() => commit(query.trim())}
+                    onClick={() => handleEnterCommit(query)}
                     disabled={saving}
                     className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
                   >
                     <Plus className="h-3 w-3" />
-                    Create new: <span className="font-medium">"{query.trim()}"</span>
+                    {currentEntityId
+                      ? <>Use <span className="font-medium">"{query.trim()}"</span></>
+                      : <>Create new: <span className="font-medium">"{query.trim()}"</span></>}
                   </button>
+                )}
+                {pendingRename && (
+                  // Two-button confirm: doc-only logs a correction without
+                  // touching the canonical row; global rename updates the
+                  // norm entry so every linked document follows.
+                  <div className="border-t bg-muted/30 p-2 space-y-2">
+                    <p className="text-[11px] text-muted-foreground">
+                      Apply <span className="font-medium">"{pendingRename}"</span> to:
+                    </p>
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => commit(pendingRename)}
+                        disabled={saving}
+                        className="rounded border bg-background px-2 py-1 text-left text-xs hover:bg-accent disabled:opacity-50"
+                      >
+                        <span className="font-medium">Fix this document only</span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          Logs a correction; canonical name unchanged.
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => renameGlobally(pendingRename)}
+                        disabled={saving}
+                        className="rounded border border-primary/30 bg-primary/5 px-2 py-1 text-left text-xs hover:bg-primary/10 disabled:opacity-50"
+                      >
+                        <span className="font-medium">Rename everywhere</span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          Updates the {normType.slice(0, -1)} record itself; every linked document follows.
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setPendingRename(null)}
+                        disabled={saving}
+                        className="rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </>
             )}

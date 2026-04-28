@@ -55,10 +55,10 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
       {!isImaging && (
         <EditableField label="Issued Date" value={doc.issued_date} field="issued_date" type="date" docId={doc.id} onSave={onSave} />
       )}
-      <EditableCombobox label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={onSave} normType="doctors" />
-      <EditableCombobox label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={onSave} normType="facilities" />
+      <EditableCombobox label="Doctor" value={doc.doctor_name} field="doctor_name" docId={doc.id} onSave={onSave} normType="doctors" currentEntityId={doc.doctor_id} />
+      <EditableCombobox label="Facility" value={doc.facility_name} field="facility_name" docId={doc.id} onSave={onSave} normType="facilities" currentEntityId={doc.facility_id} />
       {!isImaging && (
-        <EditableCombobox label="Specialty" value={doc.specialty_display || doc.specialty_original} field="specialty_original" docId={doc.id} onSave={onSave} normType="specialties" />
+        <EditableCombobox label="Specialty" value={doc.specialty_display || doc.specialty_original} field="specialty_original" docId={doc.id} onSave={onSave} normType="specialties" currentEntityId={doc.norm_specialty_id} />
       )}
       {!isImaging && (
         <InfoRow label="Language" value={doc.language_source} />

@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.12] - 2026-04-28 - graceful sphinx: major bug-fix sweep
+
+### Fixed
+
+- **Specialty merge** no longer fails with `foreign key constraint failed`.
+  ``norm_specialties`` is referenced from ``documents.norm_specialty_id`` and
+  ``doctors.norm_specialty_id`` as well as ``encounters``; the merge ref-table
+  list only walked encounters, leaving the other two un-migrated rows
+  pointing at the source row at delete time.
+- **Lab/blood-test dates** now reliably inherit the parent document's
+  ``event_date`` when the LLM emits a malformed or placeholder
+  ``test_date``. Strings that don't parse as ISO ``YYYY-MM-DD`` drop to
+  ``None`` so the fallback fires, and a post-insert sweep covers the edge
+  case where the document's date is stamped after the lab loop runs.
+- **Facility names** keep acronym tokens (``ASST``, ``AOU``, ``IRCCS``)
+  instead of getting title-cased into ``Asst Milano``. Doctor names still
+  go through the existing title-case + ``Dr.``/``Prof.`` mapping.
+- **Specialty edits from the doc view** now actually update the displayed
+  value. The PATCH handler resolves the new free-text to a
+  ``norm_specialties`` id (alias / fuzzy match / auto-create) so the
+  detail-view join reflects the change instead of looking like a no-op.
+- **MRI viewer center/width sliders** now do something. The PNG renderer
+  used to clip pixels to the window, then re-normalise the *clipped*
+  array's own min/max to 0-255 — i.e. the user's window was always
+  stretched back to full dynamic range, so the slider was a no-op for
+  valid windows and produced all-black/all-white when the window fell
+  outside the data range. The fix maps the window bounds directly to
+  [0, 255]. RescaleSlope/RescaleIntercept (Modality LUT) is now applied
+  before windowing so CT and rescaled MR data don't get double-shifted.
+- **MRI viewer zoom** is sharper. A new ``upscale=N`` (1-4) param
+  bicubic-resamples the PNG server-side; the viewer asks for 2x past
+  ~1.5x zoom and 4x past ~3x, replacing the CSS-only scale path that
+  produced obvious pixelation.
+- **DICOM zip ingestion** picks up frames that lack the standard
+  128-byte preamble (raw Implicit VR Little Endian streams from some
+  vendors — that's why a 7-series export only landed 3 series before).
+  ``DICOMDIR`` is special-cased to the bundle path, never the frame
+  path. Series grouping uses the source folder name as a tiebreaker
+  when ``SeriesInstanceUID`` is missing, so multiple series with
+  overlapping ``SeriesNumber=1`` no longer collapse into one row.
+- **Top-bar processing chip** closes the gap during fast-burst pipelines
+  (DICOM zips, batch uploads). Polling is now adaptive — 1.5s while
+  busy, 5s when idle — so the chip flickers off less often between
+  files.
+
+### Added
+
+- **Editable encounters** — ``PATCH /api/encounters/{id}`` accepts
+  ``diagnosis_original`` (resolves to ``norm_diagnosis_id``),
+  ``diagnosis_code``, ``specialty_original`` (resolves to
+  ``norm_specialty_id``), ``notes``, and ``findings``. Each accepted
+  field is logged against the parent document in
+  ``extraction_corrections`` so the few-shot retriever picks up the
+  correction next time we re-process a similar doc.
+- **Editable medications** — ``PATCH /api/medications/{id}`` accepts
+  ``active_ingredient_original`` (resolves to ``norm_medication_id``),
+  ``brand_name``, ``dosage``, ``form``, ``frequency``, ``duration``,
+  ``quantity``. Same correction-logging pattern as encounters.
+- **Doc-view rename UX** — when editing a doctor / facility / specialty
+  on the document detail page, typing a name that isn't already a
+  canonical entry pops a two-button confirm: **Fix this document only**
+  (logs a correction; leaves the canonical row alone) vs **Rename
+  everywhere** (calls the normalization rename endpoint so every linked
+  document follows). Defaults to doc-only and the picker stays out of
+  the way when the typed value matches an existing entry.
+- **Per-user table column preferences** — ``user_view_prefs`` table +
+  ``GET/PUT /api/settings/view-prefs/{view_key}`` carry column
+  visibility and ordering per user, so the choice follows the user
+  across devices instead of getting trapped in localStorage. New
+  Settings → Table columns tab edits Documents and Imaging columns;
+  the Documents page migrates the legacy localStorage entry up to the
+  server on first run. Lab Results uses a grouped layout (not a flat
+  column list) and is excluded for now.
+- **Per-file upload errors** — when a bulk upload includes failed files,
+  the result panel now exposes a "Show details" toggle listing the
+  failed filename + reason. No more "10 uploaded, 1 failed" with
+  zero clue which one.
+- **Recommended LLM stack** documented as a four-tier setup: Chandra
+  (OCR primary) + Tesseract (OCR fallback) + Qwen 2.5 14B (text LLM) +
+  Claude Haiku (cloud fallback). The admin-guide LLM page now spells
+  out the exact provider wiring.
+
+### Changed
+
+- **Encounters card** drops the redundant per-encounter date row (the
+  document's ``event_date`` is the single source of truth shown in the
+  metadata panel). The diagnosis renders as a heading-style block with
+  inline edit instead of a plain key/value row.
+- **Medications card** moves from a static table to one editable block
+  per row, mirroring the encounters layout.
+- **Event create form** has visible "Start date" / "End date" labels
+  with a "leave empty if ongoing" hint; the inert HTML placeholders
+  are gone.
+- **LLM/OCR semaphore semantics** documented: ``max_concurrent`` is the
+  absolute cap on inflight calls per credential, shared across LLM,
+  Vision, and OCR purposes. Top-bar chips suffix ``(queued)`` when a
+  call is waiting on the semaphore so the dual chips no longer read as
+  parallel calls. (No behaviour change — this was already the
+  underlying enforcement.)
+
+## [0.9.11] - 2026-04-28 - upload double-click guard
+
+### Fixed
+
+- Double-clicking the upload button no longer queues the same file
+  twice. The handler now uses a synchronous ref-based re-entry guard
+  alongside the existing ``uploading`` state flag.
+
+## [0.9.10] - 2026-04-28 - vault picker + inbox sweep dedupe
+
+### Changed
+
+- The vault file picker on the document detail page (used by the
+  broken-file recovery flow) now matches the file browser's layout and
+  navigation behaviour.
+- Inbox sweep removes duplicate UID-less DICOM files when the same zip
+  is re-uploaded; the watcher logs the path relative to the inbox
+  root so duplicate-zip diagnostics are readable.
+
+## [0.9.9] - 2026-04-28 - imaging viewer + bundle files + linked report
+
+### Fixed
+
+- Imaging viewer: assorted bundle-file, casing, and date display fixes;
+  the linked-report row in the imaging detail page surfaces correctly.
+
 ## [0.9.8] - 2026-04-28 - editable imaging metadata + broken-file recovery
 
 ### Added

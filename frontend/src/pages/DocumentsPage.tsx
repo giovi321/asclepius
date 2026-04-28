@@ -7,9 +7,10 @@ import type { PipelineStatus } from "@/types";
 import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
 import {
-  COLUMNS, COLUMN_STORAGE_KEY, loadVisibleColumns,
+  COLUMNS, DOCUMENTS_DEFAULTS,
   type ColumnKey,
 } from "@/components/documents/columns";
+import { useColumnPrefs } from "@/lib/columnPrefs";
 import DocumentFilters from "@/components/documents/DocumentFilters";
 import BulkActionsBar, { type ReprocessMode } from "@/components/documents/BulkActionsBar";
 import DocumentTable from "@/components/documents/DocumentTable";
@@ -34,8 +35,12 @@ export default function DocumentsPage() {
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
 
-  // Column visibility (persisted to localStorage)
-  const [visibleCols, setVisibleCols] = useState<Set<ColumnKey>>(() => loadVisibleColumns());
+  // Column visibility — synced through the backend so the user's choice
+  // follows them across devices. The hook migrates the legacy localStorage
+  // entry (asclepius_documents_columns) up to the server on first run.
+  const colPrefs = useColumnPrefs("documents", DOCUMENTS_DEFAULTS);
+  const visibleCols = useMemo(() => new Set(colPrefs.visible as ColumnKey[]), [colPrefs.visible]);
+  const setVisibleCols = (next: Set<ColumnKey>) => colPrefs.setVisible(Array.from(next));
 
   // Selection + bulk state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -55,10 +60,6 @@ export default function DocumentsPage() {
     () => COLUMNS.filter((c) => visibleCols.has(c.key)),
     [visibleCols],
   );
-
-  useEffect(() => {
-    localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(Array.from(visibleCols)));
-  }, [visibleCols]);
 
   // Poll pipeline status for live page progress
   useEffect(() => {

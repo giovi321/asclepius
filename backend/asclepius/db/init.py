@@ -87,6 +87,21 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
                 UPDATE {table} SET facility_id = NEW.facility_id WHERE document_id = NEW.id;
             END
         """)
+    # Specialty cascades only to encounters — imaging_studies has no
+    # norm_specialty_id column. Without this, repointing a document's
+    # specialty in the doc detail page leaves the extracted encounter
+    # rows attached to the OLD norm_specialties row, so the Normalization
+    # tab's "linked documents" walk (which traverses both documents and
+    # encounters) keeps surfacing the document under the old specialty.
+    await db.execute("""
+        CREATE TRIGGER IF NOT EXISTS encounters_specialty_sync
+        AFTER UPDATE OF norm_specialty_id ON documents
+        FOR EACH ROW
+        WHEN NEW.norm_specialty_id IS NOT OLD.norm_specialty_id
+        BEGIN
+            UPDATE encounters SET norm_specialty_id = NEW.norm_specialty_id WHERE document_id = NEW.id;
+        END
+    """)
     await db.commit()
 
     # Skip the rest entirely on a fresh install (no documents yet).

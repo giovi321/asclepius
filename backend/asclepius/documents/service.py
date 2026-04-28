@@ -278,9 +278,10 @@ async def update_document_fields(
 ) -> None:
     """Generic field update on a document row.
 
-    Changes to ``doctor_id`` / ``facility_id`` cascade to this document's
-    children (``encounters`` and ``imaging_studies``) via AFTER UPDATE
-    triggers installed by db.init — no manual cascade needed here.
+    Changes to ``doctor_id`` / ``facility_id`` / ``norm_specialty_id``
+    cascade to this document's children (``encounters`` and, where the
+    column exists, ``imaging_studies``) via AFTER UPDATE triggers
+    installed by db.init — no manual cascade needed here.
     """
     if not updates:
         return

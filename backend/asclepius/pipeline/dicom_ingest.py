@@ -14,6 +14,31 @@ from asclepius.config import AppConfig
 logger = logging.getLogger(__name__)
 
 
+def study_base_path(
+    *,
+    patient_slug: str | None,
+    study_date: str | None,
+    institution: str | None,
+    modality: str | None,
+) -> str:
+    """Canonical vault path for the study folder of a DICOM exam.
+
+    Single source of truth for the formula. ``process_dicom`` files
+    frames under this path; ``inbox_sweep`` rebuilds it to compute the
+    same fallback hash when a DICOM has no StudyInstanceUID.
+    """
+    from asclepius.patients.service import slugify
+
+    year = study_date[:4] if study_date else "unknown"
+    facility_slug = slugify(institution) if institution else "unknown"
+    study_folder_name = (
+        f"{study_date or 'unknown'}_{facility_slug}_{modality or 'unknown'}"
+    )
+    if patient_slug:
+        return f"patients/{patient_slug}/{year}/{study_folder_name}"
+    return f"unclassified/{year}/{study_folder_name}"
+
+
 def parse_dicom_pn(raw: str) -> str:
     """Convert DICOM Person Name (PN) syntax to a plain "First Last" string.
 
@@ -143,9 +168,12 @@ async def process_dicom(
         if cleaned:
             doctor_id = await _upsert_doctor(db, {"name": cleaned}, facility_id)
 
-    # Determine destination path
-    from asclepius.patients.service import slugify
-
+    # Determine destination path. Imaging studies live at the same level
+    # as document files: directly under the patient's ``{year}/`` folder.
+    # Each study is its own subfolder (peer to document PDFs / event
+    # subfolders), with frame files nested in ``series-N/`` and any
+    # auxiliary bundle files (the old DICOMDIR / JPEG previews) under
+    # ``bundle/``.
     if patient_id:
         cursor = await db.execute("SELECT slug FROM patients WHERE id = ?", (patient_id,))
         row = await cursor.fetchone()
@@ -153,19 +181,12 @@ async def process_dicom(
     else:
         patient_slug = None
 
-    year = study_date[:4] if study_date else "unknown"
-    facility_slug = slugify(institution) if institution else "unknown"
-    study_folder_name = f"{study_date or 'unknown'}_{facility_slug}_{modality or 'unknown'}"
-
-    # Imaging studies live at the same level as document files: directly
-    # under the patient's ``{year}/`` folder. Each study is its own
-    # subfolder (peer to document PDFs / event subfolders), with frame
-    # files nested in ``series-N/`` and any auxiliary bundle files (the
-    # old DICOMDIR / JPEG previews) under ``bundle/``.
-    if patient_slug:
-        base_path = f"patients/{patient_slug}/{year}/{study_folder_name}"
-    else:
-        base_path = f"unclassified/{year}/{study_folder_name}"
+    base_path = study_base_path(
+        patient_slug=patient_slug,
+        study_date=study_date,
+        institution=institution,
+        modality=modality,
+    )
 
     series_folder = f"series-{series_number or '001'}"
     relative_path = f"{base_path}/{series_folder}/{path.name}"

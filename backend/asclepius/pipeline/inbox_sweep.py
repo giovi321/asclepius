@@ -51,7 +51,9 @@ def _study_doc_hash(study_uid: str | None, fallback_key: str) -> str:
 
 async def _is_dicom_already_ingested(path: Path, db: aiosqlite.Connection) -> bool:
     """Read the DICOM's StudyInstanceUID and check whether a documents
-    row already exists with the deterministic study hash."""
+    row already exists with the deterministic study hash. Falls back
+    to a study-folder hash for DICOMs that carry no StudyInstanceUID,
+    rebuilt the same way ``process_dicom`` derives ``base_path``."""
     try:
         import pydicom
     except ImportError:
@@ -61,14 +63,68 @@ async def _is_dicom_already_ingested(path: Path, db: aiosqlite.Connection) -> bo
     except Exception:
         return False
     study_uid = str(getattr(ds, "StudyInstanceUID", "") or "") or None
-    # Matching dicom_ingest's fallback when the file has no UID — uses
-    # the study folder path. We don't know that here, so a file with
-    # no StudyInstanceUID can't be safely matched. Leave it.
-    if not study_uid:
-        return False
+    if study_uid:
+        cursor = await db.execute(
+            "SELECT 1 FROM documents WHERE file_hash = ? LIMIT 1",
+            (_study_doc_hash(study_uid, ""),),
+        )
+        return (await cursor.fetchone()) is not None
+
+    # No StudyInstanceUID: rebuild the canonical ``base_path`` the same
+    # way ``process_dicom`` does and hash with it. Without this the sweep
+    # never recognises ingested copies of UID-less DICOMs and the inbox
+    # accumulates duplicates the watcher keeps re-detecting.
+    from asclepius.pipeline.dicom_ingest import parse_dicom_pn, study_base_path
+
+    patient_name = parse_dicom_pn(str(getattr(ds, "PatientName", ""))) or None
+    study_date_raw = str(getattr(ds, "StudyDate", "")) or None
+    modality = str(getattr(ds, "Modality", "")) or None
+    institution = str(getattr(ds, "InstitutionName", "")) or None
+
+    study_date = None
+    if study_date_raw and len(study_date_raw) == 8:
+        study_date = (
+            f"{study_date_raw[:4]}-{study_date_raw[4:6]}-{study_date_raw[6:8]}"
+        )
+
+    # Resolve patient_id from the upload-form hint sidecar first, then
+    # fall back to PatientName matching — same precedence as ingest.
+    hinted_patient_id: int | None = None
+    hint_sidecar = Path(str(path) + ".patient_hint")
+    if hint_sidecar.exists():
+        try:
+            hinted_patient_id = int(hint_sidecar.read_text().strip())
+        except (ValueError, OSError):
+            hinted_patient_id = None
+
+    patient_id: int | None = None
+    if hinted_patient_id:
+        cursor = await db.execute(
+            "SELECT id FROM patients WHERE id = ?", (hinted_patient_id,),
+        )
+        if await cursor.fetchone():
+            patient_id = hinted_patient_id
+    if patient_id is None and patient_name:
+        from asclepius.pipeline.extractor import _match_patient
+        patient_id = await _match_patient(db, patient_name)
+
+    patient_slug: str | None = None
+    if patient_id:
+        cursor = await db.execute(
+            "SELECT slug FROM patients WHERE id = ?", (patient_id,),
+        )
+        row = await cursor.fetchone()
+        patient_slug = row[0] if row else "unknown"
+
+    base_path = study_base_path(
+        patient_slug=patient_slug,
+        study_date=study_date,
+        institution=institution,
+        modality=modality,
+    )
     cursor = await db.execute(
         "SELECT 1 FROM documents WHERE file_hash = ? LIMIT 1",
-        (_study_doc_hash(study_uid, ""),),
+        (_study_doc_hash(None, base_path),),
     )
     return (await cursor.fetchone()) is not None
 

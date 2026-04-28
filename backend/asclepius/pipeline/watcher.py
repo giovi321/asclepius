@@ -30,8 +30,22 @@ SUPPORTED_EXTENSIONS = {
 class InboxHandler(FileSystemEventHandler):
     """Handles new files appearing in the inbox directory."""
 
-    def __init__(self, queue: PriorityQueue):
+    def __init__(self, queue: PriorityQueue, inbox_root: Path | None = None):
         self.queue = queue
+        self.inbox_root = inbox_root
+
+    def _display_path(self, path: Path) -> str:
+        """Path string used in log lines: the path relative to the inbox
+        root when possible, full path otherwise. The basename alone hides
+        which subfolder the event came from, which matters when the same
+        zip is uploaded twice and produces ``…-1/`` siblings with
+        identical leaf filenames."""
+        if self.inbox_root is not None:
+            try:
+                return str(path.relative_to(self.inbox_root))
+            except ValueError:
+                pass
+        return str(path)
 
     def _enqueue(self, src_path: str) -> None:
         path = Path(src_path)
@@ -42,10 +56,10 @@ class InboxHandler(FileSystemEventHandler):
 
         # Check extension
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-            logger.debug("Skipping unsupported file: %s", path.name)
+            logger.debug("Skipping unsupported file: %s", self._display_path(path))
             return
 
-        logger.info("New file detected: %s", path.name)
+        logger.info("New file detected: %s", self._display_path(path))
 
         # Wait for the file to finish being written. The previous code slept
         # a flat 2 s; for files extracted from a zip the writer has already
@@ -246,7 +260,7 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     logger.info("Pipeline worker thread started")
 
     # Start file watcher
-    handler = InboxHandler(queue)
+    handler = InboxHandler(queue, inbox_root=Path(inbox_path))
     observer = Observer()
     observer.schedule(handler, inbox_path, recursive=True)
     observer.start()

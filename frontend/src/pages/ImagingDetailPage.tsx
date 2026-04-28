@@ -22,6 +22,18 @@ function modalityLabel(code: string | null | undefined): string {
   return MODALITY_LABELS[code.toUpperCase()] || code;
 }
 
+/** Title-case DICOM-source strings ("ABDOMEN" → "Abdomen") that arrive
+ * in ALL CAPS from the source. Mixed-case strings the user already
+ * curated are left alone. */
+function niceCase(s: string | null | undefined): string {
+  if (!s) return "";
+  const letters = s.replace(/[^a-zA-Z]/g, "");
+  if (!letters) return s;
+  const upperRatio = letters.replace(/[^A-Z]/g, "").length / letters.length;
+  if (upperRatio < 0.7) return s;
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+}
+
 /**
  * Detail page for a single imaging study. Layout:
  *
@@ -109,10 +121,14 @@ export default function ImagingDetailPage() {
           </button>
           <p className="text-base font-semibold truncate">
             {modalityLabel(headlineStudy?.modality)}
-            {headlineStudy?.body_part ? ` - ${headlineStudy.body_part}` : ""}
-            {headlineStudy?.study_date ? ` - ${headlineStudy.study_date}` : ""}
+            {headlineStudy?.body_part ? ` - ${niceCase(headlineStudy.body_part)}` : ""}
           </p>
           <p className="text-xs text-muted-foreground">
+            {/* Date lives on the parent ``documents.event_date`` (single
+                source of truth). Falls back to the study row's
+                aliased ``study_date`` for older payloads. */}
+            {(doc?.event_date || study.study_date) ?? "Unknown date"}
+            {" | "}
             {study.patient_name || "Unclassified"}
             {" | "}
             {study.num_series} series, {study.num_images} images

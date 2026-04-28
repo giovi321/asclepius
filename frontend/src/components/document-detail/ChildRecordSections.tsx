@@ -18,6 +18,22 @@ const modalityLabel = (code: string | null | undefined) =>
   !code ? "Unknown" : (MODALITY_LABELS[code.toUpperCase()] || code);
 const MODALITY_CODES = Object.keys(MODALITY_LABELS);
 
+/** DICOM tags routinely arrive in ALL-CAPS (e.g. body_part="ABDOMEN",
+ * series_description="T2 AXIAL FLAIR"). Title-case them for display
+ * without rewriting the stored value, so editing still shows the raw
+ * tag the user can fix.
+ */
+function niceCase(s: string | null | undefined): string {
+  if (!s) return "";
+  // Only normalise when the string is mostly upper-case — preserve
+  // mixed-case strings the user already curated.
+  const letters = s.replace(/[^a-zA-Z]/g, "");
+  if (!letters) return s;
+  const upperRatio = letters.replace(/[^A-Z]/g, "").length / letters.length;
+  if (upperRatio < 0.7) return s;
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+}
+
 export function EncountersSection({ encounters }: { encounters: any[] }) {
   if (!encounters?.length) return null;
   return (
@@ -189,6 +205,7 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
         docId={study.id}
         apiPath={apiPath}
         onSave={handleSaved}
+        formatDisplay={niceCase}
       />
       <EditableField
         label="Description"
@@ -197,6 +214,7 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
         docId={study.id}
         apiPath={apiPath}
         onSave={handleSaved}
+        formatDisplay={niceCase}
       />
       <EditableField
         label="Accession"
@@ -221,7 +239,7 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
               }`}
             >
               <span className="truncate">
-                Series {s.series_number ?? idx + 1}: {s.series_description || s.modality || "Untitled"}
+                Series {s.series_number ?? idx + 1}: {niceCase(s.series_description) || s.modality || "Untitled"}
               </span>
               <span className="text-xs text-muted-foreground tabular-nums">{s.num_images} images</span>
             </button>
@@ -230,7 +248,10 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
       )}
 
       {activeSeriesId != null && (
-        <div className="rounded-md border overflow-hidden h-[500px] mt-2">
+        // 720px gives the viewport enough room (toolbar + optional MR
+        // controls + 400px min viewport + slider row). A shorter
+        // container clips the slider thumb at the bottom.
+        <div className="rounded-md border h-[720px] mt-2 flex flex-col">
           <DicomViewer
             studyId={study.id}
             seriesId={activeSeriesId}
@@ -244,14 +265,25 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
           <p className="text-xs font-medium text-muted-foreground mt-3 mb-1">Linked documents</p>
           <ul className="space-y-1">
             {linkedDocs.map((d) => (
-              <li key={d.link_id} className="flex items-center justify-between text-sm">
+              <li
+                // The "report" entry is synthetic (no link_id). Build a
+                // composite key so it doesn't collide with real links.
+                key={d.link_type === "report" ? `report-${d.id}` : `link-${d.link_id}`}
+                className="flex items-center justify-between text-sm gap-2"
+              >
                 <button
                   onClick={() => navigate(`/documents/${d.id}`)}
-                  className="truncate hover:underline text-primary text-left"
+                  className="truncate hover:underline text-primary text-left flex-1 min-w-0"
                 >
                   {d.original_filename}
                 </button>
-                <span className="text-xs text-muted-foreground ml-2">{d.doc_type}</span>
+                {d.link_type === "report" ? (
+                  <span className="text-[10px] uppercase tracking-wide rounded-full bg-primary/10 text-primary px-2 py-0.5 flex-shrink-0">
+                    Report
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">{d.doc_type}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -259,12 +291,15 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
       )}
 
       {bundleFiles.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mt-3 mb-1 flex items-center gap-1.5">
+        // Collapsed by default — bundle files are auxiliary
+        // (DICOMDIR + JPEG previews) and the user only opens them
+        // occasionally. <details> renders a tidy native disclosure.
+        <details className="mt-3">
+          <summary className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 cursor-pointer hover:text-foreground select-none">
             <FileImage className="h-3.5 w-3.5" />
-            Bundle files
-          </p>
-          <ul className="max-h-40 overflow-y-auto space-y-0.5 text-xs">
+            Bundle files ({bundleFiles.length})
+          </summary>
+          <ul className="max-h-40 overflow-y-auto space-y-0.5 text-xs mt-2">
             {bundleFiles.map((f) => (
               <li key={f.name} className="flex items-center justify-between">
                 <a
@@ -281,7 +316,7 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
     </Section>
   );

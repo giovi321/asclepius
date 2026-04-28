@@ -17,6 +17,16 @@ function modalityLabel(code: string | null | undefined): string {
   return MODALITY_LABELS[code.toUpperCase()] || code;
 }
 
+/** Title-case DICOM-source strings that arrive in ALL CAPS. */
+function niceCase(s: string | null | undefined): string {
+  if (!s) return "";
+  const letters = s.replace(/[^a-zA-Z]/g, "");
+  if (!letters) return s;
+  const upperRatio = letters.replace(/[^A-Z]/g, "").length / letters.length;
+  if (upperRatio < 0.7) return s;
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+}
+
 interface Study {
   id: number;
   document_id: number;
@@ -210,7 +220,7 @@ export default function ImagingPage() {
                 className="border-b cursor-pointer hover:bg-accent/30 transition-colors"
               >
                 <td className="px-3 py-2">{modalityLabel(s.modality)}</td>
-                <td className="px-3 py-2 text-muted-foreground">{s.body_part || "Unknown"}</td>
+                <td className="px-3 py-2 text-muted-foreground">{niceCase(s.body_part) || "Unknown"}</td>
                 <td className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || "—"}</td>
                 <td className="px-3 py-2 text-muted-foreground truncate">{s.institution_name || "Unknown"}</td>
                 <td className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || s.referring_physician || "Unknown"}</td>

@@ -32,7 +32,7 @@ export function InfoRow({ label, value }: { label: string; value: any }) {
 
 // ─── EditableField ─────────────────────────────────────────────
 
-export function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false, apiPath }: {
+export function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false, apiPath, formatDisplay }: {
   label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
   type?: string; multiline?: boolean;
   /** Override the PATCH endpoint. Defaults to ``/documents/{docId}`` so
@@ -40,6 +40,11 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
    * page passes ``/imaging/{studyId}/metadata`` so modality, body_part,
    * etc. save against ``imaging_studies`` instead. */
   apiPath?: string;
+  /** Optional read-only formatter for the displayed value. The raw
+   * value is still used for editing and saving — the formatter only
+   * affects how it appears in the row. Used to title-case DICOM-source
+   * strings like body_part="ABDOMEN" without rewriting the DB. */
+  formatDisplay?: (v: any) => string;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -93,7 +98,9 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
       onClick={() => { setVal(value || ""); setEditing(true); }}>
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">
-        {value || <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+        {value
+          ? (formatDisplay ? formatDisplay(value) : value)
+          : <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
       </span>
     </div>
   );

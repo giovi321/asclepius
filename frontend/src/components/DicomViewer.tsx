@@ -313,16 +313,17 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
         />
       </div>
 
-      {/* Frame slider */}
+      {/* Frame slider — extra vertical padding so the range thumb stays
+          inside the container (some browsers render it ~16px tall). */}
       {totalFrames > 1 && (
-        <div className="px-3 py-2 border-t bg-muted/30">
+        <div className="px-4 py-3 border-t bg-muted/30 flex-shrink-0">
           <input
             type="range"
             min={0}
             max={totalFrames - 1}
             value={currentFrame}
             onChange={(e) => setCurrentFrame(Number(e.target.value))}
-            className="w-full accent-primary"
+            className="block w-full accent-primary"
           />
         </div>
       )}

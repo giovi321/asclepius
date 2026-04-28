@@ -990,7 +990,15 @@ export interface paths {
         };
         /**
          * List Imaging Links
-         * @description Documents linked to this imaging study (e.g. a radiology report PDF).
+         * @description Documents linked to this imaging study.
+         *
+         *     The first item is ALWAYS the parent radiology report — even though
+         *     technically it isn't a row in ``document_links`` (the imaging study
+         *     is a child of that document). Surfacing it as a synthetic link
+         *     means clinicians see the report in the same place as any other
+         *     related document. The synthetic entry is marked with
+         *     ``link_type='report'`` and ``link_id=null`` so the frontend doesn't
+         *     offer an "unlink" affordance for it (you can't unlink a parent).
          */
         get: operations["list_imaging_links_api_imaging__study_id__links_get"];
         put?: never;

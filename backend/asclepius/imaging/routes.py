@@ -457,8 +457,43 @@ async def list_imaging_links(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Documents linked to this imaging study (e.g. a radiology report PDF)."""
+    """Documents linked to this imaging study.
+
+    The first item is ALWAYS the parent radiology report — even though
+    technically it isn't a row in ``document_links`` (the imaging study
+    is a child of that document). Surfacing it as a synthetic link
+    means clinicians see the report in the same place as any other
+    related document. The synthetic entry is marked with
+    ``link_type='report'`` and ``link_id=null`` so the frontend doesn't
+    offer an "unlink" affordance for it (you can't unlink a parent).
+    """
     study = await _study_with_access(study_id, current_user, db)
+    document_id = study["document_id"]
+
+    items: list[dict] = []
+
+    # Synthetic "report" entry for the parent document. We render it
+    # whether or not the report PDF is actually attached — when it's a
+    # placeholder the frontend already shows an *Upload PDF* affordance
+    # at the slot above; here it just gives clinicians a navigation
+    # entry to the document detail.
+    if document_id:
+        cursor = await db.execute(
+            "SELECT id, original_filename, doc_type, event_date "
+            "FROM documents WHERE id = ?",
+            (document_id,),
+        )
+        report_row = await cursor.fetchone()
+        if report_row:
+            items.append({
+                "link_id": None,
+                "link_type": "report",
+                "id": report_row["id"],
+                "original_filename": report_row["original_filename"],
+                "doc_type": report_row["doc_type"],
+                "event_date": report_row["event_date"],
+            })
+
     cursor = await db.execute(
         """SELECT dl.id AS link_id, dl.link_type, d.id, d.original_filename,
                   d.doc_type, d.event_date
@@ -471,10 +506,11 @@ async def list_imaging_links(
            FROM document_links dl
            JOIN documents d ON d.id = dl.source_document_id
            WHERE dl.target_document_id = ?""",
-        (study["document_id"], study["document_id"]),
+        (document_id, document_id),
     )
     rows = await cursor.fetchall()
-    return {"items": [dict(r) for r in rows]}
+    items.extend(dict(r) for r in rows)
+    return {"items": items}
 
 
 @router.post("/{study_id}/links", status_code=201)

@@ -2929,7 +2929,7 @@
           "imaging"
         ],
         "summary": "List Imaging Links",
-        "description": "Documents linked to this imaging study (e.g. a radiology report PDF).",
+        "description": "Documents linked to this imaging study.\n\nThe first item is ALWAYS the parent radiology report \u2014 even though\ntechnically it isn't a row in ``document_links`` (the imaging study\nis a child of that document). Surfacing it as a synthetic link\nmeans clinicians see the report in the same place as any other\nrelated document. The synthetic entry is marked with\n``link_type='report'`` and ``link_id=null`` so the frontend doesn't\noffer an \"unlink\" affordance for it (you can't unlink a parent).",
         "operationId": "list_imaging_links_api_imaging__study_id__links_get",
         "parameters": [
           {

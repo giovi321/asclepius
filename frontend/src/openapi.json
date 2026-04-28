@@ -1714,6 +1714,108 @@
         }
       }
     },
+    "/api/encounters/{encounter_id}": {
+      "patch": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Update Encounter",
+        "description": "Edit an encounter's diagnosis / specialty / notes inline.\n\n``diagnosis_original`` and ``specialty_original`` resolve to canonical\nnorm_* ids on the same row so the detail-view join (which displays via\n``norm_*`` tables) reflects the change.",
+        "operationId": "update_encounter_api_encounters__encounter_id__patch",
+        "parameters": [
+          {
+            "name": "encounter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Encounter Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncounterPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/medications/{medication_id}": {
+      "patch": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Update Medication",
+        "description": "Edit a medication row inline. ``active_ingredient_original`` resolves\nto ``norm_medication_id`` so future extractions pick up the alias.",
+        "operationId": "update_medication_api_medications__medication_id__patch",
+        "parameters": [
+          {
+            "name": "medication_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Medication Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedicationPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/events": {
       "get": {
         "tags": [
@@ -2736,7 +2838,7 @@
           "imaging"
         ],
         "summary": "Get Frame",
-        "description": "Serve a frame as PNG (default) or raw DICOM.\n\n``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth\nso MRI users can adjust contrast / brightness from the viewer without\nre-decoding pixel data on the client. Both must be supplied together;\notherwise the file's own VOI LUT is used (or a default min-max\nnormalisation when none is present).",
+        "description": "Serve a frame as PNG (default) or raw DICOM.\n\n``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth\nso MRI users can adjust contrast / brightness from the viewer without\nre-decoding pixel data on the client. Both must be supplied together;\notherwise the file's own VOI LUT is used (or a default min-max\nnormalisation when none is present).\n\n``upscale`` (1-4) bicubic-resamples the PNG to N\u00d7 the source size before\nencoding. The viewer asks for ``upscale=2`` once the user zooms past\n~1.5\u00d7 and ``upscale=4`` past ~3\u00d7, trading bandwidth for sharpness so\nthe canvas-scale fallback no longer pixelates.",
         "operationId": "get_frame_api_imaging__study_id__series__series_id__frame__index__get",
         "parameters": [
           {
@@ -2807,6 +2909,18 @@
                 }
               ],
               "title": "Ww"
+            }
+          },
+          {
+            "name": "upscale",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 4,
+              "minimum": 1,
+              "default": 1,
+              "title": "Upscale"
             }
           }
         ],
@@ -5143,6 +5257,95 @@
         }
       }
     },
+    "/api/settings/view-prefs/{view_key}": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get View Prefs",
+        "description": "Return the user's stored prefs for ``view_key`` or ``null`` keys\nwhen no row exists. Frontend treats null as \"use defaults\".",
+        "operationId": "get_view_prefs_api_settings_view_prefs__view_key__get",
+        "parameters": [
+          {
+            "name": "view_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "View Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Set View Prefs",
+        "operationId": "set_view_prefs_api_settings_view_prefs__view_key__put",
+        "parameters": [
+          {
+            "name": "view_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "View Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ViewPrefsBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -5745,6 +5948,72 @@
         "type": "object",
         "title": "DocumentUpdate",
         "description": "Partial update payload. Unset fields are left untouched."
+      },
+      "EncounterPatch": {
+        "properties": {
+          "diagnosis_original": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis Original"
+          },
+          "diagnosis_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis Code"
+          },
+          "specialty_original": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specialty Original"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "findings": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Findings"
+          }
+        },
+        "type": "object",
+        "title": "EncounterPatch"
       },
       "EventCreate": {
         "properties": {
@@ -6994,6 +7263,96 @@
           "event_type"
         ],
         "title": "MedicalEventDetail"
+      },
+      "MedicationPatch": {
+        "properties": {
+          "active_ingredient_original": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Ingredient Original"
+          },
+          "brand_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Name"
+          },
+          "dosage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dosage"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Form"
+          },
+          "frequency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frequency"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          }
+        },
+        "type": "object",
+        "title": "MedicationPatch"
       },
       "MergeBatchRequest": {
         "properties": {
@@ -8259,6 +8618,26 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ViewPrefsBody": {
+        "properties": {
+          "visible": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Visible"
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Order"
+          }
+        },
+        "type": "object",
+        "title": "ViewPrefsBody"
       }
     }
   }

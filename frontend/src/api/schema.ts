@@ -670,6 +670,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/encounters/{encounter_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Encounter
+         * @description Edit an encounter's diagnosis / specialty / notes inline.
+         *
+         *     ``diagnosis_original`` and ``specialty_original`` resolve to canonical
+         *     norm_* ids on the same row so the detail-view join (which displays via
+         *     ``norm_*`` tables) reflects the change.
+         */
+        patch: operations["update_encounter_api_encounters__encounter_id__patch"];
+        trace?: never;
+    };
+    "/api/medications/{medication_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Medication
+         * @description Edit a medication row inline. ``active_ingredient_original`` resolves
+         *     to ``norm_medication_id`` so future extractions pick up the alias.
+         */
+        patch: operations["update_medication_api_medications__medication_id__patch"];
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -926,6 +971,11 @@ export interface paths {
          *     re-decoding pixel data on the client. Both must be supplied together;
          *     otherwise the file's own VOI LUT is used (or a default min-max
          *     normalisation when none is present).
+         *
+         *     ``upscale`` (1-4) bicubic-resamples the PNG to N× the source size before
+         *     encoding. The viewer asks for ``upscale=2`` once the user zooms past
+         *     ~1.5× and ``upscale=4`` past ~3×, trading bandwidth for sharpness so
+         *     the canvas-scale fallback no longer pixelates.
          */
         get: operations["get_frame_api_imaging__study_id__series__series_id__frame__index__get"];
         put?: never;
@@ -1800,6 +1850,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/view-prefs/{view_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get View Prefs
+         * @description Return the user's stored prefs for ``view_key`` or ``null`` keys
+         *     when no row exists. Frontend treats null as "use defaults".
+         */
+        get: operations["get_view_prefs_api_settings_view_prefs__view_key__get"];
+        /** Set View Prefs */
+        put: operations["set_view_prefs_api_settings_view_prefs__view_key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -2021,6 +2093,19 @@ export interface components {
             original_filename?: string | null;
             /** User Notes */
             user_notes?: string | null;
+        };
+        /** EncounterPatch */
+        EncounterPatch: {
+            /** Diagnosis Original */
+            diagnosis_original?: string | null;
+            /** Diagnosis Code */
+            diagnosis_code?: string | null;
+            /** Specialty Original */
+            specialty_original?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Findings */
+            findings?: string | null;
         };
         /** EventCreate */
         EventCreate: {
@@ -2354,6 +2439,23 @@ export interface components {
              */
             documents: components["schemas"]["LinkedDocument"][];
         };
+        /** MedicationPatch */
+        MedicationPatch: {
+            /** Active Ingredient Original */
+            active_ingredient_original?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Dosage */
+            dosage?: string | null;
+            /** Form */
+            form?: string | null;
+            /** Frequency */
+            frequency?: string | null;
+            /** Duration */
+            duration?: string | null;
+            /** Quantity */
+            quantity?: string | null;
+        };
         /** MergeBatchRequest */
         MergeBatchRequest: {
             /** Source Ids */
@@ -2677,6 +2779,13 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** ViewPrefsBody */
+        ViewPrefsBody: {
+            /** Visible */
+            visible?: string[];
+            /** Order */
+            order?: string[];
         };
     };
     responses: never;
@@ -3814,6 +3923,76 @@ export interface operations {
             };
         };
     };
+    update_encounter_api_encounters__encounter_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                encounter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EncounterPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_medication_api_medications__medication_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                medication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MedicationPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_events_api_events_get: {
         parameters: {
             query?: {
@@ -4384,6 +4563,7 @@ export interface operations {
                 format?: string;
                 wc?: number | null;
                 ww?: number | null;
+                upscale?: number;
             };
             header?: never;
             path: {
@@ -6075,6 +6255,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_view_prefs_api_settings_view_prefs__view_key__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_view_prefs_api_settings_view_prefs__view_key__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ViewPrefsBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

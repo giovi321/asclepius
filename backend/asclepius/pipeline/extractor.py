@@ -15,6 +15,25 @@ from datetime import date
 
 import aiosqlite
 
+from asclepius.config import AppConfig
+from asclepius.llm.base import LLMProvider
+from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
+
+from .entity_matching import (
+    _match_patient,
+    _resolve_specialty_from_doctor,
+    _upsert_doctor,
+    _upsert_facility,
+    normalize_name,
+    strip_doctor_title,
+)
+from .extractor_db import (
+    _resolve_diagnosis,
+    _resolve_lab_test,
+    _resolve_medication,
+    _resolve_specialty_from_data,
+)
+
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -37,25 +56,6 @@ def _coerce_iso_date(value) -> str | None:
     except ValueError:
         return None
     return s
-
-from asclepius.config import AppConfig
-from asclepius.llm.base import LLMProvider
-from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
-
-from .entity_matching import (
-    _match_patient,
-    _resolve_specialty_from_doctor,
-    _upsert_doctor,
-    _upsert_facility,
-    normalize_name,
-    strip_doctor_title,
-)
-from .extractor_db import (
-    _resolve_diagnosis,
-    _resolve_lab_test,
-    _resolve_medication,
-    _resolve_specialty_from_data,
-)
 
 __all__ = [
     "build_extraction_context",

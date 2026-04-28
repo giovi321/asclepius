@@ -2,7 +2,17 @@ import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import { Eye, EyeOff, Pencil, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
+
+/** Proper singular noun for each normalization entity type. The previous
+ * copy used ``normType.slice(0, -1)`` which produced "facilitie" and
+ * "specialtie" — close, no cigar. */
+const NORM_SINGULAR: Record<"doctors" | "facilities" | "specialties", string> = {
+  doctors: "doctor",
+  facilities: "facility",
+  specialties: "specialty",
+};
 
 // ─── Section wrapper ───────────────────────────────────────────
 
@@ -186,6 +196,7 @@ export function EditableCombobox({
   currentEntityId?: number | null;
 }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -197,6 +208,8 @@ export function EditableCombobox({
     entityId: number | null;
   } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const singular = NORM_SINGULAR[normType];
+  const fromLabel = String(value || "").trim();
 
   const doctors = useDoctors();
   const facilities = useFacilities();
@@ -265,6 +278,22 @@ export function EditableCombobox({
       await commitDocOnly(newDisplay);
       return;
     }
+    // Bulk action — get explicit user confirmation. The merge / rename
+    // path cascades through every linked row, so the blast radius is
+    // potentially much larger than just the current document.
+    const isMerge = !!(targetEntityId && targetEntityId !== currentEntityId);
+    const ok = await confirm({
+      title: isMerge
+        ? `Merge "${fromLabel}" into "${newDisplay}"?`
+        : `Rename "${fromLabel}" to "${newDisplay}"?`,
+      description: isMerge
+        ? `Every document, encounter and other record currently labelled "${fromLabel}" will be relabelled "${newDisplay}". The "${fromLabel}" ${singular} record will be deleted and its aliases moved onto "${newDisplay}". This affects all linked records, not just the current document.`
+        : `The ${singular} record currently called "${fromLabel}" will be renamed to "${newDisplay}". Every document, encounter and other record linked to it will display the new name. This affects all linked records, not just the current document.`,
+      confirmText: isMerge ? "Merge all" : "Rename all",
+      cancelText: "Cancel",
+      variant: "destructive",
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       if (targetEntityId && targetEntityId !== currentEntityId) {
@@ -282,7 +311,18 @@ export function EditableCombobox({
           canonical_display: newDisplay,
         });
       }
-      onSave();
+      // Refetch the document so the parent state picks up the new
+      // joined display name. Without this the page keeps showing the
+      // old name until the user reloads, because merge/rename mutate
+      // a different table than the document row.
+      try {
+        const fresh = await api.get(`/documents/${docId}`);
+        onSave(fresh.data);
+      } catch {
+        // Worst case the parent keeps stale state; the underlying
+        // change has still been persisted server-side.
+        onSave();
+      }
       setEditing(false);
       setQuery("");
       setPendingChange(null);
@@ -416,37 +456,51 @@ export function EditableCombobox({
                 )}
                 {pendingChange && (
                   // Two-button scope confirm. Fires for every change to a
-                  // populated field — picking a sibling entry, typing a
+                  // populated field: picking a sibling entry, typing a
                   // new name, anything that's not a no-op or a clear.
                   // The "all documents" path adapts: merge when the user
                   // picked an existing entry, rename when they typed a
                   // brand-new name. Both cascade through joins so every
                   // doc linked to the old entity follows automatically.
                   <div className="border-t bg-muted/30 p-2 space-y-2">
-                    <p className="text-[11px] text-muted-foreground">
-                      Apply <span className="font-medium">"{pendingChange.display}"</span> to:
-                    </p>
+                    <div className="rounded border bg-background px-2 py-1.5">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Change {singular}
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                        <span className="rounded bg-muted px-1.5 py-0.5 font-medium break-all">
+                          {fromLabel || <span className="text-muted-foreground italic">(empty)</span>}
+                        </span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary break-all">
+                          {pendingChange.display}
+                        </span>
+                      </div>
+                    </div>
                     <div className="flex flex-col gap-1">
                       <button
                         onClick={() => commitDocOnly(pendingChange.display)}
                         disabled={saving}
-                        className="rounded border bg-background px-2 py-1 text-left text-xs hover:bg-accent disabled:opacity-50"
+                        className="rounded border bg-background px-2 py-1.5 text-left text-xs hover:bg-accent disabled:opacity-50"
                       >
-                        <span className="font-medium">This document only</span>
-                        <span className="block text-[10px] text-muted-foreground">
-                          Repoint just this document. Other documents linked to the current {normType.slice(0, -1)} keep their existing value.
+                        <span className="font-medium">Just this document</span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
+                          Only this document switches to <span className="font-medium">"{pendingChange.display}"</span>.
+                          Other documents labelled <span className="font-medium">"{fromLabel}"</span> stay as they are.
                         </span>
                       </button>
                       <button
                         onClick={() => applyToAllDocuments(pendingChange.display, pendingChange.entityId)}
                         disabled={saving}
-                        className="rounded border border-primary/30 bg-primary/5 px-2 py-1 text-left text-xs hover:bg-primary/10 disabled:opacity-50"
+                        className="rounded border border-primary/40 bg-primary/5 px-2 py-1.5 text-left text-xs hover:bg-primary/10 disabled:opacity-50"
                       >
-                        <span className="font-medium">All documents</span>
-                        <span className="block text-[10px] text-muted-foreground">
+                        <span className="font-medium">
+                          Every document with "{fromLabel}"
+                        </span>
+                        <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
                           {pendingChange.entityId && pendingChange.entityId !== currentEntityId
-                            ? <>Merge the current {normType.slice(0, -1)} into the picked one. Every linked document follows.</>
-                            : <>Rename the current {normType.slice(0, -1)} record. Every linked document follows.</>}
+                            ? <>All documents currently labelled <span className="font-medium">"{fromLabel}"</span> will be relabelled <span className="font-medium">"{pendingChange.display}"</span>. The two {normType} are merged. Confirmation required.</>
+                            : <>The {singular} record <span className="font-medium">"{fromLabel}"</span> is renamed to <span className="font-medium">"{pendingChange.display}"</span>, so every linked document picks up the new name. Confirmation required.</>}
                         </span>
                       </button>
                       <button

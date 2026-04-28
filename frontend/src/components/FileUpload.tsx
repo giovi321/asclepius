@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Upload, CheckCircle, AlertCircle, X, Calendar } from "lucide-react";
@@ -29,6 +29,12 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [showPatientPrompt, setShowPatientPrompt] = useState(false);
+  // Synchronous re-entry guard. ``uploading`` (state) only flips on
+  // the next render, so two onClicks fired in the same frame both see
+  // ``uploading === false`` and would each kick off a full upload of
+  // the same files. The ref short-circuits the second call before the
+  // network request goes out.
+  const uploadInFlightRef = useRef(false);
   const { data: patientsData } = usePatients();
   const patients = Array.isArray(patientsData) ? patientsData : [];
   const [chosenPatientId, setChosenPatientId] = useState<string>("");
@@ -68,6 +74,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
 
   const doUpload = useCallback(
     async (files: File[], patientId: number | null, eventId: number | null = null) => {
+      if (uploadInFlightRef.current) return;
+      uploadInFlightRef.current = true;
       setUploading(true);
       setResult(null);
       setShowPatientPrompt(false);
@@ -110,6 +118,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       }
 
       setUploading(false);
+      uploadInFlightRef.current = false;
       setUploadedCount(successCount);
 
       if (errorCount === 0) {
@@ -193,13 +202,15 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           <div className="flex gap-2">
             <button
               onClick={() => doUpload(pendingFiles, chosenPatientId ? Number(chosenPatientId) : null, chosenEventId ? Number(chosenEventId) : null)}
-              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+              disabled={uploading}
+              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Upload
+              {uploading ? "Uploading..." : "Upload"}
             </button>
             <button
               onClick={() => { setShowPatientPrompt(false); setPendingFiles(null); }}
-              className="rounded-md border px-4 py-2 text-sm"
+              disabled={uploading}
+              className="rounded-md border px-4 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Cancel
             </button>

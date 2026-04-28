@@ -119,14 +119,37 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
 
     async def _run():
         from asclepius.pipeline.processor import process_file, ProviderUnreachableError
+        from asclepius.pipeline.inbox_sweep import sweep_inbox
+        import aiosqlite as _aiosqlite
 
         consecutive_provider_failures = 0
+        idle_ticks_since_sweep = 0
 
         while True:
             try:
                 _priority, file_path = queue.get(timeout=2)
             except Empty:
+                # Run the inbox sweep after a stretch of idle ticks (~30s)
+                # so duplicate / orphan files left behind by a crashed
+                # process get cleaned up without a restart. The sweep
+                # is a fast no-op when the inbox is empty.
+                idle_ticks_since_sweep += 1
+                if idle_ticks_since_sweep >= 15:
+                    idle_ticks_since_sweep = 0
+                    try:
+                        async with _aiosqlite.connect(config.database.path) as _db:
+                            _db.row_factory = _aiosqlite.Row
+                            await sweep_inbox(
+                                inbox_root=Path(config.vault.inbox_path),
+                                vault_root=Path(config.vault.root_path),
+                                db=_db,
+                            )
+                    except Exception:
+                        logger.debug("Inbox idle sweep failed (non-fatal)", exc_info=True)
                 continue
+            # Picked up a file → reset idle counter so we don't sweep
+            # mid-batch.
+            idle_ticks_since_sweep = 0
 
             try:
                 logger.info("Pipeline worker processing: %s", Path(file_path).name)
@@ -229,9 +252,28 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     observer.start()
     logger.info("File watcher started on %s", inbox_path)
 
-    # Scan for existing files in inbox — rglob to reach per-user subfolders
-    # (inbox/user-{id}/…). The watchdog Observer above is already recursive
-    # so new files in those subfolders are picked up automatically.
+    # First: sweep the inbox for files that are already ingested
+    # somewhere under the vault. This catches duplicates a previous
+    # process left behind (e.g. crash after copy, before unlink) so
+    # they don't get re-queued and re-processed below.
+    try:
+        import aiosqlite as _aiosqlite
+        from asclepius.pipeline.inbox_sweep import sweep_inbox
+        async with _aiosqlite.connect(config.database.path) as _db:
+            _db.row_factory = _aiosqlite.Row
+            await _db.execute("PRAGMA foreign_keys=ON")
+            await sweep_inbox(
+                inbox_root=Path(inbox_path),
+                vault_root=Path(config.vault.root_path),
+                db=_db,
+            )
+    except Exception:
+        logger.warning("Inbox sweep failed at startup (non-fatal)", exc_info=True)
+
+    # Scan for existing files in inbox — rglob to reach per-upload
+    # subfolders (inbox/{patient-slug}/, inbox/user-{id}/, …). The
+    # watchdog Observer above is already recursive so new files in
+    # those subfolders are picked up automatically.
     for f in Path(inbox_path).rglob("*"):
         if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS and not f.name.startswith("."):
             logger.info("Queuing existing inbox file: %s", f.relative_to(inbox_path))

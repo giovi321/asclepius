@@ -14,16 +14,12 @@ import {
   Move,
 } from "lucide-react";
 
-// Folders that are part of the app's own plumbing — never useful to a user
-// browsing their vault. Matched only at the top level so a patient-named
-// folder that happens to collide wouldn't be hidden.
-const ROOT_HIDDEN_FOLDERS = new Set(["config"]);
-
-// Per-patient plumbing folders. Hidden when the user navigates inside a
-// patient directory so the year folders (and their imaging study peers)
-// stay tidy. ``imaging-bundles`` holds DICOMDIR + JPEG previews extracted
-// from zip uploads — they are accessed via the imaging UI, not directly.
-const PATIENT_HIDDEN_FOLDERS = new Set(["imaging-bundles"]);
+// Hidden-folder rules live in lib/vaultHidden so the file browser and the
+// DocumentViewer's "Pick file from vault" recovery picker show identical
+// trees. ``config/`` at root, ``imaging-bundles/`` inside a patient.
+import {
+  ROOT_HIDDEN_FOLDERS, PATIENT_HIDDEN_FOLDERS,
+} from "@/lib/vaultHidden";
 
 interface TreeNode {
   name: string;

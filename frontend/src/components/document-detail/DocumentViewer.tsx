@@ -4,6 +4,7 @@ import { FileText, Download, Image as ImageIcon, FileX2, Upload, Search, X } fro
 import api from "@/api/client";
 import PdfViewer from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
+import { isHiddenVaultPath } from "@/lib/vaultHidden";
 
 export interface DocumentViewerProps {
   id: number | string;
@@ -110,14 +111,15 @@ export default function DocumentViewer({
       // Augment with a vault tree fetch so the user can browse.
       const list: string[] = res.data?.candidates || [];
       if (list.length === 0) {
-        // Fall back to the full vault tree top-level.
+        // Fall back to the full vault tree. Walk client-side and apply
+        // the SAME hidden-folder rules the FileBrowser uses, so the two
+        // pages always show the same set of paths to choose from.
         try {
           const t = await api.get("/vault/tree");
-          // Walk the tree client-side for files only (small set; this is
-          // the broken-file path so accuracy beats speed).
           const flat: string[] = [];
           const walk = (n: any) => {
             if (!n) return;
+            if (n.path && isHiddenVaultPath(n.path)) return;
             if (n.type === "file" && n.path) flat.push(n.path);
             (n.children || []).forEach(walk);
           };
@@ -127,7 +129,10 @@ export default function DocumentViewer({
           setPickerResults([]);
         }
       } else {
-        setPickerResults(list);
+        // Even the find-candidates results pass through the visibility
+        // rules — find-candidates already skips ``inbox/`` but not
+        // ``imaging-bundles/`` etc.
+        setPickerResults(list.filter((p) => !isHiddenVaultPath(p)));
       }
     } catch {
       setPickerResults([]);

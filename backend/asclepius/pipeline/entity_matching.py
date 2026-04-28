@@ -67,6 +67,38 @@ def strip_doctor_title(name: str) -> str:
     return " ".join(tokens)
 
 
+def normalize_facility_name(name: str) -> str:
+    """Normalize a facility name without crushing acronyms.
+
+    Title-cases lowercase tokens but preserves any token that already contains
+    two or more consecutive uppercase letters — that's how Italian hospital
+    networks (ASST, AOU, IRCCS, ATS, …) and most English acronyms are written.
+    Particles ("de", "della", "von", …) are still lowered when they aren't the
+    first word so "Ospedale Di Milano" → "Ospedale di Milano".
+
+    Doctor names use ``normalize_name`` because they need title-case + the
+    "Dr."/"Prof." prefix mapping; facilities don't.
+    """
+    if not name:
+        return name
+
+    particles = {"von", "della", "del", "de", "di", "van", "den", "der", "la", "le", "da"}
+    words = name.split()
+    result = []
+    for i, word in enumerate(words):
+        if any(c.isupper() for c in word[1:]) and sum(1 for c in word if c.isupper()) >= 2:
+            # Token already carries an acronym shape (>=2 uppercase letters,
+            # at least one of them past position 0). Trust it as-is.
+            result.append(word)
+            continue
+        lower = word.lower().rstrip(".")
+        if i > 0 and lower in particles:
+            result.append(lower)
+        else:
+            result.append(word.capitalize())
+    return " ".join(result)
+
+
 def normalize_name(name: str) -> str:
     """Normalize doctor/facility name capitalization.
 
@@ -166,7 +198,7 @@ async def _upsert_facility(db: aiosqlite.Connection, facility_data: dict) -> int
     """
     from asclepius.patients.service import slugify
 
-    name = normalize_name(facility_data["name"])
+    name = normalize_facility_name(facility_data["name"])
     slug = slugify(name)
 
     cursor = await db.execute(

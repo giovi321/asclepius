@@ -34,7 +34,14 @@ NORM_TABLES = {
         "main": "norm_specialties",
         "aliases": "norm_specialty_aliases",
         "fk": "norm_specialty_id",
-        "ref_tables": [{"table": "encounters", "col": "norm_specialty_id"}],
+        # Every table whose schema declares an FK to norm_specialties(id) must
+        # appear here, otherwise the source row's DELETE in _merge_one violates
+        # the FK constraint. Per schema.sql: documents, doctors, encounters.
+        "ref_tables": [
+            {"table": "encounters", "col": "norm_specialty_id"},
+            {"table": "documents", "col": "norm_specialty_id"},
+            {"table": "doctors", "col": "norm_specialty_id"},
+        ],
         "doc_sources": [
             ("documents", "norm_specialty_id"),
             ("encounters", "norm_specialty_id"),

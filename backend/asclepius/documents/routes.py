@@ -263,14 +263,23 @@ async def update_doc(
         name = (updates["facility_name"] or "").strip()
         updates["facility_id"] = await _upsert_facility(db, {"name": name}) if name else None
 
-    # Clearing the free-text specialty should also drop its normalized FK;
-    # otherwise the normalization page and detail view disagree (empty text
-    # vs. a still-linked canonical entry).
+    # specialty_original is the user's free-text. The detail view displays via
+    # the norm_specialties join (norm_specialty_id), so we must also resolve /
+    # auto-create a canonical row, otherwise the edit looks like a no-op.
+    # Clearing the field drops the FK in lockstep so the two views agree.
     if "specialty_original" in updates:
         raw_specialty = updates["specialty_original"]
         if raw_specialty is None or not str(raw_specialty).strip():
             updates["specialty_original"] = None
             updates["norm_specialty_id"] = None
+        else:
+            from asclepius.normalization.resolver import AliasCache, resolve_specialty
+            cleaned = str(raw_specialty).strip()
+            updates["specialty_original"] = cleaned
+            cache = AliasCache()
+            norm_id = await resolve_specialty(db, cache, cleaned)
+            if norm_id is not None:
+                updates["norm_specialty_id"] = norm_id
 
     # Log corrections before applying updates (compares against raw_extraction)
     from asclepius.documents.corrections import log_corrections

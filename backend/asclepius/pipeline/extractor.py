@@ -10,8 +10,33 @@ import _upsert_doctor, _match_patient, …`` call sites keep working.
 
 import json
 import logging
+import re
+from datetime import date
 
 import aiosqlite
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _coerce_iso_date(value) -> str | None:
+    """Return ``value`` as an ISO ``YYYY-MM-DD`` string, or None if unparseable.
+
+    The LLM occasionally emits placeholders like ``"unknown"``, ``"n/a"``, or
+    a malformed date such as ``"2024-13-40"``. We accept only strict ISO so
+    the document's ``event_date`` fallback can fire downstream.
+    """
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value.isoformat()
+    s = str(value).strip()
+    if not s or not _ISO_DATE_RE.match(s):
+        return None
+    try:
+        date.fromisoformat(s)
+    except ValueError:
+        return None
+    return s
 
 from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
@@ -719,7 +744,9 @@ async def extract_and_store(
             norm_id = lab.get("norm_lab_test_id")
             if norm_id is None:
                 norm_id = await _resolve_lab_test(db, lab)
-            lab_test_date = lab.get("test_date") or doc_best_date
+            # Strict ISO parse: garbage strings ("unknown", "n/a", malformed
+            # dates) are dropped so the parent's event_date fallback fires.
+            lab_test_date = _coerce_iso_date(lab.get("test_date")) or doc_best_date
             await db.execute(
                 """INSERT INTO lab_results
                    (document_id, patient_id, test_name_original, norm_lab_test_id,
@@ -733,6 +760,19 @@ async def extract_and_store(
                  lab.get("sample_type"), lab.get("panel_name"),
                  lab_test_date),
             )
+
+        # Belt-and-braces: if any lab rows still have NULL test_date but the
+        # parent document carries an event_date, copy it across. Covers the
+        # edge case where event_date is stamped after the lab loop runs (some
+        # extraction paths reorder).
+        await db.execute(
+            """UPDATE lab_results SET test_date = (
+                   SELECT event_date FROM documents WHERE id = ?
+               )
+               WHERE document_id = ? AND test_date IS NULL
+                 AND (SELECT event_date FROM documents WHERE id = ?) IS NOT NULL""",
+            (doc_id, doc_id, doc_id),
+        )
 
         # Insert encounters/diagnoses
         encounter = extraction.get("encounter", {})

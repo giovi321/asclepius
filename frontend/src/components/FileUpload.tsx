@@ -26,7 +26,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const { selectedPatient } = usePatient();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string; failures?: { file: string; reason: string }[] } | null>(null);
+  const [showFailures, setShowFailures] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [showPatientPrompt, setShowPatientPrompt] = useState(false);
   // Synchronous re-entry guard. ``uploading`` (state) only flips on
@@ -88,6 +89,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       let zipDicom = 0;
       let zipOther = 0;
       let sawZip = false;
+      const failures: { file: string; reason: string }[] = [];
       for (const file of files) {
         try {
           const form = new FormData();
@@ -110,9 +112,15 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
             zipDicom += data.dicom || 0;
             zipOther += data.other || 0;
           }
-          // Try to get the doc ID from the response filename by looking it up
-          // We'll collect IDs after all uploads complete
-        } catch {
+        } catch (err: any) {
+          // Capture as much detail as possible — backend returns
+          // ``{detail: "..."}`` on validation errors; axios surfaces both
+          // the response body and the wire error message.
+          const detail = err?.response?.data?.detail;
+          const reason = (typeof detail === "string" && detail)
+            || err?.message
+            || "Upload failed";
+          failures.push({ file: file.name, reason });
           errorCount++;
         }
       }
@@ -120,6 +128,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       setUploading(false);
       uploadInFlightRef.current = false;
       setUploadedCount(successCount);
+      setShowFailures(false);
 
       if (errorCount === 0) {
         const baseMsg = sawZip
@@ -127,7 +136,11 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           : `${successCount} file(s) uploaded`;
         setResult({ ok: true, message: baseMsg });
       } else {
-        setResult({ ok: false, message: `${successCount} uploaded, ${errorCount} failed` });
+        setResult({
+          ok: false,
+          message: `${successCount} uploaded, ${errorCount} failed`,
+          failures,
+        });
       }
 
       // If batch scheduling was suggested, fetch pending doc IDs and show dialog
@@ -325,12 +338,32 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
         )}
 
         {result && (
-          <div className={`mt-3 flex items-center justify-center gap-2 text-sm ${
-            result.ok ? "text-green-600" : "text-destructive"
-          }`}>
-            {result.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-            {result.message}
-            <button onClick={() => setResult(null)} className="ml-1"><X className="h-3 w-3" /></button>
+          <div className="mt-3 space-y-2">
+            <div className={`flex items-center justify-center gap-2 text-sm ${
+              result.ok ? "text-green-600" : "text-destructive"
+            }`}>
+              {result.ok ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+              {result.message}
+              {result.failures && result.failures.length > 0 && (
+                <button
+                  onClick={() => setShowFailures((v) => !v)}
+                  className="ml-1 underline text-xs"
+                >
+                  {showFailures ? "Hide" : "Show"} details
+                </button>
+              )}
+              <button onClick={() => setResult(null)} className="ml-1"><X className="h-3 w-3" /></button>
+            </div>
+            {showFailures && result.failures && result.failures.length > 0 && (
+              <ul className="rounded-md border border-destructive/20 bg-destructive/5 p-2 text-xs space-y-1 max-h-48 overflow-y-auto">
+                {result.failures.map((f, i) => (
+                  <li key={i} className="flex flex-col">
+                    <span className="font-medium truncate">{f.file}</span>
+                    <span className="text-muted-foreground">{f.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

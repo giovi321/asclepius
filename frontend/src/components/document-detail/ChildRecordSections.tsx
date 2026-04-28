@@ -1,11 +1,74 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
-import { Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage } from "lucide-react";
+import { Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage, Pencil, X } from "lucide-react";
 import DicomViewer from "@/components/DicomViewer";
+import { useToast } from "@/contexts/ToastContext";
 import {
   Section, InfoRow, EditableField, EditableSelect, MedFormBadge, getSectionTypeStyle,
 } from "@/components/document-detail/DocumentDetailHelpers";
+
+/** Heading-style inline editor for an encounter's diagnosis. Uses the
+ * encounter PATCH endpoint so the rest of the section stays aligned with
+ * the same backend.
+ */
+function DiagnosisHeading({ value, encounterId, onSaved }: {
+  value: string; encounterId: number; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if ((val || "").trim() === (value || "").trim()) { setEditing(false); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/encounters/${encounterId}`, { diagnosis_original: val.trim() || null });
+      setEditing(false);
+      onSaved();
+    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    setSaving(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setEditing(false); setVal(value || ""); }
+          }}
+          className="flex-1 rounded border bg-background px-2 py-1 text-base font-semibold"
+          autoFocus
+          disabled={saving}
+        />
+        <button onClick={handleSave} disabled={saving}
+          className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
+          {saving ? "..." : "OK"}
+        </button>
+        <button onClick={() => { setEditing(false); setVal(value || ""); }}
+          className="rounded border px-2 py-1 text-xs">
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => { setVal(value || ""); setEditing(true); }}
+      className="group flex w-full items-center gap-2 text-left rounded px-1 -mx-1 hover:bg-accent/30"
+    >
+      <span className="flex-1 text-base font-semibold truncate">
+        {value || <span className="text-muted-foreground italic font-normal">No diagnosis — click to add</span>}
+      </span>
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0" />
+    </button>
+  );
+}
 
 // Same DICOM modality → readable label map used in ImagingPage. Keeping
 // it co-located with the section avoids a dependency on the imaging page.
@@ -34,59 +97,134 @@ function niceCase(s: string | null | undefined): string {
   return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
 }
 
-export function EncountersSection({ encounters }: { encounters: any[] }) {
+export function EncountersSection({ encounters, onUpdated }: { encounters: any[]; onUpdated?: () => void }) {
   if (!encounters?.length) return null;
   return (
     <Section title="Encounters" icon={Stethoscope}>
-      {encounters.map((enc) => (
-        <div key={enc.id} className="space-y-1 text-sm">
-          <InfoRow label="Date" value={enc.encounter_date} />
-          <InfoRow label="Diagnosis" value={enc.diagnosis_original} />
-          <InfoRow label="ICD-10" value={enc.diagnosis_code} />
-          {enc.findings && <p className="text-muted-foreground">{enc.findings}</p>}
-          {enc.notes && <p className="text-muted-foreground">{enc.notes}</p>}
+      {encounters.map((enc, i) => (
+        <div key={enc.id} className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}>
+          {/* Diagnosis is the encounter's headline — render larger than the
+              metadata rows so it's visually distinct. The other fields below
+              use EditableField rows. */}
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Diagnosis</p>
+          <DiagnosisHeading
+            value={enc.diagnosis_original || ""}
+            encounterId={enc.id}
+            onSaved={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="ICD-10"
+            value={enc.diagnosis_code || ""}
+            field="diagnosis_code"
+            docId={enc.id}
+            apiPath={`/encounters/${enc.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Specialty"
+            value={enc.specialty_canonical_display || enc.specialty_original || ""}
+            field="specialty_original"
+            docId={enc.id}
+            apiPath={`/encounters/${enc.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Findings"
+            value={enc.findings || ""}
+            field="findings"
+            docId={enc.id}
+            apiPath={`/encounters/${enc.id}`}
+            onSave={onUpdated || (() => {})}
+            multiline
+          />
+          <EditableField
+            label="Notes"
+            value={enc.notes || ""}
+            field="notes"
+            docId={enc.id}
+            apiPath={`/encounters/${enc.id}`}
+            onSave={onUpdated || (() => {})}
+            multiline
+          />
         </div>
       ))}
     </Section>
   );
 }
 
-export function MedicationsSection({ medications }: { medications: any[] }) {
+export function MedicationsSection({ medications, onUpdated }: { medications: any[]; onUpdated?: () => void }) {
   if (!medications?.length) return null;
+  // The medications block was previously a static table. Inline editing per-
+  // row matches the encounters / imaging pattern: each field is an
+  // EditableField backed by /api/medications/{id}.
   return (
     <Section title="Medications" icon={Pill}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b">
-              <th className="py-1 pr-2 text-left font-medium">Medication</th>
-              <th className="py-1 pr-2 text-left font-medium">Dosage</th>
-              <th className="py-1 pr-2 text-left font-medium">Form</th>
-              <th className="py-1 pr-2 text-left font-medium">Frequency</th>
-              <th className="py-1 pr-2 text-left font-medium">Duration</th>
-              <th className="py-1 pr-2 text-left font-medium">Qty</th>
-              <th className="py-1 text-left font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {medications.map((med) => (
-              <tr key={med.id}>
-                <td className="py-1 pr-2 font-medium">
-                  {med.active_ingredient_original || med.brand_name || "\u2014"}
-                </td>
-                <td className="py-1 pr-2 text-muted-foreground">{med.dosage || "\u2014"}</td>
-                <td className="py-1 pr-2">
-                  <MedFormBadge form={med.form} />
-                </td>
-                <td className="py-1 pr-2 text-muted-foreground">{med.frequency || "\u2014"}</td>
-                <td className="py-1 pr-2 text-muted-foreground">{med.duration || "\u2014"}</td>
-                <td className="py-1 pr-2 text-muted-foreground">{med.quantity || "\u2014"}</td>
-                <td className="py-1 text-muted-foreground">{med.date_prescribed || med.start_date || "\u2014"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {medications.map((med, i) => (
+        <div key={med.id} className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold flex-1 truncate">
+              {med.active_ingredient_original || med.brand_name || "Medication"}
+            </span>
+            <MedFormBadge form={med.form} />
+          </div>
+          <EditableField
+            label="Active ingredient"
+            value={med.active_ingredient_original || ""}
+            field="active_ingredient_original"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Brand"
+            value={med.brand_name || ""}
+            field="brand_name"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Dosage"
+            value={med.dosage || ""}
+            field="dosage"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Form"
+            value={med.form || ""}
+            field="form"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Frequency"
+            value={med.frequency || ""}
+            field="frequency"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Duration"
+            value={med.duration || ""}
+            field="duration"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+          <EditableField
+            label="Quantity"
+            value={med.quantity || ""}
+            field="quantity"
+            docId={med.id}
+            apiPath={`/medications/${med.id}`}
+            onSave={onUpdated || (() => {})}
+          />
+        </div>
+      ))}
     </Section>
   );
 }

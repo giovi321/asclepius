@@ -323,6 +323,32 @@ async def get_related_records(
                ORDER BY lr.id""",
             (doc_id,),
         )
+    elif table == "encounters":
+        # Join the canonical specialty / diagnosis displays so the doc
+        # detail page can render the normalized name without a second
+        # round-trip. Falls back to the *_original text when nothing is
+        # linked yet.
+        cursor = await db.execute(
+            """SELECT e.*,
+                      ns.canonical_display AS specialty_canonical_display,
+                      nd.canonical_display AS diagnosis_canonical_display
+               FROM encounters e
+               LEFT JOIN norm_specialties ns ON e.norm_specialty_id = ns.id
+               LEFT JOIN norm_diagnoses nd ON e.norm_diagnosis_id = nd.id
+               WHERE e.document_id = ?
+               ORDER BY e.id""",
+            (doc_id,),
+        )
+    elif table == "medications":
+        cursor = await db.execute(
+            """SELECT m.*,
+                      nm.canonical_display AS medication_canonical_display
+               FROM medications m
+               LEFT JOIN norm_medications nm ON m.norm_medication_id = nm.id
+               WHERE m.document_id = ?
+               ORDER BY m.id""",
+            (doc_id,),
+        )
     else:
         cursor = await db.execute(
             f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,)

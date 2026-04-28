@@ -164,6 +164,11 @@ def create_app() -> FastAPI:
     from asclepius.documents.routes import router as documents_router
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 
+    # Child-record edits live at /api/encounters/{id} and /api/medications/{id}
+    # — separate prefix because they don't pivot on a document id in the URL.
+    from asclepius.documents.child_routes import router as child_router
+    app.include_router(child_router, prefix="/api", tags=["records"])
+
     from asclepius.events.routes import router as events_router
     app.include_router(events_router, prefix="/api/events", tags=["events"])
 

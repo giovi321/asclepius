@@ -224,8 +224,8 @@ export default function DocumentDetailPage() {
             onChange={() => loadDoc(false)}
           />
 
-          <EncountersSection encounters={doc.encounters || []} />
-          <MedicationsSection medications={doc.medications || []} />
+          <EncountersSection encounters={doc.encounters || []} onUpdated={() => loadDoc(false)} />
+          <MedicationsSection medications={doc.medications || []} onUpdated={() => loadDoc(false)} />
           <VaccinationsSection vaccinations={doc.vaccinations || []} />
 
           <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />

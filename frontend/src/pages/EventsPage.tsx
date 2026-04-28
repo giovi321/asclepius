@@ -151,12 +151,18 @@ export default function EventsPage() {
               className="rounded-md border bg-background px-3 py-2 text-sm">
               {EVENT_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
             </select>
-            <input type="date" placeholder="Start date" value={newEvent.date_start}
-              onChange={(e) => setNewEvent({ ...newEvent, date_start: e.target.value })}
-              className="rounded-md border bg-background px-3 py-2 text-sm" />
-            <input type="date" placeholder="End date" value={newEvent.date_end}
-              onChange={(e) => setNewEvent({ ...newEvent, date_end: e.target.value })}
-              className="rounded-md border bg-background px-3 py-2 text-sm" />
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Start date
+              <input type="date" value={newEvent.date_start}
+                onChange={(e) => setNewEvent({ ...newEvent, date_start: e.target.value })}
+                className="rounded-md border bg-background px-3 py-2 text-sm" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              End date <span className="text-muted-foreground/70">(leave empty if ongoing)</span>
+              <input type="date" value={newEvent.date_end}
+                onChange={(e) => setNewEvent({ ...newEvent, date_end: e.target.value })}
+                className="rounded-md border bg-background px-3 py-2 text-sm" />
+            </label>
             <input type="text" placeholder="Diagnosis" value={newEvent.diagnosis_text}
               onChange={(e) => setNewEvent({ ...newEvent, diagnosis_text: e.target.value })}
               className="rounded-md border bg-background px-3 py-2 text-sm" />

@@ -149,7 +149,7 @@ Tables:
 - encounters(id, document_id, patient_id, doctor_id, facility_id, encounter_date, admission_date, discharge_date, diagnosis_original, diagnosis_code, notes, findings, follow_up_date, follow_up_instructions)
 - medications(id, document_id, patient_id, brand_name, active_ingredient_original, dosage, form, frequency, duration, quantity, prescribed_date)
 - vaccinations(id, document_id, patient_id, vaccine_name, manufacturer, lot_number, dose_number, date_administered)
-- imaging_studies(id, document_id, patient_id, doctor_id, facility_id, study_date, modality, body_part, study_description, institution_name)
+- imaging_studies(id, document_id, patient_id, doctor_id, facility_id, study_date, modality, body_part, study_description, accession_number, study_instance_uid, num_series, num_images, report_status, folder_path)
 - norm_lab_tests(id, canonical_code, canonical_display, loinc_code, category, unit_preferred)
 - norm_lab_test_aliases(id, norm_lab_test_id, alias, language)
 - norm_diagnoses(id, canonical_code, canonical_display, icd10_code)

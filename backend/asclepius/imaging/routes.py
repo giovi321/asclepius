@@ -38,11 +38,12 @@ async def _study_with_access(
 
 _LIST_SORT_COLUMNS: dict[str, str] = {
     # Frontend sort key → SQL expression. Whitelist only — anything not
-    # here falls back to ``study_date DESC``.
+    # here falls back to ``study_date DESC``. Doctor + facility are
+    # joined through documents → doctors / facilities so the sort lines
+    # up with the canonical names shown in the UI.
     "modality":          "s.modality",
     "body_part":         "s.body_part",
     "study_date":        "s.study_date",
-    "institution":       "s.institution_name",
     "doctor":            "doc.name",
     "facility":          "f.name",
     "patient":           "p.display_name",
@@ -97,8 +98,11 @@ async def list_imaging_studies(
         params.append(date_to)
     if q:
         like = f"%{q}%"
+        # Search is across imaging-specific text + the canonical doctor /
+        # facility names that come from the parent documents row.
         conditions.append(
-            "(s.body_part LIKE ? OR s.institution_name LIKE ? OR s.referring_physician LIKE ? OR s.study_description LIKE ?)"
+            "(s.body_part LIKE ? OR s.study_description LIKE ? "
+            "OR doc.name LIKE ? OR f.name LIKE ?)"
         )
         params.extend([like, like, like, like])
 

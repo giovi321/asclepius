@@ -13,8 +13,8 @@ import ReprocessMenu from "@/components/document-detail/ReprocessMenu";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import {
   EncountersSection, MedicationsSection, VaccinationsSection, DocumentSectionsList,
-  ImagingStudiesSection,
 } from "@/components/document-detail/ChildRecordSections";
+import ReportSlot from "@/components/imaging/ReportSlot";
 import NotesEditor from "@/components/document-detail/NotesEditor";
 import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
@@ -182,20 +182,26 @@ export default function DocumentDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         <div className="space-y-4 min-w-0">
-          {/* DocumentViewer renders the PDF / image when there is one;
-              when this is an imaging_report placeholder (no file_path)
-              its imaging-aware fallback links to /imaging/:studyId. */}
-          <DocumentViewer
-            id={id!}
-            filePath={doc.file_path}
-            originalFilename={doc.original_filename}
-            onRotate={handleRotate}
-            imagingStudyId={doc.imaging_studies?.[0]?.id || null}
-          />
-          {/* For imaging documents, the DICOM viewer + bundle files
-              + linked docs live below the report viewer. */}
-          {(doc.imaging_studies?.length ?? 0) > 0 && (
-            <ImagingStudiesSection studies={doc.imaging_studies || []} />
+          {isImagingDoc(doc) ? (
+            // Imaging documents: keep the metadata view focused on the
+            // report. The DICOM viewer + bundle files live on /imaging/:id;
+            // here we only render the report PDF (or upload/pick UI when
+            // it is a placeholder) and a link to the imaging view.
+            <ReportSlot
+              studyId={doc.imaging_studies?.[0]?.id}
+              patientId={doc.patient_id}
+              reportStatus={doc.file_path ? "attached" : "placeholder"}
+              documentId={doc.id}
+              onChanged={() => loadDoc(false)}
+            />
+          ) : (
+            <DocumentViewer
+              id={id!}
+              filePath={doc.file_path}
+              originalFilename={doc.original_filename}
+              onRotate={handleRotate}
+              imagingStudyId={doc.imaging_studies?.[0]?.id || null}
+            />
           )}
         </div>
 

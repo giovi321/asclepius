@@ -153,11 +153,13 @@ function ImagingStudyBlock({ study }: { study: any }) {
 
   return (
     <Section title="Imaging" icon={ImageIcon}>
+      {/* Doctor + Facility are NOT shown here — they live on the parent
+          documents row (rendered by MetadataEditor) which is the single
+          source of truth. The imaging-specific block only carries fields
+          that are unique to imaging studies. */}
       <InfoRow label="Type" value={`${modalityLabel(study.modality)}${study.modality ? ` (${study.modality})` : ""}`} />
       <InfoRow label="Body Part" value={study.body_part || "Unknown"} />
       <InfoRow label="Study Date" value={study.study_date || "Unknown"} />
-      <InfoRow label="Institution" value={study.institution_name || "Unknown"} />
-      <InfoRow label="Referring" value={study.referring_physician || "Unknown"} />
       <InfoRow label="Accession" value={study.accession_number || "Unknown"} />
       <InfoRow label="Study UID" value={study.study_instance_uid || "Unknown"} />
       <InfoRow label="Series" value={`${study.num_series ?? series.length} | ${study.num_images} images`} />

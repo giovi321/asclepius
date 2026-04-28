@@ -262,13 +262,12 @@ async def process_dicom(
             """INSERT INTO imaging_studies
                (document_id, patient_id, doctor_id, facility_id,
                 study_date, modality, body_part,
-                study_description, institution_name, referring_physician,
-                accession_number, study_instance_uid, num_series, num_images,
-                is_dicom, folder_path)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?)""",
+                study_description, accession_number, study_instance_uid,
+                num_series, num_images, folder_path)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)""",
             (doc_id, patient_id, doctor_id, facility_id,
              study_date, modality, body_part,
-             study_desc, institution, referring, accession, study_uid,
+             study_desc, accession, study_uid,
              base_path),
         )
         study_id = cursor.lastrowid

@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, Download, Image as ImageIcon } from "lucide-react";
+import { FileText, Download, Image as ImageIcon, FileX2 } from "lucide-react";
+import api from "@/api/client";
 import PdfViewer from "@/components/PdfViewer";
 
 export interface DocumentViewerProps {
@@ -24,6 +26,45 @@ export default function DocumentViewer({
 }: DocumentViewerProps) {
   const fp = (filePath || "").toLowerCase();
   const fn = (originalFilename || "").toLowerCase();
+  // HEAD-check the file before handing it to PdfViewer / <img>; pdf.js
+  // surfaces "Missing PDF" as a hard error, and a broken <img> just
+  // shows the alt text. Both are a worse UX than a small "file is
+  // missing" card. The check runs only once per id.
+  const [fileMissing, setFileMissing] = useState(false);
+  useEffect(() => {
+    if (!filePath) {
+      setFileMissing(true);
+      return;
+    }
+    let alive = true;
+    setFileMissing(false);
+    api.head(`/documents/${id}/file`).catch(() => {
+      if (alive) setFileMissing(true);
+    });
+    return () => { alive = false; };
+  }, [id, filePath]);
+
+  if (fileMissing) {
+    return (
+      <div className="rounded-lg border p-8 text-center text-muted-foreground space-y-2">
+        <FileX2 className="h-12 w-12 mx-auto mb-2 text-amber-500" />
+        <p className="text-foreground font-medium">File not available</p>
+        <p className="text-sm">
+          The document record exists but its file is missing on disk
+          {filePath ? ` (${filePath})` : ""}.
+        </p>
+        {imagingStudyId && (
+          <Link
+            to={`/imaging/${imagingStudyId}`}
+            className="inline-flex items-center gap-1 mt-2 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
+          >
+            <ImageIcon className="h-4 w-4" /> Open in Imaging view
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   if (fp.endsWith(".pdf") || fn.endsWith(".pdf")) {
     return (
       <div className="rounded-lg border overflow-hidden h-[700px]">

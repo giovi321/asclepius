@@ -194,6 +194,12 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     patient_id INTEGER NOT NULL REFERENCES patients(id),
+    -- doctor_id / facility_id are kept in lockstep with the parent
+    -- documents row via AFTER UPDATE triggers (see db/init.py). The
+    -- corresponding human-readable name lives on documents → doctors /
+    -- facilities and is the single source of truth; we used to store
+    -- ``referring_physician`` and ``institution_name`` here too but
+    -- they drifted from the canonical names so 0.9.7 dropped them.
     doctor_id INTEGER REFERENCES doctors(id),
     facility_id INTEGER REFERENCES facilities(id),
     -- 'placeholder' (no PDF report attached yet) | 'attached' (the parent
@@ -203,13 +209,10 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     modality TEXT,
     body_part TEXT,
     study_description TEXT,
-    institution_name TEXT,
-    referring_physician TEXT,
     accession_number TEXT,
     study_instance_uid TEXT,
     num_series INTEGER DEFAULT 0,
     num_images INTEGER DEFAULT 0,
-    is_dicom BOOLEAN DEFAULT 0,
     folder_path TEXT
 );
 
@@ -441,6 +444,22 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
 CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+
+-- Server-side sessions — lets admins list and revoke live logins.
+-- session_id is the random token stored in the user's signed cookie;
+-- the row is the source of truth for whether the session is still valid.
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    revoked_at DATETIME
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(revoked_at, expires_at);
 
 -- Per-page OCR text cache (avoids re-processing on reprocess/sectioning)
 CREATE TABLE IF NOT EXISTS ocr_page_cache (

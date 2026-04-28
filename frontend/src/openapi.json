@@ -478,6 +478,45 @@
       }
     },
     "/api/documents/{doc_id}/file": {
+      "head": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Head File",
+        "description": "HEAD probe used by the frontend to decide whether to render a file\nviewer at all. Returns the same status codes as the GET (404 when\nthe file is missing on disk, 403 when the caller lacks access).",
+        "operationId": "head_file_api_documents__doc_id__file_head",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "documents"

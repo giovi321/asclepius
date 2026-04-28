@@ -12,7 +12,7 @@ from pathlib import Path
 
 import aiosqlite
 import fitz
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -70,6 +70,37 @@ class RenameRequest(BaseModel):
 class RotateRequest(BaseModel):
     degrees: int = 90  # 90, 180, 270
     pages: list[int] | None = None  # None = all pages, or list of 1-based page numbers
+
+
+@router.head("/{doc_id}/file")
+async def head_file(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """HEAD probe used by the frontend to decide whether to render a file
+    viewer at all. Returns the same status codes as the GET (404 when
+    the file is missing on disk, 403 when the caller lacks access)."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if current_user.get("role") != "admin":
+        allowed = False
+        if doc["patient_id"]:
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            allowed = bool(role)
+        if not allowed and doc.get("uploaded_by_user_id") == current_user["id"]:
+            allowed = True
+        if not allowed:
+            raise HTTPException(status_code=403, detail="No access")
+    if not doc["file_path"]:
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+    file_path = _resolve_vault_file(vault_root, doc["file_path"])
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    return Response(status_code=200)
 
 
 @router.get("/{doc_id}/file")

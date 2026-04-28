@@ -246,7 +246,13 @@ export interface paths {
         post?: never;
         delete?: never;
         options?: never;
-        head?: never;
+        /**
+         * Head File
+         * @description HEAD probe used by the frontend to decide whether to render a file
+         *     viewer at all. Returns the same status codes as the GET (404 when
+         *     the file is missing on disk, 403 when the caller lacks access).
+         */
+        head: operations["head_file_api_documents__doc_id__file_head"];
         patch?: never;
         trace?: never;
     };
@@ -2925,6 +2931,37 @@ export interface operations {
         };
     };
     serve_file_api_documents__doc_id__file_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    head_file_api_documents__doc_id__file_head: {
         parameters: {
             query?: never;
             header?: never;

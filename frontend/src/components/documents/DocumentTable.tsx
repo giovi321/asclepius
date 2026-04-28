@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import type { PipelineStatus } from "@/types";
 import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
@@ -38,6 +39,7 @@ export default function DocumentTable({
   onSortToggle,
   pipeline,
 }: DocumentTableProps) {
+  const navigate = useNavigate();
   const tableColSpan = 2 + orderedVisibleColumns.length;
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -88,7 +90,11 @@ export default function DocumentTable({
             <tr><td colSpan={tableColSpan} className="p-4 text-center text-muted-foreground">No documents found</td></tr>
           ) : (
             documents.map((doc: any) => (
-              <tr key={doc.id} className={`hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}>
+              <tr
+                key={doc.id}
+                onClick={() => navigate(`/documents/${doc.id}`)}
+                className={`cursor-pointer hover:bg-accent/50 ${selectedIds.has(doc.id) ? "bg-accent/30" : ""}`}
+              >
                 <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
@@ -99,7 +105,14 @@ export default function DocumentTable({
                   />
                 </td>
                 <td className="px-4 py-2 overflow-hidden">
-                  <InlineRenameCell doc={doc} onRenamed={onRenamed} />
+                  {/* The cell stops propagation so the inline rename
+                      pencil + input don't bubble to the row's navigate
+                      handler — but the filename Link still fires
+                      because clicks ON the link are NOT a navigate-on-row,
+                      they are a real link. */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <InlineRenameCell doc={doc} onRenamed={onRenamed} />
+                  </div>
                 </td>
                 {orderedVisibleColumns.map((c) => {
                   if (c.key === "type") {

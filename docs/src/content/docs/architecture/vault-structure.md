@@ -26,13 +26,13 @@ The vault is the single root for every stored file and the SQLite database. It m
   <text x="40"  y="92"  class="vs-row" font-weight="600">vault/</text>
   <text x="40"  y="124" class="vs-row">├── inbox/</text>
   <text x="380" y="124" class="vs-anno">drop zone · watched</text>
-  <text x="40"  y="152" class="vs-row-soft">│   └── user-&lt;id&gt;/</text>
-  <text x="380" y="152" class="vs-anno">per-user dropzone</text>
+  <text x="40"  y="152" class="vs-row-soft">│   └── {patient-slug | user-&lt;id&gt;}/</text>
+  <text x="380" y="152" class="vs-anno">per-patient or per-user</text>
   <text x="40"  y="188" class="vs-row">├── patients/</text>
   <text x="380" y="188" class="vs-anno">organized records</text>
   <text x="40"  y="216" class="vs-row-soft">│   └── {slug}/{year}/{event}/</text>
   <text x="40"  y="244" class="vs-row-soft">│       ├── {date}_{provider}_{type}.pdf</text>
-  <text x="40"  y="272" class="vs-row-soft">│       └── imaging/{study}/series-N/*.dcm</text>
+  <text x="40"  y="272" class="vs-row-soft">│       └── {study-folder}/series-N/*.dcm</text>
   <text x="40"  y="308" class="vs-row">├── unclassified/</text>
   <text x="380" y="308" class="vs-anno">no patient resolved</text>
   <text x="40"  y="336" class="vs-row-soft">│   └── user-&lt;id&gt;/</text>
@@ -62,8 +62,10 @@ The vault is the single root for every stored file and the SQLite database. It m
 ```
 vault/
 ├── inbox/
-│   ├── user-1/                         # Per-user dropzones
+│   ├── alex-smith/                     # Per-patient when upload knows the patient
 │   │   └── my-upload.pdf
+│   ├── user-1/                         # Per-user fallback when no patient yet
+│   │   └── unassigned-doc.pdf
 │   └── user-2/
 ├── patients/
 │   ├── alex-smith/
@@ -77,14 +79,18 @@ vault/
 │   │   │   ├── knee-injury/
 │   │   │   │   ├── 20240722_riverside-clinic_radiology-report.pdf
 │   │   │   │   └── 20240801_riverside-clinic_specialist-report.pdf
-│   │   │   └── imaging/
-│   │   │       └── 20240722_riverside-clinic_ct-abdomen/
-│   │   │           ├── series-001/
-│   │   │           │   ├── 00001.dcm
-│   │   │           │   └── ...
-│   │   │           └── series-002/
-│   │   └── 2025/
-│   │       └── 20250110_dr-jones_prescription.pdf
+│   │   │   └── 20240722_riverside-clinic_ct-abdomen/    # imaging study folder
+│   │   │       ├── series-001/                          # peer of PDFs in {year}/
+│   │   │       │   ├── 00001.dcm
+│   │   │       │   └── ...
+│   │   │       └── series-002/
+│   │   ├── 2025/
+│   │   │   └── 20250110_dr-jones_prescription.pdf
+│   │   └── imaging-bundles/                              # auxiliary imaging files
+│   │       └── exam-AA387249Z07/                         # one folder per zip upload
+│   │           ├── DICOMDIR
+│   │           ├── image_s0001_i0001.jpg                 # JPEG previews
+│   │           └── LOCKFILE
 │   └── jordan-lee/
 │       └── ...
 ├── unclassified/
@@ -94,9 +100,32 @@ vault/
 └── asclepius.sqlite                    # SQLite database
 ```
 
-`inbox/` and `unclassified/` are split into `user-<id>/` subfolders so each user has their own isolated dropzone. Uploads via `POST /api/documents/upload` land in the caller's subfolder automatically, and documents with no assigned patient are organized under the uploader's subfolder. The file watcher is recursive, so existing files and new drops in any `user-*/` subfolder are picked up. Legacy files still at the flat `inbox/<name>` or `unclassified/<name>` paths continue to work and are visible only to admins.
+`inbox/` is split into per-upload sub-folders so each upload has its own
+isolated dropzone. When the upload form names a patient (the common
+case) the sub-folder is the patient slug — e.g. ``inbox/alex-smith/`` —
+so a shell-level `ls inbox/` reads as a human roster. When there's no
+patient yet the sub-folder falls back to ``user-<id>/``. Uploads via
+`POST /api/documents/upload` write a ``.user_hint`` sidecar so the
+pipeline can stamp `uploaded_by_user_id` regardless of the folder
+naming. The file watcher is recursive, so existing files and new
+drops in any sub-folder are picked up; empty inbox folders are swept
+after every successful pipeline tick. Legacy files at the flat
+`inbox/<name>` or `unclassified/<name>` paths continue to work and
+are admin-only. `unclassified/` keeps the `user-<id>/` per-user split
+so each user's unassigned queue stays isolated.
 
 Documents assigned to a medical event are organized into an event subfolder within the year. Documents without an event remain directly in the year folder.
+
+Imaging studies are filed as **peers of regular document files** under
+the year folder — the study folder (e.g.
+`20240722_riverside-clinic_ct-abdomen/`) takes the place a single PDF
+would, with `series-N/` subfolders for the DICOM frames. Auxiliary
+files extracted from the same zip upload (DICOMDIR, JPEG previews,
+LOCKFILE, VERSION) live at the **patient-level** under
+`imaging-bundles/{zip-stem}/` and are surfaced via
+`GET /api/imaging/{id}/bundle-files`. The file browser hides
+`imaging-bundles/` when navigating inside a patient directory so the
+year folders stay tidy.
 
 ## File Naming Convention
 
@@ -118,12 +147,13 @@ Examples:
 
 ## Key Rules
 
-1. **Files move once.** From `inbox/user-<id>/` to their final spot in `patients/{slug}/{year}/`. After that, the path doesn't change.
-2. **No manual reorganization.** Reassign documents through the web UI; the server takes care of moving the file on disk.
-3. **The database is the source of truth.** Paths in `documents.file_path` are relative to the vault root.
-4. **Imaging files keep their DICOM structure.** Series folders contain the original `.dcm` files with their series instance UIDs.
+1. **Files move once on ingest.** From `inbox/{patient-slug | user-<id>}/` to their final spot in `patients/{slug}/{year}/`. After that, the path doesn't change unless the user moves it via the file browser.
+2. **The file browser can move files.** The `Move` action on each row calls `POST /api/vault/move`, which renames the file on disk **and** rewrites the matching `documents.file_path`, `imaging_studies.folder_path`, and `imaging_series.folder_path` rows in lockstep so the document reference stays intact. Use it to fix files that landed in the wrong date / event folder.
+3. **The database is the source of truth.** Paths in `documents.file_path` are relative to the vault root. Imaging studies use `imaging_studies.folder_path` for the study folder; the parent `documents.file_path` points at the radiology report PDF (or is empty when the study has only a placeholder report).
+4. **Imaging files keep their DICOM structure.** Series folders contain the original `.dcm` files with their series instance UIDs. Files extracted from a zip with no DICOM extension are auto-renamed to `.dcm` after the DICM preamble at byte 128 is verified.
 5. **Unclassified documents** land in `vault/unclassified/user-<id>/` when the pipeline can't figure out the patient. Legacy rows without `uploaded_by_user_id` fall back to the flat `unclassified/` directory and stay admin-only.
 6. **Per-user scope.** Non-admin users see only their own patients and their own `inbox/` and `unclassified/` subfolders in the file browser and document lists. Admins see everything.
+7. **One imaging study, one document.** A 35-frame ultrasound creates one `documents` row (the radiology report PDF, or a placeholder until one is attached) and one `imaging_studies` row, not 35 of each. The DICOM frames are on disk under the study folder; only the report has a `documents.file_path`.
 
 ## Patient Slug
 

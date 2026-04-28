@@ -5,6 +5,180 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-04-27 - imaging consistency + migration cleanup
+
+### Added
+
+- `POST /api/vault/move` — relocate a file or directory in the vault and
+  rewrite ``documents.file_path`` / ``imaging_studies.folder_path`` /
+  ``imaging_series.folder_path`` in lockstep so document references
+  stay intact. Surfaced as a *Move* action on every row in the file
+  browser.
+- `HEAD /api/documents/{id}/file` — frontend probe so the document
+  detail page can show a clean "file not available" empty state when
+  the underlying file is missing on disk, instead of a broken pdf.js /
+  ``<img>`` viewer.
+- Shared `ReportSlot` component (front-end) used by both the imaging
+  detail page and the imaging-flavoured document detail page so the
+  upload-PDF / pick-existing-PDF UX is identical from either entry
+  point.
+
+### Changed
+
+- Documents list: clicking anywhere on a row now opens the document
+  (was: only the filename Link). Bulk-select checkbox + inline rename
+  pencil + rename input still stop event propagation.
+- Imaging detail page: full-width DICOM viewer (was constrained to one
+  column of a 2-column grid; cross-sectional modalities had no room).
+  Layout is now header → summary → full-width
+  ``ImagingStudiesSection`` → 2-column grid (report PDF slot ‖
+  metadata stack).
+- Document detail page (imaging documents): the embedded DICOM viewer
+  + bundle list are gone. The page renders the same report-PDF slot
+  ImagingDetailPage uses; the DICOM viewer lives only on
+  ``/imaging/:id``. The header gains an *Imaging view* cross-link.
+- Imaging metadata block no longer shows *Institution* and *Referring*
+  rows. Doctor and Facility are exclusively rendered via
+  MetadataEditor on the parent document — single source of truth.
+- ``db/init.py`` shrank from ~1490 lines to ~570. Every pre-0.9
+  ALTER TABLE migration was deleted; the schema is baked into
+  ``schema.sql`` and a fresh install runs no migrations at all. What
+  remains is the 0.9.5 → 0.9.7 imaging ladder, each step a clearly-
+  named per-version function. Anyone upgrading from before 0.9 needs
+  to start from a clean database.
+- ``schema.sql`` gained the ``sessions`` table + indexes (was created
+  only by the migration code).
+
+### Removed
+
+- ``imaging_studies.institution_name`` (duplicated ``facility_id`` →
+  ``facilities.name`` and drifted in capitalisation / titles).
+- ``imaging_studies.referring_physician`` (duplicated ``doctor_id`` →
+  ``doctors.name`` with the messy raw DICOM PN form vs the cleaned
+  canonical name).
+- ``imaging_studies.is_dicom`` (always 1; never read).
+- All pre-0.9 migrations: ``process_at`` / ``error_message`` /
+  ``role`` / ``sessions`` / ``ocr_page_cache`` / ``audit_log`` /
+  ``doctor_aliases`` / ``canonical_code,canonical_display`` /
+  ``date_visit``→``event_date`` unification / kebab-case sweep / etc.
+  Use the bundled ``schema.sql`` for fresh installs.
+
+## [0.9.6] - 2026-04-27 - imaging is a child of the radiology report
+
+### Added
+
+- `POST /api/imaging/{id}/report` — attach a radiology PDF to a study
+  either by linking an existing document (``?document_id=N``) or by
+  uploading a fresh PDF (multipart ``file=``). PDF-only is enforced via
+  libmagic. Uploaded reports flow through the standard pipeline; an
+  ``.imaging_study_hint`` sidecar tells ``process_file`` to repoint the
+  study at the new document and delete the placeholder on completion.
+- New route ``/imaging/:studyId`` (was: single-page
+  selection-mutates-right-column with no URL change). The list page
+  lives at ``/imaging`` and is modelled on ``/documents``: search,
+  modality / report-status / date filters, sortable columns,
+  pagination.
+- Cross-link buttons: the imaging detail header has a *Document view*
+  button → ``/documents/{report_doc_id}``; the document detail header
+  has an *Imaging view* button → ``/imaging/{study_id}`` for any
+  document that is the parent of an imaging study. Symmetric.
+- ``imaging_studies.report_status`` (`placeholder` | `attached`) —
+  denormalised flag so list queries don't have to join + stat.
+
+### Changed
+
+- **Data model flip**: an imaging study is now a child of a radiology
+  REPORT document, not the other way round. ``imaging_studies.document_id``
+  points at a ``documents`` row whose ``doc_type`` is
+  ``imaging_report`` — either a real PDF the user attached or a
+  placeholder (``file_path=''``) waiting to be populated. Every legacy
+  ``doc_type='imaging_dicom'`` row is migrated to a placeholder
+  ``imaging_report`` so existing studies show up correctly in the
+  list.
+- Imaging document type list (front-end ``DOC_TYPE_OPTIONS``,
+  ``columns.ts`` ``DOC_TYPES``, ``MetadataEditor``,
+  ``TimelinePage`` badge) updated: ``imaging_dicom`` →
+  ``imaging_report``.
+
+## [0.9.5] - 2026-04-27 - DICOM zip uploads + imaging consistency
+
+### Added
+
+- DICOM zip upload support. The upload endpoint now accepts
+  ``application/zip`` (and ``.zip`` suffix), extracts every member
+  server-side, peeks byte 128–131 for the ``DICM`` preamble, and
+  auto-renames true DICOM files to ``.dcm`` (extension-less hospital
+  exports like ``I1000000`` work). Non-DICOM members (DICOMDIR, JPEG
+  previews, LOCKFILE, VERSION) get a ``.bin`` extension + a
+  ``.zip_member`` sidecar and are filed under
+  ``patients/{slug}/imaging-bundles/{zip_stem}/``. Default upload cap
+  raised to 1 GB. Zip-bomb expansion is capped via
+  ``server.max_zip_uncompressed_bytes``.
+- ``GET /api/imaging/{id}/bundle-files`` and
+  ``/bundle-file/{name}`` to surface auxiliary zip members (DICOMDIR,
+  JPEG previews) on the imaging detail page.
+- ``GET /api/imaging/{id}/links`` + POST/DELETE — link arbitrary
+  documents (e.g. a separate radiology PDF) to a study via the
+  existing ``document_links`` table.
+- Imaging study list/detail endpoints enriched with patient,
+  doctor, facility names from the parent ``documents`` join.
+- Frame endpoint ``GET /api/imaging/{id}/series/{sid}/frame/{i}``
+  accepts ``?wc=`` and ``?ww=`` query params for window-center /
+  window-width override (used by the MR contrast sliders in the
+  viewer).
+- Patient access checks on ``list_frames`` / ``get_frame``
+  (regression: an authenticated user could fetch any patient's DICOM
+  by guessing study/series IDs).
+- DICOM Person Name parser: ``Family^Given^Middle^Prefix^Suffix``
+  becomes ``Given Family``; the existing ``strip_doctor_title``
+  removes the title prefix. Used for both PatientName and
+  ReferringPhysicianName at ingest, so doctor and patient matching
+  hit the canonical normalisation pipeline.
+- DICOM viewer: zoom (Ctrl+wheel, +/- keys, toolbar buttons), pan
+  (middle-button or shift+drag), reset (double-click or ``0``), MR-
+  only contrast sliders (window-center, window-width). Removed the
+  unused ``@cornerstonejs/core`` + ``dicom-image-loader`` imports
+  (~1.3 MB JS savings).
+
+### Changed
+
+- One DICOM bundle = one imaging study = one document row. The
+  pre-0.9.5 ingest created ``N`` documents per frame (35 for an
+  ultrasound) plus extra rows for bundle files. Now a deterministic
+  hash of ``StudyInstanceUID`` keys the parent row and subsequent
+  frames reuse it. Re-uploading the same study is idempotent — frames
+  already on disk at the destination size don't bump ``num_images``
+  again. Migration collapses pre-0.9.5 data: keeps the canonical row,
+  drops per-frame and per-bundle-file dupes.
+- Vault layout simplified: imaging studies live directly under the
+  year folder (``patients/{slug}/{year}/{study-folder}/``) instead of
+  inside an extra ``imaging/`` segment. A study folder is now a peer
+  of a regular PDF. Migration moves on-disk folders + rewrites
+  ``imaging_studies.folder_path``, ``imaging_series.folder_path``, and
+  ``documents.file_path``.
+- Inbox sub-folders use the patient slug (``inbox/alex-smith/``) when
+  the upload knows the patient; ``user-<id>/`` is the fallback for
+  uploads with no patient. A ``.user_hint`` sidecar always carries the
+  uploader id. Empty inbox folders are swept after every successful
+  pipeline tick.
+- Imaging series merging: a NULL ``series_instance_uid`` no longer
+  spawns one row per frame (was: ``WHERE x = NULL`` never matched in
+  SQL). Falls back to ``(study_id, series_number)`` grouping.
+  ``num_series`` on the parent study is bumped only on the first frame
+  of a brand-new series (not on every frame of an existing one).
+- DICOM frames now record ``file_hash`` + ``file_size`` on their
+  documents row (was: 0 / unset; re-uploads inflated counters and
+  documents rows).
+- Topbar pipeline status: queue depth + queued-files list are now
+  populated (was: only decremented; counter stuck at 0). MetricsStrip
+  always renders an "idle" chip when the worker is idle, so the
+  topbar isn't blank between processing ticks.
+
+### Removed
+
+- Per-frame and per-bundle-file ``documents`` rows (collapsed into
+  one per study).
+
 ## [0.9.0] - 2026-04-22 - refactor
 
 Major refactor release. No user-visible behavior changes planned, but the

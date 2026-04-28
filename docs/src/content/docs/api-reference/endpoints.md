@@ -177,19 +177,34 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/imaging` | Yes | List imaging studies (filterable) |
-| `GET` | `/api/imaging/{id}` | Yes | Get study with series |
+| `GET` | `/api/imaging` | Yes | List imaging studies (filterable, paginated) |
+| `GET` | `/api/imaging/{id}` | Yes | Get study with nested ``series`` + report fields |
 | `GET` | `/api/imaging/{id}/series/{series_id}/frames` | Yes | List DICOM frames in a series |
-| `GET` | `/api/imaging/{id}/series/{series_id}/frames/{frame}` | Yes | Serve a DICOM frame image |
+| `GET` | `/api/imaging/{id}/series/{series_id}/frame/{index}` | Yes | Serve a frame as PNG (default) or raw DICOM. Accepts ``?wc=`` and ``?ww=`` for window-center / window-width override (used by the MR contrast sliders). |
+| `GET` | `/api/imaging/{id}/bundle-files` | Yes | List auxiliary files extracted from the same zip (DICOMDIR, JPEG previews, etc.) |
+| `GET` | `/api/imaging/{id}/bundle-file/{name}` | Yes | Download a single bundle file by name |
+| `GET` | `/api/imaging/{id}/links` | Yes | Linked documents (uses ``document_links``) |
+| `POST` | `/api/imaging/{id}/links` | Yes | Link an existing document to this study |
+| `DELETE` | `/api/imaging/{id}/links/{link_id}` | Yes | Remove a study-document link |
+| `POST` | `/api/imaging/{id}/report` | Yes | Attach a radiology report PDF to this study. Either pass ``?document_id=N`` (or JSON ``{"document_id": N}``) to link an existing PDF document, or post a multipart ``file=`` to upload a fresh PDF. PDF-only is enforced via libmagic. The placeholder document is replaced. |
 
-### Imaging query parameters
+### Imaging query parameters (list endpoint)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `patient_id` | int | Filter by patient |
-| `modality` | string | Filter by modality (CT, MRI, XR, etc.) |
-| `date_from` | string | Filter by date |
-| `date_to` | string | Filter by date |
+| `modality` | string | Filter by DICOM modality code (CT, MR, US, XR, MG, PT, …) |
+| `report_status` | string | Filter by ``placeholder`` (no PDF report yet) or ``attached`` |
+| `q` | string | Search across body part / study description / referring doctor / facility |
+| `date_from` | string (ISO date) | Lower bound for ``study_date`` |
+| `date_to` | string (ISO date) | Upper bound for ``study_date`` |
+| `sort` | string | One of ``modality``, ``body_part``, ``study_date``, ``doctor``, ``facility``, ``patient``, ``report_status``, ``date_added`` |
+| `order` | string | ``asc`` or ``desc`` (default ``desc``) |
+| `limit` | int | Default 50, max 500 |
+| `offset` | int | Pagination offset |
+
+The list response shape mirrors `/api/documents`:
+``{"items": [...], "total": N, "limit": L, "offset": O}``.
 
 ## Chat
 
@@ -332,3 +347,11 @@ For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.pro
 | `GET` | `/api/settings/users/{id}/access` | Yes | Get user's patient access |
 | `POST` | `/api/settings/users/{id}/access` | Yes | Grant patient access |
 | `DELETE` | `/api/settings/users/{id}/access/{patient_id}` | Yes | Revoke patient access |
+
+## Vault file browser
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/vault/tree` | Yes | Get the vault directory tree (filtered by user scope) |
+| `DELETE` | `/api/vault/file` | Yes | Delete a file on disk and its matching documents row |
+| `POST` | `/api/vault/move` | Yes | Move a file or directory and atomically rewrite ``documents.file_path``, ``imaging_studies.folder_path``, and ``imaging_series.folder_path`` so the document reference stays intact. Used by the *Move* action in the file browser to fix files that landed in the wrong folder. |

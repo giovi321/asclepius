@@ -136,9 +136,11 @@ The pipeline is the ingestion engine. It watches the inbox folder, sends each fi
 
 The pipeline uses `watchdog` to monitor the `vault/inbox/` directory for new files. When a file appears:
 
-1. It is added to a **priority queue** sorted by file size (smallest first)
-2. The queue is processed sequentially (one file at a time)
-3. Processing status is tracked in memory and visible on the Dashboard
+1. The watcher does a short size-stability poll (≤ 2 s) so a still-being-written file doesn't enter the queue half-formed
+2. It is added to a **priority queue** sorted by file size (smallest first)
+3. The queue is processed sequentially (one file at a time)
+4. Processing status is tracked in memory and visible on the topbar / Dashboard
+5. After every successful tick the worker walks up from the just-handled file and ``rmdir``s any empty parent directory inside the inbox tree, so per-upload sub-folders don't linger
 
 Configuration:
 
@@ -149,14 +151,58 @@ Configuration:
 | `pipeline.retry_interval_seconds` | `300` | Wait before retrying failed extractions |
 | `pipeline.max_retries` | `3` | Maximum retry attempts |
 
+## DICOM Zip Handling
+
+Imaging exams ship as a single ``.zip`` containing extension-less DICOM
+frames (e.g. ``I1000000``), a ``DICOMDIR`` manifest, JPEG previews, and
+bookkeeping files. The upload route extracts the zip server-side
+**before** the watcher sees the contents:
+
+1. **Detect**: ``application/zip`` mime or ``.zip`` suffix.
+2. **Validate**: ``zipfile.testzip()`` rejects corrupt archives; the
+   uncompressed-size budget caps zip-bomb expansion.
+3. **Sanitise** every member name through ``safe_filename`` /
+   ``safe_vault_join`` (Zip Slip rejected).
+4. **Peek** byte 128–131 of every member from the zip stream. If those
+   four bytes equal ``DICM``, the member is treated as a DICOM frame
+   and written to disk under its **final** filename
+   (``<stem>.dcm``); otherwise it is written as ``<original-name>.bin``
+   with a ``.zip_member`` sidecar carrying the original filename.
+   Writing under the final name avoids a watcher-create race that the
+   intermediate-rename approach used to hit.
+5. **Sidecars**: ``.patient_hint``, ``.event_hint``, and ``.user_hint``
+   are written next to every member so the pipeline links the file to
+   the right patient / event / uploader regardless of inbox folder
+   shape.
+
+The pipeline worker then:
+
+1. **Dispatch ``.dcm``** to ``process_dicom`` (DICOM ingest in
+   ``backend/asclepius/pipeline/dicom_ingest.py``). Frames are filed
+   under ``patients/{slug}/{year}/{study-folder}/series-N/`` (no
+   ``imaging/`` middle segment from v0.9.6+). The first frame creates
+   a placeholder ``imaging_report`` document; subsequent frames find
+   it via the deterministic study hash and bump series / image
+   counters.
+2. **Dispatch ``.bin``** to ``process_zip_member``. The file is moved
+   to ``patients/{slug}/imaging-bundles/{zip_stem}/`` under its
+   restored original name. Bundle files do **not** get their own
+   ``documents`` row; the imaging detail page surfaces them via
+   ``GET /api/imaging/{id}/bundle-files``.
+3. **Auto-attach a report PDF** if the file came from
+   ``POST /api/imaging/{id}/report``: an ``.imaging_study_hint``
+   sidecar tells the worker to repoint
+   ``imaging_studies.document_id`` at the new (post-pipeline) document
+   and delete the placeholder.
+
 ## Patient Assignment
 
 Documents can be pre-assigned to a patient in two ways:
 
-1. **Upload via web UI** -- selecting a patient during upload writes a `.patient_hint` file alongside the document
-2. **Hint file** -- a file named `document.pdf.patient_hint` containing the patient ID (a single integer)
+1. **Upload via web UI** -- selecting a patient during upload writes a `.patient_hint` file alongside the document. When a patient is provided, the inbox sub-folder is the patient slug (e.g. ``inbox/alex-smith/``); otherwise it falls back to ``inbox/user-<id>/``. A ``.user_hint`` sidecar always carries the uploader id so the pipeline can stamp ``uploaded_by_user_id`` regardless of the folder name.
+2. **Hint file** -- a file named `document.pdf.patient_hint` containing the patient ID (a single integer).
 
-The pipeline reads and deletes the hint file during processing, then sets the `patient_id` on the document record.
+The pipeline reads and deletes the hint files during processing, then sets the `patient_id` on the document record.
 
 ## OCR Phase
 

@@ -12,7 +12,12 @@ Two ingestion paths:
   them automatically. To pre-assign a patient, place a `<filename>.patient_hint`
   sibling file containing the patient ID.
 
-Supported formats: PDF, JPEG, PNG, TIFF, DICOM (.dcm).
+Supported formats: PDF, JPEG, PNG, TIFF, DICOM (.dcm), and DICOM zip
+bundles (.zip). Zip uploads are extracted server-side: the DICM
+preamble at byte 128 of every member is checked, true DICOM files are
+auto-renamed to `.dcm`, and the rest (DICOMDIR / JPEG previews /
+LOCKFILE / VERSION) is filed under `imaging-bundles/`. Default upload
+cap is 1 GB. See [Imaging](/user-guide/imaging) for the full flow.
 
 Documents appear in the list immediately with `pending` status; the pipeline
 picks them up asynchronously.
@@ -65,10 +70,28 @@ Selecting rows reveals a bulk action bar:
 Actions run sequentially and report a single summary toast. Selection
 clears automatically on filter / page / patient changes.
 
+## Document list — row click
+
+Clicking anywhere on a row opens the document detail page. The
+checkbox column, the rename pencil, and the inline-rename input stop
+event propagation so they keep their own behaviour.
+
 ## Document detail page
 
-The left panel shows the PDF viewer (or the DICOM viewer for imaging
-studies). The right panel holds all extracted metadata with inline-editable
+The left panel shows the PDF viewer for PDFs, an inline image for
+JPEG / PNG / TIFF, or — for **imaging documents** (`doc_type =
+'imaging_report'`, see [Imaging](/user-guide/imaging)) — the same
+report-PDF slot used on the imaging detail page. When the report is
+attached, the PDF renders inline; when it is a placeholder, the slot
+shows *Upload PDF* / *Pick existing PDF* buttons. The DICOM viewer
+itself only lives on `/imaging/:studyId`; the document page header
+gets an *Imaging view* button that jumps there. If the document is
+missing on disk for any reason, the panel renders a clean
+"file not available" empty state instead of a broken viewer (the
+frontend HEAD-checks `/api/documents/{id}/file` before mounting the
+viewer).
+
+The right panel holds all extracted metadata with inline-editable
 fields:
 
 - **Type** — dropdown across the 25+ supported types
@@ -146,3 +169,18 @@ for accessible patients. Viewers cannot delete.
 Reassigning a document to a different patient moves the file on disk to
 the new patient's directory and updates all child records. Only users with
 the `owner` role can move documents.
+
+## Moving files in the file browser
+
+Files can also be relocated from the **Files** page (`/files`). Each
+row has a *Move* action that calls `POST /api/vault/move`; the file is
+renamed on disk and the matching `documents.file_path`,
+`imaging_studies.folder_path`, and `imaging_series.folder_path` rows
+are rewritten in lockstep so the document reference stays intact.
+Useful when a file landed in the wrong date or event folder and you
+want to fix it without breaking links to the document detail page.
+
+Access scope is enforced on both endpoints: a user can only move a
+file between two paths their role lets them see. Moves that would land
+inside the source directory itself are rejected (no infinite-loop
+folders).

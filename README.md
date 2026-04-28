@@ -45,10 +45,10 @@ You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Cl
   <img src="docs/public/assets/diagrams/hero.svg" alt="Asclepius pipeline overview" width="900" />
 </p>
 
-- Drops PDFs, images, and DICOM files into the pipeline. OCR can be Tesseract, Google Vision, or any LLM with vision; extraction can be Ollama, vLLM, Claude, or OpenAI.
+- Drops PDFs, images, DICOM files, and DICOM zip bundles (the format every imaging CD ships in) into the pipeline. OCR can be Tesseract, Google Vision, or any LLM with vision; extraction can be Ollama, vLLM, Claude, or OpenAI.
 - Long documents (over 5 pages) get split into logical sections — lab block, clinical notes, discharge summary — and each section is extracted on its own.
 - Lab results are normalized across visits and languages. A "ferritin" in Italian, a typo'd "Ferrytin" in a German report, and "ferritin (s)" with weird units all end up on the same trend chart.
-- A built-in DICOM viewer handles MRI and CT studies with windowing, zoom, and slice scrolling.
+- A built-in DICOM viewer handles MRI and CT studies with windowing, zoom, and pan, and can attach the radiology PDF report next to the frames so you read the doctor's narrative and the images in the same place.
 - The timeline view groups documents into medical events — a diagnosis, a course of treatment, a surgery and the follow-ups around it.
 - Full-text search (SQLite FTS5) and a small RAG chat layer let you ask things like *when did I last get a tetanus shot?*
 - Multi-patient with role-based access, so you can keep records for a partner or your kids in the same install with separate access.
@@ -65,7 +65,7 @@ You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Cl
 | OCR | Tesseract 5, LLM Vision, Google Vision |
 | LLM | Ollama, vLLM, Claude API, OpenAI API |
 | Vision-LLM | Ollama (Qwen2.5-VL, MiniCPM-V, …), Claude vision, GPT-4o |
-| DICOM | pydicom + Cornerstone.js |
+| DICOM | pydicom (server-side render to PNG with optional window-level override) |
 | Deployment | Docker Compose |
 
 ## Before you self-host

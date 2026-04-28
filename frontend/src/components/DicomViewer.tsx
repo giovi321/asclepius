@@ -184,6 +184,13 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
   const params = new URLSearchParams();
   if (isMR && wc != null) params.set("wc", String(wc));
   if (isMR && ww != null) params.set("ww", String(ww));
+  // Ask the backend to bicubic-upscale the PNG once the user zooms past
+  // ~1.5x — without this the CSS scale path produces a blurry/pixelated
+  // image because the PNG is delivered at the DICOM's native resolution
+  // (often 256x256 or 512x512). Capped at 4x because PIL bicubic gets
+  // expensive past that and there's no further sharpness gain.
+  const upscale = zoom >= 3 ? 4 : zoom >= 1.5 ? 2 : 1;
+  if (upscale > 1) params.set("upscale", String(upscale));
   const qs = params.toString();
   const frameUrl = `/api/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}${qs ? `?${qs}` : ""}`;
 

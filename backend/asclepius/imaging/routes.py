@@ -250,6 +250,7 @@ async def get_frame(
     format: str = Query(default="png", pattern="^(png|dicom)$"),
     wc: float | None = Query(default=None),
     ww: float | None = Query(default=None),
+    upscale: int = Query(default=1, ge=1, le=4),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -260,6 +261,11 @@ async def get_frame(
     re-decoding pixel data on the client. Both must be supplied together;
     otherwise the file's own VOI LUT is used (or a default min-max
     normalisation when none is present).
+
+    ``upscale`` (1-4) bicubic-resamples the PNG to N× the source size before
+    encoding. The viewer asks for ``upscale=2`` once the user zooms past
+    ~1.5× and ``upscale=4`` past ~3×, trading bandwidth for sharpness so
+    the canvas-scale fallback no longer pixelates.
     """
     folder = await _series_folder_with_access(study_id, series_id, current_user, db)
 
@@ -290,6 +296,13 @@ async def get_frame(
         ds = pydicom.dcmread(str(frames[index]))
         pixel_array = ds.pixel_array.astype(float)
 
+        # Apply Modality LUT (RescaleSlope/RescaleIntercept) before windowing.
+        # CT data is mandatory (Hounsfield Units); some MR vendors set them too.
+        slope = float(getattr(ds, "RescaleSlope", 1) or 1)
+        intercept = float(getattr(ds, "RescaleIntercept", 0) or 0)
+        if slope != 1 or intercept != 0:
+            pixel_array = pixel_array * slope + intercept
+
         # Decide window-level. Caller-supplied wc+ww win; otherwise fall
         # back to the file's WindowCenter/WindowWidth tags.
         if wc is not None and ww is not None and ww > 0:
@@ -302,17 +315,31 @@ async def get_frame(
             wc_val = None
             ww_val = None
 
-        if wc_val is not None and ww_val is not None:
+        if wc_val is not None and ww_val is not None and ww_val > 0:
+            # Map the user-chosen [wc-ww/2, wc+ww/2] window to [0, 255] —
+            # everything below the window clamps to black, above to white.
+            # Pre-0.9.12 the array was clipped and then re-normalised using
+            # the clipped array's own min/max, which made the slider almost
+            # a no-op (clipped min/max ≡ window bounds, so the math always
+            # stretched the same range to 0-255). Using the window bounds
+            # directly fixes the "no visible change" + "all black/white"
+            # symptoms reported on MR studies.
             img_min = wc_val - ww_val / 2
             img_max = wc_val + ww_val / 2
             pixel_array = np.clip(pixel_array, img_min, img_max)
+            pixel_array = (pixel_array - img_min) / (img_max - img_min) * 255
+        else:
+            # No window info — fall back to a min-max stretch so blank-tag
+            # files still render with reasonable contrast.
+            if pixel_array.max() != pixel_array.min():
+                pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min()) * 255
 
-        # Normalize to 0-255
-        if pixel_array.max() != pixel_array.min():
-            pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min()) * 255
         pixel_array = pixel_array.astype(np.uint8)
 
         img = PILImage.fromarray(pixel_array)
+        if upscale > 1:
+            new_size = (img.width * upscale, img.height * upscale)
+            img = img.resize(new_size, resample=PILImage.BICUBIC)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         buf.seek(0)

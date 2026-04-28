@@ -188,6 +188,14 @@ async def process_dicom(
         modality=modality,
     )
 
+    # Real-world DICOM exports almost always put each series in its own
+    # subfolder. When SeriesInstanceUID is missing (raw IVR LE streams,
+    # legacy media), the upstream zip-extracted folder name is the
+    # strongest signal that two frames belong to the same series — without
+    # it, we fall back to series_number and collide files from different
+    # source folders into one series row. Capture the parent folder for
+    # use further down as a tiebreaker.
+    source_folder_hint = path.parent.name if path.parent else ""
     series_folder = f"series-{series_number or '001'}"
     relative_path = f"{base_path}/{series_folder}/{path.name}"
 
@@ -298,9 +306,11 @@ async def process_dicom(
         study_is_new = True
 
     # Create or find imaging series. Match on series_instance_uid when
-    # present; fall back to (study_id, series_number) when the DICOM lacks
-    # a SeriesInstanceUID — otherwise every frame would create its own
-    # series row because ``WHERE series_instance_uid = NULL`` never matches.
+    # present; fall back to (study_id, series_number, source_folder) when
+    # the DICOM lacks a SeriesInstanceUID. The folder name is the tiebreaker
+    # because different vendor ZIPs ship multiple series with overlapping
+    # SeriesNumber=1 entries — without it, all of them collapse into one
+    # series row and the user only sees the first one.
     if series_uid:
         cursor = await db.execute(
             "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid = ?",
@@ -309,8 +319,9 @@ async def process_dicom(
     else:
         cursor = await db.execute(
             "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid IS NULL "
-            "AND COALESCE(series_number, -1) = COALESCE(?, -1)",
-            (study_id, series_number),
+            "AND COALESCE(series_number, -1) = COALESCE(?, -1) "
+            "AND COALESCE(series_description, '') = COALESCE(?, '')",
+            (study_id, series_number, series_desc or source_folder_hint),
         )
     row = await cursor.fetchone()
     if row:
@@ -321,12 +332,17 @@ async def process_dicom(
                 (row[0],),
             )
     else:
+        # When there's no SeriesInstanceUID, fall back to the source folder
+        # name as a synthesized description so the distinct-series check on
+        # the next frame matches consistently. Real description still wins
+        # if the DICOM tag carried one.
+        effective_desc = series_desc or (source_folder_hint if not series_uid else None)
         await db.execute(
             """INSERT INTO imaging_series
                (study_id, series_number, series_description, modality,
                 num_images, series_instance_uid, folder_path)
                VALUES (?, ?, ?, ?, 1, ?, ?)""",
-            (study_id, series_number, series_desc, modality,
+            (study_id, series_number, effective_desc, modality,
              series_uid, f"{base_path}/{series_folder}"),
         )
         # First frame of a brand-new series under an EXISTING study — bump

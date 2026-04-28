@@ -36,6 +36,39 @@ _CHUNK = 1024 * 1024
 _DICM_MAGIC = b"DICM"
 _DICM_OFFSET = 128
 
+# DICOM image SOP class UID prefix — used as a force-read fallback for files
+# that lack the standard 128-byte preamble (Implicit VR Little Endian streams
+# emitted by some vendors). If pydicom can parse the file and finds either a
+# SOPClassUID or SeriesInstanceUID we treat it as DICOM.
+_DICOM_FORCE_READ_BYTES = 4096
+
+# Image extensions we treat as imaging frames when they appear inside a zip
+# without any DICOM siblings (e.g. ultrasound exports as JPEG).
+_IMAGE_FRAME_EXTS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"}
+
+
+def _looks_like_dicom_via_pydicom(head: bytes) -> bool:
+    """Force-read fallback: parse a small head buffer with pydicom.
+
+    Real-world DICOM exports occasionally omit the 128-byte preamble (raw
+    Implicit VR Little Endian streams from some vendors and the files
+    DICOMDIR points at). pydicom can still parse them with ``force=True``;
+    we look for one of the SOP/Series UIDs as confirmation that this isn't
+    just garbage that happened to start with valid VR codes.
+    """
+    try:
+        import pydicom
+        import io
+        ds = pydicom.dcmread(
+            io.BytesIO(head), force=True, stop_before_pixels=True,
+        )
+        return bool(
+            getattr(ds, "SOPClassUID", None)
+            or getattr(ds, "SeriesInstanceUID", None)
+        )
+    except Exception:
+        return False
+
 # Mime detections that should be treated as a zip archive.
 _ZIP_MIMES = {"application/zip", "application/x-zip-compressed"}
 
@@ -167,11 +200,40 @@ def _extract_zip(
             # ``I1000000``) would be skipped by the watcher's extension
             # filter and then renamed out from under it.
             with zf.open(info, "r") as src:
-                head = src.read(_DICM_OFFSET + 4)
+                # Read enough to (a) check the preamble at offset 128 and
+                # (b) feed the pydicom force-read fallback for vendors that
+                # ship raw Implicit VR LE streams without a preamble.
+                head = src.read(_DICOM_FORCE_READ_BYTES)
                 ext = Path(original_name).suffix.lower()
-                is_dicom = ext in {".dcm", ".dicom"} or (
+                lower_name = original_name.lower()
+
+                # DICOMDIR is a DICOM index file with no pixel data. We never
+                # treat it as a frame — the pipeline walks the folders
+                # directly, and dropping DICOMDIR through dicom_ingest just
+                # produces noise. Park it as a bundle file instead.
+                is_dicomdir = lower_name == "dicomdir"
+
+                # JPG/PNG/TIFF *inside* a zip get the imaging-image
+                # treatment further down (see _image_frame_kind below). For
+                # the per-member loop they're tagged as "other" so the
+                # bundle path stores them; the post-extract pass promotes
+                # all-image folders to a synthesized imaging study.
+                is_image_frame = ext in _IMAGE_FRAME_EXTS
+
+                preamble_match = (
                     len(head) >= _DICM_OFFSET + 4
                     and head[_DICM_OFFSET:_DICM_OFFSET + 4] == _DICM_MAGIC
+                )
+                is_dicom = (
+                    not is_dicomdir
+                    and (
+                        ext in {".dcm", ".dicom"}
+                        or preamble_match
+                        # Force-read fallback for preamble-less DICOM —
+                        # only checked when neither extension nor preamble
+                        # gave us a hit, so the common path stays cheap.
+                        or (not is_image_frame and _looks_like_dicom_via_pydicom(head))
+                    )
                 )
 
                 # Final on-disk name. DICOM frames keep ``.dcm``; everything

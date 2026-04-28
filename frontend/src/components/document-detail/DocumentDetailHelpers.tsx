@@ -178,18 +178,24 @@ export function EditableCombobox({
   docId: number;
   onSave: (updated?: any) => void;
   normType: "doctors" | "facilities" | "specialties";
-  /** If set, the user can choose to rename this canonical entry globally
-   * instead of just fixing the current document. The two-button confirm
-   * appears when the typed value is different from the current display
-   * AND lacks an exact match in the existing options (i.e. it would be
-   * a real rename, not a switch to a sibling entry). */
+  /** Required for the scope confirm to fire. When the field already
+   * carries an entity id and the user picks/types a new value, the
+   * combobox always asks whether the change should apply to this
+   * document only or to every document linked to the current entity.
+   * Without it, only the doc-only path is offered. */
   currentEntityId?: number | null;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const [pendingRename, setPendingRename] = useState<string | null>(null);
+  // Pending change pending the scope choice. `entityId` is the resolved
+  // existing entry's id when the user picked from the dropdown; null
+  // when they typed a new value (which would be auto-created on commit).
+  const [pendingChange, setPendingChange] = useState<{
+    display: string;
+    entityId: number | null;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const doctors = useDoctors();
@@ -208,20 +214,28 @@ export function EditableCombobox({
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setEditing(false);
         setQuery("");
+        setPendingChange(null);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [editing]);
 
-  const commit = async (chosen: string | null) => {
+  const displayOf = (opt: any) =>
+    opt.canonical_display || opt.name || opt.display || "";
+
+  /** Apply the change to THIS document only — repoint its FK, leave the
+   * canonical row untouched. The backend's _upsert_* helpers resolve the
+   * display name to an existing entry by alias/slug, or auto-create one
+   * if there's no match. */
+  const commitDocOnly = async (chosen: string | null) => {
     setSaving(true);
     try {
       const res = await api.patch(`/documents/${docId}`, { [field]: chosen });
       onSave(res.data);
       setEditing(false);
       setQuery("");
-      setPendingRename(null);
+      setPendingChange(null);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Failed to save";
       toast({ title: typeof d === "string" ? d : "Failed to save", variant: "error" });
@@ -230,58 +244,84 @@ export function EditableCombobox({
     }
   };
 
-  /** Rename the canonical entry globally (all linked documents follow).
-   * Used by the "Rename everywhere" button when ``currentEntityId`` is
-   * known and the user typed a real rename rather than picking a sibling
-   * entry from the dropdown. */
-  const renameGlobally = async (newDisplay: string) => {
-    if (!currentEntityId) return;
+  /** Apply the change to EVERY document currently linked to the
+   * ``currentEntityId``. The strategy depends on whether the user picked
+   * an existing entry or typed a new one:
+   *
+   * - Picked existing entry (``targetEntityId`` known) → merge the
+   *   current entity into the picked one. Every document that pointed
+   *   at the old entity now points at the picked entity, and the old
+   *   entity row is deleted (its name copied as an alias on the target).
+   * - Typed a new name → rename the current entity's
+   *   ``canonical_display``. The FK stays put; every linked document
+   *   simply renders the new name through the join.
+   */
+  const applyToAllDocuments = async (
+    newDisplay: string,
+    targetEntityId: number | null,
+  ) => {
+    if (!currentEntityId) {
+      // No existing entity to mutate — fall back to doc-only.
+      await commitDocOnly(newDisplay);
+      return;
+    }
     setSaving(true);
     try {
-      await api.patch(`/normalization/${normType}/${currentEntityId}`, {
-        canonical_display: newDisplay,
-      });
-      // No PATCH on the document — the FK already points at this entry,
-      // and the canonical_display change cascades to every doc that joins
-      // through the same FK.
+      if (targetEntityId && targetEntityId !== currentEntityId) {
+        // Merge: every doc pointing at currentEntityId becomes a doc
+        // pointing at targetEntityId. The merge endpoint also copies
+        // the source's display name as an alias on the target so the
+        // few-shot retriever picks it up next time.
+        await api.post(`/normalization/${normType}/merge`, {
+          source_id: currentEntityId,
+          target_id: targetEntityId,
+        });
+      } else {
+        // Rename: change the canonical row's display name in place.
+        await api.patch(`/normalization/${normType}/${currentEntityId}`, {
+          canonical_display: newDisplay,
+        });
+      }
       onSave();
       setEditing(false);
       setQuery("");
-      setPendingRename(null);
+      setPendingChange(null);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Failed to rename";
-      toast({ title: typeof d === "string" ? d : "Failed to rename", variant: "error" });
+      const d = err?.response?.data?.detail || err?.message || "Failed to apply";
+      toast({ title: typeof d === "string" ? d : "Failed to apply", variant: "error" });
     } finally {
       setSaving(false);
     }
   };
 
-  /** Returns true when a typed value would be a real "rename this entry"
-   * action (vs picking a sibling entry from the existing options). Only
-   * gates the scope picker — exact matches commit the doc-only path
-   * directly. */
-  const isRenameCandidate = (typed: string): boolean => {
-    if (!currentEntityId) return false;
-    const t = typed.trim();
-    if (!t) return false;
-    if (t.toLowerCase() === String(value || "").toLowerCase()) return false;
-    // Only ask when the typed value doesn't match an existing canonical
-    // entry — otherwise the user is switching to a sibling, not renaming.
-    return !options.some((o: any) =>
-      (o.canonical_display || o.name || "").toLowerCase() === t.toLowerCase()
-    );
-  };
-
-  const handleEnterCommit = (typed: string) => {
-    if (isRenameCandidate(typed)) {
-      setPendingRename(typed.trim());
-    } else {
-      commit(typed.trim());
+  /** Decide whether to commit straight through (no scope ambiguity) or
+   * raise the two-button picker. The picker fires when:
+   *   - the field already has a current entity (something to mutate), AND
+   *   - the new value differs from the current display, AND
+   *   - the new value is non-empty (clear has its own button).
+   * Without a current entity we can't "apply to all" — there's nothing
+   * to rename or merge from — so we go straight to doc-only. */
+  const handleCommit = (newDisplay: string, targetEntityId: number | null) => {
+    const trimmed = (newDisplay || "").trim();
+    if (!trimmed) {
+      // Clearing — handled separately by the Clear button.
+      commitDocOnly(null);
+      return;
     }
+    if (trimmed.toLowerCase() === String(value || "").toLowerCase()
+        && targetEntityId === currentEntityId) {
+      // No-op — same name and same entity.
+      setEditing(false);
+      setQuery("");
+      return;
+    }
+    if (!currentEntityId) {
+      // Nothing to "apply to all" against — go straight to doc-only.
+      commitDocOnly(trimmed);
+      return;
+    }
+    setPendingChange({ display: trimmed, entityId: targetEntityId });
   };
-
-  const displayOf = (opt: any) =>
-    opt.canonical_display || opt.name || opt.display || "";
 
   const q = query.trim().toLowerCase();
   const filtered = q
@@ -307,10 +347,13 @@ export function EditableCombobox({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") { setEditing(false); setQuery(""); setPendingRename(null); }
+                  if (e.key === "Escape") { setEditing(false); setQuery(""); setPendingChange(null); }
                   if (e.key === "Enter") {
-                    if (filtered.length === 1) commit(displayOf(filtered[0]));
-                    else if (canCreate) handleEnterCommit(query);
+                    if (filtered.length === 1) {
+                      handleCommit(displayOf(filtered[0]), filtered[0].id);
+                    } else if (canCreate) {
+                      handleCommit(query, null);
+                    }
                   }
                 }}
                 placeholder={`Search ${normType}...`}
@@ -319,12 +362,12 @@ export function EditableCombobox({
                 disabled={saving}
               />
             </div>
-            <button onClick={() => commit(null)} disabled={saving}
+            <button onClick={() => commitDocOnly(null)} disabled={saving}
               className="rounded border px-2 py-1 text-xs hover:bg-accent"
               title="Clear this field">
               Clear
             </button>
-            <button onClick={() => { setEditing(false); setQuery(""); }}
+            <button onClick={() => { setEditing(false); setQuery(""); setPendingChange(null); }}
               className="rounded border px-2 py-1 text-xs">
               <X className="h-3 w-3" />
             </button>
@@ -340,13 +383,13 @@ export function EditableCombobox({
                     No {normType} yet. Type a name to create one.
                   </div>
                 )}
-                {filtered.slice(0, 50).map((opt: any) => {
+                {!pendingChange && filtered.slice(0, 50).map((opt: any) => {
                   const d = displayOf(opt);
                   const isCurrent = value && d.toLowerCase() === String(value).toLowerCase();
                   return (
                     <button
                       key={opt.id}
-                      onClick={() => commit(d)}
+                      onClick={() => handleCommit(d, opt.id)}
                       disabled={saving}
                       className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
                     >
@@ -359,9 +402,9 @@ export function EditableCombobox({
                     </button>
                   );
                 })}
-                {canCreate && !pendingRename && (
+                {canCreate && !pendingChange && (
                   <button
-                    onClick={() => handleEnterCommit(query)}
+                    onClick={() => handleCommit(query, null)}
                     disabled={saving}
                     className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
                   >
@@ -371,37 +414,43 @@ export function EditableCombobox({
                       : <>Create new: <span className="font-medium">"{query.trim()}"</span></>}
                   </button>
                 )}
-                {pendingRename && (
-                  // Two-button confirm: doc-only logs a correction without
-                  // touching the canonical row; global rename updates the
-                  // norm entry so every linked document follows.
+                {pendingChange && (
+                  // Two-button scope confirm. Fires for every change to a
+                  // populated field — picking a sibling entry, typing a
+                  // new name, anything that's not a no-op or a clear.
+                  // The "all documents" path adapts: merge when the user
+                  // picked an existing entry, rename when they typed a
+                  // brand-new name. Both cascade through joins so every
+                  // doc linked to the old entity follows automatically.
                   <div className="border-t bg-muted/30 p-2 space-y-2">
                     <p className="text-[11px] text-muted-foreground">
-                      Apply <span className="font-medium">"{pendingRename}"</span> to:
+                      Apply <span className="font-medium">"{pendingChange.display}"</span> to:
                     </p>
                     <div className="flex flex-col gap-1">
                       <button
-                        onClick={() => commit(pendingRename)}
+                        onClick={() => commitDocOnly(pendingChange.display)}
                         disabled={saving}
                         className="rounded border bg-background px-2 py-1 text-left text-xs hover:bg-accent disabled:opacity-50"
                       >
-                        <span className="font-medium">Fix this document only</span>
+                        <span className="font-medium">This document only</span>
                         <span className="block text-[10px] text-muted-foreground">
-                          Logs a correction; canonical name unchanged.
+                          Repoint just this document. Other documents linked to the current {normType.slice(0, -1)} keep their existing value.
                         </span>
                       </button>
                       <button
-                        onClick={() => renameGlobally(pendingRename)}
+                        onClick={() => applyToAllDocuments(pendingChange.display, pendingChange.entityId)}
                         disabled={saving}
                         className="rounded border border-primary/30 bg-primary/5 px-2 py-1 text-left text-xs hover:bg-primary/10 disabled:opacity-50"
                       >
-                        <span className="font-medium">Rename everywhere</span>
+                        <span className="font-medium">All documents</span>
                         <span className="block text-[10px] text-muted-foreground">
-                          Updates the {normType.slice(0, -1)} record itself; every linked document follows.
+                          {pendingChange.entityId && pendingChange.entityId !== currentEntityId
+                            ? <>Merge the current {normType.slice(0, -1)} into the picked one. Every linked document follows.</>
+                            : <>Rename the current {normType.slice(0, -1)} record. Every linked document follows.</>}
                         </span>
                       </button>
                       <button
-                        onClick={() => setPendingRename(null)}
+                        onClick={() => setPendingChange(null)}
                         disabled={saving}
                         className="rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent"
                       >

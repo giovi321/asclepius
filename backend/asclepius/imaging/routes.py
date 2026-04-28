@@ -40,10 +40,11 @@ _LIST_SORT_COLUMNS: dict[str, str] = {
     # Frontend sort key → SQL expression. Whitelist only — anything not
     # here falls back to ``study_date DESC``. Doctor + facility are
     # joined through documents → doctors / facilities so the sort lines
-    # up with the canonical names shown in the UI.
+    # up with the canonical names shown in the UI. Study date now lives
+    # on the parent ``documents.event_date`` (single source of truth).
     "modality":          "s.modality",
     "body_part":         "s.body_part",
-    "study_date":        "s.study_date",
+    "study_date":        "d.event_date",
     "doctor":            "doc.name",
     "facility":          "f.name",
     "patient":           "p.display_name",
@@ -91,10 +92,10 @@ async def list_imaging_studies(
         conditions.append("s.report_status = ?")
         params.append(report_status)
     if date_from:
-        conditions.append("s.study_date >= ?")
+        conditions.append("d.event_date >= ?")
         params.append(date_from)
     if date_to:
-        conditions.append("s.study_date <= ?")
+        conditions.append("d.event_date <= ?")
         params.append(date_to)
     if q:
         like = f"%{q}%"
@@ -108,7 +109,7 @@ async def list_imaging_studies(
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
-    sort_sql = _LIST_SORT_COLUMNS.get(sort or "", "s.study_date")
+    sort_sql = _LIST_SORT_COLUMNS.get(sort or "", "d.event_date")
     order_sql = "ASC" if (order or "desc").lower() == "asc" else "DESC"
 
     # Count total (unbounded) so the UI can paginate.
@@ -132,6 +133,7 @@ async def list_imaging_studies(
                   f.name as facility_name,
                   d.original_filename as report_filename,
                   d.file_path as report_file_path,
+                  d.event_date as study_date,
                   d.created_at as date_added
            FROM imaging_studies s
            LEFT JOIN documents d ON s.document_id = d.id
@@ -158,7 +160,8 @@ async def get_imaging_study(
                   p.display_name as patient_name,
                   d.original_filename as report_filename,
                   d.file_path as report_file_path,
-                  d.doc_type as report_doc_type
+                  d.doc_type as report_doc_type,
+                  d.event_date as study_date
            FROM imaging_studies s
            LEFT JOIN documents d ON s.document_id = d.id
            LEFT JOIN patients p ON s.patient_id = p.id
@@ -507,6 +510,86 @@ async def add_imaging_link(
     except aiosqlite.IntegrityError:
         raise HTTPException(status_code=409, detail="Link already exists")
     return {"id": link_id, "status": "linked"}
+
+
+class ImagingMetadataPatch(BaseModel):
+    modality: str | None = None
+    body_part: str | None = None
+    study_description: str | None = None
+    accession_number: str | None = None
+
+
+_IMAGING_PATCH_FIELDS = {"modality", "body_part", "study_description", "accession_number"}
+
+
+@router.patch("/{study_id}/metadata")
+async def update_imaging_metadata(
+    study_id: int,
+    body: ImagingMetadataPatch,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Update imaging-specific metadata (modality, body part, accession,
+    study description). Doctor / facility / event_date / patient are
+    edited on the parent ``documents`` row via PATCH /api/documents/{id};
+    those fields are NOT accepted here so the two endpoints can't drift.
+
+    Every accepted field is recorded in ``extraction_corrections`` so the
+    same correction-driven learning that documents use applies to
+    imaging too — when the user fixes ``modality`` on one study the LLM
+    sees the correction as a few-shot example for similar future studies.
+    """
+    study = await _study_with_access(study_id, current_user, db)
+    document_id = study["document_id"]
+
+    # Patient access ⇒ write access for now (mirror /api/documents PATCH).
+    cursor = await db.execute(
+        "SELECT modality, body_part, study_description, accession_number "
+        "FROM imaging_studies WHERE id = ?",
+        (study_id,),
+    )
+    before_row = await cursor.fetchone()
+    before = dict(before_row) if before_row else {}
+
+    updates: dict = body.model_dump(exclude_none=False)
+    set_parts: list[str] = []
+    params: list = []
+    corrections: list[tuple[str, str | None, str | None]] = []
+    for field, new_val in updates.items():
+        if field not in _IMAGING_PATCH_FIELDS:
+            continue
+        # ``None`` clears the field; same convention as /documents PATCH.
+        if new_val is None and field not in body.model_fields_set:
+            continue
+        old_val = before.get(field) if before else None
+        if (old_val or None) == (new_val or None):
+            continue
+        set_parts.append(f"{field} = ?")
+        params.append(new_val)
+        corrections.append((field, old_val, new_val))
+
+    if not set_parts:
+        return {"status": "noop", "id": study_id}
+
+    params.append(study_id)
+    await db.execute(
+        f"UPDATE imaging_studies SET {', '.join(set_parts)} WHERE id = ?",
+        params,
+    )
+
+    # Self-learning: record the corrections against the parent document
+    # so the existing few-shot pipeline picks them up.
+    if document_id:
+        for field, old_val, new_val in corrections:
+            await db.execute(
+                """INSERT INTO extraction_corrections
+                   (document_id, field_name, llm_value, corrected_value, doc_type)
+                   VALUES (?, ?, ?, ?, 'imaging_report')""",
+                (document_id, f"imaging.{field}", old_val, new_val),
+            )
+
+    await db.commit()
+    return {"status": "updated", "id": study_id, "fields": [c[0] for c in corrections]}
 
 
 @router.delete("/{study_id}/links/{link_id}")

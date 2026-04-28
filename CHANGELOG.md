@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-04-28 - editable imaging metadata + broken-file recovery
+
+### Added
+
+- ``PATCH /api/imaging/{id}/metadata`` for inline edits of imaging-
+  specific fields (``modality``, ``body_part``, ``study_description``,
+  ``accession_number``). Every accepted field is recorded against the
+  parent document in ``extraction_corrections`` (with
+  ``doc_type='imaging_report'``) so the same correction-driven
+  few-shot learning that documents use applies to imaging metadata.
+  Doctor / facility / event_date / patient are still edited only via
+  ``PATCH /api/documents/{id}`` so the two endpoints can't drift.
+- ImagingStudiesSection now renders editable rows (modality →
+  EditableSelect with the readable label map; body_part / description /
+  accession → EditableField) backed by an ``apiPath`` override the
+  shared helpers gained.
+- ``GET /api/documents/{id}/find-candidates`` — walks the vault for
+  files whose basename matches the document's ``original_filename``
+  and returns vault-relative paths. Used by the document detail page
+  to recover from a broken ``file_path``.
+- ``POST /api/documents/{id}/relink`` — repoint an existing document
+  at a different vault file. Updates ``file_path`` + ``file_size`` only;
+  does not re-run the pipeline.
+- ``POST /api/documents/{id}/replace-file`` — multipart upload of a
+  replacement file. Lands in the organised destination
+  (``patients/{slug}/{year}/...`` based on ``event_date``), updates
+  ``file_path``. Extension is locked to the original.
+- DocumentViewer's missing-file empty state now auto-scans on mount,
+  auto-relinks when there's exactly one match, and offers a candidate
+  list, a "Pick file from vault" picker, and an "Upload replacement"
+  button when the auto-scan finds 0 or >1 matches.
+
+### Changed
+
+- The shared ``EditableField`` and ``EditableSelect`` helpers gained
+  an optional ``apiPath`` prop so callers can target endpoints other
+  than the default ``/documents/{docId}``. ImagingStudiesSection uses
+  it to PATCH ``/imaging/{studyId}/metadata``.
+
+### Removed
+
+- ``imaging_studies.study_date`` column. It duplicated
+  ``documents.event_date`` (the canonical timeline anchor used by every
+  other table and the timeline view) and the two drifted on user
+  edits. Migration backfills any non-null ``study_date`` onto the
+  parent's ``event_date`` first, then drops the column. UI / API now
+  expose the value via the document join (``d.event_date as
+  study_date`` aliasing) so the imaging list still sorts and filters
+  on it.
+
 ## [0.9.7] - 2026-04-27 - imaging consistency + migration cleanup
 
 ### Added

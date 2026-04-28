@@ -143,7 +143,12 @@ export default function ImagingDetailPage() {
           Clinicians need every pixel they can get for frame review;
           constraining this to a column is unusable for cross-sectional
           modalities. */}
-      {doc && <ImagingStudiesSection studies={doc.imaging_studies || []} />}
+      {doc && (
+        <ImagingStudiesSection
+          studies={doc.imaging_studies || []}
+          onUpdated={load}
+        />
+      )}
 
       {/* Report PDF + metadata stack — same shape as DocumentDetailPage. */}
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import aiosqlite
 import fitz
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -312,6 +312,217 @@ async def rename_document(
     await db.execute(
         "UPDATE documents SET original_filename = ?, file_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (new_name, new_file_path, doc_id),
+    )
+    await db.commit()
+    return await get_document(db, doc_id)
+
+
+# ── Broken-file recovery ───────────────────────────────────────────
+
+
+def _scan_vault_for_filename(vault_root: Path, filename: str, limit: int = 25) -> list[str]:
+    """Walk the vault for files whose name matches ``filename`` and return
+    vault-relative POSIX paths. Stops after ``limit`` matches.
+
+    Match is case-insensitive and matches the basename only — exactly what
+    a user would compare visually if they were hunting for a misplaced
+    file. Inbox folders are skipped (those are pipeline staging, not
+    final vault content).
+    """
+    target = filename.lower()
+    matches: list[str] = []
+    if not vault_root.exists():
+        return matches
+    skip_top = {"inbox", ".staging", "_staging"}
+    for top in vault_root.iterdir():
+        if not top.is_dir() or top.name in skip_top:
+            continue
+        for p in top.rglob("*"):
+            if not p.is_file():
+                continue
+            if p.name.lower() == target:
+                try:
+                    matches.append(str(p.relative_to(vault_root)).replace("\\", "/"))
+                except ValueError:
+                    continue
+                if len(matches) >= limit:
+                    return matches
+    return matches
+
+
+@router.get("/{doc_id}/find-candidates")
+async def find_candidate_files(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Look for files in the vault whose basename matches this document's
+    ``original_filename``. Used by the document detail page to recover
+    from a broken ``file_path`` (the file was moved or renamed outside
+    the app). Returns vault-relative POSIX paths so the frontend can
+    pass them straight back to ``POST /relink``.
+    """
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if current_user.get("role") != "admin":
+        allowed = False
+        if doc["patient_id"]:
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            allowed = bool(role)
+        if not allowed and doc.get("uploaded_by_user_id") == current_user["id"]:
+            allowed = True
+        if not allowed:
+            raise HTTPException(status_code=403, detail="No access")
+
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+    raw_filename = doc.get("original_filename") or ""
+    candidates = _scan_vault_for_filename(vault_root, raw_filename)
+    # Drop the path the document already points at — it's broken by
+    # definition; we want alternatives.
+    current = (doc.get("file_path") or "").replace("\\", "/")
+    candidates = [c for c in candidates if c != current]
+    return {"candidates": candidates, "filename": raw_filename}
+
+
+class RelinkRequest(BaseModel):
+    vault_path: str = Field(min_length=1)
+
+
+@router.post("/{doc_id}/relink")
+async def relink_document(
+    doc_id: int,
+    body: RelinkRequest,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Repoint a document at an existing vault file. Use case: the
+    file was moved outside the app and the user picked the right path
+    from ``find-candidates`` or the file browser. The new file is NOT
+    re-processed; only ``documents.file_path`` is updated.
+    """
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+    rel = body.vault_path.replace("\\", "/").lstrip("/")
+    target = _resolve_vault_file(vault_root, rel)
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Target file not found")
+
+    # Final path is recorded relative to the vault root.
+    new_rel = str(target.relative_to(vault_root.resolve())).replace("\\", "/")
+    new_size = target.stat().st_size
+
+    await db.execute(
+        "UPDATE documents SET file_path = ?, file_size = ?, "
+        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_rel, new_size, doc_id),
+    )
+    await db.commit()
+    return await get_document(db, doc_id)
+
+
+@router.post("/{doc_id}/replace-file")
+async def replace_document_file(
+    doc_id: int,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Upload a fresh copy of a missing file. The file lands in the
+    correct organised location (``patients/{slug}/{year}/...`` based on
+    the document's ``event_date``), the document's ``file_path`` is
+    updated, and the file is NOT re-processed (the document already has
+    its OCR text, extraction, and child rows). Patient access checked.
+
+    The file extension is locked to the document's ``original_filename``
+    to prevent content-type confusion.
+    """
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    # Lock the extension to the original filename's extension.
+    old_ext = Path(doc["original_filename"]).suffix.lower()
+    incoming = (file.filename or "").lower()
+    if old_ext and not incoming.endswith(old_ext):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Replacement file must have the same extension ({old_ext})",
+        )
+
+    # Compute the destination folder. Prefer the existing file_path's
+    # parent (so the replacement lands next to where the doc thinks it
+    # is); otherwise build a fresh organised path from the document's
+    # patient slug + year-from-event-date.
+    config = get_config()
+    vault_root = Path(config.vault.root_path)
+    existing = (doc.get("file_path") or "").replace("\\", "/")
+    if existing:
+        dest_dir_rel = "/".join(existing.split("/")[:-1])
+    else:
+        # Fall back to patients/{slug}/{year} (or unclassified).
+        cursor = await db.execute(
+            "SELECT slug FROM patients WHERE id = ?", (doc.get("patient_id"),),
+        )
+        row = await cursor.fetchone()
+        slug = row[0] if row else None
+        year = "unknown"
+        ev = doc.get("event_date") or doc.get("issued_date") or doc.get("date_received")
+        if ev and len(str(ev)) >= 4:
+            year = str(ev)[:4]
+        if slug:
+            dest_dir_rel = f"patients/{slug}/{year}"
+        else:
+            dest_dir_rel = "unclassified"
+
+    safe_name = safe_filename(doc["original_filename"])
+    try:
+        dest = safe_vault_join(vault_root, dest_dir_rel, safe_name)
+    except UnsafePathError as exc:
+        raise HTTPException(status_code=400, detail=f"Unsafe destination: {exc}")
+
+    # Disambiguate on collision so we don't clobber a file the user
+    # intended to keep.
+    counter = 2
+    base = dest
+    while dest.exists():
+        stem = base.stem
+        suffix = base.suffix
+        dest = base.parent / f"{stem}-{counter}{suffix}"
+        counter += 1
+        if counter > 1000:
+            raise HTTPException(status_code=409, detail="Could not allocate filename")
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    max_bytes = config.server.max_upload_bytes
+    chunk = 1024 * 1024
+    try:
+        with open(dest, "wb") as out:
+            while True:
+                buf = await file.read(chunk)
+                if not buf:
+                    break
+                written += len(buf)
+                if written > max_bytes:
+                    raise HTTPException(status_code=413, detail="Upload exceeds size cap")
+                out.write(buf)
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        raise
+
+    new_rel = str(dest.relative_to(vault_root.resolve())).replace("\\", "/")
+    await db.execute(
+        "UPDATE documents SET file_path = ?, file_size = ?, "
+        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (new_rel, written, doc_id),
     )
     await db.commit()
     return await get_document(db, doc_id)

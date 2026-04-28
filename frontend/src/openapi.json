@@ -659,6 +659,149 @@
         }
       }
     },
+    "/api/documents/{doc_id}/find-candidates": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Find Candidate Files",
+        "description": "Look for files in the vault whose basename matches this document's\n``original_filename``. Used by the document detail page to recover\nfrom a broken ``file_path`` (the file was moved or renamed outside\nthe app). Returns vault-relative POSIX paths so the frontend can\npass them straight back to ``POST /relink``.",
+        "operationId": "find_candidate_files_api_documents__doc_id__find_candidates_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/relink": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Relink Document",
+        "description": "Repoint a document at an existing vault file. Use case: the\nfile was moved outside the app and the user picked the right path\nfrom ``find-candidates`` or the file browser. The new file is NOT\nre-processed; only ``documents.file_path`` is updated.",
+        "operationId": "relink_document_api_documents__doc_id__relink_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/replace-file": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Replace Document File",
+        "description": "Upload a fresh copy of a missing file. The file lands in the\ncorrect organised location (``patients/{slug}/{year}/...`` based on\nthe document's ``event_date``), the document's ``file_path`` is\nupdated, and the file is NOT re-processed (the document already has\nits OCR text, extraction, and child rows). Patient access checked.\n\nThe file extension is locked to the document's ``original_filename``\nto prevent content-type confusion.",
+        "operationId": "replace_document_file_api_documents__doc_id__replace_file_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_replace_document_file_api_documents__doc_id__replace_file_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents/{doc_id}/link": {
       "post": {
         "tags": [
@@ -2850,6 +2993,57 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/metadata": {
+      "patch": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Update Imaging Metadata",
+        "description": "Update imaging-specific metadata (modality, body part, accession,\nstudy description). Doctor / facility / event_date / patient are\nedited on the parent ``documents`` row via PATCH /api/documents/{id};\nthose fields are NOT accepted here so the two endpoints can't drift.\n\nEvery accepted field is recorded in ``extraction_corrections`` so the\nsame correction-driven learning that documents use applies to\nimaging too \u2014 when the user fixes ``modality`` on one study the LLM\nsees the correction as a few-shot example for similar future studies.",
+        "operationId": "update_imaging_metadata_api_imaging__study_id__metadata_patch",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImagingMetadataPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -5271,6 +5465,20 @@
         "type": "object",
         "title": "Body_attach_imaging_report_api_imaging__study_id__report_post"
       },
+      "Body_replace_document_file_api_documents__doc_id__replace_file_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_replace_document_file_api_documents__doc_id__replace_file_post"
+      },
       "Body_upload_document_api_documents_upload_post": {
         "properties": {
           "file": {
@@ -5949,6 +6157,56 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ImagingMetadataPatch": {
+        "properties": {
+          "modality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modality"
+          },
+          "body_part": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Part"
+          },
+          "study_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Study Description"
+          },
+          "accession_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession Number"
+          }
+        },
+        "type": "object",
+        "title": "ImagingMetadataPatch"
       },
       "LabResultCreate": {
         "properties": {
@@ -7167,6 +7425,20 @@
           "text"
         ],
         "title": "PromptUpdate"
+      },
+      "RelinkRequest": {
+        "properties": {
+          "vault_path": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Vault Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "vault_path"
+        ],
+        "title": "RelinkRequest"
       },
       "RenameRequest": {
         "properties": {

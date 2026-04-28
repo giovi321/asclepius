@@ -258,15 +258,18 @@ async def process_dicom(
                 )
 
     if study_id is None:
+        # Note: study_date is NOT written here — it lives on the parent
+        # ``documents.event_date`` column (set above on the documents
+        # INSERT). Single source of truth for the timeline anchor.
         cursor = await db.execute(
             """INSERT INTO imaging_studies
                (document_id, patient_id, doctor_id, facility_id,
-                study_date, modality, body_part,
+                modality, body_part,
                 study_description, accession_number, study_instance_uid,
                 num_series, num_images, folder_path)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?)""",
             (doc_id, patient_id, doctor_id, facility_id,
-             study_date, modality, body_part,
+             modality, body_part,
              study_desc, accession, study_uid,
              base_path),
         )

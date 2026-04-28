@@ -4,7 +4,7 @@ import api from "@/api/client";
 import { Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage } from "lucide-react";
 import DicomViewer from "@/components/DicomViewer";
 import {
-  Section, InfoRow, MedFormBadge, getSectionTypeStyle,
+  Section, InfoRow, EditableField, EditableSelect, MedFormBadge, getSectionTypeStyle,
 } from "@/components/document-detail/DocumentDetailHelpers";
 
 // Same DICOM modality → readable label map used in ImagingPage. Keeping
@@ -16,6 +16,7 @@ const MODALITY_LABELS: Record<string, string> = {
 };
 const modalityLabel = (code: string | null | undefined) =>
   !code ? "Unknown" : (MODALITY_LABELS[code.toUpperCase()] || code);
+const MODALITY_CODES = Object.keys(MODALITY_LABELS);
 
 export function EncountersSection({ encounters }: { encounters: any[] }) {
   if (!encounters?.length) return null;
@@ -116,24 +117,27 @@ export function DocumentSectionsList({ sections }: { sections: any[] }) {
 /**
  * Imaging block on the Document Detail page. Mirrors how lab results are
  * shown for blood-test documents: it only appears when the document is a
- * DICOM bundle, and surfaces the imaging-specific fields (modality, body
- * part, study date, institution, referring physician, accession number,
- * StudyInstanceUID), the series breakdown, the embedded DICOM frame
- * viewer, and the auxiliary bundle files (DICOMDIR, JPEG previews, etc.)
- * that were extracted from the same zip.
+ * DICOM bundle. The imaging-specific fields (modality, body_part,
+ * accession_number) are now editable inline with the same UX as the
+ * MetadataEditor on the documents side; corrections are recorded in
+ * ``extraction_corrections`` for the same self-learning loop.
+ *
+ * Study date is NOT shown here because it lives on the parent
+ * ``documents.event_date`` (single source of truth) and is already
+ * editable via ``MetadataEditor``.
  */
-export function ImagingStudiesSection({ studies }: { studies: any[] }) {
+export function ImagingStudiesSection({ studies, onUpdated }: { studies: any[]; onUpdated?: () => void }) {
   if (!studies?.length) return null;
   return (
     <>
       {studies.map((study) => (
-        <ImagingStudyBlock key={study.id} study={study} />
+        <ImagingStudyBlock key={study.id} study={study} onUpdated={onUpdated} />
       ))}
     </>
   );
 }
 
-function ImagingStudyBlock({ study }: { study: any }) {
+function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () => void }) {
   const navigate = useNavigate();
   const series = study.series || [];
   const [activeSeriesId, setActiveSeriesId] = useState<number | null>(
@@ -151,16 +155,57 @@ function ImagingStudyBlock({ study }: { study: any }) {
     }).catch(() => setLinkedDocs([]));
   }, [study.id]);
 
+  // Save handler used by every editable row in this block. The shared
+  // EditableField / EditableSelect components hit the override path
+  // ``/api/imaging/{id}/metadata`` instead of their default
+  // ``/documents/{docId}`` so changes land on imaging_studies.
+  const apiPath = `/imaging/${study.id}/metadata`;
+  const handleSaved = () => {
+    // Triggers a parent reload so the section re-renders with the new
+    // value, mirroring the MetadataEditor flow.
+    onUpdated?.();
+  };
+
   return (
     <Section title="Imaging" icon={ImageIcon}>
-      {/* Doctor + Facility are NOT shown here — they live on the parent
-          documents row (rendered by MetadataEditor) which is the single
-          source of truth. The imaging-specific block only carries fields
-          that are unique to imaging studies. */}
-      <InfoRow label="Type" value={`${modalityLabel(study.modality)}${study.modality ? ` (${study.modality})` : ""}`} />
-      <InfoRow label="Body Part" value={study.body_part || "Unknown"} />
-      <InfoRow label="Study Date" value={study.study_date || "Unknown"} />
-      <InfoRow label="Accession" value={study.accession_number || "Unknown"} />
+      {/* Doctor + Facility + Event Date are NOT shown here — they live
+          on the parent documents row (rendered by MetadataEditor) which
+          is the single source of truth. The imaging-specific block only
+          carries fields that are unique to imaging studies. */}
+      <EditableSelect
+        label="Type"
+        value={study.modality || ""}
+        field="modality"
+        docId={study.id}
+        apiPath={apiPath}
+        onSave={handleSaved}
+        options={MODALITY_CODES}
+        formatLabel={(code) => `${modalityLabel(code)} (${code})`}
+      />
+      <EditableField
+        label="Body Part"
+        value={study.body_part || ""}
+        field="body_part"
+        docId={study.id}
+        apiPath={apiPath}
+        onSave={handleSaved}
+      />
+      <EditableField
+        label="Description"
+        value={study.study_description || ""}
+        field="study_description"
+        docId={study.id}
+        apiPath={apiPath}
+        onSave={handleSaved}
+      />
+      <EditableField
+        label="Accession"
+        value={study.accession_number || ""}
+        field="accession_number"
+        docId={study.id}
+        apiPath={apiPath}
+        onSave={handleSaved}
+      />
       <InfoRow label="Study UID" value={study.study_instance_uid || "Unknown"} />
       <InfoRow label="Series" value={`${study.num_series ?? series.length} | ${study.num_images} images`} />
 

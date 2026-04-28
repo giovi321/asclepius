@@ -71,6 +71,9 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `POST` | `/api/documents/{id}/edit-with-ai` | Yes | Edit metadata via natural language |
 | `POST` | `/api/documents/{id}/generate-filename` | Yes | Get an AI-suggested `{suggested_filename}` (does not rename) |
 | `POST` | `/api/documents/{id}/rename` | Yes | Rename on disk + DB; auto-disambiguates on collision (`-2`, `-3`, …) |
+| `GET` | `/api/documents/{id}/find-candidates` | Yes | Walk the vault for files matching this document's ``original_filename``. Returns vault-relative paths. Used by the document detail page to recover from a broken ``file_path``. |
+| `POST` | `/api/documents/{id}/relink` | Yes | Repoint a document at an existing vault file (``{"vault_path": "..."}``). Updates ``file_path`` + ``file_size``; does NOT re-run the pipeline. |
+| `POST` | `/api/documents/{id}/replace-file` | Yes | Multipart upload of a replacement file. Lands in the document's organised folder (``patients/{slug}/{year}/...``), updates ``file_path``. Extension is locked to the original. Does NOT re-run the pipeline. |
 | `POST` | `/api/documents/{id}/link` | Yes | Link to another document |
 | `GET` | `/api/documents/{id}/links` | Yes | Get all document links |
 | `DELETE` | `/api/documents/{id}/links/{link_id}` | Yes | Remove a document link |
@@ -187,6 +190,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `POST` | `/api/imaging/{id}/links` | Yes | Link an existing document to this study |
 | `DELETE` | `/api/imaging/{id}/links/{link_id}` | Yes | Remove a study-document link |
 | `POST` | `/api/imaging/{id}/report` | Yes | Attach a radiology report PDF to this study. Either pass ``?document_id=N`` (or JSON ``{"document_id": N}``) to link an existing PDF document, or post a multipart ``file=`` to upload a fresh PDF. PDF-only is enforced via libmagic. The placeholder document is replaced. |
+| `PATCH` | `/api/imaging/{id}/metadata` | Yes | Update imaging-specific fields (``modality``, ``body_part``, ``study_description``, ``accession_number``). Each change is also recorded in ``extraction_corrections`` against the parent document so the LLM picks it up as a few-shot example. Doctor / facility / event_date / patient are NOT accepted here — those are edited via PATCH /api/documents/{id}. |
 
 ### Imaging query parameters (list endpoint)
 

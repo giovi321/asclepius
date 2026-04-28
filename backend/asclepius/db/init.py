@@ -61,6 +61,8 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
       - 0.9.6: imaging_dicom → imaging_report (placeholder PDF parent)
       - 0.9.7: drop dead imaging_studies columns
         (institution_name, referring_physician, is_dicom)
+      - 0.9.8: drop imaging_studies.study_date (use documents.event_date
+        as the single source of truth for the timeline anchor)
 
     The compat view ``documents_with_names`` is rebuilt every init.
     """
@@ -102,6 +104,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await _migration_0_9_5_imaging_series_dedup(db)
     await _migration_0_9_6_imaging_report(db)
     await _migration_0_9_7_drop_dead_imaging_columns(db)
+    await _migration_0_9_8_drop_imaging_study_date(db)
     await _ensure_compat_view(db)
 
 
@@ -366,10 +369,13 @@ async def _migration_0_9_6_imaging_report(db: aiosqlite.Connection) -> None:
         )
         logger.info("Migration: added imaging_studies.report_status")
 
+    # ``study_date`` was dropped by the 0.9.8 migration; pull the parent
+    # document's ``event_date`` instead so the placeholder filename still
+    # carries a date.
     cursor = await db.execute(
         """SELECT d.id, COALESCE(s.modality, '') AS modality,
                   COALESCE(s.body_part, '') AS body_part,
-                  COALESCE(s.study_date, '') AS study_date
+                  COALESCE(d.event_date, '') AS study_date
            FROM documents d
            LEFT JOIN imaging_studies s ON s.document_id = d.id
            WHERE d.doc_type = 'imaging_dicom'"""
@@ -441,6 +447,49 @@ async def _migration_0_9_7_drop_dead_imaging_columns(db: aiosqlite.Connection) -
         logger.info(
             "Migration: dropped dead imaging_studies columns: %s",
             ", ".join(dropped),
+        )
+
+
+async def _migration_0_9_8_drop_imaging_study_date(db: aiosqlite.Connection) -> None:
+    """0.9.8: ``imaging_studies.study_date`` duplicated
+    ``documents.event_date`` (the canonical timeline anchor used by every
+    other table and by the timeline view). The two drifted whenever a
+    user edited the document side, and "Study date" + "Event date" being
+    different fields in the UI was confusing. Backfill any imaging study
+    whose parent document has no event_date but the imaging row does,
+    then drop the column.
+    """
+    cursor = await db.execute("PRAGMA table_info(imaging_studies)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    if "study_date" not in cols:
+        return  # already migrated
+
+    # Backfill: copy non-null study_date onto the parent document when it
+    # has no event_date set (rare, but safe).
+    await db.execute(
+        """UPDATE documents SET event_date = (
+              SELECT s.study_date FROM imaging_studies s
+              WHERE s.document_id = documents.id
+              LIMIT 1
+           )
+           WHERE event_date IS NULL
+             AND id IN (
+                 SELECT document_id FROM imaging_studies
+                 WHERE study_date IS NOT NULL
+             )"""
+    )
+
+    try:
+        await db.execute("ALTER TABLE imaging_studies DROP COLUMN study_date")
+        await db.commit()
+        logger.info(
+            "Migration: dropped imaging_studies.study_date "
+            "(use documents.event_date as the single source of truth)"
+        )
+    except Exception:
+        logger.warning(
+            "Migration: ALTER TABLE DROP COLUMN study_date failed "
+            "(older SQLite?); leaving column in place",
         )
 
 

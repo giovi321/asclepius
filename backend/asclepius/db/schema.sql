@@ -205,7 +205,10 @@ CREATE TABLE IF NOT EXISTS imaging_studies (
     -- 'placeholder' (no PDF report attached yet) | 'attached' (the parent
     -- documents row is a real PDF the user uploaded / linked).
     report_status TEXT NOT NULL DEFAULT 'placeholder',
-    study_date DATE,
+    -- The study date lives on the parent ``documents.event_date`` (single
+    -- source of truth for the timeline anchor). Pre-0.9.8 imaging_studies
+    -- had a ``study_date`` column that drifted from the document side; it
+    -- was dropped by the 0.9.8 migration.
     modality TEXT,
     body_part TEXT,
     study_description TEXT,

@@ -304,6 +304,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{doc_id}/find-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find Candidate Files
+         * @description Look for files in the vault whose basename matches this document's
+         *     ``original_filename``. Used by the document detail page to recover
+         *     from a broken ``file_path`` (the file was moved or renamed outside
+         *     the app). Returns vault-relative POSIX paths so the frontend can
+         *     pass them straight back to ``POST /relink``.
+         */
+        get: operations["find_candidate_files_api_documents__doc_id__find_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{doc_id}/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Relink Document
+         * @description Repoint a document at an existing vault file. Use case: the
+         *     file was moved outside the app and the user picked the right path
+         *     from ``find-candidates`` or the file browser. The new file is NOT
+         *     re-processed; only ``documents.file_path`` is updated.
+         */
+        post: operations["relink_document_api_documents__doc_id__relink_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents/{doc_id}/replace-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Document File
+         * @description Upload a fresh copy of a missing file. The file lands in the
+         *     correct organised location (``patients/{slug}/{year}/...`` based on
+         *     the document's ``event_date``), the document's ``file_path`` is
+         *     updated, and the file is NOT re-processed (the document already has
+         *     its OCR text, extraction, and child rows). Patient access checked.
+         *
+         *     The file extension is locked to the document's ``original_filename``
+         *     to prevent content-type confusion.
+         */
+        post: operations["replace_document_file_api_documents__doc_id__replace_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{doc_id}/link": {
         parameters: {
             query?: never;
@@ -929,6 +1003,34 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/imaging/{study_id}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Imaging Metadata
+         * @description Update imaging-specific metadata (modality, body part, accession,
+         *     study description). Doctor / facility / event_date / patient are
+         *     edited on the parent ``documents`` row via PATCH /api/documents/{id};
+         *     those fields are NOT accepted here so the two endpoints can't drift.
+         *
+         *     Every accepted field is recorded in ``extraction_corrections`` so the
+         *     same correction-driven learning that documents use applies to
+         *     imaging too — when the user fixes ``modality`` on one study the LLM
+         *     sees the correction as a few-shot example for similar future studies.
+         */
+        patch: operations["update_imaging_metadata_api_imaging__study_id__metadata_patch"];
         trace?: never;
     };
     "/api/imaging/{study_id}/links/{link_id}": {
@@ -1842,6 +1944,11 @@ export interface components {
             /** File */
             file?: string | null;
         };
+        /** Body_replace_document_file_api_documents__doc_id__replace_file_post */
+        Body_replace_document_file_api_documents__doc_id__replace_file_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_document_api_documents_upload_post */
         Body_upload_document_api_documents_upload_post: {
             /** File */
@@ -2029,6 +2136,17 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** ImagingMetadataPatch */
+        ImagingMetadataPatch: {
+            /** Modality */
+            modality?: string | null;
+            /** Body Part */
+            body_part?: string | null;
+            /** Study Description */
+            study_description?: string | null;
+            /** Accession Number */
+            accession_number?: string | null;
         };
         /** LabResultCreate */
         LabResultCreate: {
@@ -2353,6 +2471,11 @@ export interface components {
         PromptUpdate: {
             /** Text */
             text: string;
+        };
+        /** RelinkRequest */
+        RelinkRequest: {
+            /** Vault Path */
+            vault_path: string;
         };
         /** RenameRequest */
         RenameRequest: {
@@ -3039,6 +3162,107 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RenameRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_candidate_files_api_documents__doc_id__find_candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relink_document_api_documents__doc_id__relink_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_document_file_api_documents__doc_id__replace_file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_replace_document_file_api_documents__doc_id__replace_file_post"];
             };
         };
         responses: {
@@ -4294,6 +4518,41 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_imaging_metadata_api_imaging__study_id__metadata_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImagingMetadataPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

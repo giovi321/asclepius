@@ -32,9 +32,14 @@ export function InfoRow({ label, value }: { label: string; value: any }) {
 
 // ─── EditableField ─────────────────────────────────────────────
 
-export function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false }: {
+export function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false, apiPath }: {
   label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
   type?: string; multiline?: boolean;
+  /** Override the PATCH endpoint. Defaults to ``/documents/{docId}`` so
+   * regular document fields keep their behaviour. The imaging detail
+   * page passes ``/imaging/{studyId}/metadata`` so modality, body_part,
+   * etc. save against ``imaging_studies`` instead. */
+  apiPath?: string;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -44,7 +49,8 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await api.patch(`/documents/${docId}`, { [field]: val || null });
+      const path = apiPath || `/documents/${docId}`;
+      const res = await api.patch(path, { [field]: val || null });
       setEditing(false);
       // Pass updated doc back so parent can update state without full reload
       onSave(res.data);
@@ -95,9 +101,11 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
 
 // ─── EditableSelect ───────────────────────────────────────────
 
-export function EditableSelect({ label, value, field, docId, onSave, options, formatLabel }: {
+export function EditableSelect({ label, value, field, docId, onSave, options, formatLabel, apiPath }: {
   label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
   options: string[]; formatLabel?: (v: string) => string;
+  /** Override the PATCH endpoint. See EditableField for details. */
+  apiPath?: string;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -108,7 +116,8 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
   const handleSave = async (newVal: string) => {
     setSaving(true);
     try {
-      const res = await api.patch(`/documents/${docId}`, { [field]: newVal || null });
+      const path = apiPath || `/documents/${docId}`;
+      const res = await api.patch(path, { [field]: newVal || null });
       setEditing(false);
       setVal(newVal);
       onSave(res.data);

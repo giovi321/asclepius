@@ -197,9 +197,9 @@ async def test_imaging_report_migration_v0_9_6(tmp_path: Path) -> None:
         doc_id = cur.lastrowid
         cur = conn.execute(
             """INSERT INTO imaging_studies
-               (document_id, patient_id, modality, body_part, study_date,
+               (document_id, patient_id, modality, body_part,
                 num_series, num_images, study_instance_uid, folder_path)
-               VALUES (?, ?, 'US', 'ABDOMEN', '2026-04-27', 1, 35, 'STUDY-A',
+               VALUES (?, ?, 'US', 'ABDOMEN', 1, 35, 'STUDY-A',
                        'patients/giovi/2026/2026-04-27_clinic_US')""",
             (doc_id, patient_id),
         )

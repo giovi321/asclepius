@@ -151,20 +151,39 @@ already exists at its destination with the same byte size doesn't bump
 | `doctor_id` | FK → ``doctors.id``. Mirrors the parent document via the ``imaging_studies_doctor_sync`` AFTER UPDATE trigger; never edited here directly. |
 | `facility_id` | FK → ``facilities.id``. Mirrors the parent document via ``imaging_studies_facility_sync``. |
 | `report_status` | ``placeholder`` (no PDF attached yet) \| ``attached`` (parent document is a real PDF) |
-| `modality` | DICOM Modality tag — CT, MR, US, XR, MG, PT, … |
-| `body_part` | Anatomical region |
-| `study_description` | Description from DICOM metadata |
-| `study_date` | Date the study was performed |
-| `accession_number` | Hospital / RIS accession number |
-| `study_instance_uid` | DICOM Study Instance UID |
+| `modality` | DICOM Modality tag — CT, MR, US, XR, MG, PT, … (editable from the imaging detail page; corrections are recorded in ``extraction_corrections``) |
+| `body_part` | Anatomical region (editable) |
+| `study_description` | Description from DICOM metadata (editable) |
+| `accession_number` | Hospital / RIS accession number (editable) |
+| `study_instance_uid` | DICOM Study Instance UID (read-only) |
 | `num_series` | Number of series in this study |
 | `num_images` | Total number of frames across all series |
 | `folder_path` | Path to the study folder under the vault root |
 
+> The study date lives on the parent ``documents.event_date`` (single
+> source of truth for the timeline anchor). Pre-0.9.8 imaging_studies
+> had a separate ``study_date`` column; it was dropped in v0.9.8.
+>
 > ``institution_name``, ``referring_physician`` and ``is_dicom`` were
 > dropped in v0.9.7. Doctor + facility now come exclusively from the
 > parent document; the dropped TEXT columns drifted in capitalisation
 > and titles vs the canonical normalised entities.
+
+### Editing imaging metadata
+
+Modality, body part, study description and accession number are all
+editable inline on the imaging detail page using the same UX as the
+documents-side ``MetadataEditor`` — click the value, type the
+correction, press Enter. The PATCH lands on
+``/api/imaging/{id}/metadata`` and every accepted field is recorded
+against the parent document in ``extraction_corrections`` (with
+``doc_type='imaging_report'``) so the same correction-driven LLM
+learning loop that documents use applies to imaging metadata too.
+
+Date, doctor and facility are NOT shown on the imaging block — they
+live on the parent document and are edited via that document's
+``MetadataEditor`` (single source of truth; AFTER UPDATE triggers
+keep ``imaging_studies.doctor_id`` / ``.facility_id`` in lockstep).
 
 ### Imaging series
 

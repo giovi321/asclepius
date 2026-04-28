@@ -201,6 +201,7 @@ export default function DocumentDetailPage() {
               originalFilename={doc.original_filename}
               onRotate={handleRotate}
               imagingStudyId={doc.imaging_studies?.[0]?.id || null}
+              onReloaded={() => loadDoc(false)}
             />
           )}
         </div>

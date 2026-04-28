@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "asclepius"
-version = "0.9.7"
+version = "0.9.8"
 description = "Asclepius — self-hosted medical records manager"
 requires-python = ">=3.13"
 dependencies = [

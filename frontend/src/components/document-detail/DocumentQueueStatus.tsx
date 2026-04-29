@@ -17,6 +17,7 @@ const STAGE_LABELS: Record<string, string> = {
   organizing: "Organizing",
   thumbnail: "Thumbnail",
   cache_ocr: "Cache OCR",
+  ai_edit: "AI edit",
 };
 
 function stageLabel(stage: string | null | undefined): string {

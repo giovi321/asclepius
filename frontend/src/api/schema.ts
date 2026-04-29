@@ -2256,6 +2256,15 @@ export interface components {
     DocumentEditRequest: {
       /** Instruction */
       instruction: string;
+      /** Ocr Provider Id */
+      ocr_provider_id?: string | null;
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+      /**
+       * Re Run Ocr
+       * @default false
+       */
+      re_run_ocr: boolean;
     };
     /** DocumentLinkRequest */
     DocumentLinkRequest: {

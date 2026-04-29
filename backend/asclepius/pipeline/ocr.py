@@ -205,6 +205,155 @@ async def extract_text_per_page(file_path: str, config: AppConfig) -> list[str]:
     return ocr_pages
 
 
+async def extract_text_for_pages(
+    file_path: str,
+    config: AppConfig,
+    page_numbers: list[int],
+    ocr_provider_id: str | None = None,
+) -> dict[int, str]:
+    """Re-OCR a subset of pages from a PDF using the chosen provider.
+
+    Returns a dict mapping each *real* PDF page number (1-indexed) to its
+    fresh OCR text. Pages outside the document are silently dropped from
+    the result; the caller is expected to validate the request against
+    ``documents.page_count`` before calling.
+
+    Used by the AI editor's scoped page reprocess to avoid relying on a
+    stale ``ocr_page_cache`` that may have fewer rows than the document
+    actually has. The provider lookup mirrors ``extract_text``: an
+    ``ocr_provider_id`` from ``config.ocr.providers`` selects the engine
+    (Tesseract local/remote or vision LLM); when omitted, the
+    highest-priority enabled provider is used.
+    """
+    path = Path(file_path)
+    ext = path.suffix.lower()
+
+    if ext != ".pdf":
+        # Single-page formats can't be page-scoped — re-OCR the whole file
+        # and surface it under page 1.
+        text, _, _ = await extract_text(file_path, config, ocr_provider_id=ocr_provider_id)
+        return {1: text} if text.strip() else {}
+
+    # Resolve the provider to use. We mirror the priority logic from
+    # ``extract_text`` (chosen id wins, otherwise highest-priority enabled).
+    provider: OcrProviderEntry | None = None
+    if ocr_provider_id:
+        for p in config.ocr.providers:
+            if p.id == ocr_provider_id and p.enabled:
+                provider = p
+                break
+    if provider is None:
+        enabled = sorted(
+            [p for p in config.ocr.providers if p.enabled],
+            key=lambda p: p.priority,
+        )
+        provider = enabled[0] if enabled else None
+
+    requested = sorted({int(n) for n in page_numbers if int(n) >= 1})
+    if not requested:
+        return {}
+
+    out: dict[int, str] = {}
+    doc = fitz.open(str(path))
+    try:
+        total_pages = len(doc)
+        in_range = [n for n in requested if 1 <= n <= total_pages]
+        if not in_range:
+            return {}
+
+        if provider is not None and provider.type == "llm_vision":
+            vision_model = provider.llm_model or config.ocr.llm_vision_model
+            for page_num in in_range:
+                page = doc.load_page(page_num - 1)
+                b64_image = _render_page_for_vision(page)
+                page_text = await _llm_vision_page_with_retry(
+                    b64_image, config, vision_model, provider_entry=provider
+                )
+                out[page_num] = page_text or ""
+        elif provider is not None and provider.type == "tesseract_remote":
+            # Remote OCR doesn't expose a per-page API; re-render the
+            # selected pages locally with Tesseract instead so we still
+            # honour the page-scoped request.
+            language = (provider.language if provider else None) or config.ocr.language
+            for page_num in in_range:
+                page = doc.load_page(page_num - 1)
+                pix = page.get_pixmap(dpi=300)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                page_text = pytesseract.image_to_string(img, lang=language)
+                out[page_num] = page_text or ""
+        else:
+            # Default: local Tesseract.
+            language = (provider.language if provider else None) or config.ocr.language
+            for page_num in in_range:
+                page = doc.load_page(page_num - 1)
+                pix = page.get_pixmap(dpi=300)
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                page_text = pytesseract.image_to_string(img, lang=language)
+                out[page_num] = page_text or ""
+    finally:
+        doc.close()
+
+    return out
+
+
+def list_ocr_providers(config: AppConfig) -> list[dict]:
+    """Return enabled OCR providers as a UI-friendly list.
+
+    Used by the AI editor when the user asks to reprocess specific pages —
+    the frontend prompts them to pick which engine to re-OCR with, then
+    re-submits with ``ocr_provider_id``.
+    """
+    enabled = sorted(
+        [p for p in config.ocr.providers if p.enabled],
+        key=lambda p: p.priority,
+    )
+    items = [
+        {
+            "id": p.id,
+            "name": p.name or p.id or p.type,
+            "type": p.type,
+            "priority": p.priority,
+        }
+        for p in enabled
+    ]
+    if not items:
+        # Legacy single-engine config: surface the engine string so the
+        # picker still has something selectable.
+        items.append(
+            {
+                "id": "",
+                "name": f"Default ({config.ocr.engine})",
+                "type": config.ocr.engine,
+                "priority": 1,
+            }
+        )
+    return items
+
+
+def list_llm_providers(config: AppConfig) -> list[dict]:
+    """Return enabled text-LLM providers as a UI-friendly list.
+
+    Mirrors ``list_ocr_providers`` for the LLM extraction step that runs
+    after re-OCR in the AI editor's scoped page reprocess flow. The
+    frontend lets the user pick which LLM should re-extract from the
+    chosen pages.
+    """
+    enabled = sorted(
+        [p for p in config.llm.providers if p.enabled],
+        key=lambda p: p.priority,
+    )
+    return [
+        {
+            "id": p.id,
+            "name": p.name or p.id or p.type,
+            "type": p.type,
+            "model": p.model,
+            "priority": p.priority,
+        }
+        for p in enabled
+    ]
+
+
 async def _extract_from_pdf(
     path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None
 ) -> tuple[str, float, str]:

@@ -39,6 +39,7 @@ const STAGE_LABELS: Record<string, string> = {
   translation: "Translation",
   region_ocr: "Region OCR",
   region_translation: "Region translation",
+  ai_edit: "AI edit",
 };
 
 const STAGE_ICONS: Record<string, any> = {
@@ -51,6 +52,7 @@ const STAGE_ICONS: Record<string, any> = {
   translation: Languages,
   region_ocr: ScanText,
   region_translation: Languages,
+  ai_edit: Brain,
 };
 
 function stageLabel(stage: string): string {

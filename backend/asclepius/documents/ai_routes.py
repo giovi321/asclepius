@@ -20,6 +20,19 @@ router = APIRouter()
 
 class DocumentEditRequest(BaseModel):
     instruction: str
+    # Phase B fields: set on the second submit, after the frontend has
+    # shown the user the picker spawned by the Phase-A
+    # ``status: needs_ocr_choice`` response. All three are None / False
+    # on the first submit.
+    #
+    # ``re_run_ocr`` toggles between two paths inside the scoped page
+    # reprocess: re-render and OCR the requested pages from the PDF
+    # with ``ocr_provider_id``, or use the cached OCR text already in
+    # ``ocr_page_cache`` for those pages. Either way the LLM
+    # re-extraction runs against the chosen ``llm_provider_id``.
+    ocr_provider_id: str | None = None
+    llm_provider_id: str | None = None
+    re_run_ocr: bool = False
 
 
 # Anchored on "page(s)" or "p./pp." so unrelated digits in the instruction
@@ -101,7 +114,17 @@ async def edit_document_with_ai(
     requested_pages = _parse_pages_from_instruction(body.instruction, 99999)
     if requested_pages:
         page_count = int(doc.get("page_count") or 0)
-        return await _scoped_page_reprocess(db, doc_id, requested_pages, page_count, config)
+        return await _scoped_page_reprocess(
+            db,
+            doc,
+            doc_id,
+            requested_pages,
+            page_count,
+            body.ocr_provider_id,
+            body.llm_provider_id,
+            body.re_run_ocr,
+            config,
+        )
 
     from asclepius.pipeline.provider_factory import _build_general_llm_provider
     from asclepius.pipeline.extractor import build_extraction_context
@@ -249,132 +272,277 @@ async def edit_document_with_ai(
 
 async def _scoped_page_reprocess(
     db: aiosqlite.Connection,
+    doc: dict,
     doc_id: int,
     requested_pages: list[int],
     page_count: int,
+    ocr_provider_id: str | None,
+    llm_provider_id: str | None,
+    re_run_ocr: bool,
     config,
 ) -> dict:
-    """Re-extract a document using only the OCR text from the chosen pages.
+    """Two-phase scoped page reprocess.
 
-    Wipes every child row (lab_results, encounters, medications,
-    vaccinations, invoice_items) before re-inserting — this is intentional:
-    when the user says "reprocess page 41 for labs", they expect labs to
-    come from page 41 and nothing else.
+    Phase A — when neither ``re_run_ocr`` nor ``llm_provider_id`` has been
+    set yet (initial submit): validate the requested pages against the
+    document's real ``page_count``, attach cache stats so the frontend
+    knows whether a re-OCR is required, and return
+    ``status='needs_ocr_choice'`` with the available OCR + LLM providers.
+
+    Phase B — second submit: either re-OCR the chosen pages with the
+    selected OCR provider (``re_run_ocr=True``) and update the cache, or
+    pull the existing cached OCR text. Either way the LLM extraction
+    runs against ``llm_provider_id`` (or the highest-priority enabled
+    LLM if not specified). Wipes every child row (lab_results,
+    encounters, medications, vaccinations, invoice_items) before
+    re-inserting — when the user says "reprocess page 41 for labs",
+    they expect labs to come from page 41 and nothing else.
+
+    The whole work block is wrapped in ``stage_events.stage()`` so the
+    document timeline reflects the AI-edit re-OCR + re-extract just like
+    a regular reprocess.
     """
+    from asclepius.config import get_active_llm_provider_config
     from asclepius.pipeline.extractor import extract_and_store
+    from asclepius.pipeline.ocr import (
+        extract_text_for_pages,
+        list_llm_providers,
+        list_ocr_providers,
+    )
     from asclepius.pipeline.provider_factory import (
         ProviderUnreachableError,
+        _build_llm_provider,
         get_llm_provider,
     )
+    from asclepius.pipeline.stage_events import (
+        STAGE_AI_EDIT,
+        STAGE_LLM_EXTRACTION,
+        STAGE_OCR,
+        begin_job,
+        end_job,
+        stage,
+    )
 
-    # Index cached OCR by its real ``page_number`` (1-indexed). The previous
-    # version loaded into a flat list and used positional indexing, which
-    # silently drifts whenever the cache has gaps and conflates "OCR cache
-    # only covers N pages" with "the document only has N pages". The
-    # documents row carries the true file page count; the cache may have
-    # fewer rows if OCR ran on a partial extract or its page splitter
-    # under-counted (cache_ocr_pages currently splits on ``\n\n``, so a
-    # doc whose OCR text doesn't naturally separate per page can land
-    # fewer cache rows than file pages).
+    total_pages = page_count if page_count and page_count > 0 else 0
+    if total_pages <= 0:
+        # Legacy doc with no page_count — fall back to counting cached
+        # OCR rows just so we can produce a sensible upper bound. Real
+        # ingests since v0.9 have page_count populated.
+        cursor = await db.execute(
+            "SELECT MAX(page_number) FROM ocr_page_cache WHERE document_id = ?",
+            (doc_id,),
+        )
+        row = await cursor.fetchone()
+        total_pages = int(row[0]) if row and row[0] else 0
+
+    in_range = [p for p in requested_pages if 1 <= p <= total_pages] if total_pages else []
+    out_of_range = [p for p in requested_pages if p not in in_range]
+    if not in_range:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"None of the requested pages exist — document has "
+                f"{total_pages or 'an unknown number of'} page(s), instruction "
+                f"referenced {requested_pages}."
+            ),
+        )
+
+    # Inspect the existing cache so the picker can default sensibly:
+    # if any requested page isn't cached, the user almost always wants
+    # to re-OCR.
     cursor = await db.execute(
-        "SELECT page_number, ocr_text FROM ocr_page_cache "
-        "WHERE document_id = ? ORDER BY page_number",
-        (doc_id,),
+        "SELECT page_number FROM ocr_page_cache WHERE document_id = ? "
+        "AND page_number IN (" + ",".join(["?"] * len(in_range)) + ")",
+        (doc_id, *in_range),
     )
-    rows = await cursor.fetchall()
-    if not rows:
+    cached_page_set = {int(r[0]) for r in await cursor.fetchall()}
+    cached_in_range = sorted(p for p in in_range if p in cached_page_set)
+    missing_from_cache = sorted(p for p in in_range if p not in cached_page_set)
+
+    # Phase A — first submit: ask the user whether to re-OCR and (if so)
+    # which OCR engine, plus which LLM should re-extract.
+    is_phase_a = not re_run_ocr and not llm_provider_id and not ocr_provider_id
+    if is_phase_a:
+        return {
+            "status": "needs_ocr_choice",
+            "mode": "pages",
+            "document_id": doc_id,
+            "pages": in_range,
+            "out_of_range_pages": out_of_range,
+            "page_count": total_pages,
+            "cached_pages": cached_in_range,
+            "missing_from_cache": missing_from_cache,
+            "recommend_re_run_ocr": bool(missing_from_cache),
+            "ocr_providers": list_ocr_providers(config),
+            "llm_providers": list_llm_providers(config),
+        }
+
+    if re_run_ocr and not ocr_provider_id:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Per-page OCR is not cached for this document. Run a full "
-                "reprocess (OCR) once before asking to re-extract specific pages."
-            ),
+            detail="re_run_ocr=true requires ocr_provider_id.",
         )
-    cached_by_page: dict[int, str] = {int(r[0]): r[1] for r in rows}
-    cached_count = len(cached_by_page)
-    # Trust the documents row when it has a real count; fall back to the
-    # cache size for legacy rows that pre-date page_count being populated.
-    total_pages = page_count if page_count and page_count > 0 else cached_count
 
-    selected_text: list[str] = []
-    used_pages: list[int] = []
-    out_of_range: list[int] = []
-    not_in_cache: list[int] = []
-    for p in requested_pages:
-        if p < 1 or p > total_pages:
-            out_of_range.append(p)
-            continue
-        text = cached_by_page.get(p)
-        if not text:
-            not_in_cache.append(p)
-            continue
-        selected_text.append(text)
-        used_pages.append(p)
+    # Resolve the LLM provider for the extraction step. Default to the
+    # highest-priority enabled provider when the user didn't pick one.
+    def _resolve_llm():
+        if llm_provider_id:
+            for entry in config.llm.providers:
+                if entry.id == llm_provider_id and entry.enabled:
+                    return _build_llm_provider(entry)
+            raise HTTPException(
+                status_code=400,
+                detail=f"LLM provider '{llm_provider_id}' is not configured or disabled.",
+            )
+        try:
+            return get_llm_provider(config, priority=1)
+        except ProviderUnreachableError as e:
+            raise HTTPException(status_code=503, detail=str(e))
 
-    if not selected_text:
-        if out_of_range and not not_in_cache:
+    file_path = doc.get("file_path") or ""
+    if re_run_ocr and not file_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Document has no file on disk to re-OCR.",
+        )
+
+    # Phase B: do the work. Surface it as a tracked job so the dashboard's
+    # pipeline timeline shows "AI Edit → (OCR) → LLM extraction" for this
+    # document in the same shape as a regular upload/reprocess.
+    planned = [STAGE_AI_EDIT]
+    if re_run_ocr:
+        planned.append(STAGE_OCR)
+    planned.append(STAGE_LLM_EXTRACTION)
+
+    # Surface the chosen LLM credential id (when known) so the dashboard
+    # can show the model badge for this job.
+    llm_cred_id: str | None = None
+    if llm_provider_id:
+        for entry in config.llm.providers:
+            if entry.id == llm_provider_id:
+                llm_cred_id = entry.credential_id or entry.id or None
+                break
+    else:
+        active = get_active_llm_provider_config(config, 1)
+        if active:
+            llm_cred_id = active.credential_id or active.id or None
+
+    begin_job(
+        doc_id=doc_id,
+        filename=doc.get("original_filename") or doc.get("file_path"),
+        kind="ai_edit",
+        stages_planned=planned,
+        providers={"ocr": ocr_provider_id or None, "llm": llm_cred_id},
+    )
+    try:
+        async with stage(db, doc_id, STAGE_AI_EDIT, job_kind="ai_edit"):
+            logger.info(
+                "AI-edit scoped reprocess doc=%d pages=%s (of %d) re_run_ocr=%s ocr=%s llm=%s",
+                doc_id,
+                in_range,
+                total_pages,
+                re_run_ocr,
+                ocr_provider_id,
+                llm_provider_id or "default",
+            )
+
+        # Phase B.1 — re-OCR the chosen pages with the user's selected engine,
+        # OR fall through to the existing cache. Re-OCR upserts into
+        # ``ocr_page_cache`` keyed by real PDF page numbers so the cache
+        # gets corrected on every AI edit.
+        ocr_for_pages: dict[int, str] = {}
+        if re_run_ocr:
+            async with stage(
+                db,
+                doc_id,
+                STAGE_OCR,
+                job_kind="ai_edit",
+                page_total=len(in_range),
+            ) as p:
+                try:
+                    fresh = await extract_text_for_pages(
+                        file_path, config, in_range, ocr_provider_id=ocr_provider_id
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("Re-OCR failed for doc %d", doc_id)
+                    raise HTTPException(status_code=500, detail=f"Re-OCR failed: {exc}")
+
+                for i, page_num in enumerate(in_range, start=1):
+                    p.set_page(i)
+                    page_text = (fresh.get(page_num) or "").strip()
+                    if not page_text:
+                        continue
+                    await db.execute(
+                        """INSERT INTO ocr_page_cache
+                              (document_id, page_number, ocr_text, ocr_engine, confidence)
+                           VALUES (?, ?, ?, ?, ?)
+                           ON CONFLICT(document_id, page_number) DO UPDATE SET
+                              ocr_text = excluded.ocr_text,
+                              ocr_engine = excluded.ocr_engine,
+                              confidence = excluded.confidence""",
+                        (doc_id, page_num, page_text, f"ai_edit:{ocr_provider_id}", 0.0),
+                    )
+                    ocr_for_pages[page_num] = page_text
+                await db.commit()
+        else:
+            # Use cached OCR text, indexed by real PDF page numbers.
+            cursor = await db.execute(
+                "SELECT page_number, ocr_text FROM ocr_page_cache "
+                "WHERE document_id = ? AND page_number IN ("
+                + ",".join(["?"] * len(in_range))
+                + ")",
+                (doc_id, *in_range),
+            )
+            for r in await cursor.fetchall():
+                txt = (r[1] or "").strip()
+                if txt:
+                    ocr_for_pages[int(r[0])] = txt
+
+        used_pages = sorted(ocr_for_pages)
+        if not used_pages:
+            if re_run_ocr:
+                raise HTTPException(
+                    status_code=502,
+                    detail="OCR returned no text for the requested pages.",
+                )
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"None of the requested pages exist — document has "
-                    f"{total_pages} page(s), instruction referenced {requested_pages}."
+                    f"None of the requested pages have cached OCR text. "
+                    f"Pick an OCR engine and re-run OCR — pages "
+                    f"{missing_from_cache or in_range} are missing from the cache."
                 ),
             )
-        if not_in_cache and not out_of_range:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"OCR cache only covers {cached_count} of {total_pages} "
-                    f"page(s); pages {not_in_cache} are not cached. Run a "
-                    f"full reprocess (OCR) to refresh the per-page cache, "
-                    f"then try again."
-                ),
-            )
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Document has {total_pages} page(s), OCR cache covers "
-                f"{cached_count}. Pages {out_of_range} are out of range and "
-                f"pages {not_in_cache} are not cached."
-            ),
-        )
 
-    scoped_ocr = "\n\n".join(selected_text)
+        scoped_ocr = "\n\n".join(ocr_for_pages[n] for n in used_pages)
 
-    try:
-        llm = get_llm_provider(config, priority=1)
-    except ProviderUnreachableError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        # Phase B.2 — extract from the OCR text (fresh or cached).
+        llm = _resolve_llm()
+        async with stage(db, doc_id, STAGE_LLM_EXTRACTION, job_kind="ai_edit"):
+            try:
+                result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Scoped reprocess failed for doc %d", doc_id)
+                raise HTTPException(status_code=500, detail=f"Extraction failed: {exc}")
 
-    logger.info(
-        "AI-edit scoped reprocess doc=%d pages=%s (of %d, %d cached) chars=%d",
-        doc_id,
-        used_pages,
-        total_pages,
-        cached_count,
-        len(scoped_ocr),
-    )
+            if isinstance(result, dict) and result.get("error"):
+                raise HTTPException(status_code=500, detail=str(result.get("error")))
 
-    try:
-        result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
-    except Exception as e:
-        logger.exception("Scoped reprocess failed for doc %d", doc_id)
-        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
-
-    if isinstance(result, dict) and result.get("error"):
-        raise HTTPException(status_code=500, detail=str(result.get("error")))
-
-    return {
-        "status": "reprocessed",
-        "mode": "pages",
-        "document_id": doc_id,
-        "pages": used_pages,
-        "skipped_pages": sorted(out_of_range + not_in_cache),
-        "out_of_range_pages": out_of_range,
-        "not_in_cache_pages": not_in_cache,
-        "page_count": total_pages,
-        "cached_page_count": cached_count,
-    }
+        return {
+            "status": "reprocessed",
+            "mode": "pages",
+            "document_id": doc_id,
+            "pages": used_pages,
+            "skipped_pages": sorted(out_of_range),
+            "out_of_range_pages": out_of_range,
+            "not_in_cache_pages": [p for p in in_range if p not in used_pages],
+            "page_count": total_pages,
+            "re_run_ocr": re_run_ocr,
+            "ocr_provider_id": ocr_provider_id,
+            "llm_provider_id": llm_provider_id,
+        }
+    finally:
+        end_job()
 
 
 @router.post("/{doc_id}/generate-filename")

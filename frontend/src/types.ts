@@ -112,7 +112,8 @@ export type PipelineJobKind =
   | "upload"
   | "reprocess"
   | "translate"
-  | "translate_region";
+  | "translate_region"
+  | "ai_edit";
 
 export interface PipelineProviders {
   ocr?: string | null;

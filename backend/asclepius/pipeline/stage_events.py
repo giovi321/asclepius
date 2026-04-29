@@ -38,6 +38,10 @@ STAGE_CACHE_OCR = "cache_ocr"
 STAGE_TRANSLATION = "translation"
 STAGE_REGION_OCR = "region_ocr"
 STAGE_REGION_TRANSLATION = "region_translation"
+# Wraps the AI editor's scoped page reprocess so the document timeline
+# shows ai_edit → ocr → llm_extraction in the same shape as a normal
+# reprocess.
+STAGE_AI_EDIT = "ai_edit"
 
 
 def plan_stages(*, flow: str, mode: str | None = None, has_ocr_text: bool = False) -> list[str]:

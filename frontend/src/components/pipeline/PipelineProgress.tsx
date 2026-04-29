@@ -34,6 +34,7 @@ const STAGE_LABELS: Record<string, string> = {
   organizing: "Organizing",
   thumbnail: "Thumbnail",
   cache_ocr: "Cache OCR",
+  ai_edit: "AI edit",
 };
 
 const STAGE_ICONS: Record<string, any> = {
@@ -45,6 +46,7 @@ const STAGE_ICONS: Record<string, any> = {
   organizing: FolderOutput,
   thumbnail: FileImage,
   cache_ocr: ScanText,
+  ai_edit: Brain,
 };
 
 function stageLabel(stage: string): string {
@@ -71,6 +73,14 @@ function kindBadge(kind: PipelineJobKind | null): {
       pill: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
       ring: "ring-emerald-300/60 dark:ring-emerald-600/40",
       glow: "from-emerald-500/10 via-emerald-500/5 to-transparent",
+    };
+  }
+  if (kind === "ai_edit") {
+    return {
+      label: "AI edit",
+      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+      ring: "ring-amber-300/60 dark:ring-amber-600/40",
+      glow: "from-amber-500/10 via-amber-500/5 to-transparent",
     };
   }
   return {

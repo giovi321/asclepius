@@ -5943,6 +5943,33 @@
           "instruction": {
             "type": "string",
             "title": "Instruction"
+          },
+          "ocr_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Provider Id"
+          },
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id"
+          },
+          "re_run_ocr": {
+            "type": "boolean",
+            "title": "Re Run Ocr",
+            "default": false
           }
         },
         "type": "object",

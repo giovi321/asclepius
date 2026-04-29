@@ -7,15 +7,22 @@ import EventSelector from "@/components/document-detail/EventSelector";
 import LinksSection from "@/components/document-detail/LinksSection";
 import NotesEditor from "@/components/document-detail/NotesEditor";
 import { ImagingStudiesSection } from "@/components/document-detail/ChildRecordSections";
-import { EditableSummary } from "@/components/document-detail/DocumentDetailHelpers";
 import ReportSlot from "@/components/imaging/ReportSlot";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 
 const MODALITY_LABELS: Record<string, string> = {
-  CT: "CT scan", MR: "MRI", US: "Ultrasound", XR: "X-ray", CR: "X-ray (computed)",
-  DX: "X-ray (digital)", MG: "Mammography", PT: "PET", NM: "Nuclear medicine",
-  RF: "Fluoroscopy", OT: "Other",
+  CT: "CT scan",
+  MR: "MRI",
+  US: "Ultrasound",
+  XR: "X-ray",
+  CR: "X-ray (computed)",
+  DX: "X-ray (digital)",
+  MG: "Mammography",
+  PT: "PET",
+  NM: "Nuclear medicine",
+  RF: "Fluoroscopy",
+  OT: "Other",
 };
 function modalityLabel(code: string | null | undefined): string {
   if (!code) return "Unknown";
@@ -38,7 +45,6 @@ function niceCase(s: string | null | undefined): string {
  * Detail page for a single imaging study. Layout:
  *
  *   header
- *   summary
  *   ImagingStudiesSection — full-width row with the DICOM viewer; the
  *                            viewer needs the whole page width to be
  *                            useful for clinicians.
@@ -79,7 +85,9 @@ export default function ImagingDetailPage() {
     }
   }, [studyId, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const updateDocFields = (updated?: any) => {
     if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
@@ -89,7 +97,8 @@ export default function ImagingDetailPage() {
     if (!doc?.id) return;
     const ok = await confirm({
       title: "Delete this imaging study?",
-      description: "All DICOM frames, the report PDF (if any), bundle files and related links will be removed. This cannot be undone.",
+      description:
+        "All DICOM frames, the report PDF (if any), bundle files and related links will be removed. This cannot be undone.",
       variant: "destructive",
     });
     if (!ok) return;
@@ -97,7 +106,11 @@ export default function ImagingDetailPage() {
       await api.delete(`/documents/${doc.id}`);
       navigate("/imaging");
     } catch (e: any) {
-      toast({ title: "Delete failed", description: e?.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Delete failed",
+        description: e?.response?.data?.detail || e.message,
+        variant: "error",
+      });
     }
   };
 
@@ -121,7 +134,9 @@ export default function ImagingDetailPage() {
           </button>
           <p className="text-base font-semibold truncate">
             {modalityLabel(headlineStudy?.modality)}
-            {headlineStudy?.body_part ? ` - ${niceCase(headlineStudy.body_part)}` : ""}
+            {headlineStudy?.body_part
+              ? ` - ${niceCase(headlineStudy.body_part)}`
+              : ""}
           </p>
           <p className="text-xs text-muted-foreground">
             {/* Date lives on the parent ``documents.event_date`` (single
@@ -151,9 +166,6 @@ export default function ImagingDetailPage() {
           </button>
         </div>
       </div>
-
-      {/* Summary (editable) */}
-      {doc && <EditableSummary value={doc.summary_en} docId={doc.id} onSave={updateDocFields} />}
 
       {/* Full-width DICOM viewer + bundle files + linked-imaging docs.
           Clinicians need every pixel they can get for frame review;
@@ -188,7 +200,9 @@ export default function ImagingDetailPage() {
                 docId={doc.id}
                 patientId={doc.patient_id}
                 currentEventId={doc.event_id}
-                onUpdate={(eventId) => setDoc((prev: any) => ({ ...prev, event_id: eventId }))}
+                onUpdate={(eventId) =>
+                  setDoc((prev: any) => ({ ...prev, event_id: eventId }))
+                }
               />
               <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />
               <LinksSection

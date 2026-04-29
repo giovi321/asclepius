@@ -789,10 +789,7 @@ function ImagingStudyBlock({
       />
 
       {series.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground mt-2">
-            Series
-          </p>
+        <div className="space-y-1 mt-2">
           {series.map((s: any, idx: number) => (
             <button
               key={s.id}

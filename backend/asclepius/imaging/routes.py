@@ -972,6 +972,53 @@ async def attach_imaging_report(
         dest.unlink(missing_ok=True)
         raise HTTPException(status_code=415, detail=f"Report must be PDF (got {mime or 'unknown'})")
 
+    # Duplicate check: a PDF already in the documents table cannot be
+    # re-ingested by the pipeline (UNIQUE file_hash). Without this branch
+    # the .imaging_study_hint sidecar would be honoured only on first
+    # upload; re-uploading the same PDF would silently no-op because the
+    # processor early-exits when status='done'. Detect it here and run
+    # the link-existing flow against the matching document so the user
+    # gets a clear response either way.
+    from asclepius.documents.service import compute_file_hash
+
+    file_hash = compute_file_hash(str(dest))
+    cursor = await db.execute(
+        "SELECT id, patient_id FROM documents WHERE file_hash = ?",
+        (file_hash,),
+    )
+    existing = await cursor.fetchone()
+    if existing:
+        dest.unlink(missing_ok=True)
+        existing_id = int(existing["id"])
+        existing_patient = existing["patient_id"]
+        if existing_patient:
+            role = await check_patient_access(db, current_user["id"], existing_patient)
+            if not role:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This PDF already exists in the system but you do not have access to it.",
+                )
+        await db.execute(
+            "UPDATE imaging_studies SET document_id = ?, report_status = 'attached' WHERE id = ?",
+            (existing_id, study_id),
+        )
+        await migrate_document_links(db, placeholder_doc_id, existing_id)
+        if placeholder_doc_id and placeholder_doc_id != existing_id:
+            cursor = await db.execute(
+                "SELECT file_path, doc_type FROM documents WHERE id = ?",
+                (placeholder_doc_id,),
+            )
+            old = await cursor.fetchone()
+            if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
+                await db.execute("DELETE FROM documents WHERE id = ?", (placeholder_doc_id,))
+        await db.commit()
+        return {
+            "status": "attached",
+            "document_id": existing_id,
+            "duplicate": True,
+            "message": "This PDF was already in the system; it has been linked to this imaging study.",
+        }
+
     # Sidecar so the pipeline associates the PDF with this imaging
     # study after processing. The watcher reads .imaging_study_hint
     # alongside the existing patient/event/user hints.

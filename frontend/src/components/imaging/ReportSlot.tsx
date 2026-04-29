@@ -1,7 +1,14 @@
 import { useRef, useState } from "react";
 import api from "@/api/client";
 import {
-  FileText, FileX2, Upload, Search, X, FileSearch, Replace, Unlink,
+  FileText,
+  FileX2,
+  Upload,
+  Search,
+  X,
+  FileSearch,
+  Replace,
+  Unlink,
 } from "lucide-react";
 import PdfViewer from "@/components/PdfViewer";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
@@ -58,10 +65,11 @@ export default function ReportSlot({
           limit: 30,
         },
       });
-      const all = Array.isArray(res.data) ? res.data : (res.data.items || []);
-      const pdfs = all.filter((d: any) =>
-        (d.file_path || "").toLowerCase().endsWith(".pdf")
-        || (d.original_filename || "").toLowerCase().endsWith(".pdf"),
+      const all = Array.isArray(res.data) ? res.data : res.data.items || [];
+      const pdfs = all.filter(
+        (d: any) =>
+          (d.file_path || "").toLowerCase().endsWith(".pdf") ||
+          (d.original_filename || "").toLowerCase().endsWith(".pdf"),
       );
       setPickerResults(pdfs);
     } catch {
@@ -93,7 +101,8 @@ export default function ReportSlot({
   const handleDetach = async () => {
     const ok = await confirm({
       title: "Detach this report?",
-      description: "The PDF document stays in the patient's documents list — only its link to this imaging study is removed. You can re-attach it (or a different one) anytime.",
+      description:
+        "The PDF document stays in the patient's documents list — only its link to this imaging study is removed. You can re-attach it (or a different one) anytime.",
       variant: "destructive",
       confirmText: "Detach",
     });
@@ -121,19 +130,35 @@ export default function ReportSlot({
     try {
       const form = new FormData();
       form.append("file", file);
-      await api.post(`/imaging/${studyId}/report`, form, {
+      const res = await api.post(`/imaging/${studyId}/report`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      toast({
-        title: "Report queued",
-        description: "The PDF is being processed; it will appear here when extraction finishes.",
-        variant: "success",
-      });
-      // Pipeline runs OCR + LLM; reload after a short delay so the user
-      // sees status updates as they land.
-      setTimeout(() => onChanged?.(), 2000);
+      if (res.data?.duplicate) {
+        toast({
+          title: "Already in the system",
+          description:
+            res.data?.message ||
+            "This PDF was already uploaded; it has been linked to this imaging study.",
+          variant: "success",
+        });
+        onChanged?.();
+      } else {
+        toast({
+          title: "Report queued",
+          description:
+            "The PDF is being processed; it will appear here when extraction finishes.",
+          variant: "success",
+        });
+        // Pipeline runs OCR + LLM; reload after a short delay so the user
+        // sees status updates as they land.
+        setTimeout(() => onChanged?.(), 2000);
+      }
     } catch (e: any) {
-      toast({ title: "Upload failed", description: e?.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Upload failed",
+        description: e?.response?.data?.detail || e.message,
+        variant: "error",
+      });
     } finally {
       setUploadBusy(false);
     }
@@ -218,7 +243,9 @@ export default function ReportSlot({
             {pickerBusy ? (
               <p className="text-xs text-muted-foreground">Loading...</p>
             ) : pickerResults.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No PDFs found for this patient</p>
+              <p className="text-xs text-muted-foreground">
+                No PDFs found for this patient
+              </p>
             ) : (
               <div className="max-h-60 overflow-y-auto divide-y rounded-md border">
                 {pickerResults
@@ -231,9 +258,12 @@ export default function ReportSlot({
                     >
                       <FileText className="h-3 w-3 flex-shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
-                        <span className="block truncate font-medium">{d.original_filename}</span>
+                        <span className="block truncate font-medium">
+                          {d.original_filename}
+                        </span>
                         <span className="block text-muted-foreground">
-                          {d.doc_type?.replace(/_/g, " ") || "no type"} | {d.event_date || "no date"}
+                          {d.doc_type?.replace(/_/g, " ") || "no type"} |{" "}
+                          {d.event_date || "no date"}
                           {d.doctor_name && ` | ${d.doctor_name}`}
                         </span>
                       </div>
@@ -257,7 +287,8 @@ export default function ReportSlot({
         <div>
           <p className="text-sm font-medium">No report attached yet</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Upload the doctor's PDF report or pick one from this patient's existing documents.
+            Upload the doctor's PDF report or pick one from this patient's
+            existing documents.
           </p>
         </div>
         <div className="flex gap-2 justify-center flex-wrap">
@@ -321,7 +352,9 @@ export default function ReportSlot({
           {pickerBusy ? (
             <p className="text-xs text-muted-foreground">Loading...</p>
           ) : pickerResults.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No PDFs found for this patient</p>
+            <p className="text-xs text-muted-foreground">
+              No PDFs found for this patient
+            </p>
           ) : (
             <div className="max-h-60 overflow-y-auto divide-y rounded-md border">
               {pickerResults.map((d) => (
@@ -332,9 +365,12 @@ export default function ReportSlot({
                 >
                   <FileText className="h-3 w-3 flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <span className="block truncate font-medium">{d.original_filename}</span>
+                    <span className="block truncate font-medium">
+                      {d.original_filename}
+                    </span>
                     <span className="block text-muted-foreground">
-                      {d.doc_type?.replace(/_/g, " ") || "no type"} | {d.event_date || "no date"}
+                      {d.doc_type?.replace(/_/g, " ") || "no type"} |{" "}
+                      {d.event_date || "no date"}
                       {d.doctor_name && ` | ${d.doctor_name}`}
                     </span>
                   </div>

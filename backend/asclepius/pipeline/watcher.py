@@ -211,6 +211,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
             reprocess_document,
         )
         from asclepius.pipeline.translator import translate_document
+        from asclepius.pipeline.region_translator import translate_region
         from asclepius.pipeline.inbox_sweep import sweep_inbox
         import aiosqlite as _aiosqlite
 
@@ -245,7 +246,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
 
             file_path = payload.get("file_path") if kind == "upload" else None
             label = file_path or f"doc#{payload.get('doc_id')}"
-            doc_kind = kind in ("reprocess", "translate")
+            doc_kind = kind in ("reprocess", "translate", "translate_region")
 
             # Pop the matching entry off pipeline_status.queued_jobs so the
             # frontend's queued list reflects the worker actually picking
@@ -307,6 +308,22 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                     await translate_document(
                         payload["doc_id"],
                         config,
+                        llm_provider_id=payload.get("llm_provider_id"),
+                        resolved_providers=payload.get("resolved_providers"),
+                    )
+                elif kind == "translate_region":
+                    logger.info(
+                        "Pipeline worker processing region translate: doc=%d region=%d",
+                        payload["doc_id"],
+                        payload["region_row_id"],
+                    )
+                    await translate_region(
+                        payload["doc_id"],
+                        config,
+                        region_row_id=payload["region_row_id"],
+                        page=payload["page"],
+                        bbox=payload["bbox"],
+                        ocr_provider_id=payload.get("ocr_provider_id"),
                         llm_provider_id=payload.get("llm_provider_id"),
                         resolved_providers=payload.get("resolved_providers"),
                     )

@@ -47,7 +47,9 @@ const numOrNull = (v: string): number | null => {
 };
 
 function TestPicker({
-  value, canonicalId, onPick,
+  value,
+  canonicalId,
+  onPick,
 }: {
   value: string;
   canonicalId: number | null | undefined;
@@ -58,7 +60,9 @@ function TestPicker({
   const { data: labTests, loading } = useLabTests();
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setQuery(value || ""); }, [value]);
+  useEffect(() => {
+    setQuery(value || "");
+  }, [value]);
 
   // Filter client-side — the normalization table is bounded (seeded list,
   // plus user-added aliases) so pulling it once and matching in JS is fast.
@@ -66,23 +70,27 @@ function TestPicker({
     const list = Array.isArray(labTests) ? labTests : [];
     const q = query.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((o: any) =>
-      (o.canonical_display || "").toLowerCase().includes(q) ||
-      (o.canonical_code || "").toLowerCase().includes(q),
+    return list.filter(
+      (o: any) =>
+        (o.canonical_display || "").toLowerCase().includes(q) ||
+        (o.canonical_code || "").toLowerCase().includes(q),
     );
   }, [labTests, query]);
 
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [open]);
 
   const q = query.trim().toLowerCase();
-  const exact = options.some((o: any) => (o.canonical_display || "").toLowerCase() === q);
+  const exact = options.some(
+    (o: any) => (o.canonical_display || "").toLowerCase() === q,
+  );
   const canCreate = q.length > 0 && !exact;
 
   return (
@@ -92,7 +100,11 @@ function TestPicker({
         <input
           type="text"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); onPick({ name: e.target.value, normId: null }); }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            onPick({ name: e.target.value, normId: null });
+          }}
           onFocus={() => setOpen(true)}
           placeholder="Search or create test..."
           className="w-full rounded border bg-background pl-7 pr-2 py-1 text-sm"
@@ -101,7 +113,9 @@ function TestPicker({
       {open && (
         <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
           {loading ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              Loading...
+            </div>
           ) : (
             <>
               {options.length === 0 && !canCreate && (
@@ -116,7 +130,11 @@ function TestPicker({
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => { onPick({ name: d, normId: opt.id }); setQuery(d); setOpen(false); }}
+                    onClick={() => {
+                      onPick({ name: d, normId: opt.id });
+                      setQuery(d);
+                      setOpen(false);
+                    }}
                     className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
                   >
                     <span className="truncate">{d}</span>
@@ -131,7 +149,10 @@ function TestPicker({
               {canCreate && (
                 <button
                   type="button"
-                  onClick={() => { onPick({ name: query.trim(), normId: null }); setOpen(false); }}
+                  onClick={() => {
+                    onPick({ name: query.trim(), normId: null });
+                    setOpen(false);
+                  }}
                   className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
                 >
                   <Plus className="h-3 w-3" />
@@ -147,7 +168,10 @@ function TestPicker({
 }
 
 function EditorRow({
-  docId, row, onCancel, onSaved,
+  docId,
+  row,
+  onCancel,
+  onSaved,
 }: {
   docId: number;
   row: LabRow;
@@ -189,7 +213,10 @@ function EditorRow({
       onSaved();
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Failed to save";
-      toast({ title: typeof d === "string" ? d : "Failed to save", variant: "error" });
+      toast({
+        title: typeof d === "string" ? d : "Failed to save",
+        variant: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -205,86 +232,131 @@ function EditorRow({
               <TestPicker
                 value={draft.test_name_original || ""}
                 canonicalId={draft.norm_lab_test_id}
-                onPick={({ name, normId }) => set({ test_name_original: name, norm_lab_test_id: normId })}
+                onPick={({ name, normId }) =>
+                  set({ test_name_original: name, norm_lab_test_id: normId })
+                }
               />
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground block mb-1">Date</span>
-              <input type="date"
+              <input
+                type="date"
                 value={draft.test_date || ""}
                 onChange={(e) => set({ test_date: e.target.value || null })}
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground block mb-1">Value (numeric)</span>
-              <input type="number" step="any"
+              <span className="text-muted-foreground block mb-1">
+                Value (numeric)
+              </span>
+              <input
+                type="number"
+                step="any"
                 value={draft.value ?? ""}
                 onChange={(e) => set({ value: numOrNull(e.target.value) })}
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
             <label className="text-xs">
-              <span className="text-muted-foreground block mb-1">Value (text)</span>
-              <input type="text"
+              <span className="text-muted-foreground block mb-1">
+                Value (text)
+              </span>
+              <input
+                type="text"
                 value={draft.value_text || ""}
                 onChange={(e) => set({ value_text: e.target.value })}
                 placeholder="e.g. Positive, Negative"
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground block mb-1">Unit</span>
-              <input type="text"
+              <input
+                type="text"
                 value={draft.unit || ""}
                 onChange={(e) => set({ unit: e.target.value })}
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-xs">
-                <span className="text-muted-foreground block mb-1">Ref low</span>
-                <input type="number" step="any"
+                <span className="text-muted-foreground block mb-1">
+                  Ref low
+                </span>
+                <input
+                  type="number"
+                  step="any"
                   value={draft.reference_range_low ?? ""}
-                  onChange={(e) => set({ reference_range_low: numOrNull(e.target.value) })}
-                  className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                  onChange={(e) =>
+                    set({ reference_range_low: numOrNull(e.target.value) })
+                  }
+                  className="w-full rounded border bg-background px-2 py-1 text-sm"
+                />
               </label>
               <label className="text-xs">
-                <span className="text-muted-foreground block mb-1">Ref high</span>
-                <input type="number" step="any"
+                <span className="text-muted-foreground block mb-1">
+                  Ref high
+                </span>
+                <input
+                  type="number"
+                  step="any"
                   value={draft.reference_range_high ?? ""}
-                  onChange={(e) => set({ reference_range_high: numOrNull(e.target.value) })}
-                  className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                  onChange={(e) =>
+                    set({ reference_range_high: numOrNull(e.target.value) })
+                  }
+                  className="w-full rounded border bg-background px-2 py-1 text-sm"
+                />
               </label>
             </div>
             <label className="text-xs">
-              <span className="text-muted-foreground block mb-1">Sample type</span>
-              <input type="text"
+              <span className="text-muted-foreground block mb-1">
+                Sample type
+              </span>
+              <input
+                type="text"
                 value={draft.sample_type || ""}
                 onChange={(e) => set({ sample_type: e.target.value })}
                 placeholder="e.g. serum, urine"
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
             <label className="text-xs">
               <span className="text-muted-foreground block mb-1">Panel</span>
-              <input type="text"
+              <input
+                type="text"
                 value={draft.panel_name || ""}
                 onChange={(e) => set({ panel_name: e.target.value })}
                 placeholder="e.g. CBC, Lipid"
-                className="w-full rounded border bg-background px-2 py-1 text-sm" />
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+              />
             </label>
           </div>
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox"
+              <input
+                type="checkbox"
                 checked={!!draft.is_abnormal}
-                onChange={(e) => set({ is_abnormal: e.target.checked })} />
+                onChange={(e) => set({ is_abnormal: e.target.checked })}
+              />
               <span>Abnormal</span>
             </label>
             <div className="flex gap-2">
-              <button type="button" onClick={onCancel} disabled={saving}
-                className="rounded border px-3 py-1 text-xs">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={saving}
+                className="rounded border px-3 py-1 text-xs"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={save} disabled={saving}
-                className="rounded bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50">
-                {saving ? "Saving..." : (draft.id ? "Save" : "Add")}
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="rounded bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50"
+              >
+                {saving ? "Saving..." : draft.id ? "Save" : "Add"}
               </button>
             </div>
           </div>
@@ -295,7 +367,11 @@ function EditorRow({
 }
 
 export default function LabResultsEditor({
-  docId, patientId, docType, labResults, onChange,
+  docId,
+  patientId,
+  docType,
+  labResults,
+  onChange,
 }: {
   docId: number;
   patientId: number | null;
@@ -315,28 +391,45 @@ export default function LabResultsEditor({
 
   const startAdd = () => {
     if (!patientId) {
-      toast({ title: "Assign a patient to this document first", variant: "error" });
+      toast({
+        title: "Assign a patient to this document first",
+        variant: "error",
+      });
       return;
     }
     setEditingId("new");
   };
 
-  const onRowSaved = () => { setEditingId(null); onChange(); };
+  const onRowSaved = () => {
+    setEditingId(null);
+    onChange();
+  };
 
   const del = async (id: number) => {
-    const ok = await confirm({ title: "Delete this lab result?", variant: "destructive" });
+    const ok = await confirm({
+      title: "Delete this lab result?",
+      variant: "destructive",
+    });
     if (!ok) return;
     try {
       await api.delete(`/lab-results/${id}`);
       onChange();
     } catch (err: any) {
       const d = err?.response?.data?.detail || "Failed to delete";
-      toast({ title: typeof d === "string" ? d : "Failed to delete", variant: "error" });
+      toast({
+        title: typeof d === "string" ? d : "Failed to delete",
+        variant: "error",
+      });
     }
   };
 
   return (
-    <Section title="Lab Results" icon={TestTube}>
+    <Section
+      title="Lab Results"
+      icon={TestTube}
+      sectionId="lab-results"
+      defaultOpen={(labResults?.length ?? 0) > 0}
+    >
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -352,50 +445,80 @@ export default function LabResultsEditor({
           <tbody className="divide-y">
             {rows.map((lr) =>
               editingId === lr.id ? (
-                <EditorRow key={lr.id} docId={docId} row={lr}
+                <EditorRow
+                  key={lr.id}
+                  docId={docId}
+                  row={lr}
                   onCancel={() => setEditingId(null)}
-                  onSaved={onRowSaved} />
+                  onSaved={onRowSaved}
+                />
               ) : (
-                <tr key={lr.id} className={lr.is_abnormal ? "text-red-600" : ""}>
+                <tr
+                  key={lr.id}
+                  className={lr.is_abnormal ? "text-red-600" : ""}
+                >
                   <td className="py-1 pr-2">
                     <div className="font-medium">
                       {lr.test_name_canonical || lr.test_name_original || ""}
                     </div>
-                    {lr.test_name_canonical && lr.test_name_original && lr.test_name_canonical !== lr.test_name_original && (
-                      <div className="text-[11px] text-muted-foreground">{lr.test_name_original}</div>
-                    )}
+                    {lr.test_name_canonical &&
+                      lr.test_name_original &&
+                      lr.test_name_canonical !== lr.test_name_original && (
+                        <div className="text-[11px] text-muted-foreground">
+                          {lr.test_name_original}
+                        </div>
+                      )}
                   </td>
-                  <td className="py-1 pr-2 font-medium">{lr.value ?? lr.value_text ?? ""}</td>
+                  <td className="py-1 pr-2 font-medium">
+                    {lr.value ?? lr.value_text ?? ""}
+                  </td>
                   <td className="py-1 pr-2">{lr.unit || ""}</td>
                   <td className="py-1 pr-2 text-muted-foreground">
-                    {lr.reference_range_low != null && lr.reference_range_high != null
+                    {lr.reference_range_low != null &&
+                    lr.reference_range_high != null
                       ? `${lr.reference_range_low}\u2013${lr.reference_range_high}`
                       : ""}
                   </td>
-                  <td className="py-1 pr-2 text-muted-foreground">{lr.test_date || ""}</td>
+                  <td className="py-1 pr-2 text-muted-foreground">
+                    {lr.test_date || ""}
+                  </td>
                   <td className="py-1 text-right">
                     <div className="inline-flex gap-1">
-                      <button type="button" onClick={() => setEditingId(lr.id!)}
-                        className="rounded border p-1 hover:bg-accent" title="Edit">
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(lr.id!)}
+                        className="rounded border p-1 hover:bg-accent"
+                        title="Edit"
+                      >
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button type="button" onClick={() => del(lr.id!)}
-                        className="rounded border p-1 hover:bg-accent text-destructive" title="Delete">
+                      <button
+                        type="button"
+                        onClick={() => del(lr.id!)}
+                        className="rounded border p-1 hover:bg-accent text-destructive"
+                        title="Delete"
+                      >
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   </td>
                 </tr>
-              )
+              ),
             )}
             {editingId === "new" && (
-              <EditorRow docId={docId} row={blankDraft()}
+              <EditorRow
+                docId={docId}
+                row={blankDraft()}
                 onCancel={() => setEditingId(null)}
-                onSaved={onRowSaved} />
+                onSaved={onRowSaved}
+              />
             )}
             {rows.length === 0 && editingId !== "new" && (
               <tr>
-                <td colSpan={6} className="py-3 text-center text-xs text-muted-foreground">
+                <td
+                  colSpan={6}
+                  className="py-3 text-center text-xs text-muted-foreground"
+                >
                   No lab results yet.
                 </td>
               </tr>
@@ -405,8 +528,11 @@ export default function LabResultsEditor({
       </div>
       {editingId !== "new" && (
         <div className="mt-2 flex justify-end">
-          <button type="button" onClick={startAdd}
-            className="inline-flex items-center gap-1 rounded border px-3 py-1 text-xs hover:bg-accent">
+          <button
+            type="button"
+            onClick={startAdd}
+            className="inline-flex items-center gap-1 rounded border px-3 py-1 text-xs hover:bg-accent"
+          >
             <Plus className="h-3 w-3" /> Add test
           </button>
         </div>

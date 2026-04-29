@@ -22,14 +22,23 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
       setInstruction("");
       await onApplied();
     } catch (e: any) {
-      toast({ title: "AI edit failed", description: e.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "AI edit failed",
+        description: e.response?.data?.detail || e.message,
+        variant: "error",
+      });
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Section title="AI Edit" icon={Stethoscope}>
+    <Section
+      title="AI Edit"
+      icon={Stethoscope}
+      sectionId="ai-edit"
+      defaultOpen={false}
+    >
       <div className="space-y-2">
         <div className="flex gap-2">
           <input

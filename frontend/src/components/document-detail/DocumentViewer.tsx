@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, Download, Image as ImageIcon, FileX2, Upload, Search, X } from "lucide-react";
+import {
+  FileText,
+  Download,
+  Image as ImageIcon,
+  FileX2,
+  Upload,
+  Search,
+  X,
+} from "lucide-react";
 import api from "@/api/client";
-import PdfViewer from "@/components/PdfViewer";
+import PdfViewer, { type NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { isHiddenVaultPath } from "@/lib/vaultHidden";
 
@@ -18,6 +26,11 @@ export interface DocumentViewerProps {
   /** Called after a successful relink / replace so the parent reloads
    * the document and re-mounts this viewer. */
   onReloaded?: () => void;
+  /** Region-translate selection mode — when true, the PDF viewer lets
+   * the user drag a rectangle to crop a region of the current page. */
+  selectionMode?: boolean;
+  onSelectionConfirm?: (page: number, bbox: NormalizedBbox) => void;
+  onSelectionCancel?: () => void;
 }
 
 /**
@@ -27,7 +40,15 @@ export interface DocumentViewerProps {
  * into a "switch to the imaging view" hint with a deep link.
  */
 export default function DocumentViewer({
-  id, filePath, originalFilename, onRotate, imagingStudyId, onReloaded,
+  id,
+  filePath,
+  originalFilename,
+  onRotate,
+  imagingStudyId,
+  onReloaded,
+  selectionMode,
+  onSelectionConfirm,
+  onSelectionCancel,
 }: DocumentViewerProps) {
   const fp = (filePath || "").toLowerCase();
   const fn = (originalFilename || "").toLowerCase();
@@ -87,7 +108,9 @@ export default function DocumentViewer({
       setFileMissing(true);
       tryAutoRelink();
     });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [id, filePath, tryAutoRelink]);
 
   const relinkTo = async (vaultPath: string) => {
@@ -97,7 +120,11 @@ export default function DocumentViewer({
       toast({ title: "Relinked", variant: "success" });
       onReloaded?.();
     } catch (e: any) {
-      toast({ title: "Relink failed", description: e?.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Relink failed",
+        description: e?.response?.data?.detail || e.message,
+        variant: "error",
+      });
     } finally {
       setBusy(false);
     }
@@ -140,7 +167,8 @@ export default function DocumentViewer({
   };
 
   const filteredPicker = pickerResults.filter(
-    (p) => !pickerSearch || p.toLowerCase().includes(pickerSearch.toLowerCase()),
+    (p) =>
+      !pickerSearch || p.toLowerCase().includes(pickerSearch.toLowerCase()),
   );
 
   const uploadReplacement = async (file: File) => {
@@ -154,7 +182,11 @@ export default function DocumentViewer({
       toast({ title: "File replaced", variant: "success" });
       onReloaded?.();
     } catch (e: any) {
-      toast({ title: "Upload failed", description: e?.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Upload failed",
+        description: e?.response?.data?.detail || e.message,
+        variant: "error",
+      });
     } finally {
       setBusy(false);
     }
@@ -168,9 +200,19 @@ export default function DocumentViewer({
           <p className="text-foreground font-medium">File not available</p>
           <p className="text-sm">
             The document record exists but the file is missing on disk
-            {filePath ? <> at <code className="text-xs">{filePath}</code></> : ""}.
+            {filePath ? (
+              <>
+                {" "}
+                at <code className="text-xs">{filePath}</code>
+              </>
+            ) : (
+              ""
+            )}
+            .
           </p>
-          {scanning && <p className="text-xs">Scanning the vault for a matching file...</p>}
+          {scanning && (
+            <p className="text-xs">Scanning the vault for a matching file...</p>
+          )}
         </div>
 
         {/* Candidate matches found by the auto-scan. */}
@@ -279,7 +321,14 @@ export default function DocumentViewer({
   if (fp.endsWith(".pdf") || fn.endsWith(".pdf")) {
     return (
       <div className="rounded-lg border overflow-hidden h-[700px]">
-        <PdfViewer key={`pdf-${id}`} url={`/api/documents/${id}/file`} onRotate={onRotate} />
+        <PdfViewer
+          key={`pdf-${id}`}
+          url={`/api/documents/${id}/file`}
+          onRotate={onRotate}
+          selectionMode={selectionMode}
+          onSelectionConfirm={onSelectionConfirm}
+          onSelectionCancel={onSelectionCancel}
+        />
       </div>
     );
   }
@@ -302,10 +351,12 @@ export default function DocumentViewer({
     return (
       <div className="rounded-lg border p-8 text-center text-muted-foreground space-y-2">
         <ImageIcon className="h-12 w-12 mx-auto mb-2 text-primary" />
-        <p className="text-foreground font-medium">This document is the report for an imaging study</p>
+        <p className="text-foreground font-medium">
+          This document is the report for an imaging study
+        </p>
         <p className="text-sm">
-          Open the Imaging view to scroll through the DICOM frames, attach a PDF report,
-          or change contrast on MRI series.
+          Open the Imaging view to scroll through the DICOM frames, attach a PDF
+          report, or change contrast on MRI series.
         </p>
         <Link
           to={`/imaging/${imagingStudyId}`}

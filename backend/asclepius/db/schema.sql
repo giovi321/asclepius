@@ -411,6 +411,29 @@ CREATE TABLE IF NOT EXISTS document_stage_events (
 );
 CREATE INDEX IF NOT EXISTS idx_stage_events_doc ON document_stage_events(document_id, id DESC);
 
+-- Per-document region translations. Each row represents a single
+-- ad-hoc OCR + translate run on a user-selected rectangle of the PDF
+-- (page + bbox in normalized [0,1] coords). Independent of the
+-- whole-document translate flow, which writes to documents.ocr_text_en.
+CREATE TABLE IF NOT EXISTS region_translations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    page INTEGER NOT NULL,
+    bbox_x REAL NOT NULL,
+    bbox_y REAL NOT NULL,
+    bbox_w REAL NOT NULL,
+    bbox_h REAL NOT NULL,
+    ocr_text TEXT,
+    translated_text TEXT,
+    ocr_provider_id TEXT,
+    llm_provider_id TEXT,
+    llm_model TEXT,
+    thumbnail_path TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_region_translations_doc
+    ON region_translations(document_id, id DESC);
+
 -- Extraction corrections (tracks user edits to LLM-extracted fields for learning)
 CREATE TABLE IF NOT EXISTS extraction_corrections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

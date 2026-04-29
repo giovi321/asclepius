@@ -108,7 +108,11 @@ export interface DocumentSection {
 
 // ─── Pipeline ──────────────────────────────────────────
 
-export type PipelineJobKind = "upload" | "reprocess" | "translate";
+export type PipelineJobKind =
+  | "upload"
+  | "reprocess"
+  | "translate"
+  | "translate_region";
 
 export interface PipelineProviders {
   ocr?: string | null;

@@ -42,6 +42,6 @@ repos:
       - id: openapi-drift
         name: OpenAPI / schema.ts drift
         language: system
-        entry: bash -c 'ASCLEPIUS_ENV=development ASCLEPIUS_COOKIE_SECURE=0 ASCLEPIUS_SECRET_KEY=pre-commit-hook-placeholder-secret-not-for-production-use python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git add frontend/src/openapi.json frontend/src/api/schema.ts'
+        entry: bash -c 'ASCLEPIUS_ENV=development ASCLEPIUS_COOKIE_SECURE=0 ASCLEPIUS_SECRET_KEY=pre-commit-hook-placeholder-secret-not-for-production-use python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && npx --prefix frontend prettier --write frontend/src/openapi.json frontend/src/api/schema.ts && git add frontend/src/openapi.json frontend/src/api/schema.ts'
         files: ^backend/.*\.py$
         pass_filenames: false

@@ -4,6914 +4,7101 @@
  */
 
 export interface paths {
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Health */
-        get: operations["health_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Login
-         * @description Authenticate with username + password and set the session cookie.
-         *
-         *     Failed attempts are rate-limited per ``(client_ip, username)`` pair to
-         *     blunt credential-stuffing. Successful logins clear the counter.
-         */
-        post: operations["login_api_auth_login_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Logout
-         * @description Revoke the current session server-side and clear the cookie.
-         */
-        post: operations["logout_api_auth_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Me */
-        get: operations["me_api_auth_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/enabled": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Oidc Enabled
-         * @description Check if OIDC is configured and enabled.
-         */
-        get: operations["oidc_enabled_api_auth_oidc_enabled_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Oidc Login
-         * @description Redirect to OIDC provider for authentication.
-         */
-        get: operations["oidc_login_api_auth_oidc_login_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Oidc Callback
-         * @description Handle OIDC callback after provider authentication.
-         */
-        get: operations["oidc_callback_api_auth_oidc_callback_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/patients": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Patients */
-        get: operations["list_patients_api_patients_get"];
-        put?: never;
-        /** Create Patient */
-        post: operations["create_patient_api_patients_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/patients/{patient_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Patient
-         * @description Get a single patient's details.
-         */
-        get: operations["get_patient_api_patients__patient_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete Patient
-         * @description Delete a patient and disassociate their documents.
-         */
-        delete: operations["delete_patient_api_patients__patient_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update Patient */
-        patch: operations["update_patient_api_patients__patient_id__patch"];
-        trace?: never;
-    };
-    "/api/documents/upload": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload Document
-         * @description Upload a document into the current user's inbox for processing.
-         */
-        post: operations["upload_document_api_documents_upload_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/schedule-batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Schedule Batch
-         * @description Schedule a batch of documents for later processing.
-         */
-        post: operations["schedule_batch_api_documents_schedule_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Serve File
-         * @description Stream the stored document file.
-         *
-         *     Security invariants:
-         *     - ``doc.file_path`` is resolved strictly under the configured vault root.
-         *     - The outbound ``Content-Disposition`` filename is sanitised so a
-         *       malicious filename cannot break out of the header.
-         *     - Non-admins need either patient-level access or uploader identity.
-         */
-        get: operations["serve_file_api_documents__doc_id__file_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        /**
-         * Head File
-         * @description HEAD probe used by the frontend to decide whether to render a file
-         *     viewer at all. Returns the same status codes as the GET (404 when
-         *     the file is missing on disk, 403 when the caller lacks access).
-         */
-        head: operations["head_file_api_documents__doc_id__file_head"];
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rotate Document
-         * @description Permanently rotate pages of a PDF document.
-         *
-         *     - degrees: rotation angle (90, 180, 270)
-         *     - pages: list of 1-based page numbers to rotate, or null/empty for all pages
-         */
-        post: operations["rotate_document_api_documents__doc_id__rotate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/rename": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Rename Document
-         * @description Rename a document's file on disk and in the database.
-         *
-         *     The new filename is sanitised (no path separators, no ``..``, reserved
-         *     names rejected) and the target path is verified to stay under the vault
-         *     root. The file extension is locked to the original to prevent tricks
-         *     like renaming ``scan.pdf`` into ``scan.html``.
-         */
-        post: operations["rename_document_api_documents__doc_id__rename_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/find-candidates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Find Candidate Files
-         * @description Look for files in the vault whose basename matches this document's
-         *     ``original_filename``. Used by the document detail page to recover
-         *     from a broken ``file_path`` (the file was moved or renamed outside
-         *     the app). Returns vault-relative POSIX paths so the frontend can
-         *     pass them straight back to ``POST /relink``.
-         */
-        get: operations["find_candidate_files_api_documents__doc_id__find_candidates_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/relink": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Relink Document
-         * @description Repoint a document at an existing vault file. Use case: the
-         *     file was moved outside the app and the user picked the right path
-         *     from ``find-candidates`` or the file browser. The new file is NOT
-         *     re-processed; only ``documents.file_path`` is updated.
-         */
-        post: operations["relink_document_api_documents__doc_id__relink_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/replace-file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Replace Document File
-         * @description Upload a fresh copy of a missing file. The file lands in the
-         *     correct organised location (``patients/{slug}/{year}/...`` based on
-         *     the document's ``event_date``), the document's ``file_path`` is
-         *     updated, and the file is NOT re-processed (the document already has
-         *     its OCR text, extraction, and child rows). Patient access checked.
-         *
-         *     The file extension is locked to the document's ``original_filename``
-         *     to prevent content-type confusion.
-         */
-        post: operations["replace_document_file_api_documents__doc_id__replace_file_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/link": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Link Documents
-         * @description Link two documents together.
-         */
-        post: operations["link_documents_api_documents__doc_id__link_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/links": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Links
-         * @description Get all linked documents for a document.
-         */
-        get: operations["get_links_api_documents__doc_id__links_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/links/{link_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Link
-         * @description Remove a document link.
-         */
-        delete: operations["delete_link_api_documents__doc_id__links__link_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/suggest-links": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Suggest Document Links
-         * @description Use LLM to suggest related documents for linking.
-         */
-        post: operations["suggest_document_links_api_documents__doc_id__suggest_links_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/relevant": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Relevant Documents
-         * @description Get AI-suggested relevant documents. Returns cached results if available.
-         */
-        get: operations["get_relevant_documents_api_documents__doc_id__relevant_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/edit-with-ai": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Edit Document With Ai
-         * @description Edit document metadata using natural language instruction via LLM.
-         *
-         *     Uses a compact prompt to minimize token usage. For simple field changes,
-         *     the LLM returns only the changed fields as JSON.
-         */
-        post: operations["edit_document_with_ai_api_documents__doc_id__edit_with_ai_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/generate-filename": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Generate Filename
-         * @description Generate an AI-suggested filename based on document metadata.
-         */
-        post: operations["generate_filename_api_documents__doc_id__generate_filename_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/failed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Failed Docs
-         * @description List failed documents with error messages for the review queue.
-         *
-         *     Restricted to admins/editors because the failure messages can expose
-         *     internal paths, provider error strings, or extracted content snippets.
-         */
-        get: operations["list_failed_docs_api_documents_failed_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/retry-all-failed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Retry All Failed
-         * @description Retry all failed documents. Admin-only.
-         *
-         *     Each doc is enqueued onto the same single-threaded pipeline worker as
-         *     fresh uploads — that's the only way to keep the "max 1 doc at a time"
-         *     invariant. ``priority=10`` puts retries behind interactive reprocess
-         *     clicks (which use 0) but ahead of large uploads.
-         */
-        post: operations["retry_all_failed_api_documents_retry_all_failed_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Docs */
-        get: operations["list_docs_api_documents_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Doc */
-        get: operations["get_doc_api_documents__doc_id__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete Doc
-         * @description Delete a document and its file from disk. Gracefully handles in-progress processing.
-         */
-        delete: operations["delete_doc_api_documents__doc_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update Doc */
-        patch: operations["update_doc_api_documents__doc_id__patch"];
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cancel Processing
-         * @description Cancel processing of a document. Requires write access.
-         *
-         *     Belt-and-braces: we both set the cooperative ``cancelled_docs`` flag
-         *     (honoured at phase boundaries inside the pipeline) and hard-cancel the
-         *     running asyncio task if one is registered. The hard cancel aborts any
-         *     in-flight ``await`` immediately (httpx POST, DB write), so the gate
-         *     slot releases and the processing chip clears without waiting for the
-         *     LLM request to finish on its own.
-         */
-        post: operations["cancel_processing_api_documents__doc_id__cancel_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/move": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Move Doc
-         * @description Reassign a document to a different patient, moving the file on disk.
-         */
-        post: operations["move_doc_api_documents__doc_id__move_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/stages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Doc Stages
-         * @description Per-document pipeline stage timeline.
-         *
-         *     Returns rows in chronological order (oldest first) so the UI can group
-         *     runs (upload → reprocess → reprocess) without re-sorting.
-         */
-        get: operations["get_doc_stages_api_documents__doc_id__stages_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/reprocess": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Reprocess Doc
-         * @description Queue a document for reprocessing. Requires write access.
-         *
-         *     Reprocess goes through the same single-threaded pipeline worker queue as
-         *     fresh uploads. The previous implementation spawned the reprocess as an
-         *     asyncio task on the FastAPI loop, which ran in parallel with the worker
-         *     loop and let two docs hit the same Ollama server at the same time.
-         */
-        post: operations["reprocess_doc_api_documents__doc_id__reprocess_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/documents/{doc_id}/translate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Translate Doc
-         * @description Queue an on-demand English translation of the document body.
-         *
-         *     Re-uses the cached ``ocr_text`` — does not run OCR again. Result is
-         *     persisted to ``documents.ocr_text_en``, overwriting any prior run.
-         */
-        post: operations["translate_doc_api_documents__doc_id__translate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/encounters/{encounter_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Encounter
-         * @description Remove an encounter row. The parent document is left untouched —
-         *     only this single extracted record is dropped.
-         */
-        delete: operations["delete_encounter_api_encounters__encounter_id__delete"];
-        options?: never;
-        head?: never;
-        /**
-         * Update Encounter
-         * @description Edit an encounter's diagnosis / specialty / notes inline.
-         *
-         *     ``diagnosis_original`` and ``specialty_original`` resolve to canonical
-         *     norm_* ids on the same row so the detail-view join (which displays via
-         *     ``norm_*`` tables) reflects the change.
-         */
-        patch: operations["update_encounter_api_encounters__encounter_id__patch"];
-        trace?: never;
-    };
-    "/api/medications/{medication_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Medication
-         * @description Remove a medication row. The parent document is left untouched.
-         */
-        delete: operations["delete_medication_api_medications__medication_id__delete"];
-        options?: never;
-        head?: never;
-        /**
-         * Update Medication
-         * @description Edit a medication row inline. ``active_ingredient_original`` resolves
-         *     to ``norm_medication_id`` so future extractions pick up the alias.
-         */
-        patch: operations["update_medication_api_medications__medication_id__patch"];
-        trace?: never;
-    };
-    "/api/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Events
-         * @description List medical events, optionally filtered by patient and type.
-         */
-        get: operations["list_events_api_events_get"];
-        put?: never;
-        /** Create Event */
-        post: operations["create_event_api_events_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events/{event_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Event
-         * @description Get a single event with its linked documents.
-         */
-        get: operations["get_event_api_events__event_id__get"];
-        put?: never;
-        post?: never;
-        /** Delete Event */
-        delete: operations["delete_event_api_events__event_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update Event */
-        patch: operations["update_event_api_events__event_id__patch"];
-        trace?: never;
-    };
-    "/api/events/{event_id}/link": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Link Document To Event
-         * @description Link a document to a medical event.
-         */
-        post: operations["link_document_to_event_api_events__event_id__link_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events/{event_id}/link/{document_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Unlink Document From Event */
-        delete: operations["unlink_document_from_event_api_events__event_id__link__document_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/events/suggest-for-document/{doc_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Suggest Events For Document
-         * @description Use LLM to suggest which medical event a document belongs to, or suggest creating a new one.
-         */
-        post: operations["suggest_events_for_document_api_events_suggest_for_document__doc_id__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lab-results": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Lab Results */
-        get: operations["list_lab_results_api_lab_results_get"];
-        put?: never;
-        /**
-         * Create Lab Result
-         * @description Create a lab result tied to a document.
-         *
-         *     Patient is derived from the document so the caller can't attach a lab row
-         *     to another patient's document. The document must already have a patient.
-         */
-        post: operations["create_lab_result_api_lab_results_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lab-results/orphans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Orphan Lab Results
-         * @description Lab results whose document_id no longer points to an existing document.
-         *
-         *     Scoped to patients the current user has access to (same rule as the list
-         *     endpoint). Explicit patient_id narrows the result further.
-         */
-        get: operations["list_orphan_lab_results_api_lab_results_orphans_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lab-results/timeline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Lab Timeline
-         * @description Get time-series data for a specific test for charting.
-         */
-        get: operations["lab_timeline_api_lab_results_timeline_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/lab-results/{result_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete Lab Result */
-        delete: operations["delete_lab_result_api_lab_results__result_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update Lab Result */
-        patch: operations["update_lab_result_api_lab_results__result_id__patch"];
-        trace?: never;
-    };
-    "/api/imaging": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Imaging Studies
-         * @description List imaging studies. Mirrors the documents-list shape: search,
-         *     filters, sort, paginated results with ``total`` count.
-         */
-        get: operations["list_imaging_studies_api_imaging_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Imaging Study */
-        get: operations["get_imaging_study_api_imaging__study_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/series/{series_id}/frames": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Frames */
-        get: operations["list_frames_api_imaging__study_id__series__series_id__frames_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/series/{series_id}/frame/{index}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Frame
-         * @description Serve a frame as PNG (default) or raw DICOM.
-         *
-         *     ``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth
-         *     so MRI users can adjust contrast / brightness from the viewer without
-         *     re-decoding pixel data on the client. Both must be supplied together;
-         *     otherwise the file's own VOI LUT is used (or a default min-max
-         *     normalisation when none is present).
-         *
-         *     ``upscale`` (1-4) bicubic-resamples the PNG to N× the source size before
-         *     encoding. The viewer asks for ``upscale=2`` once the user zooms past
-         *     ~1.5× and ``upscale=4`` past ~3×, trading bandwidth for sharpness so
-         *     the canvas-scale fallback no longer pixelates.
-         */
-        get: operations["get_frame_api_imaging__study_id__series__series_id__frame__index__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/metadata": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Frame Metadata
-         * @description Return the DICOM tags of a single frame as a JSON dict.
-         *
-         *     Used by the viewer's "Metadata" panel — gives the user the full DICOM
-         *     header without leaving the page. Pixel data and other large binary
-         *     blobs are filtered out so the payload stays small (typically a few
-         *     hundred tags). Tags whose value can't be represented as plain JSON
-         *     are coerced to ``str(value)``.
-         */
-        get: operations["get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/window": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Frame Window
-         * @description Return the file's effective window center / width for a frame.
-         *
-         *     Lightweight cousin of ``/metadata`` — only reads the two VOI tags
-         *     so the viewer can position its sliders at the actual auto value
-         *     instead of an arbitrary midpoint. Returns ``null`` for either axis
-         *     when the DICOM file doesn't carry that tag (the viewer falls back
-         *     to a min/max stretch in that case).
-         */
-        get: operations["get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/bundle-files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Bundle Files
-         * @description List the auxiliary files (DICOMDIR, JPEG previews, LOCKFILE, etc.)
-         *     that came in the same zip bundle as this study's DICOM frames.
-         *
-         *     Returns ``[{name, size, kind}]`` entries the UI can render and link to
-         *     via the ``GET .../bundle-file/{name}`` route.
-         */
-        get: operations["list_bundle_files_api_imaging__study_id__bundle_files_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/bundle-file/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Bundle File
-         * @description Download a bundle file by name (the same string returned by the
-         *     list endpoint). Path traversal is rejected via ``safe_vault_join``.
-         */
-        get: operations["get_bundle_file_api_imaging__study_id__bundle_file__name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/links": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Imaging Links
-         * @description Documents linked to this imaging study.
-         *
-         *     The first item is ALWAYS the parent radiology report — even though
-         *     technically it isn't a row in ``document_links`` (the imaging study
-         *     is a child of that document). Surfacing it as a synthetic link
-         *     means clinicians see the report in the same place as any other
-         *     related document. The synthetic entry is marked with
-         *     ``link_type='report'`` and ``link_id=null`` so the frontend doesn't
-         *     offer an "unlink" affordance for it (you can't unlink a parent).
-         */
-        get: operations["list_imaging_links_api_imaging__study_id__links_get"];
-        put?: never;
-        /**
-         * Add Imaging Link
-         * @description Link an existing document (e.g. a radiology report) to this study.
-         */
-        post: operations["add_imaging_link_api_imaging__study_id__links_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/metadata": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Imaging Metadata
-         * @description Update imaging-specific metadata (modality, body part, accession,
-         *     study description). Doctor / facility / event_date / patient are
-         *     edited on the parent ``documents`` row via PATCH /api/documents/{id};
-         *     those fields are NOT accepted here so the two endpoints can't drift.
-         *
-         *     Every accepted field is recorded in ``extraction_corrections`` so the
-         *     same correction-driven learning that documents use applies to
-         *     imaging too — when the user fixes ``modality`` on one study the LLM
-         *     sees the correction as a few-shot example for similar future studies.
-         */
-        patch: operations["update_imaging_metadata_api_imaging__study_id__metadata_patch"];
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/links/{link_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove Imaging Link
-         * @description Remove a document_links row. Validates the link belongs to this study.
-         */
-        delete: operations["remove_imaging_link_api_imaging__study_id__links__link_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/imaging/{study_id}/report": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Attach Imaging Report
-         * @description Attach a radiology report PDF to an imaging study.
-         *
-         *     Two flows:
-         *       - **Link existing**: pass ``?document_id=<id>`` (or JSON body
-         *         ``{"document_id": <id>}``) — the study's parent document is
-         *         repointed at that PDF; the placeholder is deleted.
-         *       - **Upload new**: post a multipart ``file=<pdf>``. The PDF lands
-         *         in the inbox like any other upload and is processed by the
-         *         standard pipeline; on completion the placeholder is replaced
-         *         by the new document.
-         *
-         *     PDF-only is enforced for uploads. The caller must have write access
-         *     to the study's patient.
-         */
-        post: operations["attach_imaging_report_api_imaging__study_id__report_post"];
-        /**
-         * Detach Imaging Report
-         * @description Detach the report PDF from an imaging study.
-         *
-         *     Repoints the study at a fresh placeholder document so the user can
-         *     attach a different report later. The previously-attached document
-         *     is left untouched on disk and in the documents table — it just
-         *     stops being the imaging study's parent. The user can still find it
-         *     in the documents list and re-attach (or delete) it from there.
-         *
-         *     No-op when the study is already a placeholder.
-         */
-        delete: operations["detach_imaging_report_api_imaging__study_id__report_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Chat */
-        post: operations["chat_api_chat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/chat/history": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chat History */
-        get: operations["chat_history_api_chat_history_get"];
-        put?: never;
-        post?: never;
-        /** Clear Chat History */
-        delete: operations["clear_chat_history_api_chat_history_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Norms */
-        get: operations["list_norms_api_normalization__norm_type__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/{norm_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Norm */
-        get: operations["get_norm_api_normalization__norm_type___norm_id__get"];
-        put?: never;
-        post?: never;
-        /** Delete Norm */
-        delete: operations["delete_norm_api_normalization__norm_type___norm_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update Norm */
-        patch: operations["update_norm_api_normalization__norm_type___norm_id__patch"];
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/{norm_id}/aliases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Add Alias */
-        post: operations["add_alias_api_normalization__norm_type___norm_id__aliases_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/aliases/{alias_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove Alias */
-        delete: operations["remove_alias_api_normalization__norm_type__aliases__alias_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/{norm_id}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirm Aliases */
-        post: operations["confirm_aliases_api_normalization__norm_type___norm_id__confirm_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Merge Norms */
-        post: operations["merge_norms_api_normalization__norm_type__merge_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/merge-batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Merge Norms Batch */
-        post: operations["merge_norms_batch_api_normalization__norm_type__merge_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/{norm_id}/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Linked Documents */
-        get: operations["list_linked_documents_api_normalization__norm_type___norm_id__documents_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/normalization/{norm_type}/auto-merge": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Auto Merge Proposals
-         * @description Ask the configured General LLM to propose merge groups. Does NOT execute any merge.
-         */
-        post: operations["auto_merge_proposals_api_normalization__norm_type__auto_merge_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/pipeline/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Pipeline Status */
-        get: operations["get_pipeline_status_api_pipeline_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/pipeline/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start Pipeline
-         * @description Start the pipeline watcher at runtime.
-         */
-        post: operations["start_pipeline_api_pipeline_start_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/pipeline/stop": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stop Pipeline
-         * @description Stop the pipeline watcher at runtime.
-         */
-        post: operations["stop_pipeline_api_pipeline_stop_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Logs
-         * @description Get recent application logs from the in-memory buffer.
-         */
-        get: operations["get_logs_api_settings_logs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/audit-log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Audit Log
-         * @description Get audit log entries (admin only).
-         */
-        get: operations["get_audit_log_api_settings_audit_log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/backup": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download Backup
-         * @description Download a SQLite backup of the database.
-         */
-        get: operations["download_backup_api_settings_backup_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/backup/files": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Scheduled Backups
-         * @description List files in the scheduled-backup directory, newest-first.
-         */
-        get: operations["list_scheduled_backups_api_settings_backup_files_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/backup/files/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Download Scheduled Backup
-         * @description Download a single scheduled-backup file.
-         */
-        get: operations["download_scheduled_backup_api_settings_backup_files__name__get"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete Scheduled Backup
-         * @description Delete a scheduled-backup file (admin only).
-         */
-        delete: operations["delete_scheduled_backup_api_settings_backup_files__name__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/backup/run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Run Scheduled Backup
-         * @description Trigger a backup immediately using the configured scope. Returns the
-         *     written filename.
-         */
-        post: operations["run_scheduled_backup_api_settings_backup_run_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/prompts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Prompts */
-        get: operations["list_prompts_api_settings_prompts_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/prompts/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Update Prompt */
-        put: operations["update_prompt_api_settings_prompts__key__put"];
-        post?: never;
-        /** Reset Prompt */
-        delete: operations["reset_prompt_api_settings_prompts__key__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/llm-providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Llm Providers
-         * @description Get the ordered list of LLM providers.
-         */
-        get: operations["get_llm_providers_api_settings_llm_providers_get"];
-        /**
-         * Update Llm Providers
-         * @description Replace the full list of LLM providers. API keys sent as empty string are preserved.
-         */
-        put: operations["update_llm_providers_api_settings_llm_providers_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/ocr-providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Ocr Providers
-         * @description Get the ordered list of OCR providers.
-         */
-        get: operations["get_ocr_providers_api_settings_ocr_providers_get"];
-        /**
-         * Update Ocr Providers
-         * @description Replace the full list of OCR providers.
-         */
-        put: operations["update_ocr_providers_api_settings_ocr_providers_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/vision-providers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Vision Providers
-         * @description Get the ordered list of Vision-LLM providers.
-         */
-        get: operations["get_vision_providers_api_settings_vision_providers_get"];
-        /**
-         * Update Vision Providers
-         * @description Replace the full list of Vision-LLM providers. API keys sent as empty string are preserved.
-         */
-        put: operations["update_vision_providers_api_settings_vision_providers_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/credentials": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Credentials
-         * @description Return the shared credentials list with api_key masked + reference counts.
-         */
-        get: operations["get_credentials_api_settings_credentials_get"];
-        /**
-         * Update Credentials
-         * @description Replace the full credentials list. Missing ids are generated; missing
-         *     api_key values preserve the stored secret.
-         */
-        put: operations["update_credentials_api_settings_credentials_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/general-llm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get General Llm
-         * @description Return the general (non-pipeline) LLM configuration. Concurrency
-         *     comes from the referenced credential.
-         */
-        get: operations["get_general_llm_api_settings_general_llm_get"];
-        /**
-         * Update General Llm
-         * @description Replace the general LLM settings.
-         */
-        put: operations["update_general_llm_api_settings_general_llm_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/test-llm-provider": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Test Llm Provider
-         * @description Test connectivity to an LLM provider via its metadata endpoint.
-         *
-         *     Hits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),
-         *     or ``client.models.list()`` (Anthropic). Free, instant, validates auth
-         *     and that the configured model is available — without acquiring an
-         *     inference slot or burning tokens.
-         */
-        post: operations["test_llm_provider_api_settings_test_llm_provider_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/test-ocr-provider": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Test Ocr Provider
-         * @description Test connectivity to an OCR provider.
-         */
-        post: operations["test_ocr_provider_api_settings_test_ocr_provider_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/test-vision-provider": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Test Vision Provider
-         * @description Test connectivity to a Vision-LLM provider via its metadata endpoint.
-         *
-         *     Same probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),
-         *     ``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).
-         *     No image is uploaded, no inference is run.
-         */
-        post: operations["test_vision_provider_api_settings_test_vision_provider_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Users */
-        get: operations["list_users_api_settings_users_get"];
-        put?: never;
-        /** Create User */
-        post: operations["create_user_api_settings_users_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/users/{user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete User */
-        delete: operations["delete_user_api_settings_users__user_id__delete"];
-        options?: never;
-        head?: never;
-        /** Update User */
-        patch: operations["update_user_api_settings_users__user_id__patch"];
-        trace?: never;
-    };
-    "/api/settings/users/{user_id}/access": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get User Access */
-        get: operations["get_user_access_api_settings_users__user_id__access_get"];
-        put?: never;
-        /** Grant Access */
-        post: operations["grant_access_api_settings_users__user_id__access_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/users/{user_id}/access/{patient_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Revoke Access */
-        delete: operations["revoke_access_api_settings_users__user_id__access__patient_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/sessions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Sessions
-         * @description List server-side sessions with user + activity details.
-         *
-         *     By default shows only sessions that are still usable (not revoked, not
-         *     expired). Pass ``include_revoked=true`` to include the rest for audit.
-         */
-        get: operations["list_sessions_api_settings_sessions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/sessions/{session_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Revoke Session Endpoint
-         * @description Revoke a session. The owner of that session is effectively logged out
-         *     on their next request.
-         */
-        delete: operations["revoke_session_endpoint_api_settings_sessions__session_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings/view-prefs/{view_key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get View Prefs
-         * @description Return the user's stored prefs for ``view_key`` or ``null`` keys
-         *     when no row exists. Frontend treats null as "use defaults".
-         */
-        get: operations["get_view_prefs_api_settings_view_prefs__view_key__get"];
-        /** Set View Prefs */
-        put: operations["set_view_prefs_api_settings_view_prefs__view_key__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Settings */
-        get: operations["get_settings_api_settings_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update Settings
-         * @description Update settings: persists to YAML and updates in-memory config.
-         */
-        patch: operations["update_settings_api_settings_patch"];
-        trace?: never;
-    };
-    "/api/vault/tree": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Vault Tree
-         * @description Get the vault directory structure as a browsable tree.
-         */
-        get: operations["get_vault_tree_api_vault_tree_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/vault/file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Vault File
-         * @description Delete a file from the vault and its matching document record.
-         */
-        delete: operations["delete_vault_file_api_vault_file_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/vault/move": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Move Vault File
-         * @description Move a file (or imaging study folder) within the vault and keep the
-         *     matching document record's ``file_path`` in sync.
-         *
-         *     Use case: a file was misclassified by date / event and the user wants
-         *     to drag it into the right folder without losing the document reference
-         *     (so document-detail links, OCR cache, lab results etc. all keep
-         *     working). The DB row is updated atomically with the disk move; if the
-         *     destination already exists or the access check fails the move is
-         *     rejected.
-         */
-        post: operations["move_vault_file_api_vault_move_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/setup/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Setup Status
-         * @description Check if initial setup is needed (no users exist).
-         */
-        get: operations["setup_status_api_setup_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/setup/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Setup Complete
-         * @description Create the first admin user and first patient.
-         */
-        post: operations["setup_complete_api_setup_complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Health */
+    get: operations["health_health_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Login
+     * @description Authenticate with username + password and set the session cookie.
+     *
+     *     Failed attempts are rate-limited per ``(client_ip, username)`` pair to
+     *     blunt credential-stuffing. Successful logins clear the counter.
+     */
+    post: operations["login_api_auth_login_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout
+     * @description Revoke the current session server-side and clear the cookie.
+     */
+    post: operations["logout_api_auth_logout_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Me */
+    get: operations["me_api_auth_me_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/oidc/enabled": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Oidc Enabled
+     * @description Check if OIDC is configured and enabled.
+     */
+    get: operations["oidc_enabled_api_auth_oidc_enabled_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/oidc/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Oidc Login
+     * @description Redirect to OIDC provider for authentication.
+     */
+    get: operations["oidc_login_api_auth_oidc_login_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/oidc/callback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Oidc Callback
+     * @description Handle OIDC callback after provider authentication.
+     */
+    get: operations["oidc_callback_api_auth_oidc_callback_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/patients": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Patients */
+    get: operations["list_patients_api_patients_get"];
+    put?: never;
+    /** Create Patient */
+    post: operations["create_patient_api_patients_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/patients/{patient_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Patient
+     * @description Get a single patient's details.
+     */
+    get: operations["get_patient_api_patients__patient_id__get"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete Patient
+     * @description Delete a patient and disassociate their documents.
+     */
+    delete: operations["delete_patient_api_patients__patient_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Patient */
+    patch: operations["update_patient_api_patients__patient_id__patch"];
+    trace?: never;
+  };
+  "/api/documents/upload": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Upload Document
+     * @description Upload a document into the current user's inbox for processing.
+     */
+    post: operations["upload_document_api_documents_upload_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/schedule-batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Schedule Batch
+     * @description Schedule a batch of documents for later processing.
+     */
+    post: operations["schedule_batch_api_documents_schedule_batch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Serve File
+     * @description Stream the stored document file.
+     *
+     *     Security invariants:
+     *     - ``doc.file_path`` is resolved strictly under the configured vault root.
+     *     - The outbound ``Content-Disposition`` filename is sanitised so a
+     *       malicious filename cannot break out of the header.
+     *     - Non-admins need either patient-level access or uploader identity.
+     */
+    get: operations["serve_file_api_documents__doc_id__file_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    /**
+     * Head File
+     * @description HEAD probe used by the frontend to decide whether to render a file
+     *     viewer at all. Returns the same status codes as the GET (404 when
+     *     the file is missing on disk, 403 when the caller lacks access).
+     */
+    head: operations["head_file_api_documents__doc_id__file_head"];
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/rotate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rotate Document
+     * @description Permanently rotate pages of a PDF document.
+     *
+     *     - degrees: rotation angle (90, 180, 270)
+     *     - pages: list of 1-based page numbers to rotate, or null/empty for all pages
+     */
+    post: operations["rotate_document_api_documents__doc_id__rotate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/rename": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rename Document
+     * @description Rename a document's file on disk and in the database.
+     *
+     *     The new filename is sanitised (no path separators, no ``..``, reserved
+     *     names rejected) and the target path is verified to stay under the vault
+     *     root. The file extension is locked to the original to prevent tricks
+     *     like renaming ``scan.pdf`` into ``scan.html``.
+     */
+    post: operations["rename_document_api_documents__doc_id__rename_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/find-candidates": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Find Candidate Files
+     * @description Look for files in the vault whose basename matches this document's
+     *     ``original_filename``. Used by the document detail page to recover
+     *     from a broken ``file_path`` (the file was moved or renamed outside
+     *     the app). Returns vault-relative POSIX paths so the frontend can
+     *     pass them straight back to ``POST /relink``.
+     */
+    get: operations["find_candidate_files_api_documents__doc_id__find_candidates_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/relink": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Relink Document
+     * @description Repoint a document at an existing vault file. Use case: the
+     *     file was moved outside the app and the user picked the right path
+     *     from ``find-candidates`` or the file browser. The new file is NOT
+     *     re-processed; only ``documents.file_path`` is updated.
+     */
+    post: operations["relink_document_api_documents__doc_id__relink_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/replace-file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Replace Document File
+     * @description Upload a fresh copy of a missing file. The file lands in the
+     *     correct organised location (``patients/{slug}/{year}/...`` based on
+     *     the document's ``event_date``), the document's ``file_path`` is
+     *     updated, and the file is NOT re-processed (the document already has
+     *     its OCR text, extraction, and child rows). Patient access checked.
+     *
+     *     The file extension is locked to the document's ``original_filename``
+     *     to prevent content-type confusion.
+     */
+    post: operations["replace_document_file_api_documents__doc_id__replace_file_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/link": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Link Documents
+     * @description Link two documents together.
+     */
+    post: operations["link_documents_api_documents__doc_id__link_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Links
+     * @description Get all linked documents for a document.
+     */
+    get: operations["get_links_api_documents__doc_id__links_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/links/{link_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Link
+     * @description Remove a document link.
+     */
+    delete: operations["delete_link_api_documents__doc_id__links__link_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/suggest-links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Suggest Document Links
+     * @description Use LLM to suggest related documents for linking.
+     */
+    post: operations["suggest_document_links_api_documents__doc_id__suggest_links_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/relevant": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Relevant Documents
+     * @description Get AI-suggested relevant documents. Returns cached results if available.
+     */
+    get: operations["get_relevant_documents_api_documents__doc_id__relevant_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/edit-with-ai": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Edit Document With Ai
+     * @description Edit document metadata using natural language instruction via LLM.
+     *
+     *     Uses a compact prompt to minimize token usage. For simple field changes,
+     *     the LLM returns only the changed fields as JSON.
+     */
+    post: operations["edit_document_with_ai_api_documents__doc_id__edit_with_ai_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/generate-filename": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Generate Filename
+     * @description Generate an AI-suggested filename based on document metadata.
+     */
+    post: operations["generate_filename_api_documents__doc_id__generate_filename_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/failed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Failed Docs
+     * @description List failed documents with error messages for the review queue.
+     *
+     *     Restricted to admins/editors because the failure messages can expose
+     *     internal paths, provider error strings, or extracted content snippets.
+     */
+    get: operations["list_failed_docs_api_documents_failed_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/retry-all-failed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Retry All Failed
+     * @description Retry all failed documents. Admin-only.
+     *
+     *     Each doc is enqueued onto the same single-threaded pipeline worker as
+     *     fresh uploads — that's the only way to keep the "max 1 doc at a time"
+     *     invariant. ``priority=10`` puts retries behind interactive reprocess
+     *     clicks (which use 0) but ahead of large uploads.
+     */
+    post: operations["retry_all_failed_api_documents_retry_all_failed_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Docs */
+    get: operations["list_docs_api_documents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Doc */
+    get: operations["get_doc_api_documents__doc_id__get"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete Doc
+     * @description Delete a document and its file from disk. Gracefully handles in-progress processing.
+     */
+    delete: operations["delete_doc_api_documents__doc_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Doc */
+    patch: operations["update_doc_api_documents__doc_id__patch"];
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Cancel Processing
+     * @description Cancel processing of a document. Requires write access.
+     *
+     *     Belt-and-braces: we both set the cooperative ``cancelled_docs`` flag
+     *     (honoured at phase boundaries inside the pipeline) and hard-cancel the
+     *     running asyncio task if one is registered. The hard cancel aborts any
+     *     in-flight ``await`` immediately (httpx POST, DB write), so the gate
+     *     slot releases and the processing chip clears without waiting for the
+     *     LLM request to finish on its own.
+     */
+    post: operations["cancel_processing_api_documents__doc_id__cancel_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Move Doc
+     * @description Reassign a document to a different patient, moving the file on disk.
+     */
+    post: operations["move_doc_api_documents__doc_id__move_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/stages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Doc Stages
+     * @description Per-document pipeline stage timeline.
+     *
+     *     Returns rows in chronological order (oldest first) so the UI can group
+     *     runs (upload → reprocess → reprocess) without re-sorting.
+     */
+    get: operations["get_doc_stages_api_documents__doc_id__stages_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/reprocess": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reprocess Doc
+     * @description Queue a document for reprocessing. Requires write access.
+     *
+     *     Reprocess goes through the same single-threaded pipeline worker queue as
+     *     fresh uploads. The previous implementation spawned the reprocess as an
+     *     asyncio task on the FastAPI loop, which ran in parallel with the worker
+     *     loop and let two docs hit the same Ollama server at the same time.
+     */
+    post: operations["reprocess_doc_api_documents__doc_id__reprocess_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/translate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Translate Doc
+     * @description Queue an on-demand English translation of the document body.
+     *
+     *     Re-uses the cached ``ocr_text`` — does not run OCR again. Result is
+     *     persisted to ``documents.ocr_text_en``, overwriting any prior run.
+     */
+    post: operations["translate_doc_api_documents__doc_id__translate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/translate-region": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Translate Region Endpoint
+     * @description Queue OCR + translation of a user-selected rectangle on one page.
+     *
+     *     Pre-allocates a row in ``region_translations`` with the bbox so the
+     *     UI can show a placeholder while the worker fills in the OCR text,
+     *     translation, and thumbnail.
+     */
+    post: operations["translate_region_endpoint_api_documents__doc_id__translate_region_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/region-translations/{region_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Region Translation
+     * @description Delete a region translation row and its thumbnail file (if present).
+     */
+    delete: operations["delete_region_translation_api_documents__doc_id__region_translations__region_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Region Thumbnail
+     * @description Serve the cropped PNG thumbnail for a region translation.
+     */
+    get: operations["get_region_thumbnail_api_documents__doc_id__region_translations__region_id__thumbnail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/encounters/{encounter_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Encounter
+     * @description Remove an encounter row. The parent document is left untouched —
+     *     only this single extracted record is dropped.
+     */
+    delete: operations["delete_encounter_api_encounters__encounter_id__delete"];
+    options?: never;
+    head?: never;
+    /**
+     * Update Encounter
+     * @description Edit an encounter's diagnosis / specialty / notes inline.
+     *
+     *     ``diagnosis_original`` and ``specialty_original`` resolve to canonical
+     *     norm_* ids on the same row so the detail-view join (which displays via
+     *     ``norm_*`` tables) reflects the change.
+     */
+    patch: operations["update_encounter_api_encounters__encounter_id__patch"];
+    trace?: never;
+  };
+  "/api/medications/{medication_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Medication
+     * @description Remove a medication row. The parent document is left untouched.
+     */
+    delete: operations["delete_medication_api_medications__medication_id__delete"];
+    options?: never;
+    head?: never;
+    /**
+     * Update Medication
+     * @description Edit a medication row inline. ``active_ingredient_original`` resolves
+     *     to ``norm_medication_id`` so future extractions pick up the alias.
+     */
+    patch: operations["update_medication_api_medications__medication_id__patch"];
+    trace?: never;
+  };
+  "/api/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Events
+     * @description List medical events, optionally filtered by patient and type.
+     */
+    get: operations["list_events_api_events_get"];
+    put?: never;
+    /** Create Event */
+    post: operations["create_event_api_events_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/events/{event_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Event
+     * @description Get a single event with its linked documents.
+     */
+    get: operations["get_event_api_events__event_id__get"];
+    put?: never;
+    post?: never;
+    /** Delete Event */
+    delete: operations["delete_event_api_events__event_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Event */
+    patch: operations["update_event_api_events__event_id__patch"];
+    trace?: never;
+  };
+  "/api/events/{event_id}/link": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Link Document To Event
+     * @description Link a document to a medical event.
+     */
+    post: operations["link_document_to_event_api_events__event_id__link_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/events/{event_id}/link/{document_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Unlink Document From Event */
+    delete: operations["unlink_document_from_event_api_events__event_id__link__document_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/events/suggest-for-document/{doc_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Suggest Events For Document
+     * @description Use LLM to suggest which medical event a document belongs to, or suggest creating a new one.
+     */
+    post: operations["suggest_events_for_document_api_events_suggest_for_document__doc_id__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lab-results": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Lab Results */
+    get: operations["list_lab_results_api_lab_results_get"];
+    put?: never;
+    /**
+     * Create Lab Result
+     * @description Create a lab result tied to a document.
+     *
+     *     Patient is derived from the document so the caller can't attach a lab row
+     *     to another patient's document. The document must already have a patient.
+     */
+    post: operations["create_lab_result_api_lab_results_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lab-results/orphans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Orphan Lab Results
+     * @description Lab results whose document_id no longer points to an existing document.
+     *
+     *     Scoped to patients the current user has access to (same rule as the list
+     *     endpoint). Explicit patient_id narrows the result further.
+     */
+    get: operations["list_orphan_lab_results_api_lab_results_orphans_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lab-results/timeline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Lab Timeline
+     * @description Get time-series data for a specific test for charting.
+     */
+    get: operations["lab_timeline_api_lab_results_timeline_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lab-results/{result_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Lab Result */
+    delete: operations["delete_lab_result_api_lab_results__result_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Lab Result */
+    patch: operations["update_lab_result_api_lab_results__result_id__patch"];
+    trace?: never;
+  };
+  "/api/imaging": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Imaging Studies
+     * @description List imaging studies. Mirrors the documents-list shape: search,
+     *     filters, sort, paginated results with ``total`` count.
+     */
+    get: operations["list_imaging_studies_api_imaging_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Imaging Study */
+    get: operations["get_imaging_study_api_imaging__study_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/series/{series_id}/frames": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Frames */
+    get: operations["list_frames_api_imaging__study_id__series__series_id__frames_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/series/{series_id}/frame/{index}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Frame
+     * @description Serve a frame as PNG (default) or raw DICOM.
+     *
+     *     ``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth
+     *     so MRI users can adjust contrast / brightness from the viewer without
+     *     re-decoding pixel data on the client. Both must be supplied together;
+     *     otherwise the file's own VOI LUT is used (or a default min-max
+     *     normalisation when none is present).
+     *
+     *     ``upscale`` (1-4) bicubic-resamples the PNG to N× the source size before
+     *     encoding. The viewer asks for ``upscale=2`` once the user zooms past
+     *     ~1.5× and ``upscale=4`` past ~3×, trading bandwidth for sharpness so
+     *     the canvas-scale fallback no longer pixelates.
+     */
+    get: operations["get_frame_api_imaging__study_id__series__series_id__frame__index__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/series/{series_id}/frame/{index}/metadata": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Frame Metadata
+     * @description Return the DICOM tags of a single frame as a JSON dict.
+     *
+     *     Used by the viewer's "Metadata" panel — gives the user the full DICOM
+     *     header without leaving the page. Pixel data and other large binary
+     *     blobs are filtered out so the payload stays small (typically a few
+     *     hundred tags). Tags whose value can't be represented as plain JSON
+     *     are coerced to ``str(value)``.
+     */
+    get: operations["get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/series/{series_id}/frame/{index}/window": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Frame Window
+     * @description Return the file's effective window center / width for a frame.
+     *
+     *     Lightweight cousin of ``/metadata`` — only reads the two VOI tags
+     *     so the viewer can position its sliders at the actual auto value
+     *     instead of an arbitrary midpoint. Returns ``null`` for either axis
+     *     when the DICOM file doesn't carry that tag (the viewer falls back
+     *     to a min/max stretch in that case).
+     */
+    get: operations["get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/bundle-files": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Bundle Files
+     * @description List the auxiliary files (DICOMDIR, JPEG previews, LOCKFILE, etc.)
+     *     that came in the same zip bundle as this study's DICOM frames.
+     *
+     *     Returns ``[{name, size, kind}]`` entries the UI can render and link to
+     *     via the ``GET .../bundle-file/{name}`` route.
+     */
+    get: operations["list_bundle_files_api_imaging__study_id__bundle_files_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/bundle-file/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Bundle File
+     * @description Download a bundle file by name (the same string returned by the
+     *     list endpoint). Path traversal is rejected via ``safe_vault_join``.
+     */
+    get: operations["get_bundle_file_api_imaging__study_id__bundle_file__name__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Imaging Links
+     * @description Documents linked to this imaging study.
+     *
+     *     The first item is ALWAYS the parent radiology report — even though
+     *     technically it isn't a row in ``document_links`` (the imaging study
+     *     is a child of that document). Surfacing it as a synthetic link
+     *     means clinicians see the report in the same place as any other
+     *     related document. The synthetic entry is marked with
+     *     ``link_type='report'`` and ``link_id=null`` so the frontend doesn't
+     *     offer an "unlink" affordance for it (you can't unlink a parent).
+     */
+    get: operations["list_imaging_links_api_imaging__study_id__links_get"];
+    put?: never;
+    /**
+     * Add Imaging Link
+     * @description Link an existing document (e.g. a radiology report) to this study.
+     */
+    post: operations["add_imaging_link_api_imaging__study_id__links_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/metadata": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Imaging Metadata
+     * @description Update imaging-specific metadata (modality, body part, accession,
+     *     study description). Doctor / facility / event_date / patient are
+     *     edited on the parent ``documents`` row via PATCH /api/documents/{id};
+     *     those fields are NOT accepted here so the two endpoints can't drift.
+     *
+     *     Every accepted field is recorded in ``extraction_corrections`` so the
+     *     same correction-driven learning that documents use applies to
+     *     imaging too — when the user fixes ``modality`` on one study the LLM
+     *     sees the correction as a few-shot example for similar future studies.
+     */
+    patch: operations["update_imaging_metadata_api_imaging__study_id__metadata_patch"];
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/links/{link_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Remove Imaging Link
+     * @description Remove a document_links row. Validates the link belongs to this study.
+     */
+    delete: operations["remove_imaging_link_api_imaging__study_id__links__link_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/imaging/{study_id}/report": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Attach Imaging Report
+     * @description Attach a radiology report PDF to an imaging study.
+     *
+     *     Two flows:
+     *       - **Link existing**: pass ``?document_id=<id>`` (or JSON body
+     *         ``{"document_id": <id>}``) — the study's parent document is
+     *         repointed at that PDF; the placeholder is deleted.
+     *       - **Upload new**: post a multipart ``file=<pdf>``. The PDF lands
+     *         in the inbox like any other upload and is processed by the
+     *         standard pipeline; on completion the placeholder is replaced
+     *         by the new document.
+     *
+     *     PDF-only is enforced for uploads. The caller must have write access
+     *     to the study's patient.
+     */
+    post: operations["attach_imaging_report_api_imaging__study_id__report_post"];
+    /**
+     * Detach Imaging Report
+     * @description Detach the report PDF from an imaging study.
+     *
+     *     Repoints the study at a fresh placeholder document so the user can
+     *     attach a different report later. The previously-attached document
+     *     is left untouched on disk and in the documents table — it just
+     *     stops being the imaging study's parent. The user can still find it
+     *     in the documents list and re-attach (or delete) it from there.
+     *
+     *     No-op when the study is already a placeholder.
+     */
+    delete: operations["detach_imaging_report_api_imaging__study_id__report_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/chat": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Chat */
+    post: operations["chat_api_chat_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/chat/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Chat History */
+    get: operations["chat_history_api_chat_history_get"];
+    put?: never;
+    post?: never;
+    /** Clear Chat History */
+    delete: operations["clear_chat_history_api_chat_history_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Norms */
+    get: operations["list_norms_api_normalization__norm_type__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/{norm_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Norm */
+    get: operations["get_norm_api_normalization__norm_type___norm_id__get"];
+    put?: never;
+    post?: never;
+    /** Delete Norm */
+    delete: operations["delete_norm_api_normalization__norm_type___norm_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Norm */
+    patch: operations["update_norm_api_normalization__norm_type___norm_id__patch"];
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/{norm_id}/aliases": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add Alias */
+    post: operations["add_alias_api_normalization__norm_type___norm_id__aliases_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/aliases/{alias_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove Alias */
+    delete: operations["remove_alias_api_normalization__norm_type__aliases__alias_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/{norm_id}/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirm Aliases */
+    post: operations["confirm_aliases_api_normalization__norm_type___norm_id__confirm_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Merge Norms */
+    post: operations["merge_norms_api_normalization__norm_type__merge_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/merge-batch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Merge Norms Batch */
+    post: operations["merge_norms_batch_api_normalization__norm_type__merge_batch_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/{norm_id}/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Linked Documents */
+    get: operations["list_linked_documents_api_normalization__norm_type___norm_id__documents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/normalization/{norm_type}/auto-merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Auto Merge Proposals
+     * @description Ask the configured General LLM to propose merge groups. Does NOT execute any merge.
+     */
+    post: operations["auto_merge_proposals_api_normalization__norm_type__auto_merge_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/pipeline/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Pipeline Status */
+    get: operations["get_pipeline_status_api_pipeline_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/pipeline/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start Pipeline
+     * @description Start the pipeline watcher at runtime.
+     */
+    post: operations["start_pipeline_api_pipeline_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/pipeline/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stop Pipeline
+     * @description Stop the pipeline watcher at runtime.
+     */
+    post: operations["stop_pipeline_api_pipeline_stop_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/logs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Logs
+     * @description Get recent application logs from the in-memory buffer.
+     */
+    get: operations["get_logs_api_settings_logs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/audit-log": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Audit Log
+     * @description Get audit log entries (admin only).
+     */
+    get: operations["get_audit_log_api_settings_audit_log_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/backup": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Download Backup
+     * @description Download a SQLite backup of the database.
+     */
+    get: operations["download_backup_api_settings_backup_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/backup/files": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Scheduled Backups
+     * @description List files in the scheduled-backup directory, newest-first.
+     */
+    get: operations["list_scheduled_backups_api_settings_backup_files_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/backup/files/{name}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Download Scheduled Backup
+     * @description Download a single scheduled-backup file.
+     */
+    get: operations["download_scheduled_backup_api_settings_backup_files__name__get"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete Scheduled Backup
+     * @description Delete a scheduled-backup file (admin only).
+     */
+    delete: operations["delete_scheduled_backup_api_settings_backup_files__name__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/backup/run": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Run Scheduled Backup
+     * @description Trigger a backup immediately using the configured scope. Returns the
+     *     written filename.
+     */
+    post: operations["run_scheduled_backup_api_settings_backup_run_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/prompts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Prompts */
+    get: operations["list_prompts_api_settings_prompts_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/prompts/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Prompt */
+    put: operations["update_prompt_api_settings_prompts__key__put"];
+    post?: never;
+    /** Reset Prompt */
+    delete: operations["reset_prompt_api_settings_prompts__key__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/llm-providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Llm Providers
+     * @description Get the ordered list of LLM providers.
+     */
+    get: operations["get_llm_providers_api_settings_llm_providers_get"];
+    /**
+     * Update Llm Providers
+     * @description Replace the full list of LLM providers. API keys sent as empty string are preserved.
+     */
+    put: operations["update_llm_providers_api_settings_llm_providers_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/ocr-providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Ocr Providers
+     * @description Get the ordered list of OCR providers.
+     */
+    get: operations["get_ocr_providers_api_settings_ocr_providers_get"];
+    /**
+     * Update Ocr Providers
+     * @description Replace the full list of OCR providers.
+     */
+    put: operations["update_ocr_providers_api_settings_ocr_providers_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/vision-providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Vision Providers
+     * @description Get the ordered list of Vision-LLM providers.
+     */
+    get: operations["get_vision_providers_api_settings_vision_providers_get"];
+    /**
+     * Update Vision Providers
+     * @description Replace the full list of Vision-LLM providers. API keys sent as empty string are preserved.
+     */
+    put: operations["update_vision_providers_api_settings_vision_providers_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/credentials": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Credentials
+     * @description Return the shared credentials list with api_key masked + reference counts.
+     */
+    get: operations["get_credentials_api_settings_credentials_get"];
+    /**
+     * Update Credentials
+     * @description Replace the full credentials list. Missing ids are generated; missing
+     *     api_key values preserve the stored secret.
+     */
+    put: operations["update_credentials_api_settings_credentials_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/general-llm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get General Llm
+     * @description Return the general (non-pipeline) LLM configuration. Concurrency
+     *     comes from the referenced credential.
+     */
+    get: operations["get_general_llm_api_settings_general_llm_get"];
+    /**
+     * Update General Llm
+     * @description Replace the general LLM settings.
+     */
+    put: operations["update_general_llm_api_settings_general_llm_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/test-llm-provider": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Llm Provider
+     * @description Test connectivity to an LLM provider via its metadata endpoint.
+     *
+     *     Hits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),
+     *     or ``client.models.list()`` (Anthropic). Free, instant, validates auth
+     *     and that the configured model is available — without acquiring an
+     *     inference slot or burning tokens.
+     */
+    post: operations["test_llm_provider_api_settings_test_llm_provider_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/test-ocr-provider": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Ocr Provider
+     * @description Test connectivity to an OCR provider.
+     */
+    post: operations["test_ocr_provider_api_settings_test_ocr_provider_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/test-vision-provider": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Test Vision Provider
+     * @description Test connectivity to a Vision-LLM provider via its metadata endpoint.
+     *
+     *     Same probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),
+     *     ``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).
+     *     No image is uploaded, no inference is run.
+     */
+    post: operations["test_vision_provider_api_settings_test_vision_provider_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/users": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Users */
+    get: operations["list_users_api_settings_users_get"];
+    put?: never;
+    /** Create User */
+    post: operations["create_user_api_settings_users_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/users/{user_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete User */
+    delete: operations["delete_user_api_settings_users__user_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update User */
+    patch: operations["update_user_api_settings_users__user_id__patch"];
+    trace?: never;
+  };
+  "/api/settings/users/{user_id}/access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get User Access */
+    get: operations["get_user_access_api_settings_users__user_id__access_get"];
+    put?: never;
+    /** Grant Access */
+    post: operations["grant_access_api_settings_users__user_id__access_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/users/{user_id}/access/{patient_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Access */
+    delete: operations["revoke_access_api_settings_users__user_id__access__patient_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Sessions
+     * @description List server-side sessions with user + activity details.
+     *
+     *     By default shows only sessions that are still usable (not revoked, not
+     *     expired). Pass ``include_revoked=true`` to include the rest for audit.
+     */
+    get: operations["list_sessions_api_settings_sessions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/sessions/{session_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Revoke Session Endpoint
+     * @description Revoke a session. The owner of that session is effectively logged out
+     *     on their next request.
+     */
+    delete: operations["revoke_session_endpoint_api_settings_sessions__session_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings/view-prefs/{view_key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get View Prefs
+     * @description Return the user's stored prefs for ``view_key`` or ``null`` keys
+     *     when no row exists. Frontend treats null as "use defaults".
+     */
+    get: operations["get_view_prefs_api_settings_view_prefs__view_key__get"];
+    /** Set View Prefs */
+    put: operations["set_view_prefs_api_settings_view_prefs__view_key__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Settings */
+    get: operations["get_settings_api_settings_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update Settings
+     * @description Update settings: persists to YAML and updates in-memory config.
+     */
+    patch: operations["update_settings_api_settings_patch"];
+    trace?: never;
+  };
+  "/api/vault/tree": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Vault Tree
+     * @description Get the vault directory structure as a browsable tree.
+     */
+    get: operations["get_vault_tree_api_vault_tree_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/vault/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Vault File
+     * @description Delete a file from the vault and its matching document record.
+     */
+    delete: operations["delete_vault_file_api_vault_file_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/vault/move": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Move Vault File
+     * @description Move a file (or imaging study folder) within the vault and keep the
+     *     matching document record's ``file_path`` in sync.
+     *
+     *     Use case: a file was misclassified by date / event and the user wants
+     *     to drag it into the right folder without losing the document reference
+     *     (so document-detail links, OCR cache, lab results etc. all keep
+     *     working). The DB row is updated atomically with the disk move; if the
+     *     destination already exists or the access check fails the move is
+     *     rejected.
+     */
+    post: operations["move_vault_file_api_vault_move_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/setup/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Setup Status
+     * @description Check if initial setup is needed (no users exist).
+     */
+    get: operations["setup_status_api_setup_status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/setup/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Setup Complete
+     * @description Create the first admin user and first patient.
+     */
+    post: operations["setup_complete_api_setup_complete_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** AliasCreate */
-        AliasCreate: {
-            /** Alias */
-            alias: string;
-            /** Language */
-            language?: string | null;
-        };
-        /** BatchScheduleRequest */
-        BatchScheduleRequest: {
-            /** Document Ids */
-            document_ids: number[];
-            /** Process At */
-            process_at?: string | null;
-        };
-        /** Body_attach_imaging_report_api_imaging__study_id__report_post */
-        Body_attach_imaging_report_api_imaging__study_id__report_post: {
-            /** File */
-            file?: string | null;
-        };
-        /** Body_replace_document_file_api_documents__doc_id__replace_file_post */
-        Body_replace_document_file_api_documents__doc_id__replace_file_post: {
-            /** File */
-            file: string;
-        };
-        /** Body_upload_document_api_documents_upload_post */
-        Body_upload_document_api_documents_upload_post: {
-            /** File */
-            file: string;
-        };
-        /** ChatRequest */
-        ChatRequest: {
-            /** Patient Id */
-            patient_id?: number | null;
-            /** Message */
-            message: string;
-        };
-        /** DocumentEditRequest */
-        DocumentEditRequest: {
-            /** Instruction */
-            instruction: string;
-        };
-        /** DocumentLinkRequest */
-        DocumentLinkRequest: {
-            /** Target Document Id */
-            target_document_id: number;
-            /** Link Type */
-            link_type: string;
-        };
-        /** DocumentMoveRequest */
-        DocumentMoveRequest: {
-            /** Patient Id */
-            patient_id: number;
-        };
-        /**
-         * DocumentUpdate
-         * @description Partial update payload. Unset fields are left untouched.
-         */
-        DocumentUpdate: {
-            /** Patient Id */
-            patient_id?: number | null;
-            /** Doc Type */
-            doc_type?: string | null;
-            /** Event Date */
-            event_date?: string | null;
-            /** Issued Date */
-            issued_date?: string | null;
-            /** Doctor Id */
-            doctor_id?: number | null;
-            /** Doctor Name */
-            doctor_name?: string | null;
-            /** Facility Id */
-            facility_id?: number | null;
-            /** Facility Name */
-            facility_name?: string | null;
-            /** Specialty Original */
-            specialty_original?: string | null;
-            /** Summary En */
-            summary_en?: string | null;
-            /** Event Id */
-            event_id?: number | null;
-            /** Notes */
-            notes?: string | null;
-            /** Tags */
-            tags?: string | null;
-            /** Original Filename */
-            original_filename?: string | null;
-            /** User Notes */
-            user_notes?: string | null;
-        };
-        /** EncounterPatch */
-        EncounterPatch: {
-            /** Diagnosis Original */
-            diagnosis_original?: string | null;
-            /** Diagnosis Code */
-            diagnosis_code?: string | null;
-            /** Specialty Original */
-            specialty_original?: string | null;
-            /** Notes */
-            notes?: string | null;
-            /** Findings */
-            findings?: string | null;
-        };
-        /** EventCreate */
-        EventCreate: {
-            /** Patient Id */
-            patient_id: number;
-            /** Title */
-            title: string;
-            /**
-             * Event Type
-             * @default other
-             */
-            event_type: string;
-            /** Description */
-            description?: string | null;
-            /** Date Start */
-            date_start?: string | null;
-            /** Date End */
-            date_end?: string | null;
-            /**
-             * Is Ongoing
-             * @default false
-             */
-            is_ongoing: boolean;
-            /** Severity */
-            severity?: string | null;
-            /** Diagnosis Text */
-            diagnosis_text?: string | null;
-            /** Icd10 Code */
-            icd10_code?: string | null;
-            /** Specialty Text */
-            specialty_text?: string | null;
-            /** Notes */
-            notes?: string | null;
-            /** Color */
-            color?: string | null;
-        };
-        /** EventCreateResponse */
-        EventCreateResponse: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-        };
-        /** EventLinkRequest */
-        EventLinkRequest: {
-            /** Document Id */
-            document_id: number;
-            /**
-             * Relevance
-             * @default primary
-             */
-            relevance: string;
-        };
-        /** EventOkResponse */
-        EventOkResponse: {
-            /** Ok */
-            ok: boolean;
-        };
-        /** EventSuggestion */
-        EventSuggestion: {
-            /** Existing Event Id */
-            existing_event_id?: number | null;
-            /** Confidence */
-            confidence?: string | null;
-            /** Reason */
-            reason?: string | null;
-            new_event_suggestion?: components["schemas"]["NewEventSuggestion"] | null;
-            matched_event?: components["schemas"]["MedicalEvent"] | null;
-        };
-        /** EventUpdate */
-        EventUpdate: {
-            /** Title */
-            title?: string | null;
-            /** Event Type */
-            event_type?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Date Start */
-            date_start?: string | null;
-            /** Date End */
-            date_end?: string | null;
-            /** Is Ongoing */
-            is_ongoing?: boolean | null;
-            /** Severity */
-            severity?: string | null;
-            /** Diagnosis Text */
-            diagnosis_text?: string | null;
-            /** Icd10 Code */
-            icd10_code?: string | null;
-            /** Specialty Text */
-            specialty_text?: string | null;
-            /** Notes */
-            notes?: string | null;
-            /** Color */
-            color?: string | null;
-        };
-        /** GeneralLlmUpdate */
-        GeneralLlmUpdate: {
-            /**
-             * Credential Id
-             * @default
-             */
-            credential_id: string;
-            /**
-             * Type
-             * @default ollama
-             */
-            type: string;
-            /**
-             * Model
-             * @default
-             */
-            model: string;
-            /**
-             * Timeout
-             * @default 120
-             */
-            timeout: number;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /** ImagingMetadataPatch */
-        ImagingMetadataPatch: {
-            /** Modality */
-            modality?: string | null;
-            /** Body Part */
-            body_part?: string | null;
-            /** Study Description */
-            study_description?: string | null;
-            /** Accession Number */
-            accession_number?: string | null;
-        };
-        /** LabResultCreate */
-        LabResultCreate: {
-            /** Document Id */
-            document_id: number;
-            /** Test Name Original */
-            test_name_original: string;
-            /** Value */
-            value?: number | null;
-            /** Value Text */
-            value_text?: string | null;
-            /** Unit */
-            unit?: string | null;
-            /** Reference Range Low */
-            reference_range_low?: number | null;
-            /** Reference Range High */
-            reference_range_high?: number | null;
-            /** Is Abnormal */
-            is_abnormal?: boolean | null;
-            /** Sample Type */
-            sample_type?: string | null;
-            /** Panel Name */
-            panel_name?: string | null;
-            /** Test Date */
-            test_date?: string | null;
-            /** Norm Lab Test Id */
-            norm_lab_test_id?: number | null;
-        };
-        /** LabResultUpdate */
-        LabResultUpdate: {
-            /** Test Name Original */
-            test_name_original?: string | null;
-            /** Value */
-            value?: number | null;
-            /** Value Text */
-            value_text?: string | null;
-            /** Unit */
-            unit?: string | null;
-            /** Reference Range Low */
-            reference_range_low?: number | null;
-            /** Reference Range High */
-            reference_range_high?: number | null;
-            /** Is Abnormal */
-            is_abnormal?: boolean | null;
-            /** Sample Type */
-            sample_type?: string | null;
-            /** Panel Name */
-            panel_name?: string | null;
-            /** Test Date */
-            test_date?: string | null;
-            /** Norm Lab Test Id */
-            norm_lab_test_id?: number | null;
-        };
-        /** LinkRequest */
-        LinkRequest: {
-            /** Target Document Id */
-            target_document_id: number;
-            /**
-             * Link Type
-             * @default imaging_for
-             */
-            link_type: string;
-        };
-        /** LinkedDocument */
-        LinkedDocument: {
-            /** Link Id */
-            link_id: number;
-            /** Relevance */
-            relevance?: string | null;
-            /**
-             * Auto Linked
-             * @default false
-             */
-            auto_linked: boolean;
-            /** Document Id */
-            document_id: number;
-            /** Original Filename */
-            original_filename?: string | null;
-            /** Doc Type */
-            doc_type?: string | null;
-            /** Event Date */
-            event_date?: string | null;
-            /** Doctor Name */
-            doctor_name?: string | null;
-            /** Facility Name */
-            facility_name?: string | null;
-            /** Summary En */
-            summary_en?: string | null;
-        };
-        /** LoginRequest */
-        LoginRequest: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
-        };
-        /** MedicalEvent */
-        MedicalEvent: {
-            /** Id */
-            id: number;
-            /** Patient Id */
-            patient_id: number;
-            /** Title */
-            title: string;
-            /** Event Type */
-            event_type: string;
-            /** Description */
-            description?: string | null;
-            /** Date Start */
-            date_start?: string | null;
-            /** Date End */
-            date_end?: string | null;
-            /**
-             * Is Ongoing
-             * @default false
-             */
-            is_ongoing: boolean;
-            /** Severity */
-            severity?: string | null;
-            /** Norm Diagnosis Id */
-            norm_diagnosis_id?: number | null;
-            /** Diagnosis Text */
-            diagnosis_text?: string | null;
-            /** Icd10 Code */
-            icd10_code?: string | null;
-            /** Norm Specialty Id */
-            norm_specialty_id?: number | null;
-            /** Specialty Text */
-            specialty_text?: string | null;
-            /** Notes */
-            notes?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Updated At */
-            updated_at?: string | null;
-            /** Patient Name */
-            patient_name?: string | null;
-            /**
-             * Document Count
-             * @default 0
-             */
-            document_count: number;
-        };
-        /** MedicalEventDetail */
-        MedicalEventDetail: {
-            /** Id */
-            id: number;
-            /** Patient Id */
-            patient_id: number;
-            /** Title */
-            title: string;
-            /** Event Type */
-            event_type: string;
-            /** Description */
-            description?: string | null;
-            /** Date Start */
-            date_start?: string | null;
-            /** Date End */
-            date_end?: string | null;
-            /**
-             * Is Ongoing
-             * @default false
-             */
-            is_ongoing: boolean;
-            /** Severity */
-            severity?: string | null;
-            /** Norm Diagnosis Id */
-            norm_diagnosis_id?: number | null;
-            /** Diagnosis Text */
-            diagnosis_text?: string | null;
-            /** Icd10 Code */
-            icd10_code?: string | null;
-            /** Norm Specialty Id */
-            norm_specialty_id?: number | null;
-            /** Specialty Text */
-            specialty_text?: string | null;
-            /** Notes */
-            notes?: string | null;
-            /** Color */
-            color?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Updated At */
-            updated_at?: string | null;
-            /** Patient Name */
-            patient_name?: string | null;
-            /**
-             * Document Count
-             * @default 0
-             */
-            document_count: number;
-            /**
-             * Documents
-             * @default []
-             */
-            documents: components["schemas"]["LinkedDocument"][];
-        };
-        /** MedicationPatch */
-        MedicationPatch: {
-            /** Active Ingredient Original */
-            active_ingredient_original?: string | null;
-            /** Brand Name */
-            brand_name?: string | null;
-            /** Dosage */
-            dosage?: string | null;
-            /** Form */
-            form?: string | null;
-            /** Frequency */
-            frequency?: string | null;
-            /** Duration */
-            duration?: string | null;
-            /** Quantity */
-            quantity?: string | null;
-        };
-        /** MergeBatchRequest */
-        MergeBatchRequest: {
-            /** Source Ids */
-            source_ids: number[];
-            /** Target Id */
-            target_id?: number | null;
-            new_target?: components["schemas"]["NewTarget"] | null;
-        };
-        /** MergeRequest */
-        MergeRequest: {
-            /** Source Id */
-            source_id: number;
-            /** Target Id */
-            target_id: number;
-        };
-        /** MoveRequest */
-        MoveRequest: {
-            /** From Path */
-            from_path: string;
-            /** To Path */
-            to_path: string;
-        };
-        /** NewEventSuggestion */
-        NewEventSuggestion: {
-            /** Title */
-            title?: string | null;
-            /** Event Type */
-            event_type?: string | null;
-            /** Description */
-            description?: string | null;
-            /** Date Start */
-            date_start?: string | null;
-        };
-        /** NewTarget */
-        NewTarget: {
-            /** Canonical Code */
-            canonical_code: string;
-            /** Canonical Display */
-            canonical_display: string;
-        };
-        /** NormUpdate */
-        NormUpdate: {
-            /** Canonical Code */
-            canonical_code?: string | null;
-            /** Canonical Display */
-            canonical_display?: string | null;
-        };
-        /** PatientAccessGrant */
-        PatientAccessGrant: {
-            /** Patient Id */
-            patient_id: number;
-            /**
-             * Role
-             * @default viewer
-             */
-            role: string;
-        };
-        /** PatientCreate */
-        PatientCreate: {
-            /** Display Name */
-            display_name: string;
-            /** Date Of Birth */
-            date_of_birth?: string | null;
-            /** Sex */
-            sex?: string | null;
-        };
-        /** PatientDeleteResponse */
-        PatientDeleteResponse: {
-            /** Status */
-            status: string;
-            /** Patient Id */
-            patient_id: number;
-        };
-        /** PatientDetail */
-        PatientDetail: {
-            /** Id */
-            id: number;
-            /** Slug */
-            slug: string;
-            /** Display Name */
-            display_name: string;
-            /** Date Of Birth */
-            date_of_birth?: string | null;
-            /** Sex */
-            sex?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Role */
-            role?: string | null;
-            /**
-             * Document Count
-             * @default 0
-             */
-            document_count: number;
-        };
-        /** PatientSummary */
-        PatientSummary: {
-            /** Id */
-            id: number;
-            /** Slug */
-            slug: string;
-            /** Display Name */
-            display_name: string;
-            /** Date Of Birth */
-            date_of_birth?: string | null;
-            /** Sex */
-            sex?: string | null;
-            /** Created At */
-            created_at?: string | null;
-            /** Role */
-            role?: string | null;
-        };
-        /** PatientUpdate */
-        PatientUpdate: {
-            /** Display Name */
-            display_name?: string | null;
-            /** Date Of Birth */
-            date_of_birth?: string | null;
-            /** Sex */
-            sex?: string | null;
-        };
-        /** PromptUpdate */
-        PromptUpdate: {
-            /** Text */
-            text: string;
-        };
-        /** RelinkRequest */
-        RelinkRequest: {
-            /** Vault Path */
-            vault_path: string;
-        };
-        /** RenameRequest */
-        RenameRequest: {
-            /** Filename */
-            filename: string;
-        };
-        /** ReprocessRequest */
-        ReprocessRequest: {
-            /**
-             * Mode
-             * @default both
-             * @enum {string}
-             */
-            mode: "ocr" | "llm" | "both" | "vision_llm";
-            /** Llm Provider Id */
-            llm_provider_id?: string | null;
-            /** Ocr Provider Id */
-            ocr_provider_id?: string | null;
-            /** Vision Provider Id */
-            vision_provider_id?: string | null;
-        };
-        /** RotateRequest */
-        RotateRequest: {
-            /**
-             * Degrees
-             * @default 90
-             */
-            degrees: number;
-            /** Pages */
-            pages?: number[] | null;
-        };
-        /** SettingsUpdate */
-        SettingsUpdate: {
-            /** Extraction Timeout */
-            extraction_timeout?: number | null;
-            /** Llm Max Concurrent Requests */
-            llm_max_concurrent_requests?: number | null;
-            /** Llm Max Retries */
-            llm_max_retries?: number | null;
-            /** Llm Retry Backoff Seconds */
-            llm_retry_backoff_seconds?: number[] | null;
-            /** Canonical Language */
-            canonical_language?: string | null;
-            /** Ocr Engine */
-            ocr_engine?: string | null;
-            /** Ocr Language */
-            ocr_language?: string | null;
-            /** Ocr Confidence Threshold */
-            ocr_confidence_threshold?: number | null;
-            /** Cloud Ocr Enabled */
-            cloud_ocr_enabled?: boolean | null;
-            /** Ocr Remote Url */
-            ocr_remote_url?: string | null;
-            /** Ocr Remote Api Key */
-            ocr_remote_api_key?: string | null;
-            /** Llm Vision Provider */
-            llm_vision_provider?: string | null;
-            /** Llm Vision Model */
-            llm_vision_model?: string | null;
-            /** Llm Vision Ollama Url */
-            llm_vision_ollama_url?: string | null;
-            /** Google Vision Key */
-            google_vision_key?: string | null;
-            /** Ocr Max Concurrent Vision Requests */
-            ocr_max_concurrent_vision_requests?: number | null;
-            /** Pipeline Watch Enabled */
-            pipeline_watch_enabled?: boolean | null;
-            /** Pipeline Poll Interval */
-            pipeline_poll_interval?: number | null;
-            /** Pipeline Retry Interval */
-            pipeline_retry_interval?: number | null;
-            /** Pipeline Max Retries */
-            pipeline_max_retries?: number | null;
-            /** Pipeline Default Flow */
-            pipeline_default_flow?: string | null;
-            /** Vision Extraction Timeout */
-            vision_extraction_timeout?: number | null;
-            /** Vision Max Concurrent Requests */
-            vision_max_concurrent_requests?: number | null;
-            /** Vision Max Retries */
-            vision_max_retries?: number | null;
-            /** Vision Retry Backoff Seconds */
-            vision_retry_backoff_seconds?: number[] | null;
-            /** Session Ttl Hours */
-            session_ttl_hours?: number | null;
-            /** Oidc Enabled */
-            oidc_enabled?: boolean | null;
-            /** Oidc Provider Url */
-            oidc_provider_url?: string | null;
-            /** Oidc Client Id */
-            oidc_client_id?: string | null;
-            /** Oidc Client Secret */
-            oidc_client_secret?: string | null;
-            /** Oidc Scopes */
-            oidc_scopes?: string | null;
-            /** Oidc Auto Create User */
-            oidc_auto_create_user?: boolean | null;
-            /** Oidc Username Claim */
-            oidc_username_claim?: string | null;
-            /** Oidc Display Name Claim */
-            oidc_display_name_claim?: string | null;
-            /** Oidc Sync Roles */
-            oidc_sync_roles?: boolean | null;
-            /** Oidc Roles Claim */
-            oidc_roles_claim?: string | null;
-            /** Oidc Admin Roles */
-            oidc_admin_roles?: string[] | null;
-            /** Oidc Editor Roles */
-            oidc_editor_roles?: string[] | null;
-            /** Oidc Viewer Roles */
-            oidc_viewer_roles?: string[] | null;
-            /** Oidc Default Role */
-            oidc_default_role?: string | null;
-            /** Backup Enabled */
-            backup_enabled?: boolean | null;
-            /** Backup Include Database */
-            backup_include_database?: boolean | null;
-            /** Backup Include Vault */
-            backup_include_vault?: boolean | null;
-            /** Backup Schedule */
-            backup_schedule?: string | null;
-            /** Backup Retention Mode */
-            backup_retention_mode?: string | null;
-            /** Backup Retention Value */
-            backup_retention_value?: number | null;
-        };
-        /** SetupRequest */
-        SetupRequest: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
-            /** Display Name */
-            display_name: string;
-            /** Patient Name */
-            patient_name: string;
-            /** Patient Date Of Birth */
-            patient_date_of_birth?: string | null;
-            /** Patient Sex */
-            patient_sex?: string | null;
-        };
-        /**
-         * TestProviderRequest
-         * @description Test-connection request.
-         *
-         *     Either pass ``provider_id`` (tests the persisted entry with that id) or
-         *     pass ``provider`` (an inline, possibly-unsaved entry). When both are set
-         *     the inline entry wins — this lets the UI test pending edits before the
-         *     user clicks Save.
-         */
-        TestProviderRequest: {
-            /** Provider Id */
-            provider_id?: string | null;
-            /** Provider */
-            provider?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** TranslateRequest */
-        TranslateRequest: {
-            /** Llm Provider Id */
-            llm_provider_id?: string | null;
-        };
-        /** UserCreate */
-        UserCreate: {
-            /** Username */
-            username: string;
-            /** Password */
-            password: string;
-            /** Display Name */
-            display_name?: string | null;
-            /**
-             * Role
-             * @default editor
-             */
-            role: string;
-        };
-        /** UserUpdate */
-        UserUpdate: {
-            /** Display Name */
-            display_name?: string | null;
-            /** Password */
-            password?: string | null;
-            /** Role */
-            role?: string | null;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
-        };
-        /** ViewPrefsBody */
-        ViewPrefsBody: {
-            /** Visible */
-            visible?: string[];
-            /** Order */
-            order?: string[];
-        };
+  schemas: {
+    /** AliasCreate */
+    AliasCreate: {
+      /** Alias */
+      alias: string;
+      /** Language */
+      language?: string | null;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** BatchScheduleRequest */
+    BatchScheduleRequest: {
+      /** Document Ids */
+      document_ids: number[];
+      /** Process At */
+      process_at?: string | null;
+    };
+    /** Body_attach_imaging_report_api_imaging__study_id__report_post */
+    Body_attach_imaging_report_api_imaging__study_id__report_post: {
+      /** File */
+      file?: string | null;
+    };
+    /** Body_replace_document_file_api_documents__doc_id__replace_file_post */
+    Body_replace_document_file_api_documents__doc_id__replace_file_post: {
+      /** File */
+      file: string;
+    };
+    /** Body_upload_document_api_documents_upload_post */
+    Body_upload_document_api_documents_upload_post: {
+      /** File */
+      file: string;
+    };
+    /** ChatRequest */
+    ChatRequest: {
+      /** Patient Id */
+      patient_id?: number | null;
+      /** Message */
+      message: string;
+    };
+    /** DocumentEditRequest */
+    DocumentEditRequest: {
+      /** Instruction */
+      instruction: string;
+    };
+    /** DocumentLinkRequest */
+    DocumentLinkRequest: {
+      /** Target Document Id */
+      target_document_id: number;
+      /** Link Type */
+      link_type: string;
+    };
+    /** DocumentMoveRequest */
+    DocumentMoveRequest: {
+      /** Patient Id */
+      patient_id: number;
+    };
+    /**
+     * DocumentUpdate
+     * @description Partial update payload. Unset fields are left untouched.
+     */
+    DocumentUpdate: {
+      /** Patient Id */
+      patient_id?: number | null;
+      /** Doc Type */
+      doc_type?: string | null;
+      /** Event Date */
+      event_date?: string | null;
+      /** Issued Date */
+      issued_date?: string | null;
+      /** Doctor Id */
+      doctor_id?: number | null;
+      /** Doctor Name */
+      doctor_name?: string | null;
+      /** Facility Id */
+      facility_id?: number | null;
+      /** Facility Name */
+      facility_name?: string | null;
+      /** Specialty Original */
+      specialty_original?: string | null;
+      /** Summary En */
+      summary_en?: string | null;
+      /** Event Id */
+      event_id?: number | null;
+      /** Notes */
+      notes?: string | null;
+      /** Tags */
+      tags?: string | null;
+      /** Original Filename */
+      original_filename?: string | null;
+      /** User Notes */
+      user_notes?: string | null;
+    };
+    /** EncounterPatch */
+    EncounterPatch: {
+      /** Diagnosis Original */
+      diagnosis_original?: string | null;
+      /** Diagnosis Code */
+      diagnosis_code?: string | null;
+      /** Specialty Original */
+      specialty_original?: string | null;
+      /** Notes */
+      notes?: string | null;
+      /** Findings */
+      findings?: string | null;
+    };
+    /** EventCreate */
+    EventCreate: {
+      /** Patient Id */
+      patient_id: number;
+      /** Title */
+      title: string;
+      /**
+       * Event Type
+       * @default other
+       */
+      event_type: string;
+      /** Description */
+      description?: string | null;
+      /** Date Start */
+      date_start?: string | null;
+      /** Date End */
+      date_end?: string | null;
+      /**
+       * Is Ongoing
+       * @default false
+       */
+      is_ongoing: boolean;
+      /** Severity */
+      severity?: string | null;
+      /** Diagnosis Text */
+      diagnosis_text?: string | null;
+      /** Icd10 Code */
+      icd10_code?: string | null;
+      /** Specialty Text */
+      specialty_text?: string | null;
+      /** Notes */
+      notes?: string | null;
+      /** Color */
+      color?: string | null;
+    };
+    /** EventCreateResponse */
+    EventCreateResponse: {
+      /** Id */
+      id: number;
+      /** Title */
+      title: string;
+    };
+    /** EventLinkRequest */
+    EventLinkRequest: {
+      /** Document Id */
+      document_id: number;
+      /**
+       * Relevance
+       * @default primary
+       */
+      relevance: string;
+    };
+    /** EventOkResponse */
+    EventOkResponse: {
+      /** Ok */
+      ok: boolean;
+    };
+    /** EventSuggestion */
+    EventSuggestion: {
+      /** Existing Event Id */
+      existing_event_id?: number | null;
+      /** Confidence */
+      confidence?: string | null;
+      /** Reason */
+      reason?: string | null;
+      new_event_suggestion?: components["schemas"]["NewEventSuggestion"] | null;
+      matched_event?: components["schemas"]["MedicalEvent"] | null;
+    };
+    /** EventUpdate */
+    EventUpdate: {
+      /** Title */
+      title?: string | null;
+      /** Event Type */
+      event_type?: string | null;
+      /** Description */
+      description?: string | null;
+      /** Date Start */
+      date_start?: string | null;
+      /** Date End */
+      date_end?: string | null;
+      /** Is Ongoing */
+      is_ongoing?: boolean | null;
+      /** Severity */
+      severity?: string | null;
+      /** Diagnosis Text */
+      diagnosis_text?: string | null;
+      /** Icd10 Code */
+      icd10_code?: string | null;
+      /** Specialty Text */
+      specialty_text?: string | null;
+      /** Notes */
+      notes?: string | null;
+      /** Color */
+      color?: string | null;
+    };
+    /** GeneralLlmUpdate */
+    GeneralLlmUpdate: {
+      /**
+       * Credential Id
+       * @default
+       */
+      credential_id: string;
+      /**
+       * Type
+       * @default ollama
+       */
+      type: string;
+      /**
+       * Model
+       * @default
+       */
+      model: string;
+      /**
+       * Timeout
+       * @default 120
+       */
+      timeout: number;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
+    /** ImagingMetadataPatch */
+    ImagingMetadataPatch: {
+      /** Modality */
+      modality?: string | null;
+      /** Body Part */
+      body_part?: string | null;
+      /** Study Description */
+      study_description?: string | null;
+      /** Accession Number */
+      accession_number?: string | null;
+    };
+    /** LabResultCreate */
+    LabResultCreate: {
+      /** Document Id */
+      document_id: number;
+      /** Test Name Original */
+      test_name_original: string;
+      /** Value */
+      value?: number | null;
+      /** Value Text */
+      value_text?: string | null;
+      /** Unit */
+      unit?: string | null;
+      /** Reference Range Low */
+      reference_range_low?: number | null;
+      /** Reference Range High */
+      reference_range_high?: number | null;
+      /** Is Abnormal */
+      is_abnormal?: boolean | null;
+      /** Sample Type */
+      sample_type?: string | null;
+      /** Panel Name */
+      panel_name?: string | null;
+      /** Test Date */
+      test_date?: string | null;
+      /** Norm Lab Test Id */
+      norm_lab_test_id?: number | null;
+    };
+    /** LabResultUpdate */
+    LabResultUpdate: {
+      /** Test Name Original */
+      test_name_original?: string | null;
+      /** Value */
+      value?: number | null;
+      /** Value Text */
+      value_text?: string | null;
+      /** Unit */
+      unit?: string | null;
+      /** Reference Range Low */
+      reference_range_low?: number | null;
+      /** Reference Range High */
+      reference_range_high?: number | null;
+      /** Is Abnormal */
+      is_abnormal?: boolean | null;
+      /** Sample Type */
+      sample_type?: string | null;
+      /** Panel Name */
+      panel_name?: string | null;
+      /** Test Date */
+      test_date?: string | null;
+      /** Norm Lab Test Id */
+      norm_lab_test_id?: number | null;
+    };
+    /** LinkRequest */
+    LinkRequest: {
+      /** Target Document Id */
+      target_document_id: number;
+      /**
+       * Link Type
+       * @default imaging_for
+       */
+      link_type: string;
+    };
+    /** LinkedDocument */
+    LinkedDocument: {
+      /** Link Id */
+      link_id: number;
+      /** Relevance */
+      relevance?: string | null;
+      /**
+       * Auto Linked
+       * @default false
+       */
+      auto_linked: boolean;
+      /** Document Id */
+      document_id: number;
+      /** Original Filename */
+      original_filename?: string | null;
+      /** Doc Type */
+      doc_type?: string | null;
+      /** Event Date */
+      event_date?: string | null;
+      /** Doctor Name */
+      doctor_name?: string | null;
+      /** Facility Name */
+      facility_name?: string | null;
+      /** Summary En */
+      summary_en?: string | null;
+    };
+    /** LoginRequest */
+    LoginRequest: {
+      /** Username */
+      username: string;
+      /** Password */
+      password: string;
+    };
+    /** MedicalEvent */
+    MedicalEvent: {
+      /** Id */
+      id: number;
+      /** Patient Id */
+      patient_id: number;
+      /** Title */
+      title: string;
+      /** Event Type */
+      event_type: string;
+      /** Description */
+      description?: string | null;
+      /** Date Start */
+      date_start?: string | null;
+      /** Date End */
+      date_end?: string | null;
+      /**
+       * Is Ongoing
+       * @default false
+       */
+      is_ongoing: boolean;
+      /** Severity */
+      severity?: string | null;
+      /** Norm Diagnosis Id */
+      norm_diagnosis_id?: number | null;
+      /** Diagnosis Text */
+      diagnosis_text?: string | null;
+      /** Icd10 Code */
+      icd10_code?: string | null;
+      /** Norm Specialty Id */
+      norm_specialty_id?: number | null;
+      /** Specialty Text */
+      specialty_text?: string | null;
+      /** Notes */
+      notes?: string | null;
+      /** Color */
+      color?: string | null;
+      /** Created At */
+      created_at?: string | null;
+      /** Updated At */
+      updated_at?: string | null;
+      /** Patient Name */
+      patient_name?: string | null;
+      /**
+       * Document Count
+       * @default 0
+       */
+      document_count: number;
+    };
+    /** MedicalEventDetail */
+    MedicalEventDetail: {
+      /** Id */
+      id: number;
+      /** Patient Id */
+      patient_id: number;
+      /** Title */
+      title: string;
+      /** Event Type */
+      event_type: string;
+      /** Description */
+      description?: string | null;
+      /** Date Start */
+      date_start?: string | null;
+      /** Date End */
+      date_end?: string | null;
+      /**
+       * Is Ongoing
+       * @default false
+       */
+      is_ongoing: boolean;
+      /** Severity */
+      severity?: string | null;
+      /** Norm Diagnosis Id */
+      norm_diagnosis_id?: number | null;
+      /** Diagnosis Text */
+      diagnosis_text?: string | null;
+      /** Icd10 Code */
+      icd10_code?: string | null;
+      /** Norm Specialty Id */
+      norm_specialty_id?: number | null;
+      /** Specialty Text */
+      specialty_text?: string | null;
+      /** Notes */
+      notes?: string | null;
+      /** Color */
+      color?: string | null;
+      /** Created At */
+      created_at?: string | null;
+      /** Updated At */
+      updated_at?: string | null;
+      /** Patient Name */
+      patient_name?: string | null;
+      /**
+       * Document Count
+       * @default 0
+       */
+      document_count: number;
+      /**
+       * Documents
+       * @default []
+       */
+      documents: components["schemas"]["LinkedDocument"][];
+    };
+    /** MedicationPatch */
+    MedicationPatch: {
+      /** Active Ingredient Original */
+      active_ingredient_original?: string | null;
+      /** Brand Name */
+      brand_name?: string | null;
+      /** Dosage */
+      dosage?: string | null;
+      /** Form */
+      form?: string | null;
+      /** Frequency */
+      frequency?: string | null;
+      /** Duration */
+      duration?: string | null;
+      /** Quantity */
+      quantity?: string | null;
+    };
+    /** MergeBatchRequest */
+    MergeBatchRequest: {
+      /** Source Ids */
+      source_ids: number[];
+      /** Target Id */
+      target_id?: number | null;
+      new_target?: components["schemas"]["NewTarget"] | null;
+    };
+    /** MergeRequest */
+    MergeRequest: {
+      /** Source Id */
+      source_id: number;
+      /** Target Id */
+      target_id: number;
+    };
+    /** MoveRequest */
+    MoveRequest: {
+      /** From Path */
+      from_path: string;
+      /** To Path */
+      to_path: string;
+    };
+    /** NewEventSuggestion */
+    NewEventSuggestion: {
+      /** Title */
+      title?: string | null;
+      /** Event Type */
+      event_type?: string | null;
+      /** Description */
+      description?: string | null;
+      /** Date Start */
+      date_start?: string | null;
+    };
+    /** NewTarget */
+    NewTarget: {
+      /** Canonical Code */
+      canonical_code: string;
+      /** Canonical Display */
+      canonical_display: string;
+    };
+    /** NormUpdate */
+    NormUpdate: {
+      /** Canonical Code */
+      canonical_code?: string | null;
+      /** Canonical Display */
+      canonical_display?: string | null;
+    };
+    /** PatientAccessGrant */
+    PatientAccessGrant: {
+      /** Patient Id */
+      patient_id: number;
+      /**
+       * Role
+       * @default viewer
+       */
+      role: string;
+    };
+    /** PatientCreate */
+    PatientCreate: {
+      /** Display Name */
+      display_name: string;
+      /** Date Of Birth */
+      date_of_birth?: string | null;
+      /** Sex */
+      sex?: string | null;
+    };
+    /** PatientDeleteResponse */
+    PatientDeleteResponse: {
+      /** Status */
+      status: string;
+      /** Patient Id */
+      patient_id: number;
+    };
+    /** PatientDetail */
+    PatientDetail: {
+      /** Id */
+      id: number;
+      /** Slug */
+      slug: string;
+      /** Display Name */
+      display_name: string;
+      /** Date Of Birth */
+      date_of_birth?: string | null;
+      /** Sex */
+      sex?: string | null;
+      /** Created At */
+      created_at?: string | null;
+      /** Role */
+      role?: string | null;
+      /**
+       * Document Count
+       * @default 0
+       */
+      document_count: number;
+    };
+    /** PatientSummary */
+    PatientSummary: {
+      /** Id */
+      id: number;
+      /** Slug */
+      slug: string;
+      /** Display Name */
+      display_name: string;
+      /** Date Of Birth */
+      date_of_birth?: string | null;
+      /** Sex */
+      sex?: string | null;
+      /** Created At */
+      created_at?: string | null;
+      /** Role */
+      role?: string | null;
+    };
+    /** PatientUpdate */
+    PatientUpdate: {
+      /** Display Name */
+      display_name?: string | null;
+      /** Date Of Birth */
+      date_of_birth?: string | null;
+      /** Sex */
+      sex?: string | null;
+    };
+    /** PromptUpdate */
+    PromptUpdate: {
+      /** Text */
+      text: string;
+    };
+    /** RegionBbox */
+    RegionBbox: {
+      /** X */
+      x: number;
+      /** Y */
+      y: number;
+      /** W */
+      w: number;
+      /** H */
+      h: number;
+    };
+    /** RelinkRequest */
+    RelinkRequest: {
+      /** Vault Path */
+      vault_path: string;
+    };
+    /** RenameRequest */
+    RenameRequest: {
+      /** Filename */
+      filename: string;
+    };
+    /** ReprocessRequest */
+    ReprocessRequest: {
+      /**
+       * Mode
+       * @default both
+       * @enum {string}
+       */
+      mode: "ocr" | "llm" | "both" | "vision_llm";
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+      /** Ocr Provider Id */
+      ocr_provider_id?: string | null;
+      /** Vision Provider Id */
+      vision_provider_id?: string | null;
+    };
+    /** RotateRequest */
+    RotateRequest: {
+      /**
+       * Degrees
+       * @default 90
+       */
+      degrees: number;
+      /** Pages */
+      pages?: number[] | null;
+    };
+    /** SettingsUpdate */
+    SettingsUpdate: {
+      /** Extraction Timeout */
+      extraction_timeout?: number | null;
+      /** Llm Max Concurrent Requests */
+      llm_max_concurrent_requests?: number | null;
+      /** Llm Max Retries */
+      llm_max_retries?: number | null;
+      /** Llm Retry Backoff Seconds */
+      llm_retry_backoff_seconds?: number[] | null;
+      /** Canonical Language */
+      canonical_language?: string | null;
+      /** Ocr Engine */
+      ocr_engine?: string | null;
+      /** Ocr Language */
+      ocr_language?: string | null;
+      /** Ocr Confidence Threshold */
+      ocr_confidence_threshold?: number | null;
+      /** Cloud Ocr Enabled */
+      cloud_ocr_enabled?: boolean | null;
+      /** Ocr Remote Url */
+      ocr_remote_url?: string | null;
+      /** Ocr Remote Api Key */
+      ocr_remote_api_key?: string | null;
+      /** Llm Vision Provider */
+      llm_vision_provider?: string | null;
+      /** Llm Vision Model */
+      llm_vision_model?: string | null;
+      /** Llm Vision Ollama Url */
+      llm_vision_ollama_url?: string | null;
+      /** Google Vision Key */
+      google_vision_key?: string | null;
+      /** Ocr Max Concurrent Vision Requests */
+      ocr_max_concurrent_vision_requests?: number | null;
+      /** Pipeline Watch Enabled */
+      pipeline_watch_enabled?: boolean | null;
+      /** Pipeline Poll Interval */
+      pipeline_poll_interval?: number | null;
+      /** Pipeline Retry Interval */
+      pipeline_retry_interval?: number | null;
+      /** Pipeline Max Retries */
+      pipeline_max_retries?: number | null;
+      /** Pipeline Default Flow */
+      pipeline_default_flow?: string | null;
+      /** Vision Extraction Timeout */
+      vision_extraction_timeout?: number | null;
+      /** Vision Max Concurrent Requests */
+      vision_max_concurrent_requests?: number | null;
+      /** Vision Max Retries */
+      vision_max_retries?: number | null;
+      /** Vision Retry Backoff Seconds */
+      vision_retry_backoff_seconds?: number[] | null;
+      /** Session Ttl Hours */
+      session_ttl_hours?: number | null;
+      /** Oidc Enabled */
+      oidc_enabled?: boolean | null;
+      /** Oidc Provider Url */
+      oidc_provider_url?: string | null;
+      /** Oidc Client Id */
+      oidc_client_id?: string | null;
+      /** Oidc Client Secret */
+      oidc_client_secret?: string | null;
+      /** Oidc Scopes */
+      oidc_scopes?: string | null;
+      /** Oidc Auto Create User */
+      oidc_auto_create_user?: boolean | null;
+      /** Oidc Username Claim */
+      oidc_username_claim?: string | null;
+      /** Oidc Display Name Claim */
+      oidc_display_name_claim?: string | null;
+      /** Oidc Sync Roles */
+      oidc_sync_roles?: boolean | null;
+      /** Oidc Roles Claim */
+      oidc_roles_claim?: string | null;
+      /** Oidc Admin Roles */
+      oidc_admin_roles?: string[] | null;
+      /** Oidc Editor Roles */
+      oidc_editor_roles?: string[] | null;
+      /** Oidc Viewer Roles */
+      oidc_viewer_roles?: string[] | null;
+      /** Oidc Default Role */
+      oidc_default_role?: string | null;
+      /** Backup Enabled */
+      backup_enabled?: boolean | null;
+      /** Backup Include Database */
+      backup_include_database?: boolean | null;
+      /** Backup Include Vault */
+      backup_include_vault?: boolean | null;
+      /** Backup Schedule */
+      backup_schedule?: string | null;
+      /** Backup Retention Mode */
+      backup_retention_mode?: string | null;
+      /** Backup Retention Value */
+      backup_retention_value?: number | null;
+    };
+    /** SetupRequest */
+    SetupRequest: {
+      /** Username */
+      username: string;
+      /** Password */
+      password: string;
+      /** Display Name */
+      display_name: string;
+      /** Patient Name */
+      patient_name: string;
+      /** Patient Date Of Birth */
+      patient_date_of_birth?: string | null;
+      /** Patient Sex */
+      patient_sex?: string | null;
+    };
+    /**
+     * TestProviderRequest
+     * @description Test-connection request.
+     *
+     *     Either pass ``provider_id`` (tests the persisted entry with that id) or
+     *     pass ``provider`` (an inline, possibly-unsaved entry). When both are set
+     *     the inline entry wins — this lets the UI test pending edits before the
+     *     user clicks Save.
+     */
+    TestProviderRequest: {
+      /** Provider Id */
+      provider_id?: string | null;
+      /** Provider */
+      provider?: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /**
+     * TranslateRegionRequest
+     * @description Bbox is in normalized [0,1] coords relative to the page width/height.
+     */
+    TranslateRegionRequest: {
+      /** Page */
+      page: number;
+      bbox: components["schemas"]["RegionBbox"];
+      /** Ocr Provider Id */
+      ocr_provider_id?: string | null;
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+    };
+    /** TranslateRequest */
+    TranslateRequest: {
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+    };
+    /** UserCreate */
+    UserCreate: {
+      /** Username */
+      username: string;
+      /** Password */
+      password: string;
+      /** Display Name */
+      display_name?: string | null;
+      /**
+       * Role
+       * @default editor
+       */
+      role: string;
+    };
+    /** UserUpdate */
+    UserUpdate: {
+      /** Display Name */
+      display_name?: string | null;
+      /** Password */
+      password?: string | null;
+      /** Role */
+      role?: string | null;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+      /** Input */
+      input?: unknown;
+      /** Context */
+      ctx?: Record<string, never>;
+    };
+    /** ViewPrefsBody */
+    ViewPrefsBody: {
+      /** Visible */
+      visible?: string[];
+      /** Order */
+      order?: string[];
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    login_api_auth_login_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    logout_api_auth_logout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    me_api_auth_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    oidc_enabled_api_auth_oidc_enabled_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    oidc_login_api_auth_oidc_login_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    oidc_callback_api_auth_oidc_callback_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_patients_api_patients_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatientSummary"][];
-                };
-            };
-        };
-    };
-    create_patient_api_patients_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatientCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatientSummary"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_patient_api_patients__patient_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                patient_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatientDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_patient_api_patients__patient_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                patient_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatientDeleteResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_patient_api_patients__patient_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                patient_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatientUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatientSummary"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upload_document_api_documents_upload_post: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-                event_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_document_api_documents_upload_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    schedule_batch_api_documents_schedule_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BatchScheduleRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    serve_file_api_documents__doc_id__file_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    head_file_api_documents__doc_id__file_head: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rotate_document_api_documents__doc_id__rotate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RotateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rename_document_api_documents__doc_id__rename_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RenameRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    find_candidate_files_api_documents__doc_id__find_candidates_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    relink_document_api_documents__doc_id__relink_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RelinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    replace_document_file_api_documents__doc_id__replace_file_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_replace_document_file_api_documents__doc_id__replace_file_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    link_documents_api_documents__doc_id__link_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DocumentLinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_links_api_documents__doc_id__links_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_link_api_documents__doc_id__links__link_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-                link_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_document_links_api_documents__doc_id__suggest_links_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_relevant_documents_api_documents__doc_id__relevant_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    edit_document_with_ai_api_documents__doc_id__edit_with_ai_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DocumentEditRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    generate_filename_api_documents__doc_id__generate_filename_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_failed_docs_api_documents_failed_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    retry_all_failed_api_documents_retry_all_failed_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_docs_api_documents_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-                type?: string | null;
-                date_from?: string | null;
-                date_to?: string | null;
-                status?: string | null;
-                q?: string | null;
-                specialty?: string | null;
-                doctor_id?: string | null;
-                facility_id?: string | null;
-                doctor?: string | null;
-                facility?: string | null;
-                limit?: number;
-                offset?: number;
-                sort?: string | null;
-                order?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_doc_api_documents__doc_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_doc_api_documents__doc_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_doc_api_documents__doc_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DocumentUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    cancel_processing_api_documents__doc_id__cancel_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    move_doc_api_documents__doc_id__move_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DocumentMoveRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_doc_stages_api_documents__doc_id__stages_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reprocess_doc_api_documents__doc_id__reprocess_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["ReprocessRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    translate_doc_api_documents__doc_id__translate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["TranslateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_encounter_api_encounters__encounter_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                encounter_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_encounter_api_encounters__encounter_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                encounter_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EncounterPatch"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_medication_api_medications__medication_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                medication_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_medication_api_medications__medication_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                medication_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MedicationPatch"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_events_api_events_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-                event_type?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MedicalEvent"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_event_api_events_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventCreateResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_event_api_events__event_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                event_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MedicalEventDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_event_api_events__event_id__delete: {
-        parameters: {
-            query?: {
-                delete_documents?: boolean;
-            };
-            header?: never;
-            path: {
-                event_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventOkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_event_api_events__event_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                event_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventOkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    link_document_to_event_api_events__event_id__link_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                event_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventLinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventOkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unlink_document_from_event_api_events__event_id__link__document_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                event_id: number;
-                document_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventOkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_events_for_document_api_events_suggest_for_document__doc_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                doc_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EventSuggestion"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_lab_results_api_lab_results_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-                test_name?: string | null;
-                date_from?: string | null;
-                date_to?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_lab_result_api_lab_results_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LabResultCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_orphan_lab_results_api_lab_results_orphans_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    lab_timeline_api_lab_results_timeline_get: {
-        parameters: {
-            query: {
-                patient_id: number;
-                test_name: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_lab_result_api_lab_results__result_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                result_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_lab_result_api_lab_results__result_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                result_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LabResultUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_imaging_studies_api_imaging_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-                modality?: string | null;
-                date_from?: string | null;
-                date_to?: string | null;
-                /** @description Search across body part, study description, doctor name, facility name */
-                q?: string | null;
-                report_status?: string | null;
-                sort?: string | null;
-                order?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_imaging_study_api_imaging__study_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_frames_api_imaging__study_id__series__series_id__frames_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-                series_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_frame_api_imaging__study_id__series__series_id__frame__index__get: {
-        parameters: {
-            query?: {
-                format?: string;
-                wc?: number | null;
-                ww?: number | null;
-                invert?: boolean;
-                upscale?: number;
-            };
-            header?: never;
-            path: {
-                study_id: number;
-                series_id: number;
-                index: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-                series_id: number;
-                index: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-                series_id: number;
-                index: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_bundle_files_api_imaging__study_id__bundle_files_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_bundle_file_api_imaging__study_id__bundle_file__name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_imaging_links_api_imaging__study_id__links_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_imaging_link_api_imaging__study_id__links_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LinkRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_imaging_metadata_api_imaging__study_id__metadata_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ImagingMetadataPatch"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_imaging_link_api_imaging__study_id__links__link_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-                link_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    attach_imaging_report_api_imaging__study_id__report_post: {
-        parameters: {
-            query?: {
-                document_id?: number | null;
-            };
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_attach_imaging_report_api_imaging__study_id__report_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detach_imaging_report_api_imaging__study_id__report_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                study_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    chat_api_chat_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ChatRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    chat_history_api_chat_history_get: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    clear_chat_history_api_chat_history_delete: {
-        parameters: {
-            query?: {
-                patient_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_norms_api_normalization__norm_type__get: {
-        parameters: {
-            query?: {
-                filter?: string | null;
-                search?: string | null;
-            };
-            header?: never;
-            path: {
-                norm_type: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_norm_api_normalization__norm_type___norm_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_norm_api_normalization__norm_type___norm_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_norm_api_normalization__norm_type___norm_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NormUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_alias_api_normalization__norm_type___norm_id__aliases_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AliasCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_alias_api_normalization__norm_type__aliases__alias_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                alias_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_aliases_api_normalization__norm_type___norm_id__confirm_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    merge_norms_api_normalization__norm_type__merge_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MergeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    merge_norms_batch_api_normalization__norm_type__merge_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MergeBatchRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_linked_documents_api_normalization__norm_type___norm_id__documents_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-                norm_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    auto_merge_proposals_api_normalization__norm_type__auto_merge_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                norm_type: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_pipeline_status_api_pipeline_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    start_pipeline_api_pipeline_start_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    stop_pipeline_api_pipeline_stop_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_logs_api_settings_logs_get: {
-        parameters: {
-            query?: {
-                level?: string | null;
-                module?: string | null;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_audit_log_api_settings_audit_log_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-                action?: string | null;
-                user_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    download_backup_api_settings_backup_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_scheduled_backups_api_settings_backup_files_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    download_scheduled_backup_api_settings_backup_files__name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_scheduled_backup_api_settings_backup_files__name__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_scheduled_backup_api_settings_backup_run_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    list_prompts_api_settings_prompts_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_prompt_api_settings_prompts__key__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PromptUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_prompt_api_settings_prompts__key__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_llm_providers_api_settings_llm_providers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_llm_providers_api_settings_llm_providers_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_ocr_providers_api_settings_ocr_providers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_ocr_providers_api_settings_ocr_providers_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_vision_providers_api_settings_vision_providers_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_vision_providers_api_settings_vision_providers_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_credentials_api_settings_credentials_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_credentials_api_settings_credentials_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_general_llm_api_settings_general_llm_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_general_llm_api_settings_general_llm_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GeneralLlmUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    test_llm_provider_api_settings_test_llm_provider_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TestProviderRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    test_ocr_provider_api_settings_test_ocr_provider_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TestProviderRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    test_vision_provider_api_settings_test_vision_provider_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TestProviderRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_users_api_settings_users_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    create_user_api_settings_users_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_user_api_settings_users__user_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_user_api_settings_users__user_id__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UserUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_user_access_api_settings_users__user_id__access_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    grant_access_api_settings_users__user_id__access_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PatientAccessGrant"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_access_api_settings_users__user_id__access__patient_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                user_id: number;
-                patient_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_sessions_api_settings_sessions_get: {
-        parameters: {
-            query?: {
-                include_revoked?: boolean;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_session_endpoint_api_settings_sessions__session_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                session_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_view_prefs_api_settings_view_prefs__view_key__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                view_key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_view_prefs_api_settings_view_prefs__view_key__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                view_key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ViewPrefsBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_settings_api_settings_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_settings_api_settings_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SettingsUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_vault_tree_api_vault_tree_get: {
-        parameters: {
-            query?: {
-                /** @description Subtree path relative to vault root */
-                path?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_vault_file_api_vault_file_delete: {
-        parameters: {
-            query: {
-                /** @description File path relative to vault root */
-                path: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    move_vault_file_api_vault_move_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MoveRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    setup_status_api_setup_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    setup_complete_api_setup_complete_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetupRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
+  health_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  login_api_auth_login_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LoginRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  logout_api_auth_logout_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  me_api_auth_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+    };
+  };
+  oidc_enabled_api_auth_oidc_enabled_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  oidc_login_api_auth_oidc_login_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  oidc_callback_api_auth_oidc_callback_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_patients_api_patients_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientSummary"][];
+        };
+      };
+    };
+  };
+  create_patient_api_patients_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PatientCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_patient_api_patients__patient_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        patient_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_patient_api_patients__patient_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        patient_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientDeleteResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_patient_api_patients__patient_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        patient_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PatientUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PatientSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  upload_document_api_documents_upload_post: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+        event_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_document_api_documents_upload_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  schedule_batch_api_documents_schedule_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BatchScheduleRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  serve_file_api_documents__doc_id__file_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  head_file_api_documents__doc_id__file_head: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rotate_document_api_documents__doc_id__rotate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RotateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rename_document_api_documents__doc_id__rename_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RenameRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  find_candidate_files_api_documents__doc_id__find_candidates_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  relink_document_api_documents__doc_id__relink_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RelinkRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  replace_document_file_api_documents__doc_id__replace_file_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_replace_document_file_api_documents__doc_id__replace_file_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  link_documents_api_documents__doc_id__link_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DocumentLinkRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_links_api_documents__doc_id__links_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_link_api_documents__doc_id__links__link_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+        link_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  suggest_document_links_api_documents__doc_id__suggest_links_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_relevant_documents_api_documents__doc_id__relevant_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  edit_document_with_ai_api_documents__doc_id__edit_with_ai_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DocumentEditRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  generate_filename_api_documents__doc_id__generate_filename_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_failed_docs_api_documents_failed_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  retry_all_failed_api_documents_retry_all_failed_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_docs_api_documents_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+        type?: string | null;
+        date_from?: string | null;
+        date_to?: string | null;
+        status?: string | null;
+        q?: string | null;
+        specialty?: string | null;
+        doctor_id?: string | null;
+        facility_id?: string | null;
+        doctor?: string | null;
+        facility?: string | null;
+        limit?: number;
+        offset?: number;
+        sort?: string | null;
+        order?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_doc_api_documents__doc_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_doc_api_documents__doc_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_doc_api_documents__doc_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DocumentUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  cancel_processing_api_documents__doc_id__cancel_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  move_doc_api_documents__doc_id__move_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DocumentMoveRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_doc_stages_api_documents__doc_id__stages_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reprocess_doc_api_documents__doc_id__reprocess_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ReprocessRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  translate_doc_api_documents__doc_id__translate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["TranslateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  translate_region_endpoint_api_documents__doc_id__translate_region_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TranslateRegionRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_region_translation_api_documents__doc_id__region_translations__region_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+        region_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_region_thumbnail_api_documents__doc_id__region_translations__region_id__thumbnail_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+        region_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_encounter_api_encounters__encounter_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        encounter_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_encounter_api_encounters__encounter_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        encounter_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EncounterPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_medication_api_medications__medication_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        medication_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_medication_api_medications__medication_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        medication_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MedicationPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_events_api_events_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+        event_type?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MedicalEvent"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_event_api_events_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventCreateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_event_api_events__event_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        event_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MedicalEventDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_event_api_events__event_id__delete: {
+    parameters: {
+      query?: {
+        delete_documents?: boolean;
+      };
+      header?: never;
+      path: {
+        event_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventOkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_event_api_events__event_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        event_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventOkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  link_document_to_event_api_events__event_id__link_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        event_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventLinkRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventOkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  unlink_document_from_event_api_events__event_id__link__document_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        event_id: number;
+        document_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventOkResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  suggest_events_for_document_api_events_suggest_for_document__doc_id__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventSuggestion"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_lab_results_api_lab_results_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+        test_name?: string | null;
+        date_from?: string | null;
+        date_to?: string | null;
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_lab_result_api_lab_results_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LabResultCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_orphan_lab_results_api_lab_results_orphans_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  lab_timeline_api_lab_results_timeline_get: {
+    parameters: {
+      query: {
+        patient_id: number;
+        test_name: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_lab_result_api_lab_results__result_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        result_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_lab_result_api_lab_results__result_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        result_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LabResultUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_imaging_studies_api_imaging_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+        modality?: string | null;
+        date_from?: string | null;
+        date_to?: string | null;
+        /** @description Search across body part, study description, doctor name, facility name */
+        q?: string | null;
+        report_status?: string | null;
+        sort?: string | null;
+        order?: string | null;
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_imaging_study_api_imaging__study_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_frames_api_imaging__study_id__series__series_id__frames_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+        series_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_frame_api_imaging__study_id__series__series_id__frame__index__get: {
+    parameters: {
+      query?: {
+        format?: string;
+        wc?: number | null;
+        ww?: number | null;
+        invert?: boolean;
+        upscale?: number;
+      };
+      header?: never;
+      path: {
+        study_id: number;
+        series_id: number;
+        index: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+        series_id: number;
+        index: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+        series_id: number;
+        index: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_bundle_files_api_imaging__study_id__bundle_files_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_bundle_file_api_imaging__study_id__bundle_file__name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_imaging_links_api_imaging__study_id__links_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_imaging_link_api_imaging__study_id__links_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LinkRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_imaging_metadata_api_imaging__study_id__metadata_patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ImagingMetadataPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_imaging_link_api_imaging__study_id__links__link_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+        link_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  attach_imaging_report_api_imaging__study_id__report_post: {
+    parameters: {
+      query?: {
+        document_id?: number | null;
+      };
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_attach_imaging_report_api_imaging__study_id__report_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  detach_imaging_report_api_imaging__study_id__report_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        study_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  chat_api_chat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ChatRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  chat_history_api_chat_history_get: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  clear_chat_history_api_chat_history_delete: {
+    parameters: {
+      query?: {
+        patient_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_norms_api_normalization__norm_type__get: {
+    parameters: {
+      query?: {
+        filter?: string | null;
+        search?: string | null;
+      };
+      header?: never;
+      path: {
+        norm_type: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_norm_api_normalization__norm_type___norm_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_norm_api_normalization__norm_type___norm_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_norm_api_normalization__norm_type___norm_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NormUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_alias_api_normalization__norm_type___norm_id__aliases_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AliasCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  remove_alias_api_normalization__norm_type__aliases__alias_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        alias_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  confirm_aliases_api_normalization__norm_type___norm_id__confirm_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  merge_norms_api_normalization__norm_type__merge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MergeRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  merge_norms_batch_api_normalization__norm_type__merge_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MergeBatchRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_linked_documents_api_normalization__norm_type___norm_id__documents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+        norm_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  auto_merge_proposals_api_normalization__norm_type__auto_merge_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        norm_type: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_pipeline_status_api_pipeline_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  start_pipeline_api_pipeline_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  stop_pipeline_api_pipeline_stop_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_logs_api_settings_logs_get: {
+    parameters: {
+      query?: {
+        level?: string | null;
+        module?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_audit_log_api_settings_audit_log_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+        offset?: number;
+        action?: string | null;
+        user_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  download_backup_api_settings_backup_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_scheduled_backups_api_settings_backup_files_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  download_scheduled_backup_api_settings_backup_files__name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_scheduled_backup_api_settings_backup_files__name__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  run_scheduled_backup_api_settings_backup_run_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_prompts_api_settings_prompts_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_prompt_api_settings_prompts__key__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PromptUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reset_prompt_api_settings_prompts__key__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_llm_providers_api_settings_llm_providers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_llm_providers_api_settings_llm_providers_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        }[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_ocr_providers_api_settings_ocr_providers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_ocr_providers_api_settings_ocr_providers_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        }[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_vision_providers_api_settings_vision_providers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_vision_providers_api_settings_vision_providers_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        }[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_credentials_api_settings_credentials_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_credentials_api_settings_credentials_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        }[];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_general_llm_api_settings_general_llm_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_general_llm_api_settings_general_llm_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GeneralLlmUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_llm_provider_api_settings_test_llm_provider_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TestProviderRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_ocr_provider_api_settings_test_ocr_provider_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TestProviderRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  test_vision_provider_api_settings_test_vision_provider_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TestProviderRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_users_api_settings_users_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  create_user_api_settings_users_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UserCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_user_api_settings_users__user_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_user_api_settings_users__user_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UserUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_user_access_api_settings_users__user_id__access_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  grant_access_api_settings_users__user_id__access_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PatientAccessGrant"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_access_api_settings_users__user_id__access__patient_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        user_id: number;
+        patient_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_sessions_api_settings_sessions_get: {
+    parameters: {
+      query?: {
+        include_revoked?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_session_endpoint_api_settings_sessions__session_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_view_prefs_api_settings_view_prefs__view_key__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        view_key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  set_view_prefs_api_settings_view_prefs__view_key__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        view_key: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ViewPrefsBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_settings_api_settings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_settings_api_settings_patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SettingsUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_vault_tree_api_vault_tree_get: {
+    parameters: {
+      query?: {
+        /** @description Subtree path relative to vault root */
+        path?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_vault_file_api_vault_file_delete: {
+    parameters: {
+      query: {
+        /** @description File path relative to vault root */
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  move_vault_file_api_vault_move_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MoveRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  setup_status_api_setup_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  setup_complete_api_setup_complete_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetupRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
 }

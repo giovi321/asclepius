@@ -368,7 +368,7 @@ export function EncountersSection({
   };
 
   return (
-    <Section title="Encounters" icon={Stethoscope}>
+    <Section title="Encounters" icon={Stethoscope} sectionId="encounters">
       {encounters.map((enc, i) => (
         <div
           key={enc.id}
@@ -554,7 +554,7 @@ export function MedicationsSection({
   };
 
   return (
-    <Section title="Medications" icon={Pill}>
+    <Section title="Medications" icon={Pill} sectionId="medications">
       {medications.map((med, i) => (
         <div key={med.id} className={i > 0 ? "pt-3 mt-3 border-t" : ""}>
           <MedicationRow
@@ -571,7 +571,7 @@ export function MedicationsSection({
 export function VaccinationsSection({ vaccinations }: { vaccinations: any[] }) {
   if (!vaccinations?.length) return null;
   return (
-    <Section title="Vaccinations" icon={Syringe}>
+    <Section title="Vaccinations" icon={Syringe} sectionId="vaccinations">
       {vaccinations.map((vax) => (
         <div key={vax.id} className="text-sm">
           <span className="font-medium">{vax.vaccine_name}</span>
@@ -617,47 +617,40 @@ function cleanSectionSummary(s: string | null | undefined): string {
 export function DocumentSectionsList({ sections }: { sections: any[] }) {
   if (!sections?.length) return null;
   return (
-    <details className="group/sections rounded-lg border">
-      <summary className="cursor-pointer select-none list-none flex items-center justify-between p-4 hover:bg-muted/40 rounded-lg">
-        <h3 className="font-medium">Document Sections ({sections.length})</h3>
-        <span
-          className="text-xs text-muted-foreground transition-transform group-open/sections:rotate-180"
-          aria-hidden
-        >
-          \u25be
-        </span>
-      </summary>
-      <div className="border-t p-4 space-y-2">
-        {sections.map((section) => {
-          const cleaned = cleanSectionSummary(section.summary_en);
-          return (
-            <div
-              key={section.id}
-              className="flex items-center gap-3 text-sm rounded-md border p-2"
+    <Section
+      title={`Document Sections (${sections.length})`}
+      sectionId="document-sections"
+      defaultOpen={false}
+    >
+      {sections.map((section) => {
+        const cleaned = cleanSectionSummary(section.summary_en);
+        return (
+          <div
+            key={section.id}
+            className="flex items-center gap-3 text-sm rounded-md border p-2"
+          >
+            <span className="text-xs text-muted-foreground w-16">
+              pp. {section.page_start}
+              {"\u2013"}
+              {section.page_end}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getSectionTypeStyle(section.section_type)}`}
             >
-              <span className="text-xs text-muted-foreground w-16">
-                pp. {section.page_start}
-                {"\u2013"}
-                {section.page_end}
-              </span>
+              {section.section_type?.replace(/_/g, " ")}
+            </span>
+            {cleaned && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getSectionTypeStyle(section.section_type)}`}
+                className="flex-1 text-xs text-muted-foreground truncate"
+                title={cleaned}
               >
-                {section.section_type?.replace(/_/g, " ")}
+                {cleaned}
               </span>
-              {cleaned && (
-                <span
-                  className="flex-1 text-xs text-muted-foreground truncate"
-                  title={cleaned}
-                >
-                  {cleaned}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </details>
+            )}
+          </div>
+        );
+      })}
+    </Section>
   );
 }
 
@@ -734,7 +727,7 @@ function ImagingStudyBlock({
   };
 
   return (
-    <Section title="Imaging" icon={ImageIcon}>
+    <Section title="Imaging" icon={ImageIcon} sectionId="imaging-study">
       {/* Doctor + Facility + Event Date are NOT shown here — they live
           on the parent documents row (rendered by MetadataEditor) which
           is the single source of truth. The imaging-specific block only

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Check,
+  ChevronDown,
   X,
   Loader2,
   Ban,
@@ -24,6 +25,7 @@ import type {
   PipelineJobKind,
 } from "@/types";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
+import { useCollapseState } from "@/components/document-detail/DocumentDetailHelpers";
 
 const STAGE_LABELS: Record<string, string> = {
   ocr: "OCR",
@@ -35,6 +37,8 @@ const STAGE_LABELS: Record<string, string> = {
   thumbnail: "Thumbnail",
   cache_ocr: "Cache OCR",
   translation: "Translation",
+  region_ocr: "Region OCR",
+  region_translation: "Region translation",
 };
 
 const STAGE_ICONS: Record<string, any> = {
@@ -45,6 +49,8 @@ const STAGE_ICONS: Record<string, any> = {
   page_classification: FileSearch,
   section_extraction: Layers,
   translation: Languages,
+  region_ocr: ScanText,
+  region_translation: Languages,
 };
 
 function stageLabel(stage: string): string {
@@ -372,53 +378,72 @@ export default function DocumentStageTimeline({ documentId }: Props) {
     return groupRuns(data.events).reverse();
   }, [data, liveJob]);
 
+  // Default closed: this is reference detail, not primary content.
+  // Auto-open when this doc is the active pipeline job so the user sees
+  // progress without clicking to expand.
+  const [open, setOpen] = useCollapseState("pipeline-stages", isLive);
+
   if (loading) return null;
   if (!data || (data.events.length === 0 && !liveJob)) return null;
 
   return (
-    <div className="rounded-xl border bg-card p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="rounded-xl border bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-3 hover:bg-accent/30 rounded-xl"
+      >
+        <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold">Pipeline stages</h2>
           <p className="text-xs text-muted-foreground">
             {groups.length} run{groups.length === 1 ? "" : "s"}
             {data.events.length > 0 &&
               ` · ${data.events.length} event${data.events.length === 1 ? "" : "s"}`}
           </p>
-        </div>
-        {isLive && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
-            <span className="relative inline-flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-50 animate-ping" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
+          {isLive && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+              <span className="relative inline-flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-50 animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
+              </span>
+              Live
             </span>
-            Live
-          </span>
-        )}
-      </div>
-
-      <div className="space-y-4">
-        {groups.map((g, gi) => (
-          <RunCard key={gi} group={g} isFirst={gi === 0 && isLive} />
-        ))}
-      </div>
+          )}
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="space-y-4 px-5 pb-5">
+          {groups.map((g, gi) => (
+            <RunCard key={gi} group={g} isFirst={gi === 0 && isLive} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
   const isReprocess = group.job_kind === "reprocess";
-  const isTranslate = group.job_kind === "translate";
+  const isTranslate =
+    group.job_kind === "translate" || group.job_kind === "translate_region";
+  const isRegionTranslate = group.job_kind === "translate_region";
   const KindIcon = isTranslate
     ? Languages
     : isReprocess
       ? RefreshCw
       : UploadIcon;
-  const runLabel = isTranslate
-    ? "Translate"
-    : isReprocess
-      ? "Reprocess"
-      : "Upload";
+  const runLabel = isRegionTranslate
+    ? "Region translate"
+    : isTranslate
+      ? "Translate"
+      : isReprocess
+        ? "Reprocess"
+        : "Upload";
   const startTs = group.events[0]?.started_at || group.events[0]?.finished_at;
   const totalMs = runDuration(group.events);
   const outcome = runOutcome(group.events);

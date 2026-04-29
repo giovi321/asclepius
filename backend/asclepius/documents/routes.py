@@ -88,6 +88,22 @@ class TranslateRequest(BaseModel):
     llm_provider_id: str | None = None  # optional text-LLM override
 
 
+class RegionBbox(BaseModel):
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+    w: float = Field(gt=0.0, le=1.0)
+    h: float = Field(gt=0.0, le=1.0)
+
+
+class TranslateRegionRequest(BaseModel):
+    """Bbox is in normalized [0,1] coords relative to the page width/height."""
+
+    page: int = Field(ge=1)
+    bbox: RegionBbox
+    ocr_provider_id: str | None = None
+    llm_provider_id: str | None = None
+
+
 # ── Failed documents ─────────────────────────────────────────────
 
 
@@ -247,6 +263,19 @@ async def get_doc(
     # Get document sections (page-level sectioning)
     sections = await get_document_sections(db, doc_id)
 
+    # Get ad-hoc region translations (newest first).
+    rt_cursor = await db.execute(
+        """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
+                  ocr_text, translated_text,
+                  ocr_provider_id, llm_provider_id, llm_model,
+                  thumbnail_path, created_at
+             FROM region_translations
+            WHERE document_id = ?
+            ORDER BY id DESC""",
+        (doc_id,),
+    )
+    region_translations = [dict(r) for r in await rt_cursor.fetchall()]
+
     return {
         **doc,
         "lab_results": lab_results,
@@ -256,6 +285,7 @@ async def get_doc(
         "imaging_studies": imaging_studies,
         "links": links,
         "sections": sections,
+        "region_translations": region_translations,
     }
 
 
@@ -824,3 +854,198 @@ async def translate_doc(
         queued_providers=queued_providers,
     )
     return {"status": "queued", "document_id": doc_id}
+
+
+# ── Region translate ─────────────────────────────────────────────
+
+
+@router.post("/{doc_id}/translate-region")
+async def translate_region_endpoint(
+    doc_id: int,
+    body: TranslateRegionRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Queue OCR + translation of a user-selected rectangle on one page.
+
+    Pre-allocates a row in ``region_translations`` with the bbox so the
+    UI can show a placeholder while the worker fills in the OCR text,
+    translation, and thumbnail.
+    """
+    from asclepius.documents.file_routes import _require_write_access
+    from asclepius.pipeline.watcher import enqueue_job
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    if not doc.get("file_path"):
+        raise HTTPException(
+            status_code=400,
+            detail="Document has no file on disk to crop.",
+        )
+
+    queue = getattr(request.app.state, "pipeline_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Pipeline worker not running")
+
+    cfg = get_config()
+
+    def _first_enabled(items):
+        enabled = [p for p in items if getattr(p, "enabled", False)]
+        if enabled:
+            return min(enabled, key=lambda p: getattr(p, "priority", 0))
+        return items[0] if items else None
+
+    queued_providers: dict[str, str | None] = {}
+    ocr_id = body.ocr_provider_id
+    if not ocr_id:
+        p = _first_enabled(cfg.ocr.providers)
+        ocr_id = p.id if p else None
+    if ocr_id:
+        queued_providers["ocr"] = ocr_id
+    llm_id = body.llm_provider_id
+    if not llm_id:
+        p = _first_enabled(cfg.llm.providers)
+        llm_id = p.id if p else None
+    if llm_id:
+        queued_providers["llm"] = llm_id
+
+    cursor = await db.execute(
+        """INSERT INTO region_translations
+              (document_id, page, bbox_x, bbox_y, bbox_w, bbox_h,
+               ocr_provider_id, llm_provider_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            doc_id,
+            body.page,
+            body.bbox.x,
+            body.bbox.y,
+            body.bbox.w,
+            body.bbox.h,
+            ocr_id,
+            llm_id,
+        ),
+    )
+    await db.commit()
+    region_row_id = cursor.lastrowid
+
+    enqueue_job(
+        queue,
+        "translate_region",
+        {
+            "doc_id": doc_id,
+            "region_row_id": region_row_id,
+            "page": body.page,
+            "bbox": body.bbox.model_dump(),
+            "ocr_provider_id": body.ocr_provider_id,
+            "llm_provider_id": body.llm_provider_id,
+            "resolved_providers": queued_providers,
+        },
+        priority=0,
+        queued_doc_id=doc_id,
+        queued_label=doc.get("original_filename") or f"doc#{doc_id}",
+        queued_providers=queued_providers,
+    )
+    return {
+        "status": "queued",
+        "document_id": doc_id,
+        "region_id": region_row_id,
+    }
+
+
+@router.delete("/{doc_id}/region-translations/{region_id}")
+async def delete_region_translation(
+    doc_id: int,
+    region_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Delete a region translation row and its thumbnail file (if present)."""
+    from asclepius.documents.file_routes import _require_write_access
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    cursor = await db.execute(
+        """SELECT thumbnail_path FROM region_translations
+            WHERE id = ? AND document_id = ?""",
+        (region_id, doc_id),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Region translation not found")
+
+    thumbnail_path = row["thumbnail_path"]
+    cfg = get_config()
+    if thumbnail_path:
+        try:
+            from asclepius.util.paths import safe_vault_join, UnsafePathError
+
+            try:
+                disk_path = safe_vault_join(Path(cfg.vault.root_path), thumbnail_path)
+                if disk_path.is_file():
+                    disk_path.unlink()
+            except UnsafePathError:
+                logger.warning("Refusing to delete unsafe thumbnail path %r", thumbnail_path)
+        except Exception:
+            logger.warning("Failed to delete thumbnail %s", thumbnail_path, exc_info=True)
+
+    await db.execute(
+        "DELETE FROM region_translations WHERE id = ? AND document_id = ?",
+        (region_id, doc_id),
+    )
+    await db.commit()
+    return {"status": "deleted", "region_id": region_id}
+
+
+@router.get("/{doc_id}/region-translations/{region_id}/thumbnail")
+async def get_region_thumbnail(
+    doc_id: int,
+    region_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Serve the cropped PNG thumbnail for a region translation."""
+    from fastapi.responses import FileResponse
+    from asclepius.util.paths import safe_vault_join, UnsafePathError
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if current_user.get("role") != "admin":
+        has_access = False
+        if doc["patient_id"]:
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            if role:
+                has_access = True
+        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
+            has_access = True
+        if not has_access:
+            raise HTTPException(status_code=403, detail="No access")
+
+    cursor = await db.execute(
+        """SELECT thumbnail_path FROM region_translations
+            WHERE id = ? AND document_id = ?""",
+        (region_id, doc_id),
+    )
+    row = await cursor.fetchone()
+    if not row or not row["thumbnail_path"]:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    cfg = get_config()
+    try:
+        disk_path = safe_vault_join(Path(cfg.vault.root_path), row["thumbnail_path"])
+    except UnsafePathError:
+        raise HTTPException(status_code=400, detail="Invalid thumbnail path")
+    if not disk_path.is_file():
+        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+    return FileResponse(
+        path=str(disk_path),
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )

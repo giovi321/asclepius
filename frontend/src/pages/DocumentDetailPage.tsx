@@ -27,6 +27,8 @@ import NotesEditor from "@/components/document-detail/NotesEditor";
 import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
 import DocumentStageTimeline from "@/components/document-detail/DocumentStageTimeline";
+import RegionTranslationsSection from "@/components/document-detail/RegionTranslationsSection";
+import type { NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
@@ -52,6 +54,16 @@ export default function DocumentDetailPage() {
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
+
+  // Region-translate selection state. ``selectionMode`` flips the PDF
+  // viewer into draw-rectangle mode; the resolved provider IDs travel
+  // with the eventual /translate-region POST so the user's choice
+  // survives the round-trip from popover → PDF interaction.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectionProviders, setSelectionProviders] = useState<{
+    ocrProviderId: string | null;
+    llmProviderId: string | null;
+  }>({ ocrProviderId: null, llmProviderId: null });
 
   // Translation jobs deliberately don't flip documents.status to
   // "processing" (they are an independent side-job that doesn't disturb
@@ -143,6 +155,41 @@ export default function DocumentDetailPage() {
     }
   }, [doc?.status, inPipeline]);
 
+  const handleStartRegionSelection = (providers: {
+    ocrProviderId: string | null;
+    llmProviderId: string | null;
+  }) => {
+    setSelectionProviders(providers);
+    setSelectionMode(true);
+  };
+
+  const handleSelectionConfirm = async (page: number, bbox: NormalizedBbox) => {
+    setSelectionMode(false);
+    try {
+      await api.post(`/documents/${id}/translate-region`, {
+        page,
+        bbox,
+        ...(selectionProviders.ocrProviderId
+          ? { ocr_provider_id: selectionProviders.ocrProviderId }
+          : {}),
+        ...(selectionProviders.llmProviderId
+          ? { llm_provider_id: selectionProviders.llmProviderId }
+          : {}),
+      });
+      await loadDoc(false);
+    } catch (e: any) {
+      toast({
+        title: "Region translate failed",
+        description: e.response?.data?.detail || e.message,
+        variant: "error",
+      });
+    }
+  };
+
+  const handleSelectionCancel = () => {
+    setSelectionMode(false);
+  };
+
   const handleDelete = async () => {
     const ok = await confirm({
       title: "Delete this document?",
@@ -221,7 +268,12 @@ export default function DocumentDetailPage() {
               <TranslateMenu
                 docId={id!}
                 hasOcrText={!!(doc.ocr_text && doc.ocr_text.trim())}
+                canSelectRegion={
+                  !!doc.file_path &&
+                  (doc.original_filename || "").toLowerCase().endsWith(".pdf")
+                }
                 onTranslated={() => loadDoc(false)}
+                onStartRegionSelection={handleStartRegionSelection}
               />
             </>
           )}
@@ -265,6 +317,9 @@ export default function DocumentDetailPage() {
               onRotate={handleRotate}
               imagingStudyId={doc.imaging_studies?.[0]?.id || null}
               onReloaded={() => loadDoc(false)}
+              selectionMode={selectionMode}
+              onSelectionConfirm={handleSelectionConfirm}
+              onSelectionCancel={handleSelectionCancel}
             />
           )}
           {!isImagingPlaceholder(doc) && (
@@ -316,6 +371,12 @@ export default function DocumentDetailPage() {
             patientId={doc.patient_id}
             links={linkedDocs}
             onLinksChange={setLinkedDocs}
+          />
+
+          <RegionTranslationsSection
+            docId={Number(id)}
+            items={doc.region_translations || []}
+            onChanged={() => loadDoc(false)}
           />
         </div>
       </div>

@@ -18,7 +18,12 @@ export interface LinksSectionProps {
  * - AI-suggested "Relevant Documents" fetched from /relevant
  * - the manual link-search dialog + selector
  */
-export default function LinksSection({ docId, patientId, links, onLinksChange }: LinksSectionProps) {
+export default function LinksSection({
+  docId,
+  patientId,
+  links,
+  onLinksChange,
+}: LinksSectionProps) {
   const { toast } = useToast();
   const [relevantDocs, setRelevantDocs] = useState<any[]>([]);
   const [loadingRelevant, setLoadingRelevant] = useState(false);
@@ -30,7 +35,8 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
   useEffect(() => {
     if (!patientId) return;
     setLoadingRelevant(true);
-    api.get(`/documents/${docId}/relevant`)
+    api
+      .get(`/documents/${docId}/relevant`)
       .then((res: any) => setRelevantDocs(res.data.suggestions || []))
       .catch(() => {})
       .finally(() => setLoadingRelevant(false));
@@ -41,7 +47,8 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
   );
   alreadyLinkedIds.add(docId);
 
-  const filterLinked = (docs: any[]) => docs.filter((d: any) => !alreadyLinkedIds.has(d.id));
+  const filterLinked = (docs: any[]) =>
+    docs.filter((d: any) => !alreadyLinkedIds.has(d.id));
 
   const runSearch = async () => {
     if (!searchTerm.trim()) {
@@ -54,20 +61,25 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
       return;
     }
     try {
-      const res = await api.get("/documents", { params: { q: searchTerm, limit: 30 } });
+      const res = await api.get("/documents", {
+        params: { q: searchTerm, limit: 30 },
+      });
       let results = filterLinked(res.data.items || []);
       if (results.length === 0) {
         const allRes = await api.get("/documents", { params: { limit: 100 } });
         const all = allRes.data.items || [];
         const term = searchTerm.toLowerCase();
-        results = filterLinked(all.filter((d: any) =>
-          d.original_filename?.toLowerCase().includes(term) ||
-          d.doc_type?.toLowerCase().includes(term) ||
-          d.doctor_name?.toLowerCase().includes(term) ||
-          d.facility_name?.toLowerCase().includes(term) ||
-          d.summary_en?.toLowerCase().includes(term) ||
-          d.patient_name?.toLowerCase().includes(term),
-        )).slice(0, 20);
+        results = filterLinked(
+          all.filter(
+            (d: any) =>
+              d.original_filename?.toLowerCase().includes(term) ||
+              d.doc_type?.toLowerCase().includes(term) ||
+              d.doctor_name?.toLowerCase().includes(term) ||
+              d.facility_name?.toLowerCase().includes(term) ||
+              d.summary_en?.toLowerCase().includes(term) ||
+              d.patient_name?.toLowerCase().includes(term),
+          ),
+        ).slice(0, 20);
       }
       setSearchResults(results);
     } catch {
@@ -78,18 +90,27 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
   const linkDocument = async (targetId: number) => {
     const scrollY = window.scrollY;
     try {
-      const res = await api.post(`/documents/${docId}/link`, { target_document_id: targetId, link_type: linkType });
+      const res = await api.post(`/documents/${docId}/link`, {
+        target_document_id: targetId,
+        link_type: linkType,
+      });
       const linked = searchResults.find((d: any) => d.id === targetId);
-      onLinksChange([...links, {
-        ...res.data,
-        target_filename: linked?.original_filename,
-        target_doc_type: linked?.doc_type,
-      }]);
+      onLinksChange([
+        ...links,
+        {
+          ...res.data,
+          target_filename: linked?.original_filename,
+          target_doc_type: linked?.doc_type,
+        },
+      ]);
       setSearchResults((prev) => prev.filter((d: any) => d.id !== targetId));
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 409) {
-        toast({ title: detail || "These documents are already linked", variant: "warning" });
+        toast({
+          title: detail || "These documents are already linked",
+          variant: "warning",
+        });
         setSearchResults((prev) => prev.filter((d: any) => d.id !== targetId));
       } else {
         toast({ title: detail || "Failed to link document", variant: "error" });
@@ -114,30 +135,61 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
         target_document_id: sg.document_id,
         link_type: sg.link_type || "related",
       });
-      onLinksChange([...links, { ...res.data, target_filename: sg.filename, target_doc_type: sg.doc_type }]);
-      setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id));
+      onLinksChange([
+        ...links,
+        {
+          ...res.data,
+          target_filename: sg.filename,
+          target_doc_type: sg.doc_type,
+        },
+      ]);
+      setRelevantDocs((prev) =>
+        prev.filter((r) => r.document_id !== sg.document_id),
+      );
     } catch (e: any) {
       if (e?.response?.status === 409) {
-        setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id));
+        setRelevantDocs((prev) =>
+          prev.filter((r) => r.document_id !== sg.document_id),
+        );
       } else {
-        toast({ title: "Failed to link", description: e.response?.data?.detail || e.message, variant: "error" });
+        toast({
+          title: "Failed to link",
+          description: e.response?.data?.detail || e.message,
+          variant: "error",
+        });
       }
     }
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   };
 
   return (
-    <Section title="Linked Documents" icon={Link2}>
+    <Section
+      title="Linked Documents"
+      icon={Link2}
+      sectionId="linked-documents"
+      defaultOpen={links.length > 0 || relevantDocs.length > 0}
+    >
       {links.length > 0 ? (
         <div className="space-y-2">
           {links.map((link: any) => {
-            const linkedId = link.source_document_id === docId ? link.target_document_id : link.source_document_id;
-            const linkedName = link.source_document_id === docId
-              ? (link.target_filename || `Document #${link.target_document_id}`)
-              : (link.source_filename || `Document #${link.source_document_id}`);
+            const linkedId =
+              link.source_document_id === docId
+                ? link.target_document_id
+                : link.source_document_id;
+            const linkedName =
+              link.source_document_id === docId
+                ? link.target_filename || `Document #${link.target_document_id}`
+                : link.source_filename ||
+                  `Document #${link.source_document_id}`;
             return (
-              <div key={link.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                <a href={`/documents/${linkedId}`} className="text-primary hover:underline truncate flex-1">
+              <div
+                key={link.id}
+                className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+              >
+                <a
+                  href={`/documents/${linkedId}`}
+                  className="text-primary hover:underline truncate flex-1"
+                >
                   {linkedName}
                 </a>
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -160,21 +212,36 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
 
       {(relevantDocs.length > 0 || loadingRelevant) && (
         <div className="mt-3 pt-3 border-t">
-          <h4 className="text-xs font-medium text-muted-foreground mb-2">Suggested by AI</h4>
+          <h4 className="text-xs font-medium text-muted-foreground mb-2">
+            Suggested by AI
+          </h4>
           {loadingRelevant ? (
-            <p className="text-xs text-muted-foreground">Analyzing document relationships...</p>
+            <p className="text-xs text-muted-foreground">
+              Analyzing document relationships...
+            </p>
           ) : (
             <div className="space-y-2">
               {relevantDocs.map((sg: any) => (
-                <div key={sg.document_id} className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
+                <div
+                  key={sg.document_id}
+                  className="flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs"
+                >
                   <div className="flex-1 min-w-0">
-                    <a href={`/documents/${sg.document_id}`} className="text-primary hover:underline block truncate font-medium">
+                    <a
+                      href={`/documents/${sg.document_id}`}
+                      className="text-primary hover:underline block truncate font-medium"
+                    >
                       {sg.filename || `Document #${sg.document_id}`}
                     </a>
                     <span className="text-muted-foreground">
-                      {sg.doc_type?.replace(/_/g, " ")} | {sg.event_date || "no date"}
+                      {sg.doc_type?.replace(/_/g, " ")} |{" "}
+                      {sg.event_date || "no date"}
                     </span>
-                    {sg.reason && <p className="text-muted-foreground italic mt-0.5">{sg.reason}</p>}
+                    {sg.reason && (
+                      <p className="text-muted-foreground italic mt-0.5">
+                        {sg.reason}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => acceptSuggestion(sg)}
@@ -183,7 +250,11 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
                     Link
                   </button>
                   <button
-                    onClick={() => setRelevantDocs((prev) => prev.filter((r) => r.document_id !== sg.document_id))}
+                    onClick={() =>
+                      setRelevantDocs((prev) =>
+                        prev.filter((r) => r.document_id !== sg.document_id),
+                      )
+                    }
                     className="rounded p-1 text-muted-foreground hover:text-destructive"
                   >
                     <X className="h-3 w-3" />
@@ -198,14 +269,21 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
       {!showSearch ? (
         <div className="mt-2 flex gap-2">
           <button
-            onClick={() => { setShowSearch(true); setSearchTerm(""); runSearch(); }}
+            onClick={() => {
+              setShowSearch(true);
+              setSearchTerm("");
+              runSearch();
+            }}
             className="flex items-center gap-1 rounded-md border border-dashed px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
           >
             <Plus className="h-3 w-3" /> Link manually
           </button>
-          <SuggestLinksButton docId={docId} onLink={(newLink) => {
-            if (newLink) onLinksChange([...links, newLink]);
-          }} />
+          <SuggestLinksButton
+            docId={docId}
+            onLink={(newLink) => {
+              if (newLink) onLinksChange([...links, newLink]);
+            }}
+          />
         </div>
       ) : (
         <div className="mt-2 space-y-2 rounded-md border p-3">
@@ -240,7 +318,11 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
               Search
             </button>
             <button
-              onClick={() => { setShowSearch(false); setSearchTerm(""); setSearchResults([]); }}
+              onClick={() => {
+                setShowSearch(false);
+                setSearchTerm("");
+                setSearchResults([]);
+              }}
               className="rounded-md border px-2 py-1.5 text-xs hover:bg-accent"
             >
               <X className="h-3 w-3" />
@@ -248,30 +330,37 @@ export default function LinksSection({ docId, patientId, links, onLinksChange }:
           </div>
           {searchResults.length > 0 && (
             <div className="max-h-60 overflow-y-auto divide-y rounded-md border">
-              {searchResults.filter((d: any) => !alreadyLinkedIds.has(d.id)).map((d: any) => (
-                <div key={d.id} className="group relative">
-                  <button
-                    onClick={() => linkDocument(d.id)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
-                  >
-                    <FileText className="h-3 w-3 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <span className="block truncate font-medium">{d.original_filename}</span>
-                      <span className="block text-muted-foreground">
-                        {d.doc_type?.replace(/_/g, " ") || "no type"} | {d.event_date || "no date"}
-                        {d.doctor_name && ` | ${d.doctor_name}`}
-                        {d.facility_name && ` | ${d.facility_name}`}
+              {searchResults
+                .filter((d: any) => !alreadyLinkedIds.has(d.id))
+                .map((d: any) => (
+                  <div key={d.id} className="group relative">
+                    <button
+                      onClick={() => linkDocument(d.id)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-accent"
+                    >
+                      <FileText className="h-3 w-3 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate font-medium">
+                          {d.original_filename}
+                        </span>
+                        <span className="block text-muted-foreground">
+                          {d.doc_type?.replace(/_/g, " ") || "no type"} |{" "}
+                          {d.event_date || "no date"}
+                          {d.doctor_name && ` | ${d.doctor_name}`}
+                          {d.facility_name && ` | ${d.facility_name}`}
+                        </span>
+                        {d.summary_en && (
+                          <span className="block text-muted-foreground truncate">
+                            {d.summary_en}
+                          </span>
+                        )}
+                      </div>
+                      <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] whitespace-nowrap">
+                        Link
                       </span>
-                      {d.summary_en && (
-                        <span className="block text-muted-foreground truncate">{d.summary_en}</span>
-                      )}
-                    </div>
-                    <span className="ml-2 rounded bg-primary/10 px-1.5 py-0.5 text-primary text-[10px] whitespace-nowrap">
-                      Link
-                    </span>
-                  </button>
-                </div>
-              ))}
+                    </button>
+                  </div>
+                ))}
             </div>
           )}
         </div>

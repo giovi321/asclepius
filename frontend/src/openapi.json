@@ -24,9 +24,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Login",
         "description": "Authenticate with username + password and set the session cookie.\n\nFailed attempts are rate-limited per ``(client_ip, username)`` pair to\nblunt credential-stuffing. Successful logins clear the counter.",
         "operationId": "login_api_auth_login_post",
@@ -64,9 +62,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Logout",
         "description": "Revoke the current session server-side and clear the cookie.",
         "operationId": "logout_api_auth_logout_post",
@@ -84,9 +80,7 @@
     },
     "/api/auth/me": {
       "get": {
-        "tags": [
-          "auth"
-        ],
+        "tags": ["auth"],
         "summary": "Me",
         "operationId": "me_api_auth_me_get",
         "responses": {
@@ -107,9 +101,7 @@
     },
     "/api/auth/oidc/enabled": {
       "get": {
-        "tags": [
-          "oidc"
-        ],
+        "tags": ["oidc"],
         "summary": "Oidc Enabled",
         "description": "Check if OIDC is configured and enabled.",
         "operationId": "oidc_enabled_api_auth_oidc_enabled_get",
@@ -127,9 +119,7 @@
     },
     "/api/auth/oidc/login": {
       "get": {
-        "tags": [
-          "oidc"
-        ],
+        "tags": ["oidc"],
         "summary": "Oidc Login",
         "description": "Redirect to OIDC provider for authentication.",
         "operationId": "oidc_login_api_auth_oidc_login_get",
@@ -147,9 +137,7 @@
     },
     "/api/auth/oidc/callback": {
       "get": {
-        "tags": [
-          "oidc"
-        ],
+        "tags": ["oidc"],
         "summary": "Oidc Callback",
         "description": "Handle OIDC callback after provider authentication.",
         "operationId": "oidc_callback_api_auth_oidc_callback_get",
@@ -167,9 +155,7 @@
     },
     "/api/patients": {
       "get": {
-        "tags": [
-          "patients"
-        ],
+        "tags": ["patients"],
         "summary": "List Patients",
         "operationId": "list_patients_api_patients_get",
         "responses": {
@@ -190,9 +176,7 @@
         }
       },
       "post": {
-        "tags": [
-          "patients"
-        ],
+        "tags": ["patients"],
         "summary": "Create Patient",
         "operationId": "create_patient_api_patients_post",
         "requestBody": {
@@ -231,9 +215,7 @@
     },
     "/api/patients/{patient_id}": {
       "get": {
-        "tags": [
-          "patients"
-        ],
+        "tags": ["patients"],
         "summary": "Get Patient",
         "description": "Get a single patient's details.",
         "operationId": "get_patient_api_patients__patient_id__get",
@@ -272,9 +254,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "patients"
-        ],
+        "tags": ["patients"],
         "summary": "Update Patient",
         "operationId": "update_patient_api_patients__patient_id__patch",
         "parameters": [
@@ -322,9 +302,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "patients"
-        ],
+        "tags": ["patients"],
         "summary": "Delete Patient",
         "description": "Delete a patient and disassociate their documents.",
         "operationId": "delete_patient_api_patients__patient_id__delete",
@@ -365,9 +343,7 @@
     },
     "/api/documents/upload": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Upload Document",
         "description": "Upload a document into the current user's inbox for processing.",
         "operationId": "upload_document_api_documents_upload_post",
@@ -439,9 +415,7 @@
     },
     "/api/documents/schedule-batch": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Schedule Batch",
         "description": "Schedule a batch of documents for later processing.",
         "operationId": "schedule_batch_api_documents_schedule_batch_post",
@@ -479,9 +453,7 @@
     },
     "/api/documents/{doc_id}/file": {
       "head": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Head File",
         "description": "HEAD probe used by the frontend to decide whether to render a file\nviewer at all. Returns the same status codes as the GET (404 when\nthe file is missing on disk, 403 when the caller lacks access).",
         "operationId": "head_file_api_documents__doc_id__file_head",
@@ -518,9 +490,7 @@
         }
       },
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Serve File",
         "description": "Stream the stored document file.\n\nSecurity invariants:\n- ``doc.file_path`` is resolved strictly under the configured vault root.\n- The outbound ``Content-Disposition`` filename is sanitised so a\n  malicious filename cannot break out of the header.\n- Non-admins need either patient-level access or uploader identity.",
         "operationId": "serve_file_api_documents__doc_id__file_get",
@@ -559,9 +529,7 @@
     },
     "/api/documents/{doc_id}/rotate": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Rotate Document",
         "description": "Permanently rotate pages of a PDF document.\n\n- degrees: rotation angle (90, 180, 270)\n- pages: list of 1-based page numbers to rotate, or null/empty for all pages",
         "operationId": "rotate_document_api_documents__doc_id__rotate_post",
@@ -610,9 +578,7 @@
     },
     "/api/documents/{doc_id}/rename": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Rename Document",
         "description": "Rename a document's file on disk and in the database.\n\nThe new filename is sanitised (no path separators, no ``..``, reserved\nnames rejected) and the target path is verified to stay under the vault\nroot. The file extension is locked to the original to prevent tricks\nlike renaming ``scan.pdf`` into ``scan.html``.",
         "operationId": "rename_document_api_documents__doc_id__rename_post",
@@ -661,9 +627,7 @@
     },
     "/api/documents/{doc_id}/find-candidates": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Find Candidate Files",
         "description": "Look for files in the vault whose basename matches this document's\n``original_filename``. Used by the document detail page to recover\nfrom a broken ``file_path`` (the file was moved or renamed outside\nthe app). Returns vault-relative POSIX paths so the frontend can\npass them straight back to ``POST /relink``.",
         "operationId": "find_candidate_files_api_documents__doc_id__find_candidates_get",
@@ -702,9 +666,7 @@
     },
     "/api/documents/{doc_id}/relink": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Relink Document",
         "description": "Repoint a document at an existing vault file. Use case: the\nfile was moved outside the app and the user picked the right path\nfrom ``find-candidates`` or the file browser. The new file is NOT\nre-processed; only ``documents.file_path`` is updated.",
         "operationId": "relink_document_api_documents__doc_id__relink_post",
@@ -753,9 +715,7 @@
     },
     "/api/documents/{doc_id}/replace-file": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Replace Document File",
         "description": "Upload a fresh copy of a missing file. The file lands in the\ncorrect organised location (``patients/{slug}/{year}/...`` based on\nthe document's ``event_date``), the document's ``file_path`` is\nupdated, and the file is NOT re-processed (the document already has\nits OCR text, extraction, and child rows). Patient access checked.\n\nThe file extension is locked to the document's ``original_filename``\nto prevent content-type confusion.",
         "operationId": "replace_document_file_api_documents__doc_id__replace_file_post",
@@ -804,9 +764,7 @@
     },
     "/api/documents/{doc_id}/link": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Link Documents",
         "description": "Link two documents together.",
         "operationId": "link_documents_api_documents__doc_id__link_post",
@@ -855,9 +813,7 @@
     },
     "/api/documents/{doc_id}/links": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Get Links",
         "description": "Get all linked documents for a document.",
         "operationId": "get_links_api_documents__doc_id__links_get",
@@ -896,9 +852,7 @@
     },
     "/api/documents/{doc_id}/links/{link_id}": {
       "delete": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Delete Link",
         "description": "Remove a document link.",
         "operationId": "delete_link_api_documents__doc_id__links__link_id__delete",
@@ -946,9 +900,7 @@
     },
     "/api/documents/{doc_id}/suggest-links": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Suggest Document Links",
         "description": "Use LLM to suggest related documents for linking.",
         "operationId": "suggest_document_links_api_documents__doc_id__suggest_links_post",
@@ -987,9 +939,7 @@
     },
     "/api/documents/{doc_id}/relevant": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Get Relevant Documents",
         "description": "Get AI-suggested relevant documents. Returns cached results if available.",
         "operationId": "get_relevant_documents_api_documents__doc_id__relevant_get",
@@ -1028,9 +978,7 @@
     },
     "/api/documents/{doc_id}/edit-with-ai": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Edit Document With Ai",
         "description": "Edit document metadata using natural language instruction via LLM.\n\nUses a compact prompt to minimize token usage. For simple field changes,\nthe LLM returns only the changed fields as JSON.",
         "operationId": "edit_document_with_ai_api_documents__doc_id__edit_with_ai_post",
@@ -1079,9 +1027,7 @@
     },
     "/api/documents/{doc_id}/generate-filename": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Generate Filename",
         "description": "Generate an AI-suggested filename based on document metadata.",
         "operationId": "generate_filename_api_documents__doc_id__generate_filename_post",
@@ -1120,9 +1066,7 @@
     },
     "/api/documents/failed": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "List Failed Docs",
         "description": "List failed documents with error messages for the review queue.\n\nRestricted to admins/editors because the failure messages can expose\ninternal paths, provider error strings, or extracted content snippets.",
         "operationId": "list_failed_docs_api_documents_failed_get",
@@ -1164,9 +1108,7 @@
     },
     "/api/documents/retry-all-failed": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Retry All Failed",
         "description": "Retry all failed documents. Admin-only.\n\nEach doc is enqueued onto the same single-threaded pipeline worker as\nfresh uploads \u2014 that's the only way to keep the \"max 1 doc at a time\"\ninvariant. ``priority=10`` puts retries behind interactive reprocess\nclicks (which use 0) but ahead of large uploads.",
         "operationId": "retry_all_failed_api_documents_retry_all_failed_post",
@@ -1184,9 +1126,7 @@
     },
     "/api/documents": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "List Docs",
         "operationId": "list_docs_api_documents_get",
         "parameters": [
@@ -1444,9 +1384,7 @@
     },
     "/api/documents/{doc_id}": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Get Doc",
         "operationId": "get_doc_api_documents__doc_id__get",
         "parameters": [
@@ -1482,9 +1420,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Update Doc",
         "operationId": "update_doc_api_documents__doc_id__patch",
         "parameters": [
@@ -1530,9 +1466,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Delete Doc",
         "description": "Delete a document and its file from disk. Gracefully handles in-progress processing.",
         "operationId": "delete_doc_api_documents__doc_id__delete",
@@ -1571,9 +1505,7 @@
     },
     "/api/documents/{doc_id}/cancel": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Cancel Processing",
         "description": "Cancel processing of a document. Requires write access.\n\nBelt-and-braces: we both set the cooperative ``cancelled_docs`` flag\n(honoured at phase boundaries inside the pipeline) and hard-cancel the\nrunning asyncio task if one is registered. The hard cancel aborts any\nin-flight ``await`` immediately (httpx POST, DB write), so the gate\nslot releases and the processing chip clears without waiting for the\nLLM request to finish on its own.",
         "operationId": "cancel_processing_api_documents__doc_id__cancel_post",
@@ -1612,9 +1544,7 @@
     },
     "/api/documents/{doc_id}/move": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Move Doc",
         "description": "Reassign a document to a different patient, moving the file on disk.",
         "operationId": "move_doc_api_documents__doc_id__move_post",
@@ -1663,9 +1593,7 @@
     },
     "/api/documents/{doc_id}/stages": {
       "get": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Get Doc Stages",
         "description": "Per-document pipeline stage timeline.\n\nReturns rows in chronological order (oldest first) so the UI can group\nruns (upload \u2192 reprocess \u2192 reprocess) without re-sorting.",
         "operationId": "get_doc_stages_api_documents__doc_id__stages_get",
@@ -1704,9 +1632,7 @@
     },
     "/api/documents/{doc_id}/reprocess": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Reprocess Doc",
         "description": "Queue a document for reprocessing. Requires write access.\n\nReprocess goes through the same single-threaded pipeline worker queue as\nfresh uploads. The previous implementation spawned the reprocess as an\nasyncio task on the FastAPI loop, which ran in parallel with the worker\nloop and let two docs hit the same Ollama server at the same time.",
         "operationId": "reprocess_doc_api_documents__doc_id__reprocess_post",
@@ -1757,9 +1683,7 @@
     },
     "/api/documents/{doc_id}/translate": {
       "post": {
-        "tags": [
-          "documents"
-        ],
+        "tags": ["documents"],
         "summary": "Translate Doc",
         "description": "Queue an on-demand English translation of the document body.\n\nRe-uses the cached ``ocr_text`` \u2014 does not run OCR again. Result is\npersisted to ``documents.ocr_text_en``, overwriting any prior run.",
         "operationId": "translate_doc_api_documents__doc_id__translate_post",
@@ -1806,11 +1730,154 @@
         }
       }
     },
+    "/api/documents/{doc_id}/translate-region": {
+      "post": {
+        "tags": ["documents"],
+        "summary": "Translate Region Endpoint",
+        "description": "Queue OCR + translation of a user-selected rectangle on one page.\n\nPre-allocates a row in ``region_translations`` with the bbox so the\nUI can show a placeholder while the worker fills in the OCR text,\ntranslation, and thumbnail.",
+        "operationId": "translate_region_endpoint_api_documents__doc_id__translate_region_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRegionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/region-translations/{region_id}": {
+      "delete": {
+        "tags": ["documents"],
+        "summary": "Delete Region Translation",
+        "description": "Delete a region translation row and its thumbnail file (if present).",
+        "operationId": "delete_region_translation_api_documents__doc_id__region_translations__region_id__delete",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+      "get": {
+        "tags": ["documents"],
+        "summary": "Get Region Thumbnail",
+        "description": "Serve the cropped PNG thumbnail for a region translation.",
+        "operationId": "get_region_thumbnail_api_documents__doc_id__region_translations__region_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/encounters/{encounter_id}": {
       "patch": {
-        "tags": [
-          "records"
-        ],
+        "tags": ["records"],
         "summary": "Update Encounter",
         "description": "Edit an encounter's diagnosis / specialty / notes inline.\n\n``diagnosis_original`` and ``specialty_original`` resolve to canonical\nnorm_* ids on the same row so the detail-view join (which displays via\n``norm_*`` tables) reflects the change.",
         "operationId": "update_encounter_api_encounters__encounter_id__patch",
@@ -1857,9 +1924,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "records"
-        ],
+        "tags": ["records"],
         "summary": "Delete Encounter",
         "description": "Remove an encounter row. The parent document is left untouched \u2014\nonly this single extracted record is dropped.",
         "operationId": "delete_encounter_api_encounters__encounter_id__delete",
@@ -1898,9 +1963,7 @@
     },
     "/api/medications/{medication_id}": {
       "patch": {
-        "tags": [
-          "records"
-        ],
+        "tags": ["records"],
         "summary": "Update Medication",
         "description": "Edit a medication row inline. ``active_ingredient_original`` resolves\nto ``norm_medication_id`` so future extractions pick up the alias.",
         "operationId": "update_medication_api_medications__medication_id__patch",
@@ -1947,9 +2010,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "records"
-        ],
+        "tags": ["records"],
         "summary": "Delete Medication",
         "description": "Remove a medication row. The parent document is left untouched.",
         "operationId": "delete_medication_api_medications__medication_id__delete",
@@ -1988,9 +2049,7 @@
     },
     "/api/events": {
       "get": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "List Events",
         "description": "List medical events, optionally filtered by patient and type.",
         "operationId": "list_events_api_events_get",
@@ -2056,9 +2115,7 @@
         }
       },
       "post": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Create Event",
         "operationId": "create_event_api_events_post",
         "requestBody": {
@@ -2097,9 +2154,7 @@
     },
     "/api/events/{event_id}": {
       "get": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Get Event",
         "description": "Get a single event with its linked documents.",
         "operationId": "get_event_api_events__event_id__get",
@@ -2138,9 +2193,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Update Event",
         "operationId": "update_event_api_events__event_id__patch",
         "parameters": [
@@ -2188,9 +2241,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Delete Event",
         "operationId": "delete_event_api_events__event_id__delete",
         "parameters": [
@@ -2240,9 +2291,7 @@
     },
     "/api/events/{event_id}/link": {
       "post": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Link Document To Event",
         "description": "Link a document to a medical event.",
         "operationId": "link_document_to_event_api_events__event_id__link_post",
@@ -2293,9 +2342,7 @@
     },
     "/api/events/{event_id}/link/{document_id}": {
       "delete": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Unlink Document From Event",
         "operationId": "unlink_document_from_event_api_events__event_id__link__document_id__delete",
         "parameters": [
@@ -2344,9 +2391,7 @@
     },
     "/api/events/suggest-for-document/{doc_id}": {
       "post": {
-        "tags": [
-          "events"
-        ],
+        "tags": ["events"],
         "summary": "Suggest Events For Document",
         "description": "Use LLM to suggest which medical event a document belongs to, or suggest creating a new one.",
         "operationId": "suggest_events_for_document_api_events_suggest_for_document__doc_id__post",
@@ -2387,9 +2432,7 @@
     },
     "/api/lab-results": {
       "get": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "List Lab Results",
         "operationId": "list_lab_results_api_lab_results_get",
         "parameters": [
@@ -2502,9 +2545,7 @@
         }
       },
       "post": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "Create Lab Result",
         "description": "Create a lab result tied to a document.\n\nPatient is derived from the document so the caller can't attach a lab row\nto another patient's document. The document must already have a patient.",
         "operationId": "create_lab_result_api_lab_results_post",
@@ -2542,9 +2583,7 @@
     },
     "/api/lab-results/orphans": {
       "get": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "List Orphan Lab Results",
         "description": "Lab results whose document_id no longer points to an existing document.\n\nScoped to patients the current user has access to (same rule as the list\nendpoint). Explicit patient_id narrows the result further.",
         "operationId": "list_orphan_lab_results_api_lab_results_orphans_get",
@@ -2590,9 +2629,7 @@
     },
     "/api/lab-results/timeline": {
       "get": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "Lab Timeline",
         "description": "Get time-series data for a specific test for charting.",
         "operationId": "lab_timeline_api_lab_results_timeline_get",
@@ -2640,9 +2677,7 @@
     },
     "/api/lab-results/{result_id}": {
       "patch": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "Update Lab Result",
         "operationId": "update_lab_result_api_lab_results__result_id__patch",
         "parameters": [
@@ -2688,9 +2723,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "lab-results"
-        ],
+        "tags": ["lab-results"],
         "summary": "Delete Lab Result",
         "operationId": "delete_lab_result_api_lab_results__result_id__delete",
         "parameters": [
@@ -2728,9 +2761,7 @@
     },
     "/api/imaging": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "List Imaging Studies",
         "description": "List imaging studies. Mirrors the documents-list shape: search,\nfilters, sort, paginated results with ``total`` count.",
         "operationId": "list_imaging_studies_api_imaging_get",
@@ -2915,9 +2946,7 @@
     },
     "/api/imaging/{study_id}": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Get Imaging Study",
         "operationId": "get_imaging_study_api_imaging__study_id__get",
         "parameters": [
@@ -2955,9 +2984,7 @@
     },
     "/api/imaging/{study_id}/series/{series_id}/frames": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "List Frames",
         "operationId": "list_frames_api_imaging__study_id__series__series_id__frames_get",
         "parameters": [
@@ -3004,9 +3031,7 @@
     },
     "/api/imaging/{study_id}/series/{series_id}/frame/{index}": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Get Frame",
         "description": "Serve a frame as PNG (default) or raw DICOM.\n\n``wc`` and ``ww`` override the DICOM file's WindowCenter / WindowWidth\nso MRI users can adjust contrast / brightness from the viewer without\nre-decoding pixel data on the client. Both must be supplied together;\notherwise the file's own VOI LUT is used (or a default min-max\nnormalisation when none is present).\n\n``upscale`` (1-4) bicubic-resamples the PNG to N\u00d7 the source size before\nencoding. The viewer asks for ``upscale=2`` once the user zooms past\n~1.5\u00d7 and ``upscale=4`` past ~3\u00d7, trading bandwidth for sharpness so\nthe canvas-scale fallback no longer pixelates.",
         "operationId": "get_frame_api_imaging__study_id__series__series_id__frame__index__get",
@@ -3128,9 +3153,7 @@
     },
     "/api/imaging/{study_id}/series/{series_id}/frame/{index}/metadata": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Get Frame Metadata",
         "description": "Return the DICOM tags of a single frame as a JSON dict.\n\nUsed by the viewer's \"Metadata\" panel \u2014 gives the user the full DICOM\nheader without leaving the page. Pixel data and other large binary\nblobs are filtered out so the payload stays small (typically a few\nhundred tags). Tags whose value can't be represented as plain JSON\nare coerced to ``str(value)``.",
         "operationId": "get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get",
@@ -3187,9 +3210,7 @@
     },
     "/api/imaging/{study_id}/series/{series_id}/frame/{index}/window": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Get Frame Window",
         "description": "Return the file's effective window center / width for a frame.\n\nLightweight cousin of ``/metadata`` \u2014 only reads the two VOI tags\nso the viewer can position its sliders at the actual auto value\ninstead of an arbitrary midpoint. Returns ``null`` for either axis\nwhen the DICOM file doesn't carry that tag (the viewer falls back\nto a min/max stretch in that case).",
         "operationId": "get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get",
@@ -3246,9 +3267,7 @@
     },
     "/api/imaging/{study_id}/bundle-files": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "List Bundle Files",
         "description": "List the auxiliary files (DICOMDIR, JPEG previews, LOCKFILE, etc.)\nthat came in the same zip bundle as this study's DICOM frames.\n\nReturns ``[{name, size, kind}]`` entries the UI can render and link to\nvia the ``GET .../bundle-file/{name}`` route.",
         "operationId": "list_bundle_files_api_imaging__study_id__bundle_files_get",
@@ -3287,9 +3306,7 @@
     },
     "/api/imaging/{study_id}/bundle-file/{name}": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Get Bundle File",
         "description": "Download a bundle file by name (the same string returned by the\nlist endpoint). Path traversal is rejected via ``safe_vault_join``.",
         "operationId": "get_bundle_file_api_imaging__study_id__bundle_file__name__get",
@@ -3337,9 +3354,7 @@
     },
     "/api/imaging/{study_id}/links": {
       "get": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "List Imaging Links",
         "description": "Documents linked to this imaging study.\n\nThe first item is ALWAYS the parent radiology report \u2014 even though\ntechnically it isn't a row in ``document_links`` (the imaging study\nis a child of that document). Surfacing it as a synthetic link\nmeans clinicians see the report in the same place as any other\nrelated document. The synthetic entry is marked with\n``link_type='report'`` and ``link_id=null`` so the frontend doesn't\noffer an \"unlink\" affordance for it (you can't unlink a parent).",
         "operationId": "list_imaging_links_api_imaging__study_id__links_get",
@@ -3376,9 +3391,7 @@
         }
       },
       "post": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Add Imaging Link",
         "description": "Link an existing document (e.g. a radiology report) to this study.",
         "operationId": "add_imaging_link_api_imaging__study_id__links_post",
@@ -3427,9 +3440,7 @@
     },
     "/api/imaging/{study_id}/metadata": {
       "patch": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Update Imaging Metadata",
         "description": "Update imaging-specific metadata (modality, body part, accession,\nstudy description). Doctor / facility / event_date / patient are\nedited on the parent ``documents`` row via PATCH /api/documents/{id};\nthose fields are NOT accepted here so the two endpoints can't drift.\n\nEvery accepted field is recorded in ``extraction_corrections`` so the\nsame correction-driven learning that documents use applies to\nimaging too \u2014 when the user fixes ``modality`` on one study the LLM\nsees the correction as a few-shot example for similar future studies.",
         "operationId": "update_imaging_metadata_api_imaging__study_id__metadata_patch",
@@ -3478,9 +3489,7 @@
     },
     "/api/imaging/{study_id}/links/{link_id}": {
       "delete": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Remove Imaging Link",
         "description": "Remove a document_links row. Validates the link belongs to this study.",
         "operationId": "remove_imaging_link_api_imaging__study_id__links__link_id__delete",
@@ -3528,9 +3537,7 @@
     },
     "/api/imaging/{study_id}/report": {
       "post": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Attach Imaging Report",
         "description": "Attach a radiology report PDF to an imaging study.\n\nTwo flows:\n  - **Link existing**: pass ``?document_id=<id>`` (or JSON body\n    ``{\"document_id\": <id>}``) \u2014 the study's parent document is\n    repointed at that PDF; the placeholder is deleted.\n  - **Upload new**: post a multipart ``file=<pdf>``. The PDF lands\n    in the inbox like any other upload and is processed by the\n    standard pipeline; on completion the placeholder is replaced\n    by the new document.\n\nPDF-only is enforced for uploads. The caller must have write access\nto the study's patient.",
         "operationId": "attach_imaging_report_api_imaging__study_id__report_post",
@@ -3592,9 +3599,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "imaging"
-        ],
+        "tags": ["imaging"],
         "summary": "Detach Imaging Report",
         "description": "Detach the report PDF from an imaging study.\n\nRepoints the study at a fresh placeholder document so the user can\nattach a different report later. The previously-attached document\nis left untouched on disk and in the documents table \u2014 it just\nstops being the imaging study's parent. The user can still find it\nin the documents list and re-attach (or delete) it from there.\n\nNo-op when the study is already a placeholder.",
         "operationId": "detach_imaging_report_api_imaging__study_id__report_delete",
@@ -3633,9 +3638,7 @@
     },
     "/api/chat": {
       "post": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "Chat",
         "operationId": "chat_api_chat_post",
         "requestBody": {
@@ -3672,9 +3675,7 @@
     },
     "/api/chat/history": {
       "get": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "Chat History",
         "operationId": "chat_history_api_chat_history_get",
         "parameters": [
@@ -3717,9 +3718,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "chat"
-        ],
+        "tags": ["chat"],
         "summary": "Clear Chat History",
         "operationId": "clear_chat_history_api_chat_history_delete",
         "parameters": [
@@ -3764,9 +3763,7 @@
     },
     "/api/normalization/{norm_type}": {
       "get": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "List Norms",
         "operationId": "list_norms_api_normalization__norm_type__get",
         "parameters": [
@@ -3836,9 +3833,7 @@
     },
     "/api/normalization/{norm_type}/{norm_id}": {
       "get": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Get Norm",
         "operationId": "get_norm_api_normalization__norm_type___norm_id__get",
         "parameters": [
@@ -3883,9 +3878,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Update Norm",
         "operationId": "update_norm_api_normalization__norm_type___norm_id__patch",
         "parameters": [
@@ -3940,9 +3933,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Delete Norm",
         "operationId": "delete_norm_api_normalization__norm_type___norm_id__delete",
         "parameters": [
@@ -3989,9 +3980,7 @@
     },
     "/api/normalization/{norm_type}/{norm_id}/aliases": {
       "post": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Add Alias",
         "operationId": "add_alias_api_normalization__norm_type___norm_id__aliases_post",
         "parameters": [
@@ -4048,9 +4037,7 @@
     },
     "/api/normalization/{norm_type}/aliases/{alias_id}": {
       "delete": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Remove Alias",
         "operationId": "remove_alias_api_normalization__norm_type__aliases__alias_id__delete",
         "parameters": [
@@ -4097,9 +4084,7 @@
     },
     "/api/normalization/{norm_type}/{norm_id}/confirm": {
       "post": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Confirm Aliases",
         "operationId": "confirm_aliases_api_normalization__norm_type___norm_id__confirm_post",
         "parameters": [
@@ -4146,9 +4131,7 @@
     },
     "/api/normalization/{norm_type}/merge": {
       "post": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Merge Norms",
         "operationId": "merge_norms_api_normalization__norm_type__merge_post",
         "parameters": [
@@ -4196,9 +4179,7 @@
     },
     "/api/normalization/{norm_type}/merge-batch": {
       "post": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Merge Norms Batch",
         "operationId": "merge_norms_batch_api_normalization__norm_type__merge_batch_post",
         "parameters": [
@@ -4246,9 +4227,7 @@
     },
     "/api/normalization/{norm_type}/{norm_id}/documents": {
       "get": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "List Linked Documents",
         "operationId": "list_linked_documents_api_normalization__norm_type___norm_id__documents_get",
         "parameters": [
@@ -4295,9 +4274,7 @@
     },
     "/api/normalization/{norm_type}/auto-merge": {
       "post": {
-        "tags": [
-          "normalization"
-        ],
+        "tags": ["normalization"],
         "summary": "Auto Merge Proposals",
         "description": "Ask the configured General LLM to propose merge groups. Does NOT execute any merge.",
         "operationId": "auto_merge_proposals_api_normalization__norm_type__auto_merge_post",
@@ -4336,9 +4313,7 @@
     },
     "/api/pipeline/status": {
       "get": {
-        "tags": [
-          "pipeline"
-        ],
+        "tags": ["pipeline"],
         "summary": "Get Pipeline Status",
         "operationId": "get_pipeline_status_api_pipeline_status_get",
         "responses": {
@@ -4355,9 +4330,7 @@
     },
     "/api/pipeline/start": {
       "post": {
-        "tags": [
-          "pipeline"
-        ],
+        "tags": ["pipeline"],
         "summary": "Start Pipeline",
         "description": "Start the pipeline watcher at runtime.",
         "operationId": "start_pipeline_api_pipeline_start_post",
@@ -4375,9 +4348,7 @@
     },
     "/api/pipeline/stop": {
       "post": {
-        "tags": [
-          "pipeline"
-        ],
+        "tags": ["pipeline"],
         "summary": "Stop Pipeline",
         "description": "Stop the pipeline watcher at runtime.",
         "operationId": "stop_pipeline_api_pipeline_stop_post",
@@ -4395,9 +4366,7 @@
     },
     "/api/settings/logs": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Logs",
         "description": "Get recent application logs from the in-memory buffer.",
         "operationId": "get_logs_api_settings_logs_get",
@@ -4469,9 +4438,7 @@
     },
     "/api/settings/audit-log": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Audit Log",
         "description": "Get audit log entries (admin only).",
         "operationId": "get_audit_log_api_settings_audit_log_get",
@@ -4555,9 +4522,7 @@
     },
     "/api/settings/backup": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Download Backup",
         "description": "Download a SQLite backup of the database.",
         "operationId": "download_backup_api_settings_backup_get",
@@ -4575,9 +4540,7 @@
     },
     "/api/settings/backup/files": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "List Scheduled Backups",
         "description": "List files in the scheduled-backup directory, newest-first.",
         "operationId": "list_scheduled_backups_api_settings_backup_files_get",
@@ -4595,9 +4558,7 @@
     },
     "/api/settings/backup/files/{name}": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Download Scheduled Backup",
         "description": "Download a single scheduled-backup file.",
         "operationId": "download_scheduled_backup_api_settings_backup_files__name__get",
@@ -4634,9 +4595,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Delete Scheduled Backup",
         "description": "Delete a scheduled-backup file (admin only).",
         "operationId": "delete_scheduled_backup_api_settings_backup_files__name__delete",
@@ -4675,9 +4634,7 @@
     },
     "/api/settings/backup/run": {
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Run Scheduled Backup",
         "description": "Trigger a backup immediately using the configured scope. Returns the\nwritten filename.",
         "operationId": "run_scheduled_backup_api_settings_backup_run_post",
@@ -4695,9 +4652,7 @@
     },
     "/api/settings/prompts": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "List Prompts",
         "operationId": "list_prompts_api_settings_prompts_get",
         "responses": {
@@ -4714,9 +4669,7 @@
     },
     "/api/settings/prompts/{key}": {
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Prompt",
         "operationId": "update_prompt_api_settings_prompts__key__put",
         "parameters": [
@@ -4762,9 +4715,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Reset Prompt",
         "operationId": "reset_prompt_api_settings_prompts__key__delete",
         "parameters": [
@@ -4802,9 +4753,7 @@
     },
     "/api/settings/llm-providers": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Llm Providers",
         "description": "Get the ordered list of LLM providers.",
         "operationId": "get_llm_providers_api_settings_llm_providers_get",
@@ -4820,9 +4769,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Llm Providers",
         "description": "Replace the full list of LLM providers. API keys sent as empty string are preserved.",
         "operationId": "update_llm_providers_api_settings_llm_providers_put",
@@ -4865,9 +4812,7 @@
     },
     "/api/settings/ocr-providers": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Ocr Providers",
         "description": "Get the ordered list of OCR providers.",
         "operationId": "get_ocr_providers_api_settings_ocr_providers_get",
@@ -4883,9 +4828,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Ocr Providers",
         "description": "Replace the full list of OCR providers.",
         "operationId": "update_ocr_providers_api_settings_ocr_providers_put",
@@ -4928,9 +4871,7 @@
     },
     "/api/settings/vision-providers": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Vision Providers",
         "description": "Get the ordered list of Vision-LLM providers.",
         "operationId": "get_vision_providers_api_settings_vision_providers_get",
@@ -4946,9 +4887,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Vision Providers",
         "description": "Replace the full list of Vision-LLM providers. API keys sent as empty string are preserved.",
         "operationId": "update_vision_providers_api_settings_vision_providers_put",
@@ -4991,9 +4930,7 @@
     },
     "/api/settings/credentials": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Credentials",
         "description": "Return the shared credentials list with api_key masked + reference counts.",
         "operationId": "get_credentials_api_settings_credentials_get",
@@ -5009,9 +4946,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Credentials",
         "description": "Replace the full credentials list. Missing ids are generated; missing\napi_key values preserve the stored secret.",
         "operationId": "update_credentials_api_settings_credentials_put",
@@ -5054,9 +4989,7 @@
     },
     "/api/settings/general-llm": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get General Llm",
         "description": "Return the general (non-pipeline) LLM configuration. Concurrency\ncomes from the referenced credential.",
         "operationId": "get_general_llm_api_settings_general_llm_get",
@@ -5072,9 +5005,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update General Llm",
         "description": "Replace the general LLM settings.",
         "operationId": "update_general_llm_api_settings_general_llm_put",
@@ -5112,9 +5043,7 @@
     },
     "/api/settings/test-llm-provider": {
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Test Llm Provider",
         "description": "Test connectivity to an LLM provider via its metadata endpoint.\n\nHits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),\nor ``client.models.list()`` (Anthropic). Free, instant, validates auth\nand that the configured model is available \u2014 without acquiring an\ninference slot or burning tokens.",
         "operationId": "test_llm_provider_api_settings_test_llm_provider_post",
@@ -5152,9 +5081,7 @@
     },
     "/api/settings/test-ocr-provider": {
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Test Ocr Provider",
         "description": "Test connectivity to an OCR provider.",
         "operationId": "test_ocr_provider_api_settings_test_ocr_provider_post",
@@ -5192,9 +5119,7 @@
     },
     "/api/settings/test-vision-provider": {
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Test Vision Provider",
         "description": "Test connectivity to a Vision-LLM provider via its metadata endpoint.\n\nSame probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),\n``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).\nNo image is uploaded, no inference is run.",
         "operationId": "test_vision_provider_api_settings_test_vision_provider_post",
@@ -5232,9 +5157,7 @@
     },
     "/api/settings/users": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "List Users",
         "operationId": "list_users_api_settings_users_get",
         "responses": {
@@ -5249,9 +5172,7 @@
         }
       },
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Create User",
         "operationId": "create_user_api_settings_users_post",
         "requestBody": {
@@ -5288,9 +5209,7 @@
     },
     "/api/settings/users/{user_id}": {
       "patch": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update User",
         "operationId": "update_user_api_settings_users__user_id__patch",
         "parameters": [
@@ -5336,9 +5255,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Delete User",
         "operationId": "delete_user_api_settings_users__user_id__delete",
         "parameters": [
@@ -5376,9 +5293,7 @@
     },
     "/api/settings/users/{user_id}/access": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get User Access",
         "operationId": "get_user_access_api_settings_users__user_id__access_get",
         "parameters": [
@@ -5414,9 +5329,7 @@
         }
       },
       "post": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Grant Access",
         "operationId": "grant_access_api_settings_users__user_id__access_post",
         "parameters": [
@@ -5464,9 +5377,7 @@
     },
     "/api/settings/users/{user_id}/access/{patient_id}": {
       "delete": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Revoke Access",
         "operationId": "revoke_access_api_settings_users__user_id__access__patient_id__delete",
         "parameters": [
@@ -5513,9 +5424,7 @@
     },
     "/api/settings/sessions": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "List Sessions",
         "description": "List server-side sessions with user + activity details.\n\nBy default shows only sessions that are still usable (not revoked, not\nexpired). Pass ``include_revoked=true`` to include the rest for audit.",
         "operationId": "list_sessions_api_settings_sessions_get",
@@ -5555,9 +5464,7 @@
     },
     "/api/settings/sessions/{session_id}": {
       "delete": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Revoke Session Endpoint",
         "description": "Revoke a session. The owner of that session is effectively logged out\non their next request.",
         "operationId": "revoke_session_endpoint_api_settings_sessions__session_id__delete",
@@ -5596,9 +5503,7 @@
     },
     "/api/settings/view-prefs/{view_key}": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get View Prefs",
         "description": "Return the user's stored prefs for ``view_key`` or ``null`` keys\nwhen no row exists. Frontend treats null as \"use defaults\".",
         "operationId": "get_view_prefs_api_settings_view_prefs__view_key__get",
@@ -5635,9 +5540,7 @@
         }
       },
       "put": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Set View Prefs",
         "operationId": "set_view_prefs_api_settings_view_prefs__view_key__put",
         "parameters": [
@@ -5685,9 +5588,7 @@
     },
     "/api/settings": {
       "get": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Get Settings",
         "operationId": "get_settings_api_settings_get",
         "responses": {
@@ -5702,9 +5603,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "settings"
-        ],
+        "tags": ["settings"],
         "summary": "Update Settings",
         "description": "Update settings: persists to YAML and updates in-memory config.",
         "operationId": "update_settings_api_settings_patch",
@@ -5742,9 +5641,7 @@
     },
     "/api/vault/tree": {
       "get": {
-        "tags": [
-          "vault"
-        ],
+        "tags": ["vault"],
         "summary": "Get Vault Tree",
         "description": "Get the vault directory structure as a browsable tree.",
         "operationId": "get_vault_tree_api_vault_tree_get",
@@ -5792,9 +5689,7 @@
     },
     "/api/vault/file": {
       "delete": {
-        "tags": [
-          "vault"
-        ],
+        "tags": ["vault"],
         "summary": "Delete Vault File",
         "description": "Delete a file from the vault and its matching document record.",
         "operationId": "delete_vault_file_api_vault_file_delete",
@@ -5835,9 +5730,7 @@
     },
     "/api/vault/move": {
       "post": {
-        "tags": [
-          "vault"
-        ],
+        "tags": ["vault"],
         "summary": "Move Vault File",
         "description": "Move a file (or imaging study folder) within the vault and keep the\nmatching document record's ``file_path`` in sync.\n\nUse case: a file was misclassified by date / event and the user wants\nto drag it into the right folder without losing the document reference\n(so document-detail links, OCR cache, lab results etc. all keep\nworking). The DB row is updated atomically with the disk move; if the\ndestination already exists or the access check fails the move is\nrejected.",
         "operationId": "move_vault_file_api_vault_move_post",
@@ -5875,9 +5768,7 @@
     },
     "/api/setup/status": {
       "get": {
-        "tags": [
-          "setup"
-        ],
+        "tags": ["setup"],
         "summary": "Setup Status",
         "description": "Check if initial setup is needed (no users exist).",
         "operationId": "setup_status_api_setup_status_get",
@@ -5895,9 +5786,7 @@
     },
     "/api/setup/complete": {
       "post": {
-        "tags": [
-          "setup"
-        ],
+        "tags": ["setup"],
         "summary": "Setup Complete",
         "description": "Create the first admin user and first patient.",
         "operationId": "setup_complete_api_setup_complete_post",
@@ -5955,9 +5844,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "alias"
-        ],
+        "required": ["alias"],
         "title": "AliasCreate"
       },
       "BatchScheduleRequest": {
@@ -5982,9 +5869,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "document_ids"
-        ],
+        "required": ["document_ids"],
         "title": "BatchScheduleRequest"
       },
       "Body_attach_imaging_report_api_imaging__study_id__report_post": {
@@ -6014,9 +5899,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "file"
-        ],
+        "required": ["file"],
         "title": "Body_replace_document_file_api_documents__doc_id__replace_file_post"
       },
       "Body_upload_document_api_documents_upload_post": {
@@ -6028,9 +5911,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "file"
-        ],
+        "required": ["file"],
         "title": "Body_upload_document_api_documents_upload_post"
       },
       "ChatRequest": {
@@ -6054,9 +5935,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "message"
-        ],
+        "required": ["message"],
         "title": "ChatRequest"
       },
       "DocumentEditRequest": {
@@ -6067,9 +5946,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "instruction"
-        ],
+        "required": ["instruction"],
         "title": "DocumentEditRequest"
       },
       "DocumentLinkRequest": {
@@ -6084,10 +5961,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "target_document_id",
-          "link_type"
-        ],
+        "required": ["target_document_id", "link_type"],
         "title": "DocumentLinkRequest"
       },
       "DocumentMoveRequest": {
@@ -6098,9 +5972,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "patient_id"
-        ],
+        "required": ["patient_id"],
         "title": "DocumentMoveRequest"
       },
       "DocumentUpdate": {
@@ -6473,10 +6345,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "patient_id",
-          "title"
-        ],
+        "required": ["patient_id", "title"],
         "title": "EventCreate"
       },
       "EventCreateResponse": {
@@ -6491,10 +6360,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "title"
-        ],
+        "required": ["id", "title"],
         "title": "EventCreateResponse"
       },
       "EventLinkRequest": {
@@ -6510,9 +6376,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "document_id"
-        ],
+        "required": ["document_id"],
         "title": "EventLinkRequest"
       },
       "EventOkResponse": {
@@ -6523,9 +6387,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "ok"
-        ],
+        "required": ["ok"],
         "title": "EventOkResponse"
       },
       "EventSuggestion": {
@@ -6936,10 +6798,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "document_id",
-          "test_name_original"
-        ],
+        "required": ["document_id", "test_name_original"],
         "title": "LabResultCreate"
       },
       "LabResultUpdate": {
@@ -7082,9 +6941,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "target_document_id"
-        ],
+        "required": ["target_document_id"],
         "title": "LinkRequest"
       },
       "LinkedDocument": {
@@ -7181,10 +7038,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "link_id",
-          "document_id"
-        ],
+        "required": ["link_id", "document_id"],
         "title": "LinkedDocument"
       },
       "LoginRequest": {
@@ -7203,10 +7057,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "LoginRequest"
       },
       "MedicalEvent": {
@@ -7393,12 +7244,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "patient_id",
-          "title",
-          "event_type"
-        ],
+        "required": ["id", "patient_id", "title", "event_type"],
         "title": "MedicalEvent"
       },
       "MedicalEventDetail": {
@@ -7593,12 +7439,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "patient_id",
-          "title",
-          "event_type"
-        ],
+        "required": ["id", "patient_id", "title", "event_type"],
         "title": "MedicalEventDetail"
       },
       "MedicationPatch": {
@@ -7723,9 +7564,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "source_ids"
-        ],
+        "required": ["source_ids"],
         "title": "MergeBatchRequest"
       },
       "MergeRequest": {
@@ -7740,10 +7579,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "source_id",
-          "target_id"
-        ],
+        "required": ["source_id", "target_id"],
         "title": "MergeRequest"
       },
       "MoveRequest": {
@@ -7758,10 +7594,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "from_path",
-          "to_path"
-        ],
+        "required": ["from_path", "to_path"],
         "title": "MoveRequest"
       },
       "NewEventSuggestion": {
@@ -7826,10 +7659,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "canonical_code",
-          "canonical_display"
-        ],
+        "required": ["canonical_code", "canonical_display"],
         "title": "NewTarget"
       },
       "NormUpdate": {
@@ -7873,9 +7703,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "patient_id"
-        ],
+        "required": ["patient_id"],
         "title": "PatientAccessGrant"
       },
       "PatientCreate": {
@@ -7908,9 +7736,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "display_name"
-        ],
+        "required": ["display_name"],
         "title": "PatientCreate"
       },
       "PatientDeleteResponse": {
@@ -7925,10 +7751,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "status",
-          "patient_id"
-        ],
+        "required": ["status", "patient_id"],
         "title": "PatientDeleteResponse"
       },
       "PatientDetail": {
@@ -7996,11 +7819,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "slug",
-          "display_name"
-        ],
+        "required": ["id", "slug", "display_name"],
         "title": "PatientDetail"
       },
       "PatientSummary": {
@@ -8063,11 +7882,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "id",
-          "slug",
-          "display_name"
-        ],
+        "required": ["id", "slug", "display_name"],
         "title": "PatientSummary"
       },
       "PatientUpdate": {
@@ -8117,10 +7932,39 @@
           }
         },
         "type": "object",
-        "required": [
-          "text"
-        ],
+        "required": ["text"],
         "title": "PromptUpdate"
+      },
+      "RegionBbox": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X"
+          },
+          "y": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y"
+          },
+          "w": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "W"
+          },
+          "h": {
+            "type": "number",
+            "maximum": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "H"
+          }
+        },
+        "type": "object",
+        "required": ["x", "y", "w", "h"],
+        "title": "RegionBbox"
       },
       "RelinkRequest": {
         "properties": {
@@ -8131,9 +7975,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "vault_path"
-        ],
+        "required": ["vault_path"],
         "title": "RelinkRequest"
       },
       "RenameRequest": {
@@ -8146,21 +7988,14 @@
           }
         },
         "type": "object",
-        "required": [
-          "filename"
-        ],
+        "required": ["filename"],
         "title": "RenameRequest"
       },
       "ReprocessRequest": {
         "properties": {
           "mode": {
             "type": "string",
-            "enum": [
-              "ocr",
-              "llm",
-              "both",
-              "vision_llm"
-            ],
+            "enum": ["ocr", "llm", "both", "vision_llm"],
             "title": "Mode",
             "default": "both"
           },
@@ -8805,12 +8640,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password",
-          "display_name",
-          "patient_name"
-        ],
+        "required": ["username", "password", "display_name", "patient_name"],
         "title": "SetupRequest"
       },
       "TestProviderRequest": {
@@ -8842,6 +8672,44 @@
         "type": "object",
         "title": "TestProviderRequest",
         "description": "Test-connection request.\n\nEither pass ``provider_id`` (tests the persisted entry with that id) or\npass ``provider`` (an inline, possibly-unsaved entry). When both are set\nthe inline entry wins \u2014 this lets the UI test pending edits before the\nuser clicks Save."
+      },
+      "TranslateRegionRequest": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/RegionBbox"
+          },
+          "ocr_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Provider Id"
+          },
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id"
+          }
+        },
+        "type": "object",
+        "required": ["page", "bbox"],
+        "title": "TranslateRegionRequest",
+        "description": "Bbox is in normalized [0,1] coords relative to the page width/height."
       },
       "TranslateRequest": {
         "properties": {
@@ -8888,10 +8756,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "username",
-          "password"
-        ],
+        "required": ["username", "password"],
         "title": "UserCreate"
       },
       "UserUpdate": {
@@ -8966,11 +8831,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
+        "required": ["loc", "msg", "type"],
         "title": "ValidationError"
       },
       "ViewPrefsBody": {

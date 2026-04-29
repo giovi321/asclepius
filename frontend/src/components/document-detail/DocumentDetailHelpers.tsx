@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
 import {
+  ChevronDown,
   Eye,
   EyeOff,
   Pencil,
@@ -28,22 +29,99 @@ const NORM_SINGULAR: Record<"doctors" | "facilities" | "specialties", string> =
 
 // ─── Section wrapper ───────────────────────────────────────────
 
+const COLLAPSE_KEY_PREFIX = "docview.collapse.";
+
+/** Read/write the open state for a collapsible section, keyed on
+ * ``sectionId``. Falls back to ``defaultOpen`` when nothing is stored —
+ * call sites pass a ``hasContent``-derived default so empty sections
+ * start collapsed automatically (smart defaults). */
+export function useCollapseState(
+  sectionId: string | undefined,
+  defaultOpen: boolean,
+): readonly [boolean, (next: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    if (!sectionId) return defaultOpen;
+    try {
+      const stored = localStorage.getItem(COLLAPSE_KEY_PREFIX + sectionId);
+      if (stored === "open") return true;
+      if (stored === "closed") return false;
+    } catch {
+      /* ignore quota / privacy mode errors */
+    }
+    return defaultOpen;
+  });
+  const update = (next: boolean) => {
+    setOpen(next);
+    if (sectionId) {
+      try {
+        localStorage.setItem(
+          COLLAPSE_KEY_PREFIX + sectionId,
+          next ? "open" : "closed",
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+  return [open, update] as const;
+}
+
 export function Section({
   title,
   icon: Icon,
   children,
+  sectionId,
+  defaultOpen = true,
+  headerExtra,
 }: {
   title: string;
   icon?: any;
   children: React.ReactNode;
+  /** When provided, the card becomes a collapsible disclosure and its
+   * open/closed state persists to localStorage under this id. */
+  sectionId?: string;
+  /** Initial open state if no preference is stored. Default true. */
+  defaultOpen?: boolean;
+  /** Optional content rendered to the right of the title (e.g. count
+   * badge, model chip). Click events stop propagation so it doesn't
+   * toggle the section. */
+  headerExtra?: React.ReactNode;
 }) {
+  const [open, setOpen] = useCollapseState(sectionId, defaultOpen);
+  if (!sectionId) {
+    return (
+      <div className="rounded-lg border p-4">
+        <h3 className="mb-3 flex items-center gap-2 font-medium">
+          {Icon && <Icon className="h-4 w-4" />}
+          {title}
+        </h3>
+        <div className="space-y-2">{children}</div>
+      </div>
+    );
+  }
   return (
-    <div className="rounded-lg border p-4">
-      <h3 className="mb-3 flex items-center gap-2 font-medium">
-        {Icon && <Icon className="h-4 w-4" />}
-        {title}
-      </h3>
-      <div className="space-y-2">{children}</div>
+    <div className="rounded-lg border">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 hover:bg-accent/50"
+      >
+        <h3 className="flex items-center gap-2 font-medium">
+          {Icon && <Icon className="h-4 w-4" />}
+          {title}
+        </h3>
+        <span className="flex items-center gap-2">
+          {headerExtra && (
+            <span onClick={(e) => e.stopPropagation()}>{headerExtra}</span>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform ${
+              open ? "" : "-rotate-90"
+            }`}
+          />
+        </span>
+      </button>
+      {open && <div className="px-4 pb-4 space-y-2">{children}</div>}
     </div>
   );
 }
@@ -753,6 +831,7 @@ export function EditableSummary({
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
   const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useCollapseState("summary", !!value);
 
   useEffect(() => {
     setVal(value || "");
@@ -772,58 +851,70 @@ export function EditableSummary({
     setSaving(false);
   };
 
-  if (editing) {
-    return (
-      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-        <h3 className="mb-2 text-sm font-medium text-primary">Summary</h3>
-        <textarea
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          className="w-full rounded border bg-background px-3 py-2 text-sm"
-          rows={3}
-          autoFocus
-          disabled={saving}
-        />
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button
-            onClick={() => {
-              setEditing(false);
-              setVal(value || "");
-            }}
-            className="rounded border px-3 py-1.5 text-xs hover:bg-accent"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="rounded-lg border border-primary/20 bg-primary/5 p-4 cursor-pointer hover:bg-primary/10 transition-colors group"
-      onClick={() => setEditing(true)}
-    >
-      <h3 className="mb-1 text-sm font-medium text-primary flex items-center justify-between">
-        Summary
-        <span className="text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">
-          click to edit
-        </span>
-      </h3>
-      <p className="text-sm">
-        {value || (
-          <span className="text-muted-foreground italic">
-            No summary — click to add
-          </span>
-        )}
-      </p>
+    <div className="rounded-lg border border-primary/20 bg-primary/5">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-2 px-4 py-3 hover:bg-primary/10 transition-colors"
+      >
+        <h3 className="text-sm font-medium text-primary">Summary</h3>
+        <ChevronDown
+          className={`h-4 w-4 text-primary/60 transition-transform ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4">
+          {editing ? (
+            <>
+              <textarea
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                className="w-full rounded border bg-background px-3 py-2 text-sm"
+                rows={3}
+                autoFocus
+                disabled={saving}
+              />
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    setVal(value || "");
+                  }}
+                  className="rounded border px-3 py-1.5 text-xs hover:bg-accent"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <div
+              className="cursor-pointer rounded p-1 -m-1 hover:bg-primary/5 group"
+              onClick={() => setEditing(true)}
+            >
+              <p className="text-sm">
+                {value || (
+                  <span className="text-muted-foreground italic">
+                    No summary - click to add
+                  </span>
+                )}
+              </p>
+              <p className="mt-1 text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">
+                click to edit
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1022,7 +1113,7 @@ export function TechnicalDetails({
 // ─── OcrSection (collapsible) ──────────────────────────────────
 
 export function OcrSection({ text }: { text: string | null }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useCollapseState("ocr-text", false);
   if (!text) return null;
   return (
     <div className="rounded-lg border">
@@ -1058,7 +1149,7 @@ export function TranslatedTextSection({
   model: string | null;
   translatedAt: string | null;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useCollapseState("translated-text", true);
   if (!text) return null;
   // Old rows persisted the verbose provider_label ("Display · model_id");
   // newer ones store just the model. Strip the "Display · " prefix when

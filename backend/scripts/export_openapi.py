@@ -33,6 +33,7 @@ def _build_app():
         str(BACKEND_DIR.parent / "config" / "settings.yaml"),
     )
     from asclepius.main import create_app
+
     return create_app()
 
 
@@ -49,7 +50,11 @@ def main() -> int:
     schema = app.openapi()
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
+    # Force LF newlines so the file matches what prettier + git autocrlf
+    # produce on Windows; without this Python's default text mode writes
+    # CRLF on Windows and the openapi-drift / prettier pre-commit hooks
+    # bicker forever over line-ending churn.
+    out_path.write_bytes((json.dumps(schema, indent=2) + "\n").encode("utf-8"))
     print(f"wrote {out_path} ({len(schema.get('paths', {}))} paths)")
     return 0
 

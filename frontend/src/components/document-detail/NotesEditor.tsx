@@ -23,7 +23,11 @@ export default function NotesEditor({ docId, initialNotes }: NotesEditorProps) {
   };
 
   return (
-    <Section title="Notes">
+    <Section
+      title="Notes"
+      sectionId="notes"
+      defaultOpen={!!initialNotes?.trim()}
+    >
       {editing ? (
         <div className="space-y-2">
           <textarea
@@ -41,7 +45,10 @@ export default function NotesEditor({ docId, initialNotes }: NotesEditorProps) {
               Save
             </button>
             <button
-              onClick={() => { setEditing(false); setNotes(initialNotes); }}
+              onClick={() => {
+                setEditing(false);
+                setNotes(initialNotes);
+              }}
               className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
             >
               Cancel

@@ -36,6 +36,8 @@ STAGE_ORGANIZING = "organizing"
 STAGE_THUMBNAIL = "thumbnail"
 STAGE_CACHE_OCR = "cache_ocr"
 STAGE_TRANSLATION = "translation"
+STAGE_REGION_OCR = "region_ocr"
+STAGE_REGION_TRANSLATION = "region_translation"
 
 
 def plan_stages(*, flow: str, mode: str | None = None, has_ocr_text: bool = False) -> list[str]:
@@ -93,7 +95,7 @@ def _provider_for_stage(stage_name: str, providers: dict[str, Any] | None) -> st
     else (LLM extraction, classification, sections, etc.) to the LLM."""
     if not providers:
         return None
-    if stage_name in ("ocr", "cache_ocr"):
+    if stage_name in ("ocr", "cache_ocr", "region_ocr"):
         return providers.get("ocr")
     if stage_name == "vision_extraction":
         return providers.get("vision")

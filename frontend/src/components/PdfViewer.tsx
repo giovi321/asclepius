@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Document, Page } from "react-pdf";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   ZoomIn,
   ZoomOut,
   RotateCw,
   RotateCcw,
+  X,
 } from "lucide-react";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -15,10 +17,26 @@ import "react-pdf/dist/Page/TextLayer.css";
 // Worker is initialised once in main.tsx — not here, to avoid
 // race conditions when React StrictMode double-mounts components.
 
+/** Bbox in normalized [0,1] coords relative to the rendered page. */
+export interface NormalizedBbox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface PdfViewerProps {
   url: string;
   /** Called when user clicks a rotate button. Receives degrees (90 or 270) and page numbers (null = all). */
   onRotate?: (degrees: number, pages: number[] | null) => Promise<void>;
+  /** When true, click-and-drag draws a selection rectangle on the current
+   * page instead of panning. The rectangle is shown with confirm/cancel
+   * controls; ``onSelectionConfirm`` fires only when the user accepts. */
+  selectionMode?: boolean;
+  /** Called when the user confirms a selection. Bbox is normalized [0,1]. */
+  onSelectionConfirm?: (page: number, bbox: NormalizedBbox) => void;
+  /** Called when the user cancels selection mode (clicks the X or hits Esc). */
+  onSelectionCancel?: () => void;
 }
 
 /**
@@ -41,13 +59,20 @@ const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3.0;
 const WHEEL_ZOOM_STEP = 0.1;
 
-export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
+export default function PdfViewer({
+  url,
+  onRotate,
+  selectionMode = false,
+  onSelectionConfirm,
+  onSelectionCancel,
+}: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [userZoomed, setUserZoomed] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageWrapperRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
@@ -60,6 +85,116 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
     scrollLeft: number;
     scrollTop: number;
   } | null>(null);
+
+  // Selection rectangle, in page-local pixel coords. ``drawingRect`` is
+  // the in-flight drag; ``lockedRect`` is what stays after mouseup so the
+  // confirm/cancel toolbar can render without flicker.
+  type SelectionRect = { x: number; y: number; w: number; h: number };
+  const [drawingRect, setDrawingRect] = useState<SelectionRect | null>(null);
+  const [lockedRect, setLockedRect] = useState<SelectionRect | null>(null);
+  const drawOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Clear selection when the user changes pages or exits selection mode.
+  useEffect(() => {
+    setDrawingRect(null);
+    setLockedRect(null);
+    drawOriginRef.current = null;
+  }, [pageNumber, selectionMode]);
+
+  // Esc cancels selection mode entirely.
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawingRect(null);
+        setLockedRect(null);
+        drawOriginRef.current = null;
+        onSelectionCancel?.();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectionMode, onSelectionCancel]);
+
+  // Drag-to-draw selection. Mouse handlers are bound to the page wrapper
+  // (not the outer container) so we can use its bounding rect to convert
+  // clientX/Y to page-local coords.
+  const handleSelectionStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (!selectionMode) return;
+      if (e.button !== 0) return;
+      const wrapper = pageWrapperRef.current;
+      if (!wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      drawOriginRef.current = { x, y };
+      setDrawingRect({ x, y, w: 0, h: 0 });
+      setLockedRect(null);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [selectionMode],
+  );
+
+  useEffect(() => {
+    if (!drawingRect) return;
+    const onMove = (e: MouseEvent) => {
+      const origin = drawOriginRef.current;
+      const wrapper = pageWrapperRef.current;
+      if (!origin || !wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
+      const cx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const cy = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+      const x = Math.min(origin.x, cx);
+      const y = Math.min(origin.y, cy);
+      const w = Math.abs(cx - origin.x);
+      const h = Math.abs(cy - origin.y);
+      setDrawingRect({ x, y, w, h });
+    };
+    const onUp = () => {
+      const final = drawingRect;
+      drawOriginRef.current = null;
+      setDrawingRect(null);
+      // Ignore tiny click-without-drag rectangles.
+      if (final && final.w >= 6 && final.h >= 6) {
+        setLockedRect(final);
+      } else {
+        setLockedRect(null);
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [drawingRect]);
+
+  const confirmSelection = () => {
+    const wrapper = pageWrapperRef.current;
+    const rect = lockedRect;
+    if (!wrapper || !rect) return;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    if (wrapperRect.width <= 0 || wrapperRect.height <= 0) return;
+    const bbox: NormalizedBbox = {
+      x: rect.x / wrapperRect.width,
+      y: rect.y / wrapperRect.height,
+      w: rect.w / wrapperRect.width,
+      h: rect.h / wrapperRect.height,
+    };
+    setLockedRect(null);
+    onSelectionConfirm?.(pageNumber, bbox);
+  };
+
+  const cancelSelection = () => {
+    setLockedRect(null);
+    setDrawingRect(null);
+    drawOriginRef.current = null;
+    onSelectionCancel?.();
+  };
+
+  const activeRect = lockedRect ?? drawingRect;
 
   // Debounce the scale so rapid zoom clicks don't flood the worker
   const debouncedScale = useDebouncedValue(scale, 150);
@@ -93,19 +228,23 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
   // behaviour. Text selection via drag is sacrificed in favour of
   // pan-as-default — the user can still cursor-select via single click +
   // shift-click or double-click word-select.
-  const handlePanStart = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    const el = containerRef.current;
-    if (!el) return;
-    panOriginRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      scrollLeft: el.scrollLeft,
-      scrollTop: el.scrollTop,
-    };
-    setIsPanning(true);
-    e.preventDefault();
-  }, []);
+  const handlePanStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (selectionMode) return;
+      if (e.button !== 0) return;
+      const el = containerRef.current;
+      if (!el) return;
+      panOriginRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: el.scrollLeft,
+        scrollTop: el.scrollTop,
+      };
+      setIsPanning(true);
+      e.preventDefault();
+    },
+    [selectionMode],
+  );
 
   // mousemove + mouseup live on the window so a fast drag that exits the
   // viewport doesn't strand the panning state.
@@ -340,14 +479,33 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
         </div>
       </div>
 
+      {/* Selection-mode hint banner */}
+      {selectionMode && (
+        <div className="flex items-center justify-between gap-2 border-b bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200">
+          <span>
+            Click and drag on page {pageNumber} to select a region. Press Esc to
+            cancel.
+          </span>
+          <button
+            onClick={cancelSelection}
+            className="rounded p-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+            title="Cancel selection"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* PDF display */}
       <div
         ref={containerRef}
         onMouseDown={handlePanStart}
         className={`flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto ${
-          isPanning
-            ? "cursor-grabbing select-none [&_*]:cursor-grabbing"
-            : "cursor-grab"
+          selectionMode
+            ? "cursor-crosshair"
+            : isPanning
+              ? "cursor-grabbing select-none [&_*]:cursor-grabbing"
+              : "cursor-grab"
         }`}
       >
         {error ? (
@@ -377,22 +535,69 @@ export default function PdfViewer({ url, onRotate }: PdfViewerProps) {
             }
             options={docOptions}
           >
-            <Page
-              pageNumber={pageNumber}
-              {...(userZoomed
-                ? { scale: debouncedScale }
-                : containerWidth
-                  ? { width: containerWidth }
-                  : { scale: 1.0 })}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-              onRenderError={onPageRenderError}
-              loading={
-                <div className="text-muted-foreground text-sm py-8">
-                  Rendering page...
+            <div
+              ref={pageWrapperRef}
+              onMouseDown={handleSelectionStart}
+              className="relative inline-block"
+            >
+              <Page
+                pageNumber={pageNumber}
+                {...(userZoomed
+                  ? { scale: debouncedScale }
+                  : containerWidth
+                    ? { width: containerWidth }
+                    : { scale: 1.0 })}
+                renderTextLayer={!selectionMode}
+                renderAnnotationLayer={!selectionMode}
+                onRenderError={onPageRenderError}
+                loading={
+                  <div className="text-muted-foreground text-sm py-8">
+                    Rendering page...
+                  </div>
+                }
+              />
+              {selectionMode && activeRect && (
+                <div
+                  className="pointer-events-none absolute border-2 border-amber-500 bg-amber-400/20"
+                  style={{
+                    left: activeRect.x,
+                    top: activeRect.y,
+                    width: activeRect.w,
+                    height: activeRect.h,
+                  }}
+                />
+              )}
+              {selectionMode && lockedRect && (
+                <div
+                  className="absolute z-10 flex gap-1"
+                  style={{
+                    left: lockedRect.x,
+                    top: lockedRect.y + lockedRect.h + 4,
+                  }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmSelection();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground shadow-lg hover:bg-primary/90"
+                  >
+                    <Check className="h-3 w-3" /> Translate this region
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cancelSelection();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs shadow-lg hover:bg-accent"
+                  >
+                    <X className="h-3 w-3" /> Cancel
+                  </button>
                 </div>
-              }
-            />
+              )}
+            </div>
           </Document>
         )}
       </div>

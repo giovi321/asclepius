@@ -77,79 +77,94 @@ export default function RegionTranslationsSection({
         {items.map((item) => {
           const failed = (item.translated_text || "").startsWith("[failed:");
           const pending = !item.translated_text;
+          const thumbUrl = item.thumbnail_path
+            ? `/api/documents/${docId}/region-translations/${item.id}/thumbnail`
+            : null;
           return (
             <div
               key={item.id}
               className="rounded-md border p-3 space-y-2 bg-muted/20"
             >
-              <div className="flex items-start gap-3">
-                {item.thumbnail_path ? (
+              {/* Header: metadata + small thumbnail preview + delete. The
+                  thumbnail sits inline so the body text below can use the
+                  full card width — a left-column thumbnail wasted space
+                  on short translations. */}
+              <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  Page {item.page}
+                </span>
+                {item.llm_model && (
+                  <span
+                    className="rounded border px-1.5 py-0 font-mono text-[10px]"
+                    title={item.llm_model}
+                  >
+                    {item.llm_model}
+                  </span>
+                )}
+                {item.created_at && <span>{formatTs(item.created_at)}</span>}
+                {thumbUrl ? (
                   <a
-                    href={`/api/documents/${docId}/region-translations/${item.id}/thumbnail`}
+                    href={thumbUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="block flex-shrink-0"
-                    title="Open full-size cropped image"
+                    className="group/thumb relative ml-auto block flex-shrink-0"
+                    title="Hover to preview, click to open full-size"
                   >
                     <img
-                      src={`/api/documents/${docId}/region-translations/${item.id}/thumbnail`}
+                      src={thumbUrl}
                       alt={`Region on page ${item.page}`}
-                      className="h-24 w-32 object-contain rounded border bg-background"
+                      className="h-7 w-12 object-cover rounded border bg-background"
                     />
+                    {/* Hover preview — anchored to the right of the
+                        thumbnail and pointer-events-none so it doesn't
+                        steal hover from the trigger. */}
+                    <div className="pointer-events-none absolute right-0 top-full mt-1 z-20 hidden rounded-md border bg-background p-1 shadow-xl group-hover/thumb:block">
+                      <img
+                        src={thumbUrl}
+                        alt=""
+                        className="max-h-64 max-w-xs object-contain"
+                      />
+                    </div>
                   </a>
                 ) : (
-                  <div className="h-24 w-32 flex-shrink-0 flex items-center justify-center rounded border bg-background text-[10px] text-muted-foreground">
+                  <span className="ml-auto text-[10px] italic">
                     {pending ? "Processing..." : "(no thumbnail)"}
-                  </div>
+                  </span>
                 )}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      Page {item.page}
-                    </span>
-                    {item.llm_model && (
-                      <span className="rounded border px-1.5 py-0 font-mono text-[10px]">
-                        {item.llm_model}
-                      </span>
-                    )}
-                    {item.created_at && (
-                      <span>{formatTs(item.created_at)}</span>
-                    )}
-                  </div>
-                  {pending ? (
-                    <p className="text-sm italic text-muted-foreground">
-                      Processing - the cropped region is being OCR'd and
-                      translated.
-                    </p>
-                  ) : failed ? (
-                    <p className="text-sm text-red-600 dark:text-red-400">
-                      {item.translated_text}
-                    </p>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap break-words">
-                      {item.translated_text}
-                    </p>
-                  )}
-                  {item.ocr_text && (
-                    <details className="mt-1 text-xs">
-                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                        Show original OCR text ({item.ocr_text.length} chars)
-                      </summary>
-                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded border bg-background p-2 text-[11px]">
-                        {item.ocr_text}
-                      </pre>
-                    </details>
-                  )}
-                </div>
                 <button
                   onClick={() => handleDelete(item.id)}
                   disabled={busyId === item.id}
-                  className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  className="flex-shrink-0 rounded p-1 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
                   title="Delete this region translation"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
+
+              {/* Body — full card width, no left-column indent. */}
+              {pending ? (
+                <p className="text-sm italic text-muted-foreground">
+                  Processing - the cropped region is being OCR'd and translated.
+                </p>
+              ) : failed ? (
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {item.translated_text}
+                </p>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap break-words">
+                  {item.translated_text}
+                </p>
+              )}
+              {item.ocr_text && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    Show original OCR text ({item.ocr_text.length} chars)
+                  </summary>
+                  <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded border bg-background p-2 text-[11px]">
+                    {item.ocr_text}
+                  </pre>
+                </details>
+              )}
             </div>
           );
         })}

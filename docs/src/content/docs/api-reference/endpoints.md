@@ -60,13 +60,17 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/documents` | Yes | List documents (filterable) |
-| `POST` | `/api/documents/upload` | Yes | Upload a document file |
+| `POST` | `/api/documents/upload` | Yes | Upload a document file. Hashes the upload before insert; on a SHA-256 match, deletes the just-uploaded copy and returns `{filename, status: "duplicate", existing_document_id, existing_filename, existing_patient_id, message}` instead of inserting a duplicate row. |
 | `GET` | `/api/documents/{id}` | Yes | Get document with all related data |
 | `GET` | `/api/documents/{id}/file` | Yes | Download/serve the document file |
 | `PATCH` | `/api/documents/{id}` | Yes | Update document metadata |
 | `DELETE` | `/api/documents/{id}` | Yes | Delete document and file |
 | `POST` | `/api/documents/{id}/move` | Yes | Reassign document to another patient |
 | `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run OCR and/or LLM extraction. Enqueues onto the same single-threaded pipeline worker as inbox uploads at priority 0, so the click jumps ahead of pending uploads but still serialises against any in-flight job. |
+| `POST` | `/api/documents/{id}/translate` | Yes | Queue an on-demand English translation of the document body. Reuses cached `ocr_text` (does not re-run OCR), runs through the `translation_en` prompt, persists to `documents.ocr_text_en`. Body: `{llm_provider_id?: string}`. Enqueues a `translate` job at priority 0. |
+| `POST` | `/api/documents/{id}/translate-region` | Yes | Queue OCR + translation of a user-selected rectangle on one PDF page. Pre-allocates a `region_translations` row (so the UI shows a placeholder card immediately) and enqueues a `translate_region` job. Body: `{page: int (1-based), bbox: {x, y, w, h} (normalized [0,1]), ocr_provider_id?: string, llm_provider_id?: string}`. Returns `{status: "queued", document_id, region_id}`. |
+| `DELETE` | `/api/documents/{id}/region-translations/{region_id}` | Yes | Delete a region translation row and its thumbnail PNG from disk. |
+| `GET` | `/api/documents/{id}/region-translations/{region_id}/thumbnail` | Yes | Serve the cropped PNG thumbnail for a region translation card. |
 | `POST` | `/api/documents/{id}/cancel` | Yes | Cancel processing |
 | `GET` | `/api/documents/{id}/stages` | Yes | Per-document pipeline stage timeline (every OCR / LLM / organize transition this doc has been through, across uploads and reprocesses). Backs the document detail page's run-grouped timeline. |
 | `POST` | `/api/documents/{id}/edit-with-ai` | Yes | Edit metadata via natural language |
@@ -164,7 +168,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 }
 ```
 
-Stage values: `ocr`, `vision_extraction`, `llm_extraction`, `page_classification`, `section_extraction`, `organizing`, `thumbnail`, `cache_ocr`. Status values: `started`, `completed`, `failed`, `skipped`, `cancelled`. `job_kind` is `upload` or `reprocess`. `message` is populated on failures with the error string. `page_current` / `page_total` are populated on stages that work page-by-page.
+Stage values: `ocr`, `vision_extraction`, `llm_extraction`, `page_classification`, `section_extraction`, `organizing`, `thumbnail`, `cache_ocr`, `translation`, `region_ocr`, `region_translation`. Status values: `started`, `completed`, `failed`, `skipped`, `cancelled`. `job_kind` is `upload`, `reprocess`, `translate`, or `translate_region`. `message` is populated on failures with the error string. `page_current` / `page_total` are populated on stages that work page-by-page.
 
 ### Document link types
 

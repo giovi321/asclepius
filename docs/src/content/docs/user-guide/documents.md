@@ -22,6 +22,16 @@ cap is 1 GB. See [Imaging](/user-guide/imaging) for the full flow.
 Documents appear in the list immediately with `pending` status; the pipeline
 picks them up asynchronously.
 
+### Duplicate uploads
+
+The upload route SHA-256s every file before insert. If the hash already
+matches an existing document, the just-uploaded copy is deleted from
+disk and the response carries `{status: "duplicate", existing_document_id,
+existing_filename, existing_patient_id}` instead of inserting a new
+row. The web UI shows an info row with a link straight to the existing
+record so you don't have to hunt for it. The pipeline never sees the
+duplicate, so there's no wasted OCR / LLM run.
+
 ## Document list
 
 Shows documents for the selected patient, or all accessible documents when
@@ -104,6 +114,28 @@ fields:
 A collapsible **Processing details** section shows OCR engine, OCR
 confidence, and LLM provider/model.
 
+Every right-column section (Document Info, Medical Event, Lab Results,
+Encounters, Medications, Vaccinations, Notes, AI Edit, Linked
+Documents, Summary, Translated Text, OCR Text, Document Sections,
+Pipeline Stages, Region Translations) is collapsible. Empty sections
+start collapsed; per-section open/closed state persists across reloads
+in localStorage so the layout you set up stays put.
+
+### PDF viewer interactions
+
+The PDF preview supports two extra interactions on top of the toolbar
+zoom buttons:
+
+- **Ctrl/Cmd + scroll wheel** zooms around the cursor, capped to the
+  same 0.5–3.0 range as the toolbar. A native wheel listener with
+  `passive: false` prevents the browser from hijacking the gesture
+  for full-page zoom.
+- **Click and drag** anywhere on the page to pan when the content
+  overflows the viewport. The cursor switches between *grab* and
+  *grabbing* so the mode is obvious. Drag-to-select-text is the
+  trade-off; single-click cursor placement and double-click
+  word-select still work.
+
 ### Pipeline stages
 
 A **Pipeline stages** card on the document detail page renders the full
@@ -171,6 +203,59 @@ child records first, so you get a clean slate.
 Useful for trying a different engine, moving a document onto the
 Vision-LLM flow, re-running with a more capable model, or rescuing
 documents marked "done" with empty results.
+
+## Translation
+
+The **Translate** toolbar action runs the document body through an LLM
+and stores the English rendering for later viewing. OCR is **never**
+re-run, the cached `ocr_text` is reused. Structured fields (names,
+dates, codes, lab values) stay in the source language so downstream
+matching keeps working.
+
+The Translate menu has two tabs:
+
+### Whole document → English
+
+Pick an LLM provider (defaults to the highest-priority enabled one),
+hit Translate. The pipeline strips Chandra HTML markup, sends the OCR
+text through the `translation_en` prompt, and stores the result on
+`documents.ocr_text_en` (plus `ocr_text_en_translated_at` and
+`ocr_text_en_model`, the model id only, not the full provider label).
+The translated text appears in the **Translated Text** section in the
+left column directly under the PDF viewer, default expanded so you can
+read it as soon as it lands.
+
+### Region on PDF
+
+For situations where the full-document translation is overkill (you
+only want to know what the line above a signature says), pick an OCR
+engine + LLM provider, click **Select region on PDF**, drag a
+rectangle on the current page, confirm. The backend crops the page
+with PyMuPDF using normalized `[0,1]` bbox coordinates so the rectangle
+re-maps correctly even if the PDF is later re-rendered at a different
+DPI, OCRs the crop with the chosen engine, then translates with the
+chosen LLM. The cropped PNG is stored under
+`vault/region_translations/{doc_id}/<uuid>.png` and a row in the
+`region_translations` table tracks the bbox + OCR + translation +
+provider ids.
+
+Each region renders as a card under the PDF preview with the cropped
+thumbnail, the OCR text, the translation, and a delete button. The
+card list polls while the worker is filling in OCR / translation / the
+thumbnail so a placeholder upgrades to the finished card without
+manual refresh.
+
+### Pipeline visibility
+
+Translation jobs deliberately do **not** flip `documents.status` to
+`processing`, translation is a side-job that should leave the main
+lifecycle alone. But the doc-detail page derives an "in pipeline" flag
+from the live `current_job` so the queue/processing pill, the Cancel
+button, and the auto-refresh poll all surface for translate jobs the
+same way they do for uploads and reprocesses. The translated text
+appears without manual refresh once the job finishes; the topbar chip
+labels the job *Translate* with an emerald tint so you can tell at a
+glance which kind of work is in flight.
 
 ## Cancelling processing
 

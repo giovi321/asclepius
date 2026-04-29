@@ -28,9 +28,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.py` change drifts `frontend/src/openapi.json` /
   `frontend/src/api/schema.ts`, the hook regenerates and `git add`s
   them; `git commit` again to finish.
+- **Chandra (and other Ollama vision) OCR truncation.** Requests now
+  send `num_predict=-1` and `num_ctx=16384` so dense pages and
+  HTML-tagged Chandra output don't get cut at the Modelfile default
+  (often 2048 tokens, sometimes as low as 128). Previously the response
+  came back mid-sentence on long pages.
+- **Translate jobs are now visible in the live timeline + topbar chip.**
+  The translator wraps the chunk loop in `stage()` so
+  `current_job.stage = "translation"` is set and the synthesizer emits
+  a "started" event; without this the timeline previously rendered as
+  green/done with "0 stages" before the run had finished. The topbar
+  chip and `PipelineProgress` widget now recognise `kind="translate"`
+  with an emerald Translate label instead of falling back to the
+  Upload branch.
+- **Imaging placeholder docs can now be renamed.** Imaging placeholders
+  with extension-less `original_filename` (e.g. `MR Brain (report
+  pending)`) used to round-trip through generate-filename + rename and
+  fail with `Cannot change file extension from '' to '.pdf'`.
+  `generate-filename` now mirrors the doc's actual extension (empty
+  when none), and `rename` permits adding any extension when the
+  original has none.
 
 ### Added
 
+- **On-demand English translation of the document body.** Translate
+  toolbar action runs the cached `documents.ocr_text` through an LLM
+  using a new `translation_en` prompt and stores the English rendering
+  on `documents.ocr_text_en` (with `ocr_text_en_translated_at` and
+  `ocr_text_en_model`). OCR is never re-run; structured fields stay in
+  the source language. Enqueued as a new `translate` job kind on the
+  worker queue, surfaced in the live timeline + topbar chip with an
+  emerald Translate label. The Translated Text panel renders in the
+  left column directly under the PDF viewer, default expanded.
+- **Region-on-PDF translation.** Translate menu → Region tab → drag a
+  rectangle on the current page → confirm. Backend crops the page with
+  PyMuPDF using normalized `[0,1]` bbox coords, OCRs the crop with the
+  chosen engine, translates with the chosen LLM. New
+  `region_translations` table tracks bbox + OCR + translation +
+  thumbnail PNG (stored under `vault/region_translations/{doc_id}/`).
+  Each region renders as a card under the PDF with cropped thumbnail,
+  OCR text, translation, and a delete button. New endpoints:
+  `POST /api/documents/{id}/translate-region`,
+  `DELETE /api/documents/{id}/region-translations/{region_id}`,
+  `GET /api/documents/{id}/region-translations/{region_id}/thumbnail`.
+- **Duplicate-hash detection on upload.** `POST /api/documents/upload`
+  now hashes the file before insert; on a SHA-256 match it deletes the
+  just-uploaded copy and returns
+  `{status: "duplicate", existing_document_id, existing_filename,
+  existing_patient_id}` instead of swallowing the UNIQUE-constraint
+  failure or letting the pipeline rediscover it. The upload UI shows
+  an info row linking to the existing record.
+- **Collapsible sections on the document detail page.** Every right-
+  column section (Document Info, Medical Event, Lab Results,
+  Encounters, Medications, Vaccinations, Notes, AI Edit, Linked
+  Documents, Summary, Translated Text, OCR Text, Document Sections,
+  Pipeline Stages, Region Translations) is collapsible. Empty sections
+  start collapsed; per-section open/closed state persists in
+  localStorage.
+- **PDF viewer Ctrl/Cmd+scroll zoom and click-and-drag pan.** Native
+  wheel listener (`passive: false`) so the browser doesn't hijack
+  ctrl+wheel for full-page zoom; cursor switches between grab/grabbing
+  while dragging. Capped to the same 0.5–3.0 range as the toolbar.
 - **Persisted per-document stage timeline.** New `document_stage_events`
   table records every OCR / vision / LLM / organize transition with
   start time, finish time, status (`completed` / `failed` / `cancelled`
@@ -61,6 +119,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pipeline status response** carries new `current_job` and
   `queued_jobs` fields. Legacy `processing` / `processing_step` /
   `processing_pages` are kept populated for backward compatibility.
+- **Per-model Test Connection button restored.** Each attached-model
+  row in the unified ProvidersTab now has a Zap-icon test action that
+  hits the same `/settings/test-{llm,vision,ocr}-provider` metadata
+  endpoints (no tokens, no GPU contention). Was lost during the Apr 23
+  refactor that consolidated the per-kind provider tabs into a single
+  ProvidersTab.
 
 ## [0.9.13] - 2026-04-29 - prancy lemon: editor polish + DICOM viewer overhaul
 

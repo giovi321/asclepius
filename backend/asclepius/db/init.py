@@ -120,9 +120,50 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await _migration_0_9_6_imaging_report(db)
     await _migration_0_9_7_drop_dead_imaging_columns(db)
     await _migration_0_9_8_drop_imaging_study_date(db)
-    await _migration_clear_llm_placeholders(db)
-    await _migration_backfill_lab_test_date(db)
+    # Data-cleanup migrations: gated by schema_migrations so they run once
+    # per DB instead of full-scanning every table on every startup. The
+    # earlier formulation was idempotent but cost ~30 full table scans
+    # per cold-start once a DB had any data, which read as a sudden
+    # app-wide slowdown on populated installs.
+    await _ensure_schema_migrations_table(db)
+    await _run_once(db, "clear_llm_placeholders_v1", _migration_clear_llm_placeholders)
+    await _run_once(db, "backfill_lab_test_date_v1", _migration_backfill_lab_test_date)
     await _ensure_compat_view(db)
+
+
+async def _ensure_schema_migrations_table(db: aiosqlite.Connection) -> None:
+    """Create the bookkeeping table for one-shot data-cleanup migrations."""
+    await db.execute(
+        """CREATE TABLE IF NOT EXISTS schema_migrations (
+            key TEXT PRIMARY KEY,
+            applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    await db.commit()
+
+
+async def _run_once(
+    db: aiosqlite.Connection,
+    key: str,
+    fn,
+) -> None:
+    """Run ``fn`` only if its key has not been recorded yet, then record it.
+
+    Use for data-cleanup migrations that are idempotent but expensive on
+    populated DBs (full table scans, GROUP BYs). Schema-shape migrations
+    keep their own inline guards via PRAGMA table_info and don't go
+    through this helper.
+    """
+    cursor = await db.execute(
+        "SELECT 1 FROM schema_migrations WHERE key = ?", (key,),
+    )
+    if await cursor.fetchone():
+        return
+    await fn(db)
+    await db.execute(
+        "INSERT OR IGNORE INTO schema_migrations (key) VALUES (?)", (key,),
+    )
+    await db.commit()
 
 
 async def _ensure_compat_view(db: aiosqlite.Connection) -> None:

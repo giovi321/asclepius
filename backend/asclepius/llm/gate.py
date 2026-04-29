@@ -12,6 +12,19 @@ credential — say an LLM extraction, an LLM-vision OCR page, and a
 Vision-LLM extraction — produce three separate rows in the snapshot
 (and therefore three separate chips in the UI), even though they all
 contend for the same semaphore's slots.
+
+Why ``threading.Semaphore`` and not ``asyncio.Semaphore``: Asclepius runs
+the FastAPI request handlers on the main event loop and the pipeline
+watcher on its own loop in a worker thread. ``asyncio.Semaphore`` is
+bound to a single loop, so a process-global asyncio semaphore would
+crash when the worker loop tried to wait on it. We previously sidestepped
+that by keying the semaphore per ``(loop_id, credential_id)`` — but that
+meant the cap was enforced PER LOOP, not globally, so a reprocess on the
+FastAPI loop and an upload on the worker loop could both hold cap=1 on
+the same Ollama and stomp on each other. ``threading.Semaphore`` is
+inherently thread-safe and loop-agnostic; we acquire it via the default
+executor when the slot is contended, which gives us cancellation
+semantics close to asyncio.Semaphore's.
 """
 
 from __future__ import annotations
@@ -20,35 +33,52 @@ import asyncio
 import contextlib
 import contextvars
 import logging
+import threading
 from collections import Counter
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-# Concurrency cap: one semaphore per (event_loop, credential_id). Python
-# 3.13 enforces that asyncio.Semaphore instances only be awaited from the
-# loop they were created on, so a module-global semaphore shared between
-# the FastAPI loop (request handlers) and the pipeline worker-thread loop
-# (watcher.py spawns its own via asyncio.new_event_loop) breaks with
-# ``RuntimeError: <Semaphore> is bound to a different event loop`` on the
-# slow path (when a task has to wait for the slot).
-#
-# Trade-off: the cap is enforced per loop, not globally, so in theory two
-# concurrent callers on different loops double the cap against the
-# backing Ollama/Claude endpoint. In practice the server-side rate limit
-# catches that and this has not surfaced as a user-visible issue.
-_SEMS: dict[tuple[int, str], asyncio.Semaphore] = {}
+# Concurrency cap: ONE semaphore per credential_id, shared across every
+# event loop and worker thread in the process. ``threading.Semaphore``
+# (not ``asyncio.Semaphore``) so the cap actually applies regardless of
+# which loop is making the call.
+_SEMS: dict[str, threading.Semaphore] = {}
 _CAPS: dict[str, int] = {}
+_SEMS_LOCK = threading.Lock()  # guards mutation of _SEMS / _CAPS
 
 
-def _current_loop_id() -> int:
-    """Identify the currently running event loop. Falls back to 0 when
-    called outside any loop (defensive — callers are always async)."""
+async def _acquire_semaphore(sem: threading.Semaphore) -> bool:
+    """Acquire a threading.Semaphore from an async context.
+
+    Fast path: try non-blocking. If a slot is free, we don't pay any
+    executor / loop overhead — matches the no-contention performance of
+    asyncio.Semaphore.
+
+    Slow path: block in the default executor so the loop stays
+    responsive. On task cancellation we wait for the executor to finish
+    so we can release the slot we may have just been awarded — without
+    that, a CancelledError mid-acquire leaks one cap slot.
+    """
+    if sem.acquire(blocking=False):
+        return True
+
+    loop = asyncio.get_running_loop()
+    fut = loop.run_in_executor(None, sem.acquire)
     try:
-        return id(asyncio.get_running_loop())
-    except RuntimeError:
-        return 0
+        return await fut
+    except asyncio.CancelledError:
+        # The executor call can't be cancelled (the underlying threading
+        # acquire has no timeout). Wait for it to settle so we can give
+        # back any slot we accidentally won.
+        try:
+            awarded = await asyncio.shield(fut)
+        except BaseException:
+            awarded = False
+        if awarded:
+            sem.release()
+        raise
 
 # Counters + labels keyed per (credential_id, kind) so LLM / Vision / OCR
 # can run on the same credential without stepping on each other's chip.
@@ -67,21 +97,30 @@ _HELD_SLOTS: contextvars.ContextVar[frozenset[tuple[str, str]]] = (
 )
 
 
-def _ensure_sem(credential_id: str, cap: int) -> None:
-    """Create or grow the per-(loop, credential) semaphore. The cap dict
-    is keyed by credential only since it is a property of the credential
-    config and not of the loop."""
+def _ensure_sem(credential_id: str, cap: int) -> threading.Semaphore:
+    """Create the credential's semaphore (once) or top up its slots if the
+    cap has grown since last call. Returns the live semaphore.
+
+    Cap growth at runtime is rare — it only happens when a previously
+    unseen credential is registered with a higher cap. Rather than
+    swapping the semaphore (which would orphan in-flight holders), we
+    just ``release()`` the difference, adding new slots to the existing
+    instance.
+    """
     cred = credential_id or ""
-    sem_key = (_current_loop_id(), cred)
-    stored_cap = _CAPS.get(cred, 0)
-    effective_cap = max(cap, stored_cap, 1)
-    if sem_key not in _SEMS or cap > stored_cap:
-        # First time this loop sees the credential, or the config grew
-        # the cap. Matches the original module-global behavior of
-        # swapping the semaphore in place.
-        _SEMS[sem_key] = asyncio.Semaphore(effective_cap)
-    if cap > stored_cap:
-        _CAPS[cred] = cap
+    cap = max(cap, 1)
+    with _SEMS_LOCK:
+        sem = _SEMS.get(cred)
+        stored_cap = _CAPS.get(cred, 0)
+        if sem is None:
+            _SEMS[cred] = threading.Semaphore(cap)
+            _CAPS[cred] = cap
+            return _SEMS[cred]
+        if cap > stored_cap:
+            for _ in range(cap - stored_cap):
+                sem.release()
+            _CAPS[cred] = cap
+        return sem
 
 
 def _ensure_counters(credential_id: str, kind: str, *,
@@ -145,14 +184,14 @@ async def credential_slot(credential_id: str, cap: int = 2, *,
         yield
         return
 
-    sem = _SEMS[(_current_loop_id(), cred_key)]
+    sem = _ensure_sem(cred_key, cap)
     stats = _STATS[sub_key]
     active = _ACTIVE_MODELS[sub_key]
     stats["waiting"] = stats.get("waiting", 0) + 1
     acquired = False
     token = None
     try:
-        await sem.acquire()
+        await _acquire_semaphore(sem)
         acquired = True
         token = _HELD_SLOTS.set(held | {sub_key})
         try:

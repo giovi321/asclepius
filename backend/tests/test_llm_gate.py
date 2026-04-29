@@ -81,6 +81,71 @@ def test_slot_acquire_across_two_loops_same_credential() -> None:
     assert not err, f"cross-thread loop use raised: {err[0]!r}"
 
 
+def test_cap_is_global_across_loops() -> None:
+    """Regression test for the FastAPI-loop ↔ worker-loop concurrency
+    leak: a slot held on one loop must block an acquire from a different
+    loop running in another thread, on the same credential.
+
+    Before the gate was switched to a process-global threading.Semaphore,
+    each loop got its own asyncio.Semaphore so the cap was enforced per
+    loop, not globally. A reprocess running on the FastAPI loop and an
+    upload running on the worker loop could both hold cap=1 on the same
+    Ollama and stomp on each other.
+    """
+    cred = "cred-global-cap"
+    started = threading.Event()
+    release_holder = threading.Event()
+    second_acquired = threading.Event()
+    holder_done = threading.Event()
+
+    async def hold_slot() -> None:
+        async with gate.credential_slot(cred, cap=1, kind="llm"):
+            started.set()
+            # Block the slot until the test releases us.
+            while not release_holder.is_set():
+                await asyncio.sleep(0.01)
+        holder_done.set()
+
+    async def try_acquire() -> None:
+        async with gate.credential_slot(cred, cap=1, kind="llm"):
+            second_acquired.set()
+
+    err: list[BaseException] = []
+
+    def run_holder() -> None:
+        try:
+            _run_in_fresh_loop(hold_slot)
+        except BaseException as e:  # noqa: BLE001
+            err.append(e)
+
+    def run_second() -> None:
+        try:
+            _run_in_fresh_loop(try_acquire)
+        except BaseException as e:  # noqa: BLE001
+            err.append(e)
+
+    holder_thread = threading.Thread(target=run_holder)
+    holder_thread.start()
+    assert started.wait(timeout=5), "holder never acquired"
+
+    second_thread = threading.Thread(target=run_second)
+    second_thread.start()
+    # The second acquire must NOT succeed while the first is held.
+    acquired_early = second_acquired.wait(timeout=0.5)
+    assert not acquired_early, (
+        "second loop acquired a cap=1 slot on the same credential while the "
+        "first loop was still holding it — gate cap is not global"
+    )
+
+    # Release the holder; the second acquire should now go through.
+    release_holder.set()
+    assert second_acquired.wait(timeout=5), "second loop never acquired"
+
+    holder_thread.join(timeout=5)
+    second_thread.join(timeout=5)
+    assert not err, f"thread raised: {err[0]!r}"
+
+
 def test_cap_grows_without_breaking_other_loops() -> None:
     """Bumping the cap on loop A must not invalidate loop B's semaphore
     (other loops just pick up the new cap the next time they call

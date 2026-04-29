@@ -30,10 +30,17 @@ title: "Contributing"
 
 ## Adding a new document type
 
-1. Add the extraction prompt in `backend/asclepius/llm/prompts.py`
-2. Register it in `backend/asclepius/llm/prompt_manager.py` (PROMPT_REGISTRY)
-3. Add the type mapping in `backend/asclepius/pipeline/extractor.py`
-4. If the type has new data fields, add a migration or table
+The `doc_type` enum is intentionally small (10 values, one axis: document
+format). Specialty information lives on its own column and should not be
+added to `doc_type`. Before adding a new type, check whether the document
+format genuinely doesn't fit one of the existing values.
+
+1. Add the new value to `VALID_DOC_TYPES` in `backend/asclepius/pipeline/extractor.py` and to `_DOC_TYPE_ALIASES` if there are obvious LLM-misspellings to catch.
+2. Add the new value to `DOC_TYPE_OPTIONS` in `frontend/src/components/document-detail/MetadataEditor.tsx` and `DOC_TYPES` in `frontend/src/components/documents/columns.ts`.
+3. Add a color entry in `TYPE_COLORS` in `frontend/src/pages/TimelinePage.tsx`.
+4. Update the doc_type enum string in the three classification prompts: `classification.yaml`, `vision_extraction.yaml`, `extraction_legacy.yaml`.
+5. (Optional) If the new type needs its own Phase-2 schema, add `extraction_<key>.yaml` under `prompts_data/` and register it in `PROMPT_REGISTRY` + `PROMPT_VARIABLE_KEYS` in `backend/asclepius/llm/prompt_manager.py`. Without an extraction yaml, Phase 2 is skipped for that type and only Phase-1 metadata + summary are stored.
+6. If the type has new data fields, add a migration or table.
 
 ## Adding a new API endpoint
 

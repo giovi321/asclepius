@@ -14,11 +14,12 @@ the document is linked to a medical event.
 
 | Color          | Document types                                               |
 | -------------- | ------------------------------------------------------------ |
-| Primary (blue) | Specialist reports, discharge letters, ER reports, surgical reports |
-| Blue           | Blood tests, lab tests                                       |
-| Emerald        | Invoices, receipts, insurance claims                         |
-| Purple         | Radiology reports, DICOM imaging                             |
+| Primary (blue) | Specialist reports, discharge letters, surgical reports      |
+| Blue           | Lab tests                                                    |
+| Emerald        | Invoices                                                     |
+| Purple         | Imaging reports (incl. attached DICOM studies)               |
 | Orange         | Prescriptions                                                |
 | Teal           | Vaccinations                                                 |
+| Amber          | Medical certificates                                         |
 
 Medical events carry their own color, set when the event is created.

@@ -980,7 +980,7 @@
       "post": {
         "tags": ["documents"],
         "summary": "Edit Document With Ai",
-        "description": "Edit document metadata using natural language instruction via LLM.\n\nUses a compact prompt to minimize token usage. For simple field changes,\nthe LLM returns only the changed fields as JSON.",
+        "description": "Edit a document via natural-language instruction.\n\nTwo modes, dispatched by the instruction itself:\n\n1. **Scoped page reprocess** \u2014 when the instruction references explicit\n   pages (``page 41``, ``pages 12-15``, \u2026). The cached per-page OCR for\n   those pages is fed to the pipeline extractor, which wipes every child\n   row (lab_results, encounters, medications, vaccinations, invoice_items)\n   and re-inserts from the new extraction. Document metadata fields are\n   overwritten only where the scoped extraction returned a value, so\n   fields outside the chosen pages survive.\n2. **Metadata edit** \u2014 fallback path. A compact JSON-only prompt asks\n   the general LLM to return just the fields the user asked to change.",
         "operationId": "edit_document_with_ai_api_documents__doc_id__edit_with_ai_post",
         "parameters": [
           {

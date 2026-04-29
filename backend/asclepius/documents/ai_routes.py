@@ -22,6 +22,49 @@ class DocumentEditRequest(BaseModel):
     instruction: str
 
 
+# Anchored on "page(s)" or "p./pp." so unrelated digits in the instruction
+# (dates, dosages, lab values) don't get treated as page references.
+_PAGE_REF_RE = re.compile(
+    r"\b(?:pages?|pp?\.?)\s+" r"((?:\d+(?:\s*[-–—]\s*\d+)?(?:\s*(?:,|and|through|to|&)\s*)?)+)",
+    re.IGNORECASE,
+)
+_PAGE_RANGE_SEP_RE = re.compile(r"\s*(?:to|through|[-–—])\s*", re.IGNORECASE)
+_PAGE_LIST_SEP_RE = re.compile(r"\s*(?:and|&|,)\s*", re.IGNORECASE)
+_PAGE_RANGE_RE = re.compile(r"^(\d+)-(\d+)$")
+
+
+def _parse_pages_from_instruction(text: str, max_pages: int) -> list[int]:
+    """Return sorted, 1-indexed page numbers referenced in an instruction.
+
+    Recognises ``page 41``, ``pages 12-15``, ``pages 12 to 15``,
+    ``pages 3, 7 and 9``, ``p. 41``. Numbers outside ``[1, max_pages]``
+    are dropped; an empty list means no page reference was detected.
+    """
+    if not text or max_pages < 1:
+        return []
+    pages: set[int] = set()
+    for match in _PAGE_REF_RE.finditer(text):
+        chunk = match.group(1)
+        # Collapse range separators (to / through / - / – / —) to "-" first,
+        # then list separators (and / & / ,) to "," so "12 to 15" becomes
+        # "12-15" (a range) instead of "12,15" (two pages).
+        chunk = _PAGE_RANGE_SEP_RE.sub("-", chunk)
+        chunk = _PAGE_LIST_SEP_RE.sub(",", chunk)
+        for piece in chunk.split(","):
+            piece = piece.strip()
+            if not piece:
+                continue
+            rng = _PAGE_RANGE_RE.match(piece)
+            if rng:
+                lo, hi = int(rng.group(1)), int(rng.group(2))
+                if lo > hi:
+                    lo, hi = hi, lo
+                pages.update(range(lo, hi + 1))
+            elif piece.isdigit():
+                pages.add(int(piece))
+    return sorted(p for p in pages if 1 <= p <= max_pages)
+
+
 @router.post("/{doc_id}/edit-with-ai")
 async def edit_document_with_ai(
     doc_id: int,
@@ -29,16 +72,37 @@ async def edit_document_with_ai(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Edit document metadata using natural language instruction via LLM.
+    """Edit a document via natural-language instruction.
 
-    Uses a compact prompt to minimize token usage. For simple field changes,
-    the LLM returns only the changed fields as JSON.
+    Two modes, dispatched by the instruction itself:
+
+    1. **Scoped page reprocess** — when the instruction references explicit
+       pages (``page 41``, ``pages 12-15``, …). The cached per-page OCR for
+       those pages is fed to the pipeline extractor, which wipes every child
+       row (lab_results, encounters, medications, vaccinations, invoice_items)
+       and re-inserts from the new extraction. Document metadata fields are
+       overwritten only where the scoped extraction returned a value, so
+       fields outside the chosen pages survive.
+    2. **Metadata edit** — fallback path. A compact JSON-only prompt asks
+       the general LLM to return just the fields the user asked to change.
     """
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
     config = get_config()
+
+    # Mode 1: scoped page reprocess. Page references in the instruction are
+    # the trigger — if the user just says "doctor is Dr. X" we fall through
+    # to the metadata-edit path below. Parse without an upper bound so the
+    # scoped helper can return a clean "page X doesn't exist" error instead
+    # of silently routing to metadata edit when the user asked for a page
+    # that's out of range.
+    requested_pages = _parse_pages_from_instruction(body.instruction, 99999)
+    if requested_pages:
+        page_count = int(doc.get("page_count") or 0)
+        return await _scoped_page_reprocess(db, doc_id, requested_pages, page_count, config)
+
     from asclepius.pipeline.provider_factory import _build_general_llm_provider
     from asclepius.pipeline.extractor import build_extraction_context
     import json as _json
@@ -180,7 +244,92 @@ async def edit_document_with_ai(
 
         await update_document_fields(db, doc_id, updates)
 
-    return {"status": "updated", "document_id": doc_id, "changes": changes}
+    return {"status": "updated", "mode": "metadata", "document_id": doc_id, "changes": changes}
+
+
+async def _scoped_page_reprocess(
+    db: aiosqlite.Connection,
+    doc_id: int,
+    requested_pages: list[int],
+    page_count: int,
+    config,
+) -> dict:
+    """Re-extract a document using only the OCR text from the chosen pages.
+
+    Wipes every child row (lab_results, encounters, medications,
+    vaccinations, invoice_items) before re-inserting — this is intentional:
+    when the user says "reprocess page 41 for labs", they expect labs to
+    come from page 41 and nothing else.
+    """
+    from asclepius.pipeline.ocr_cache import load_cached_ocr_pages
+    from asclepius.pipeline.extractor import extract_and_store
+    from asclepius.pipeline.provider_factory import (
+        ProviderUnreachableError,
+        get_llm_provider,
+    )
+
+    cached_pages = await load_cached_ocr_pages(db, doc_id)
+    if not cached_pages:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Per-page OCR is not cached for this document. Run a full "
+                "reprocess (OCR) once before asking to re-extract specific pages."
+            ),
+        )
+
+    total = len(cached_pages)
+    selected_text: list[str] = []
+    used_pages: list[int] = []
+    skipped_pages: list[int] = []
+    for p in requested_pages:
+        if 1 <= p <= total:
+            selected_text.append(cached_pages[p - 1])
+            used_pages.append(p)
+        else:
+            skipped_pages.append(p)
+
+    if not selected_text:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"None of the requested pages exist — document has {total} "
+                f"page(s), instruction referenced {requested_pages}."
+            ),
+        )
+
+    scoped_ocr = "\n\n".join(selected_text)
+
+    try:
+        llm = get_llm_provider(config, priority=1)
+    except ProviderUnreachableError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    logger.info(
+        "AI-edit scoped reprocess doc=%d pages=%s (of %d) chars=%d",
+        doc_id,
+        used_pages,
+        total,
+        len(scoped_ocr),
+    )
+
+    try:
+        result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
+    except Exception as e:
+        logger.exception("Scoped reprocess failed for doc %d", doc_id)
+        raise HTTPException(status_code=500, detail=f"Extraction failed: {e}")
+
+    if isinstance(result, dict) and result.get("error"):
+        raise HTTPException(status_code=500, detail=str(result.get("error")))
+
+    return {
+        "status": "reprocessed",
+        "mode": "pages",
+        "document_id": doc_id,
+        "pages": used_pages,
+        "skipped_pages": skipped_pages,
+        "page_count": total,
+    }
 
 
 @router.post("/{doc_id}/generate-filename")

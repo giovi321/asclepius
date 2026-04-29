@@ -18,9 +18,24 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
     if (!instruction.trim()) return;
     setBusy(true);
     try {
-      await api.post(`/documents/${docId}/edit-with-ai`, { instruction });
+      const resp = await api.post(`/documents/${docId}/edit-with-ai`, {
+        instruction,
+      });
       setInstruction("");
       await onApplied();
+      const data = resp?.data || {};
+      if (data.mode === "pages") {
+        const pages: number[] = Array.isArray(data.pages) ? data.pages : [];
+        const skipped: number[] = Array.isArray(data.skipped_pages)
+          ? data.skipped_pages
+          : [];
+        const description =
+          `Re-extracted from page${pages.length === 1 ? "" : "s"} ${pages.join(", ")}` +
+          (skipped.length
+            ? ` (skipped out-of-range: ${skipped.join(", ")})`
+            : "");
+        toast({ title: "Pages reprocessed", description, variant: "success" });
+      }
     } catch (e: any) {
       toast({
         title: "AI edit failed",
@@ -46,7 +61,7 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
-            placeholder='e.g. "doctor is Dr. Bianchi", "type is invoice", "date 15/03/2024"'
+            placeholder='e.g. "doctor is Dr. Bianchi", "reprocess page 41 for lab tests"'
             className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm"
             disabled={busy}
           />
@@ -59,7 +74,9 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Tell the AI what to change. Press Enter or click Apply.
+          Edit metadata, or re-extract specific pages by mentioning them (e.g.
+          "page 41", "pages 12-15"). Re-extracting wipes existing labs /
+          encounters / medications and re-inserts from the chosen pages.
         </p>
       </div>
     </Section>

@@ -489,10 +489,19 @@ export interface paths {
     put?: never;
     /**
      * Edit Document With Ai
-     * @description Edit document metadata using natural language instruction via LLM.
+     * @description Edit a document via natural-language instruction.
      *
-     *     Uses a compact prompt to minimize token usage. For simple field changes,
-     *     the LLM returns only the changed fields as JSON.
+     *     Two modes, dispatched by the instruction itself:
+     *
+     *     1. **Scoped page reprocess** — when the instruction references explicit
+     *        pages (``page 41``, ``pages 12-15``, …). The cached per-page OCR for
+     *        those pages is fed to the pipeline extractor, which wipes every child
+     *        row (lab_results, encounters, medications, vaccinations, invoice_items)
+     *        and re-inserts from the new extraction. Document metadata fields are
+     *        overwritten only where the scoped extraction returned a value, so
+     *        fields outside the chosen pages survive.
+     *     2. **Metadata edit** — fallback path. A compact JSON-only prompt asks
+     *        the general LLM to return just the fields the user asked to change.
      */
     post: operations["edit_document_with_ai_api_documents__doc_id__edit_with_ai_post"];
     delete?: never;

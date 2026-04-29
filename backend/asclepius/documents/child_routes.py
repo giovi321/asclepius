@@ -151,6 +151,26 @@ async def update_encounter(
     return {"status": "updated", "id": encounter_id, "fields": [c[0] for c in corrections]}
 
 
+@router.delete("/encounters/{encounter_id}")
+async def delete_encounter(
+    encounter_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Remove an encounter row. The parent document is left untouched —
+    only this single extracted record is dropped."""
+    rec, doc = await _row_with_doc(db, "encounters", encounter_id)
+    await _require_doc_write(db, current_user, doc)
+    await db.execute("DELETE FROM encounters WHERE id = ?", (encounter_id,))
+    await db.commit()
+    await audit_log(
+        db, current_user["id"], "encounter.delete", "encounter", encounter_id,
+        {"document_id": rec.get("document_id")}, get_client_ip(request),
+    )
+    return {"status": "deleted", "id": encounter_id}
+
+
 # ── Medications ────────────────────────────────────────────────────
 
 
@@ -231,3 +251,22 @@ async def update_medication(
         {"fields": [c[0] for c in corrections]}, get_client_ip(request),
     )
     return {"status": "updated", "id": medication_id, "fields": [c[0] for c in corrections]}
+
+
+@router.delete("/medications/{medication_id}")
+async def delete_medication(
+    medication_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Remove a medication row. The parent document is left untouched."""
+    rec, doc = await _row_with_doc(db, "medications", medication_id)
+    await _require_doc_write(db, current_user, doc)
+    await db.execute("DELETE FROM medications WHERE id = ?", (medication_id,))
+    await db.commit()
+    await audit_log(
+        db, current_user["id"], "medication.delete", "medication", medication_id,
+        {"document_id": rec.get("document_id")}, get_client_ip(request),
+    )
+    return {"status": "deleted", "id": medication_id}

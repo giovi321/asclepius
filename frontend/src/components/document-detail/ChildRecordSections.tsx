@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
-import { Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage, Pencil, X } from "lucide-react";
+import {
+  Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage, Pencil, X,
+  Trash2, Plus, Search,
+} from "lucide-react";
 import DicomViewer from "@/components/DicomViewer";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import { useDiagnoses } from "@/hooks/data";
 import {
   Section, InfoRow, EditableField, EditableSelect, MedFormBadge, getSectionTypeStyle,
 } from "@/components/document-detail/DocumentDetailHelpers";
@@ -97,48 +102,210 @@ function niceCase(s: string | null | undefined): string {
   return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
 }
 
+/** Searchable ICD-10 picker. Backed by the /normalization/diagnoses
+ * list — each canonical row carries an ``icd10_code`` field, which is
+ * what we save to ``encounters.diagnosis_code``. The display name from
+ * the matching diagnosis row gives the user a recognisable preview.
+ */
+function IcdCodeSelect({ value, encounterId, onSaved }: {
+  value: string | null; encounterId: number; onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const diagnoses = useDiagnoses();
+  const [editing, setEditing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Map the current value back to a diagnosis row (if any) for the
+  // display label. Falls back to just the raw code when the user typed
+  // a code we don't have in norm_diagnoses.
+  const options = (Array.isArray(diagnoses.data) ? diagnoses.data : []) as any[];
+  const codedOptions = useMemo(
+    () => options.filter((o: any) => (o.icd10_code || "").trim()),
+    [options],
+  );
+  const currentRow = value
+    ? codedOptions.find((o: any) =>
+        (o.icd10_code || "").toLowerCase() === value.toLowerCase())
+    : null;
+
+  useEffect(() => {
+    if (!editing) return;
+    const handler = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setEditing(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [editing]);
+
+  const save = async (code: string | null) => {
+    setSaving(true);
+    try {
+      await api.patch(`/encounters/${encounterId}`, { diagnosis_code: code });
+      setEditing(false);
+      setQuery("");
+      onSaved();
+    } catch {
+      toast({ title: "Failed to save", variant: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? codedOptions.filter((o: any) => {
+        const code = (o.icd10_code || "").toLowerCase();
+        const name = (o.canonical_display || "").toLowerCase();
+        return code.includes(q) || name.includes(q);
+      })
+    : codedOptions.slice(0, 50);
+
+  if (editing) {
+    return (
+      <div className="flex items-start gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">ICD-10</span>
+        <div ref={rootRef} className="relative flex-1">
+          <div className="flex items-center gap-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setEditing(false); setQuery(""); }
+                  if (e.key === "Enter" && filtered.length === 1) {
+                    save(filtered[0].icd10_code);
+                  }
+                }}
+                placeholder="Search code or diagnosis..."
+                className="w-full rounded border bg-background pl-7 pr-2 py-1 text-sm"
+                autoFocus
+                disabled={saving}
+              />
+            </div>
+            <button onClick={() => save(null)} disabled={saving}
+              className="rounded border px-2 py-1 text-xs hover:bg-accent"
+              title="Clear">
+              Clear
+            </button>
+            <button onClick={() => { setEditing(false); setQuery(""); }}
+              className="rounded border px-2 py-1 text-xs">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
+            {diagnoses.loading ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+            ) : filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                No matching ICD-10 codes.
+              </div>
+            ) : (
+              filtered.map((opt: any) => {
+                const isCurrent = value && (opt.icd10_code || "").toLowerCase() === value.toLowerCase();
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => save(opt.icd10_code)}
+                    disabled={saving}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
+                  >
+                    <span className="font-mono text-[11px] text-primary flex-shrink-0">
+                      {opt.icd10_code}
+                    </span>
+                    <span className="truncate text-muted-foreground">
+                      {opt.canonical_display}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => { setQuery(""); setEditing(true); }}>
+      <span className="text-muted-foreground">ICD-10</span>
+      <span className="font-medium">
+        {value ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="font-mono text-primary">{value}</span>
+            {currentRow?.canonical_display && (
+              <span className="text-xs text-muted-foreground truncate">
+                {currentRow.canonical_display}
+              </span>
+            )}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 export function EncountersSection({ encounters, onUpdated }: { encounters: any[]; onUpdated?: () => void }) {
+  const confirm = useConfirm();
+  const { toast } = useToast();
   if (!encounters?.length) return null;
+
+  const handleDelete = async (encId: number) => {
+    const ok = await confirm({
+      title: "Delete this encounter?",
+      description: "The encounter row will be removed. The parent document is left untouched.",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/encounters/${encId}`);
+      onUpdated?.();
+    } catch {
+      toast({ title: "Failed to delete", variant: "error" });
+    }
+  };
+
   return (
     <Section title="Encounters" icon={Stethoscope}>
       {encounters.map((enc, i) => (
         <div key={enc.id} className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}>
-          {/* Diagnosis is the encounter's headline — render larger than the
-              metadata rows so it's visually distinct. The other fields below
-              use EditableField rows. */}
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Diagnosis</p>
-          <DiagnosisHeading
-            value={enc.diagnosis_original || ""}
+          {/* Diagnosis is the encounter's headline. Only Diagnosis +
+              ICD-10 + Details show up here; other extracted fields are
+              hidden because the user wanted a focused editor. */}
+          <div className="flex items-start gap-2">
+            <div className="flex-1 min-w-0 space-y-1">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Diagnosis</p>
+              <DiagnosisHeading
+                value={enc.diagnosis_original || ""}
+                encounterId={enc.id}
+                onSaved={onUpdated || (() => {})}
+              />
+            </div>
+            <button
+              onClick={() => handleDelete(enc.id)}
+              className="rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+              title="Delete encounter"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <IcdCodeSelect
+            value={enc.diagnosis_code || null}
             encounterId={enc.id}
             onSaved={onUpdated || (() => {})}
           />
           <EditableField
-            label="ICD-10"
-            value={enc.diagnosis_code || ""}
-            field="diagnosis_code"
-            docId={enc.id}
-            apiPath={`/encounters/${enc.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Specialty"
-            value={enc.specialty_canonical_display || enc.specialty_original || ""}
-            field="specialty_original"
-            docId={enc.id}
-            apiPath={`/encounters/${enc.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Findings"
-            value={enc.findings || ""}
-            field="findings"
-            docId={enc.id}
-            apiPath={`/encounters/${enc.id}`}
-            onSave={onUpdated || (() => {})}
-            multiline
-          />
-          <EditableField
-            label="Notes"
+            label="Details"
             value={enc.notes || ""}
             field="notes"
             docId={enc.id}
@@ -152,76 +319,134 @@ export function EncountersSection({ encounters, onUpdated }: { encounters: any[]
   );
 }
 
+/** Schema for the medication editor: each entry binds a label to a DB
+ * column. ``active_ingredient_original`` is the headline so it always
+ * shows; the rest are gated on (a) having a value or (b) the user
+ * having explicitly added them via the "+" menu. */
+const MED_FIELDS: Array<{ key: string; label: string }> = [
+  { key: "active_ingredient_original", label: "Active ingredient" },
+  { key: "brand_name", label: "Brand" },
+  { key: "dosage", label: "Dosage" },
+  { key: "form", label: "Form" },
+  { key: "frequency", label: "Frequency" },
+  { key: "duration", label: "Duration" },
+  { key: "quantity", label: "Quantity" },
+];
+
+function MedicationRow({ med, onUpdated, onDelete }: {
+  med: any; onUpdated: () => void; onDelete: () => void;
+}) {
+  // Fields that have any DB value are always shown. The "+" menu only
+  // surfaces the rest, and once a user picks one we keep it visible
+  // even before they save anything so they can type into it.
+  const hasValue = (k: string) => {
+    const v = med[k];
+    return v !== null && v !== undefined && String(v).trim() !== "";
+  };
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [pickerOpen]);
+
+  const visible = MED_FIELDS.filter((f) => hasValue(f.key) || revealed.has(f.key));
+  const hidden = MED_FIELDS.filter((f) => !hasValue(f.key) && !revealed.has(f.key));
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-semibold flex-1 truncate">
+          {med.active_ingredient_original || med.brand_name || "Medication"}
+        </span>
+        <MedFormBadge form={med.form} />
+        <button
+          onClick={onDelete}
+          className="rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+          title="Delete medication"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {visible.map((f) => (
+        <EditableField
+          key={f.key}
+          label={f.label}
+          value={med[f.key] || ""}
+          field={f.key}
+          docId={med.id}
+          apiPath={`/medications/${med.id}`}
+          onSave={onUpdated}
+        />
+      ))}
+      {hidden.length > 0 && (
+        <div ref={pickerRef} className="relative pt-0.5">
+          <button
+            onClick={() => setPickerOpen(!pickerOpen)}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+          >
+            <Plus className="h-3 w-3" />
+            Add field
+          </button>
+          {pickerOpen && (
+            <div className="absolute left-0 top-full z-10 mt-1 min-w-[160px] rounded-md border bg-background shadow-lg">
+              {hidden.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => {
+                    setRevealed((prev) => new Set(prev).add(f.key));
+                    setPickerOpen(false);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left text-xs hover:bg-accent"
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MedicationsSection({ medications, onUpdated }: { medications: any[]; onUpdated?: () => void }) {
+  const confirm = useConfirm();
+  const { toast } = useToast();
   if (!medications?.length) return null;
-  // The medications block was previously a static table. Inline editing per-
-  // row matches the encounters / imaging pattern: each field is an
-  // EditableField backed by /api/medications/{id}.
+
+  const handleDelete = async (medId: number) => {
+    const ok = await confirm({
+      title: "Delete this medication?",
+      description: "The medication row will be removed. The parent document is left untouched.",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/medications/${medId}`);
+      onUpdated?.();
+    } catch {
+      toast({ title: "Failed to delete", variant: "error" });
+    }
+  };
+
   return (
     <Section title="Medications" icon={Pill}>
       {medications.map((med, i) => (
-        <div key={med.id} className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold flex-1 truncate">
-              {med.active_ingredient_original || med.brand_name || "Medication"}
-            </span>
-            <MedFormBadge form={med.form} />
-          </div>
-          <EditableField
-            label="Active ingredient"
-            value={med.active_ingredient_original || ""}
-            field="active_ingredient_original"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Brand"
-            value={med.brand_name || ""}
-            field="brand_name"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Dosage"
-            value={med.dosage || ""}
-            field="dosage"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Form"
-            value={med.form || ""}
-            field="form"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Frequency"
-            value={med.frequency || ""}
-            field="frequency"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Duration"
-            value={med.duration || ""}
-            field="duration"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
-          />
-          <EditableField
-            label="Quantity"
-            value={med.quantity || ""}
-            field="quantity"
-            docId={med.id}
-            apiPath={`/medications/${med.id}`}
-            onSave={onUpdated || (() => {})}
+        <div key={med.id} className={i > 0 ? "pt-3 mt-3 border-t" : ""}>
+          <MedicationRow
+            med={med}
+            onUpdated={onUpdated || (() => {})}
+            onDelete={() => handleDelete(med.id)}
           />
         </div>
       ))}

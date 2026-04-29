@@ -680,7 +680,12 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Encounter
+         * @description Remove an encounter row. The parent document is left untouched —
+         *     only this single extracted record is dropped.
+         */
+        delete: operations["delete_encounter_api_encounters__encounter_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -704,7 +709,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Medication
+         * @description Remove a medication row. The parent document is left untouched.
+         */
+        delete: operations["delete_medication_api_medications__medication_id__delete"];
         options?: never;
         head?: never;
         /**
@@ -3923,6 +3932,37 @@ export interface operations {
             };
         };
     };
+    delete_encounter_api_encounters__encounter_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                encounter_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_encounter_api_encounters__encounter_id__patch: {
         parameters: {
             query?: never;
@@ -3937,6 +3977,37 @@ export interface operations {
                 "application/json": components["schemas"]["EncounterPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_medication_api_medications__medication_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                medication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

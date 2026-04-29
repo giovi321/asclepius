@@ -1762,6 +1762,45 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Delete Encounter",
+        "description": "Remove an encounter row. The parent document is left untouched —\nonly this single extracted record is dropped.",
+        "operationId": "delete_encounter_api_encounters__encounter_id__delete",
+        "parameters": [
+          {
+            "name": "encounter_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Encounter Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/medications/{medication_id}": {
@@ -1793,6 +1832,45 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Delete Medication",
+        "description": "Remove a medication row. The parent document is left untouched.",
+        "operationId": "delete_medication_api_medications__medication_id__delete",
+        "parameters": [
+          {
+            "name": "medication_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Medication Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",

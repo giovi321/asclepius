@@ -586,9 +586,23 @@ async def _migration_clear_llm_placeholders(db: aiosqlite.Connection) -> None:
             continue
         # Filter to columns that actually exist on this DB shape so older
         # databases that pre-date a column's introduction don't error.
+        # Also skip NOT NULL columns: writing NULL into them would raise
+        # IntegrityError and abort startup. Those columns hold the row's
+        # identity (test name, vaccine name, invoice description) — if
+        # the LLM emitted a placeholder there the row is effectively
+        # junk, but cleaning it up is a separate concern from this
+        # placeholder sweep, so we just leave it for the user to fix
+        # via the UI.
         cursor = await db.execute(f"PRAGMA table_info({table})")
-        existing = {row[1] for row in await cursor.fetchall()}
-        applicable = [c for c in cols if c in existing]
+        col_info = {row[1]: row for row in await cursor.fetchall()}
+        applicable = []
+        for c in cols:
+            info = col_info.get(c)
+            if info is None:
+                continue
+            if info[3]:  # notnull flag
+                continue
+            applicable.append(c)
         if not applicable:
             continue
         for col in applicable:

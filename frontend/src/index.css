@@ -74,3 +74,11 @@
     filter: invert(1);
   }
 }
+
+/* Pipeline progress bar shimmer — used by PipelineProgress.tsx for the
+   page-progress fill while it's actively advancing. Slides a brighter band
+   across the gradient to signal "live work" without being noisy. */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

@@ -60,6 +60,12 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
   const isMR = (modality || "").toUpperCase() === "MR";
   const [wc, setWc] = useState<number | null>(null);
   const [ww, setWw] = useState<number | null>(null);
+  // ``autoWc`` / ``autoWw`` are the file's own VOI tag values, fetched
+  // once per series. They drive the slider thumb position when the user
+  // hasn't overridden the value, so "auto" doesn't visually slam the
+  // thumb to the midpoint of the slider's range.
+  const [autoWc, setAutoWc] = useState<number | null>(null);
+  const [autoWw, setAutoWw] = useState<number | null>(null);
   const [invert, setInvert] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const [metaItems, setMetaItems] = useState<any[] | null>(null);
@@ -89,10 +95,39 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
     setPan({ x: 0, y: 0 });
     setWc(null);
     setWw(null);
+    setAutoWc(null);
+    setAutoWw(null);
     setInvert(false);
     setMetaItems(null);
     setMetaQuery("");
   }, [studyId, seriesId]);
+
+  // Fetch the file's own WindowCenter / WindowWidth so the slider thumb
+  // sits where the image actually is when wc/ww are unset. Lightweight
+  // endpoint — only reads the two VOI tags. We refetch when the user
+  // navigates frames so per-frame VOI changes (rare but real on MR) are
+  // reflected, but throttled to "first frame visible" to avoid spamming.
+  useEffect(() => {
+    if (!isMR) return;
+    let cancelled = false;
+    api
+      .get(`/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}/window`)
+      .then((res) => {
+        if (cancelled) return;
+        const c = res.data?.window_center;
+        const w = res.data?.window_width;
+        setAutoWc(typeof c === "number" ? c : null);
+        setAutoWw(typeof w === "number" ? w : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAutoWc(null);
+        setAutoWw(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isMR, studyId, seriesId, currentFrame]);
 
   // Lazy-load DICOM metadata for the current frame on demand.
   const openMetadata = useCallback(async () => {
@@ -325,47 +360,87 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
         </span>
       </div>
 
-      {/* MRI contrast controls. Wider sliders + step=10 so a small mouse
-          movement maps to a small window-level change. The previous
-          step=1 over a 4096-value range made every pixel of slider
-          travel jump the image by ~32 intensity units. */}
-      {isMR && (
-        <div className="flex items-center gap-3 border-b px-3 py-2 bg-muted/20 text-xs flex-wrap">
-          <Sun className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-          <label className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <span className="text-muted-foreground w-12 flex-shrink-0">Center</span>
-            <input
-              type="range"
-              min={-1024}
-              max={3072}
-              step={10}
-              value={wc ?? 1024}
-              onChange={(e) => setWc(Number(e.target.value))}
-              className="flex-1 accent-primary"
-            />
-            <span className="tabular-nums w-14 text-right flex-shrink-0">{wc ?? "auto"}</span>
-          </label>
-          <label className="flex items-center gap-2 flex-1 min-w-[200px]">
-            <span className="text-muted-foreground w-12 flex-shrink-0">Width</span>
-            <input
-              type="range"
-              min={1}
-              max={4096}
-              step={10}
-              value={ww ?? 2048}
-              onChange={(e) => setWw(Number(e.target.value))}
-              className="flex-1 accent-primary"
-            />
-            <span className="tabular-nums w-14 text-right flex-shrink-0">{ww ?? "auto"}</span>
-          </label>
-          <button
-            onClick={resetContrast}
-            className="rounded border px-2 py-0.5 hover:bg-accent flex-shrink-0"
-          >
-            Auto
-          </button>
-        </div>
-      )}
+      {/* MRI contrast controls. Each axis pairs a number input (precise
+          typed value) with a slider whose thumb position reflects the
+          *real* current value — the file's own WindowCenter / Width
+          when on auto, or the user's override when manual. Previously
+          the slider snapped the thumb to a hard-coded midpoint
+          whenever wc/ww were null, which made the "auto" position
+          look like an arbitrary value rather than what the image was
+          actually being windowed at.
+
+          Slider extents widen around the auto value so the user can
+          still drag well above and below it without manually setting
+          min/max. Number input lets the user type any value precisely;
+          slider gives quick coarse adjustment. */}
+      {isMR && (() => {
+        const effectiveWc = wc ?? autoWc ?? 0;
+        const effectiveWw = ww ?? autoWw ?? 1;
+        // Build dynamic slider ranges around the auto value so the
+        // thumb is always somewhere visible. Falls back to a sensible
+        // default range when no auto is known.
+        const wcSpan = autoWc != null ? Math.max(Math.abs(autoWc) * 2, 1024) : 2048;
+        const wcMin = Math.round((autoWc ?? 0) - wcSpan);
+        const wcMax = Math.round((autoWc ?? 0) + wcSpan);
+        const wwMax = Math.max((autoWw ?? 0) * 4, 4096);
+        return (
+          <div className="flex items-center gap-3 border-b px-3 py-2 bg-muted/20 text-xs flex-wrap">
+            <Sun className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <div className="flex items-center gap-2 flex-1 min-w-[260px]">
+              <span className="text-muted-foreground w-12 flex-shrink-0">Center</span>
+              <input
+                type="number"
+                step={1}
+                value={Math.round(effectiveWc)}
+                onChange={(e) => setWc(Number(e.target.value))}
+                className="w-20 rounded border bg-background px-2 py-0.5 text-xs tabular-nums"
+              />
+              <input
+                type="range"
+                min={wcMin}
+                max={wcMax}
+                step={Math.max(1, Math.round(wcSpan / 200))}
+                value={Math.round(effectiveWc)}
+                onChange={(e) => setWc(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+              {wc == null && (
+                <span className="text-[10px] text-muted-foreground flex-shrink-0">auto</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-1 min-w-[260px]">
+              <span className="text-muted-foreground w-12 flex-shrink-0">Width</span>
+              <input
+                type="number"
+                step={1}
+                min={1}
+                value={Math.round(effectiveWw)}
+                onChange={(e) => setWw(Math.max(1, Number(e.target.value)))}
+                className="w-20 rounded border bg-background px-2 py-0.5 text-xs tabular-nums"
+              />
+              <input
+                type="range"
+                min={1}
+                max={wwMax}
+                step={Math.max(1, Math.round(wwMax / 200))}
+                value={Math.round(effectiveWw)}
+                onChange={(e) => setWw(Math.max(1, Number(e.target.value)))}
+                className="flex-1 accent-primary"
+              />
+              {ww == null && (
+                <span className="text-[10px] text-muted-foreground flex-shrink-0">auto</span>
+              )}
+            </div>
+            <button
+              onClick={resetContrast}
+              className="rounded border px-2 py-0.5 hover:bg-accent flex-shrink-0"
+              title="Reset to file defaults"
+            >
+              Reset
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Viewport */}
       <div

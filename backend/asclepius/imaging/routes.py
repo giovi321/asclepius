@@ -436,6 +436,56 @@ async def get_frame_metadata(
     return {"items": items, "count": len(items)}
 
 
+@router.get("/{study_id}/series/{series_id}/frame/{index}/window")
+async def get_frame_window(
+    study_id: int,
+    series_id: int,
+    index: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Return the file's effective window center / width for a frame.
+
+    Lightweight cousin of ``/metadata`` — only reads the two VOI tags
+    so the viewer can position its sliders at the actual auto value
+    instead of an arbitrary midpoint. Returns ``null`` for either axis
+    when the DICOM file doesn't carry that tag (the viewer falls back
+    to a min/max stretch in that case).
+    """
+    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
+    config = get_config()
+    series_path = Path(config.vault.root_path) / folder
+    if not series_path.exists():
+        raise HTTPException(status_code=404, detail="Frame not found")
+    frames = sorted(
+        [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
+    )
+    if index < 0 or index >= len(frames):
+        raise HTTPException(status_code=404, detail="Frame not found")
+
+    try:
+        import pydicom
+        ds = pydicom.dcmread(str(frames[index]), stop_before_pixels=True)
+    except Exception:
+        return {"window_center": None, "window_width": None}
+
+    def _scalar(attr: str) -> float | None:
+        if not hasattr(ds, attr):
+            return None
+        raw = getattr(ds, attr)
+        try:
+            if isinstance(raw, pydicom.multival.MultiValue):
+                return float(raw[0])
+            return float(raw)
+        except Exception:
+            return None
+
+    return {
+        "window_center": _scalar("WindowCenter"),
+        "window_width": _scalar("WindowWidth"),
+    }
+
+
 # ── Bundle files (DICOMDIR, JPEG previews, etc.) ───────────────────
 
 
@@ -914,4 +964,85 @@ async def attach_imaging_report(
         "filename": dest.name,
         "study_id": study_id,
         "message": "Report PDF queued for processing; it will be attached to this study automatically.",
+    }
+
+
+@router.delete("/{study_id}/report")
+async def detach_imaging_report(
+    study_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Detach the report PDF from an imaging study.
+
+    Repoints the study at a fresh placeholder document so the user can
+    attach a different report later. The previously-attached document
+    is left untouched on disk and in the documents table — it just
+    stops being the imaging study's parent. The user can still find it
+    in the documents list and re-attach (or delete) it from there.
+
+    No-op when the study is already a placeholder.
+    """
+    study = await _study_with_access(study_id, current_user, db)
+    old_doc_id = study["document_id"]
+
+    # _study_with_access returns a minimal projection; pull the full row
+    # so we can copy modality / body_part / patient ids onto the new
+    # placeholder document.
+    cursor = await db.execute(
+        """SELECT s.modality, s.body_part, s.report_status, s.doctor_id, s.facility_id,
+                  d.event_date AS study_date
+           FROM imaging_studies s
+           LEFT JOIN documents d ON s.document_id = d.id
+           WHERE s.id = ?""",
+        (study_id,),
+    )
+    full = await cursor.fetchone()
+    if not full:
+        raise HTTPException(status_code=404, detail="Study not found")
+    full = dict(full)
+
+    if (full.get("report_status") or "placeholder") == "placeholder":
+        return {"status": "noop", "study_id": study_id}
+
+    # Reuse the same placeholder shape that dicom_ingest.process_dicom
+    # creates for fresh studies. Empty file_path is the placeholder
+    # marker; doc_type 'imaging_report' is the canonical type.
+    bits = [b for b in (full.get("modality") or "", full.get("body_part") or "") if b]
+    placeholder_label = " ".join(bits) or "Imaging"
+    placeholder_name = f"{placeholder_label} (report pending)"
+    cursor = await db.execute(
+        """INSERT INTO documents
+           (patient_id, file_path, original_filename, doc_type, event_date,
+            doctor_id, facility_id, file_hash, file_size,
+            status, ocr_engine, ocr_text)
+           VALUES (?, '', ?, 'imaging_report', ?, ?, ?, NULL, NULL, 'done', 'dicom', '')""",
+        (study["patient_id"], placeholder_name, full.get("study_date"),
+         full.get("doctor_id"), full.get("facility_id")),
+    )
+    new_placeholder_id = cursor.lastrowid
+
+    await db.execute(
+        "UPDATE imaging_studies SET document_id = ?, report_status = 'placeholder' WHERE id = ?",
+        (new_placeholder_id, study_id),
+    )
+
+    # If the previously-attached row was itself a placeholder (defensive
+    # check — shouldn't happen given the report_status guard above), we
+    # can drop it. Real PDF documents stay alive on purpose.
+    if old_doc_id and old_doc_id != new_placeholder_id:
+        cursor = await db.execute(
+            "SELECT file_path, doc_type FROM documents WHERE id = ?",
+            (old_doc_id,),
+        )
+        old = await cursor.fetchone()
+        if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
+            await db.execute("DELETE FROM documents WHERE id = ?", (old_doc_id,))
+
+    await db.commit()
+    return {
+        "status": "detached",
+        "study_id": study_id,
+        "previous_document_id": old_doc_id,
+        "placeholder_document_id": new_placeholder_id,
     }

@@ -24,7 +24,7 @@ mimes are accepted.
 ## Pages and routing
 
 - ``/imaging`` — list page modelled on ``/documents``: search across
-  body part / institution / referring doctor / study description,
+  body part / facility / doctor / study description,
   modality filter, date range filter, *report status* filter
   (``placeholder`` vs ``attached``), sortable columns, paginated 20
   rows / page. Clicking anywhere on a row opens the detail page.
@@ -52,11 +52,19 @@ on-demand from the source DICOM). Interactions:
 - **Zoom**: ``Ctrl+wheel``, ``+`` / ``-`` keys, toolbar buttons. Range
   25%–800%. Double-click resets zoom + pan.
 - **Pan**: middle-mouse-button or ``shift``+drag. ``0`` resets the view.
-- **Contrast (MR only)**: when the modality is ``MR`` two sliders
-  appear, *Window center* and *Window width*. They drive ``?wc=`` and
-  ``?ww=`` query params on the frame endpoint, which the backend uses
-  to override the file's stored VOI LUT before normalising to PNG.
-  *Auto* reverts to the file's own values.
+- **Contrast (MR only)**: when the modality is ``MR`` two paired
+  controls appear for *Window center* and *Window width*. Each axis
+  has a number input (precise typed value) plus a slider whose thumb
+  reflects the *real* current value — the file's own
+  ``WindowCenter`` / ``WindowWidth`` when on auto, or the user's
+  override when manual. The slider range adapts around the auto
+  value so dragging stays useful regardless of modality. Either
+  axis can be moved independently — the missing axis falls back to
+  the file's tag — and *Reset* clears both back to auto. The viewer
+  also has an **Invert colours** toggle (sends ``?invert=1`` so the
+  PNG comes back inverted post-windowing) and a **Metadata** button
+  that opens a panel listing every DICOM header tag for the current
+  frame, with a search filter.
 - Other modalities use the file's stored windowing or a default
   min-max normalisation if none is present.
 
@@ -87,6 +95,19 @@ Two ways to attach a report from the empty-state slot:
 Once a report is attached, ``imaging_studies.report_status`` flips to
 ``attached`` and the slot renders the PDF inline using the same
 PdfViewer used on the documents page.
+
+The attached state is no longer one-shot. The PDF viewer panel now
+exposes:
+
+- **Replace with PDF** — upload a different PDF; the imaging study
+  is repointed at the new one once processing finishes. The previous
+  PDF document stays alive (it's just no longer this study's parent).
+- **Pick different PDF** — same shape as the empty-state picker but
+  excludes the currently-attached document.
+- **Detach** — calls ``DELETE /api/imaging/{id}/report``, which
+  creates a fresh placeholder and repoints the study at it. The
+  previously-attached PDF document is left in the documents list so
+  the user can re-attach it (or anything else) later.
 
 ## Cross-links between documents and imaging
 

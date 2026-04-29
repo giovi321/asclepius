@@ -5,6 +5,132 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.13] - 2026-04-29 - prancy lemon: editor polish + DICOM viewer overhaul
+
+### Added
+
+- **Imaging report can now be detached or replaced.** The radiology
+  report PDF used to be one-shot — once attached the imaging study was
+  stuck with it. The Radiology Report panel now shows Replace (upload
+  or pick a different PDF) and Detach (revert to placeholder; the PDF
+  stays in the documents list) controls. Backed by a new
+  ``DELETE /api/imaging/{study_id}/report`` endpoint that creates a
+  fresh placeholder document and repoints the imaging study at it.
+- **DICOM viewer toolbox.** Invert-colours toggle (``?invert=1`` on
+  the frame URL applies ``255 - pixel_array`` after windowing). New
+  Metadata panel lists every DICOM header tag for the current frame
+  (skipping pixel-data blobs) with a search filter. Backed by
+  ``GET /api/imaging/.../frame/{i}/metadata``.
+- **Searchable ICD-10 picker on encounters.** The diagnosis code field
+  is now a typeahead backed by ``/api/normalization/diagnoses``;
+  search hits the ``icd10_code`` column or the canonical display name.
+- **Per-row delete on encounters and medications**, with confirmation
+  prompts. New ``DELETE /api/encounters/{id}`` and
+  ``DELETE /api/medications/{id}`` endpoints with the same
+  patient-level access rules as the PATCH counterparts.
+
+### Changed
+
+- **Scope picker for normalized fields** (Specialty, Doctor,
+  Facility) now leads with a ``"X" -> "Y"`` chip pair so the change
+  is unmistakable, labels the second option ``Every document with
+  "X"`` instead of the bland "All documents", and prompts via
+  ``useConfirm`` before applying the merge / rename. The picker is
+  followed by an explicit confirmation dialog with a tailored merge
+  vs rename description.
+- **Encounters editor** now shows only Diagnosis, ICD-10 and Details
+  (one multiline field backed by ``encounters.notes``). Specialty,
+  Findings and Notes-as-separate-row are gone — they cluttered the
+  card and the doc-level specialty already covers the first.
+- **Medications editor** hides empty fields by default and exposes
+  an ``Add field`` picker that reveals the rest one at a time, so
+  the card stays compact when the LLM only filled in a few columns.
+- **DICOM viewer contrast controls** got a major rework. Each axis
+  pairs a number input (precise typed value) with a slider whose
+  thumb position now reflects the *real* current value — the file's
+  own ``WindowCenter`` / ``WindowWidth`` when on auto, or the user's
+  override when manual. Previously the slider snapped the thumb to
+  a hard-coded midpoint whenever the override was unset. The slider
+  range now adapts to the auto value so dragging stays useful.
+  Backed by a lightweight new
+  ``GET /api/imaging/.../frame/{i}/window`` endpoint.
+- **Single-slider window adjustments now apply.** The frame renderer
+  used to require both ``wc`` and ``ww`` to be sent together; if the
+  user moved one and left the other on auto the override silently
+  fell back to the file's tags. Each axis now resolves
+  independently, falling back to the DICOM file's own VOI tag for
+  the missing one.
+- **DICOM bicubic upscale ceiling raised** from 4× to 8× and the
+  schedule tightened, so the on-screen pixel ratio stays close to 1
+  even at deep zoom (zoom ≥5 now asks for 8× upscale).
+- **Imaging list "Institution" column replaced with "Facility"**.
+  The ``imaging_studies.institution_name`` column was dropped in
+  0.9.7 but the list still rendered "Unknown" through the dead
+  field. Now reads ``facility_name`` from the existing facilities
+  join. Search description and frontend types updated to match.
+- **"Language" row collapsed into Processing Details.** Was a
+  top-level row on the document detail card; now lives inside the
+  existing technical-details disclosure so the metadata card stays
+  focused on fields the user is actually likely to edit.
+
+### Fixed
+
+- **MRI study with N series no longer collapses to fewer rows.** When
+  a DICOM lacked a SeriesInstanceUID, every series with the same
+  SeriesNumber wrote into the same disk folder (``series-N/``) and
+  frames either overwrote each other on filename collision or piled
+  up under the wrong series row. The on-disk folder is now slugified
+  from the source folder name, so each source series gets its own
+  folder; ``imaging_series.folder_path`` is the unique lookup key
+  for NULL-UID rows. The ``_migration_0_9_5_imaging_series_dedup``
+  grouping now also includes ``folder_path`` so legitimately distinct
+  series are no longer merged on startup.
+- **Specialty change in the document view now sticks immediately.**
+  ``applyToAllDocuments`` was calling ``onSave()`` with no argument
+  after the merge / rename, so the parent state never updated and
+  the page kept showing the old name until reload. Now refetches the
+  document and feeds the fresh row to ``onSave``.
+- **Old specialty stops showing this document as "linked"** after
+  repointing it from the document detail page. Previously the
+  Normalization tab walked both ``documents.norm_specialty_id`` and
+  ``encounters.norm_specialty_id``, but only the documents row was
+  updated when the user changed the specialty — encounters extracted
+  from that document kept the old FK. New
+  ``encounters_specialty_sync`` AFTER UPDATE trigger mirrors the
+  existing doctor / facility sync triggers and cascades the change.
+- **LLM placeholder strings are no longer stored or shown.** Strings
+  the LLM emits when it can't find a value (``"Null"``,
+  ``"Illegible"``, ``"—"``, ``"N/A"``, ``"Unknown"``,
+  ``"Unspecified"``, etc.) are now coerced to ``NULL`` at extract
+  time across lab_results, encounters, medications, vaccinations,
+  invoice_items and the document-level metadata write. A one-shot
+  ``_migration_clear_llm_placeholders`` cleans up any pre-existing
+  rows. The lab results table no longer falls back to em-dashes for
+  empty cells either.
+- **Lab test dates inherit from the parent document.** New
+  ``_migration_backfill_lab_test_date`` fills ``lab_results.test_date``
+  from ``documents.event_date`` (or ``issued_date`` as a secondary
+  fallback) for any lab row left without one.
+
+### Performance
+
+- **Data-cleanup migrations now run once per DB.** New
+  ``schema_migrations`` bookkeeping table gates the placeholder and
+  lab-date cleanups so they don't full-scan every targeted table on
+  every startup. The earlier formulation was idempotent but cost
+  roughly 30 full-table scans per cold-start once a DB had any data,
+  reading as a sudden app-wide slowdown on populated installs.
+
+### API
+
+- New ``DELETE /api/encounters/{id}`` and
+  ``DELETE /api/medications/{id}``.
+- New ``DELETE /api/imaging/{study_id}/report``.
+- New ``GET /api/imaging/{study_id}/series/{sid}/frame/{i}/metadata``
+  and ``GET /api/imaging/.../frame/{i}/window``.
+- ``GET /api/imaging/.../frame/{i}`` accepts ``invert=1`` and the
+  ``upscale`` ceiling moves from 4 to 8.
+
 ## [0.9.12] - 2026-04-28 - graceful sphinx: major bug-fix sweep
 
 ### Fixed

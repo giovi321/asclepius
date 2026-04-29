@@ -3093,6 +3093,65 @@
         }
       }
     },
+    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/window": {
+      "get": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Get Frame Window",
+        "description": "Return the file's effective window center / width for a frame.\n\nLightweight cousin of ``/metadata`` \u2014 only reads the two VOI tags\nso the viewer can position its sliders at the actual auto value\ninstead of an arbitrary midpoint. Returns ``null`` for either axis\nwhen the DICOM file doesn't carry that tag (the viewer falls back\nto a min/max stretch in that case).",
+        "operationId": "get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "series_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Series Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/imaging/{study_id}/bundle-files": {
       "get": {
         "tags": [
@@ -3419,6 +3478,45 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Detach Imaging Report",
+        "description": "Detach the report PDF from an imaging study.\n\nRepoints the study at a fresh placeholder document so the user can\nattach a different report later. The previously-attached document\nis left untouched on disk and in the documents table \u2014 it just\nstops being the imaging study's parent. The user can still find it\nin the documents list and re-attach (or delete) it from there.\n\nNo-op when the study is already a placeholder.",
+        "operationId": "detach_imaging_report_api_imaging__study_id__report_delete",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",

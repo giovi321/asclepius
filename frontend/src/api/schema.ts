@@ -1021,6 +1021,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Frame Window
+         * @description Return the file's effective window center / width for a frame.
+         *
+         *     Lightweight cousin of ``/metadata`` — only reads the two VOI tags
+         *     so the viewer can position its sliders at the actual auto value
+         *     instead of an arbitrary midpoint. Returns ``null`` for either axis
+         *     when the DICOM file doesn't carry that tag (the viewer falls back
+         *     to a min/max stretch in that case).
+         */
+        get: operations["get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/imaging/{study_id}/bundle-files": {
         parameters: {
             query?: never;
@@ -1172,7 +1198,19 @@ export interface paths {
          *     to the study's patient.
          */
         post: operations["attach_imaging_report_api_imaging__study_id__report_post"];
-        delete?: never;
+        /**
+         * Detach Imaging Report
+         * @description Detach the report PDF from an imaging study.
+         *
+         *     Repoints the study at a fresh placeholder document so the user can
+         *     attach a different report later. The previously-attached document
+         *     is left untouched on disk and in the documents table — it just
+         *     stops being the imaging study's parent. The user can still find it
+         *     in the documents list and re-attach (or delete) it from there.
+         *
+         *     No-op when the study is already a placeholder.
+         */
+        delete: operations["detach_imaging_report_api_imaging__study_id__report_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4726,6 +4764,39 @@ export interface operations {
             };
         };
     };
+    get_frame_window_api_imaging__study_id__series__series_id__frame__index__window_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+                series_id: number;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_bundle_files_api_imaging__study_id__bundle_files_get: {
         parameters: {
             query?: never;
@@ -4938,6 +5009,37 @@ export interface operations {
                 "multipart/form-data": components["schemas"]["Body_attach_imaging_report_api_imaging__study_id__report_post"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_imaging_report_api_imaging__study_id__report_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                study_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

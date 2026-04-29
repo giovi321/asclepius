@@ -104,6 +104,33 @@ fields:
 A collapsible **Processing details** section shows OCR engine, OCR
 confidence, and LLM provider/model.
 
+### Pipeline stages
+
+A **Pipeline stages** card on the document detail page renders the full
+processing history for this document — every upload run plus every
+reprocess, grouped by run. Each run card shows:
+
+- **Kind badge** — *Upload run* (blue) or *Reprocess run* (purple).
+- **Flow badge** — *Vision-LLM* (amber) or *OCR + LLM* (slate), so two
+  reprocesses on the same doc with different flows are visually
+  distinguishable at a glance.
+- **Outcome pill** — *Completed*, *Failed*, *Cancelled*, *Running*, or
+  *Skipped* (worst stage outcome wins so a run with one failed stage
+  reads as failed).
+- **Total duration** and start time.
+
+Inside each run, the stages are rendered against a vertical rail with
+status-coloured marker dots: green check on completed, red X on failed,
+spinning blue loader on the active stage, amber ban on cancelled. Each
+row shows the stage name, status, duration, page count where relevant
+(`pages 1–49/49` for OCR), and the error message for failed stages.
+
+The newest run sits on top. While this document is the active pipeline
+job, a *Live* ping pill appears in the card header and the timeline
+polls every 2.5 seconds so stages tick in as the worker advances.
+Underlying data comes from `GET /api/documents/{id}/stages` and is
+persisted across runs in the `document_stage_events` table.
+
 ### AI Edit
 
 Apply natural-language instructions to the metadata, e.g. "Change the

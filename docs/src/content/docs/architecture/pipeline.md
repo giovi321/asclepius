@@ -132,15 +132,25 @@ The pipeline is the ingestion engine. It watches the inbox folder, sends each fi
 
 `pipeline.default_flow` decides which branch a **new upload** takes (`ocr_llm` or `vision_llm`). For **existing** documents, the Reprocess menu on the document page overrides the flow per-document (OCR+LLM, OCR only, LLM only, or Vision-LLM). Initial ingest and reprocess both run through the same `run_extraction()` strategy picker, so a 3-page blood test gets the same sectioning, chunking, or single-shot decision regardless of when it lands.
 
-## File Watcher
+## Worker Queue
 
-The pipeline uses `watchdog` to monitor the `vault/inbox/` directory for new files. When a file appears:
+The pipeline runs in a single-threaded worker thread with its own asyncio event loop. **Every** unit of work — fresh uploads from the inbox, manual reprocess clicks, retry-all-failed runs — is enqueued onto the same thread-safe `PriorityQueue`. The queue is the load-bearing primitive that enforces the "max one document at a time" invariant: there is one worker, it dequeues one job, awaits it to completion, and only then dequeues the next.
 
-1. The watcher does a short size-stability poll (≤ 2 s) so a still-being-written file doesn't enter the queue half-formed
-2. It is added to a **priority queue** sorted by file size (smallest first)
-3. The queue is processed sequentially (one file at a time)
-4. Processing status is tracked in memory and visible on the topbar / Dashboard
-5. After every successful tick the worker walks up from the just-handled file and ``rmdir``s any empty parent directory inside the inbox tree, so per-upload sub-folders don't linger
+Each queue entry is a tagged tuple `(priority, seq, kind, payload)`:
+
+- `kind="upload"` — payload `{file_path, file_size}`. Calls `process_file()`.
+- `kind="reprocess"` — payload `{doc_id, mode, llm_provider_id, ocr_provider_id, vision_provider_id}`. Calls `reprocess_document()`.
+
+`priority` is min-heap: smaller numbers run first. Inbox uploads use the file size (smaller files first, so a 100-page scan doesn't head-of-line-block a one-pager). Reprocess clicks from the document detail page use **priority 0**, which jumps ahead of pending uploads — the user explicitly asked for it. Retry-all-failed uses priority 10 (ahead of uploads, behind interactive reprocess). `seq` is a monotonic counter so two jobs with the same priority compare on insertion order rather than on the payload dict.
+
+Routing reprocess through the same queue as uploads — instead of spawning it as an `asyncio.create_task` on the FastAPI loop — fixes a class of concurrency bugs that used to surface as "the OCR chip switched mid-run." Before the queue refactor, a reprocess started in the FastAPI loop and a fresh upload in the worker loop would each acquire a separate `cap=1` slot from the credential gate (semaphores were keyed per-loop) and run in parallel against the same Ollama server. Both flows now share the worker loop, the queue, and the gate.
+
+When a file appears in `vault/inbox/`:
+
+1. The watcher does a short size-stability poll (≤ 2 s) so a still-being-written file doesn't enter the queue half-formed.
+2. The watcher enqueues it via `enqueue_job(queue, "upload", ...)`. The same helper updates `pipeline_status.queue_depth` and `queued_jobs` so the dashboard sees a non-zero queue between processing ticks.
+3. The worker dequeues it, runs the appropriate function based on `kind`, and only then loops.
+4. After every successful tick the worker walks up from the just-handled file and ``rmdir``s any empty parent directory inside the inbox tree, so per-upload sub-folders don't linger.
 
 Configuration:
 
@@ -230,7 +240,7 @@ The `provider_name` stored in the database is the user-configured display name (
 2. Send each page image to the LLM (Claude, OpenAI, or Ollama with vision model)
 3. LLM transcribes all visible text, preserving structure
 4. Transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) retry with per-credential backoff (defaults to `[30, 60, 120]` seconds, configurable via `CredentialEntry.max_retries` / `retry_backoff_seconds`)
-5. Per-page calls are serialized through a process-wide gate keyed by `(credential, kind)` so OCR and LLM traffic to the same endpoint never exceed the credential's configured `max_concurrent`
+5. Per-page calls are serialized through a **process-global** semaphore keyed by `credential_id`. All kinds (LLM, Vision-LLM, LLM-vision OCR) on the same credential share the same slots, so an Ollama server set to `max_concurrent=1` runs at most one request total — even when the FastAPI loop (chat, AI features) and the worker loop are both active
 6. Can use a **separate** provider/model/URL from the extraction LLM
 
 ### Remote Tesseract
@@ -254,7 +264,7 @@ When `pipeline.default_flow` is `vision_llm`, or the Reprocess menu is set to **
 5. Run **Phase 2 type-specific extraction** on the vision-produced OCR text using the same provider selected for vision. Lab results, medications, and diagnoses are populated even though classification came from the vision prompt.
 6. Call `extract_and_store` with the merged result as the override.
 
-Retries on transient failures are controlled per-credential (`max_retries`, `retry_backoff_seconds`). Per-page vision calls share the same `(credential, kind)` gate as OCR, so vision traffic respects the credential's configured concurrency cap.
+Retries on transient failures are controlled per-credential (`max_retries`, `retry_backoff_seconds`). Per-page vision calls share the **same** credential-keyed semaphore as the LLM and the LLM-vision OCR — so vision traffic, OCR traffic, and extraction traffic on the same Ollama server all contend for the same `max_concurrent` slots, regardless of which event loop initiated the call.
 
 **Advantages:** single model pull, no model swapping, and the model sees visual layout cues (bold headers, table grids, letterhead positioning, signatures) that OCR strips away.
 
@@ -505,9 +515,48 @@ The pipeline maintains an in-memory status dict visible via `GET /api/pipeline/s
   "recent_errors": [],
   "queued_files": [
     {"filename": "next.pdf", "size": 1234567}
-  ]
+  ],
+  "current_job": {
+    "doc_id": 42,
+    "filename": "document.pdf",
+    "kind": "reprocess",
+    "stage": "llm_extraction",
+    "page_current": 7,
+    "page_total": 15,
+    "stages_planned": ["ocr", "llm_extraction"],
+    "stages_done": ["ocr"],
+    "started_at": "2026-04-29T11:38:08"
+  },
+  "queued_jobs": [
+    {"kind": "upload", "label": "next.pdf", "doc_id": null}
+  ],
+  "llm_queues": [],
+  "watcher_active": true,
+  "auto_stopped": false,
+  "auto_stop_reason": ""
 }
 ```
+
+`current_job` is the richer descriptor the dashboard's PipelineProgress widget renders against — it carries the job kind (`upload` / `reprocess`), the stages this job will go through (`stages_planned`), the ones already completed (`stages_done`), and the live page progress when OCR or vision is mid-run. `queued_jobs` mirrors the worker queue so the dashboard's "Up next" rail shows what's waiting. The legacy `processing` / `processing_step` / `processing_pages` fields are kept populated for backward compatibility — older clients (and the top-bar chip's fallback path) still read them.
+
+The flow architecture is implicit in `stages_planned`: a list containing `vision_extraction` is the Vision-LLM flow, a list containing `ocr` is the OCR + LLM flow. The frontend renders a small flow-type pill from this so users can A/B-compare flows without reading the stage list.
+
+## Stage Timeline
+
+Every stage transition is also persisted to the `document_stage_events` table — one row per `(document_id, stage, status)` event. Recording is best-effort and runs alongside the in-memory `pipeline_status` updates: a hiccup on the events table never breaks the actual extraction run.
+
+A stage event carries:
+
+- `stage` — `ocr`, `vision_extraction`, `llm_extraction`, `page_classification`, `section_extraction`, `organizing`, `thumbnail`, `cache_ocr`
+- `status` — `started` / `completed` / `failed` / `skipped` / `cancelled`
+- `job_kind` — `upload` or `reprocess`
+- `started_at` and `finished_at` — for duration calculation
+- `message` — populated on failures with the error message
+- `page_current` / `page_total` — set on stages that work page-by-page (OCR, vision)
+
+The document detail page reads these via `GET /api/documents/{id}/stages` and renders them as a vertical run-grouped timeline: each upload or reprocess invocation gets its own card, status-coloured marker dots show success/failure/cancellation per stage, and the run header summarises kind, total duration, outcome, and flow type. While the doc is the active pipeline job, the timeline polls every 2.5 s so stages tick in live.
+
+Stage events also let the dashboard's idle state remain useful — clicking on a recently-finished doc surfaces its full processing history (including past failures and reprocesses) without needing the in-memory status to still be populated.
 
 ## Runtime Pipeline Control
 

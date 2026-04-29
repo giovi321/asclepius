@@ -66,8 +66,9 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `PATCH` | `/api/documents/{id}` | Yes | Update document metadata |
 | `DELETE` | `/api/documents/{id}` | Yes | Delete document and file |
 | `POST` | `/api/documents/{id}/move` | Yes | Reassign document to another patient |
-| `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run OCR and/or LLM extraction |
+| `POST` | `/api/documents/{id}/reprocess` | Yes | Re-run OCR and/or LLM extraction. Enqueues onto the same single-threaded pipeline worker as inbox uploads at priority 0, so the click jumps ahead of pending uploads but still serialises against any in-flight job. |
 | `POST` | `/api/documents/{id}/cancel` | Yes | Cancel processing |
+| `GET` | `/api/documents/{id}/stages` | Yes | Per-document pipeline stage timeline (every OCR / LLM / organize transition this doc has been through, across uploads and reprocesses). Backs the document detail page's run-grouped timeline. |
 | `POST` | `/api/documents/{id}/edit-with-ai` | Yes | Edit metadata via natural language |
 | `POST` | `/api/documents/{id}/generate-filename` | Yes | Get an AI-suggested `{suggested_filename}` (does not rename) |
 | `POST` | `/api/documents/{id}/rename` | Yes | Rename on disk + DB; auto-disambiguates on collision (`-2`, `-3`, …) |
@@ -128,6 +129,42 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `llm_provider_id` | string | null | Specific LLM provider ID (null = default highest-priority). Used when `mode` is `llm` or `both`. |
 | `ocr_provider_id` | string | null | Specific OCR provider ID (null = default highest-priority). Used when `mode` is `ocr` or `both`. |
 | `vision_provider_id` | string | null | Specific Vision-LLM provider ID (null = default highest-priority). Used when `mode` is `vision_llm`. |
+
+### Stage timeline response
+
+`GET /api/documents/{id}/stages` returns every persisted stage event for a document, oldest first:
+
+```json
+{
+  "document_id": 42,
+  "events": [
+    {
+      "id": 1,
+      "stage": "ocr",
+      "status": "completed",
+      "job_kind": "upload",
+      "message": null,
+      "page_current": 49,
+      "page_total": 49,
+      "started_at": "2026-04-29T11:02:46",
+      "finished_at": "2026-04-29T11:08:11"
+    },
+    {
+      "id": 2,
+      "stage": "llm_extraction",
+      "status": "completed",
+      "job_kind": "upload",
+      "message": null,
+      "page_current": null,
+      "page_total": null,
+      "started_at": "2026-04-29T11:08:11",
+      "finished_at": "2026-04-29T11:09:02"
+    }
+  ]
+}
+```
+
+Stage values: `ocr`, `vision_extraction`, `llm_extraction`, `page_classification`, `section_extraction`, `organizing`, `thumbnail`, `cache_ocr`. Status values: `started`, `completed`, `failed`, `skipped`, `cancelled`. `job_kind` is `upload` or `reprocess`. `message` is populated on failures with the error string. `page_current` / `page_total` are populated on stages that work page-by-page.
 
 ### Document link types
 
@@ -267,11 +304,28 @@ The list response shape mirrors `/api/documents`:
   "total_errors": 3,
   "recent_errors": [],
   "queued_files": [{"filename": "next.pdf", "size": 1234567}],
+  "current_job": {
+    "doc_id": 42,
+    "filename": "document.pdf",
+    "kind": "reprocess",
+    "stage": "llm_extraction",
+    "page_current": null,
+    "page_total": null,
+    "stages_planned": ["ocr", "llm_extraction"],
+    "stages_done": ["ocr"],
+    "started_at": "2026-04-29T11:38:08"
+  },
+  "queued_jobs": [
+    {"kind": "upload", "label": "next.pdf", "doc_id": null}
+  ],
+  "llm_queues": [],
   "watcher_active": true,
   "auto_stopped": false,
   "auto_stop_reason": ""
 }
 ```
+
+The `processing` / `processing_step` / `processing_pages` fields are kept populated for backward compatibility. New clients should read `current_job` (carries the job kind, the stage stepper data, and live page progress) and `queued_jobs` (mirrors the worker queue so the UI can show "Up next"). `kind` is `"upload"` for inbox files and `"reprocess"` for clicks from the document detail page. The flow architecture is implicit in `stages_planned`: a list containing `vision_extraction` is the Vision-LLM flow, otherwise it's the OCR + LLM flow.
 
 ## Settings
 

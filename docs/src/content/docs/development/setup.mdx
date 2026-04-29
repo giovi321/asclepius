@@ -157,12 +157,21 @@ asclepius/
 
 ### Regenerating frontend API types
 
-The frontend types in `src/api/schema.ts` are generated from the FastAPI OpenAPI spec. Run both steps after touching a request/response model on the backend:
+The frontend types in `src/api/schema.ts` are generated from the FastAPI OpenAPI spec. After touching a request/response model on the backend:
 
 ```bash
 python backend/scripts/export_openapi.py
 npm --prefix frontend run gen:api
 ```
+
+You normally don't have to remember this step. The repo ships a pre-commit hook (`.pre-commit-config.yaml`) that runs both commands automatically whenever a backend `.py` file is staged, then `git add`s the regenerated `frontend/src/openapi.json` and `frontend/src/api/schema.ts`. If anything actually changed, pre-commit aborts the commit with `Files were modified by this hook` so you can review the diff; re-running `git commit` then succeeds with the artefacts included. To activate it once per clone:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The same regen check runs in CI (`openapi-drift` job) so a PR that skips the hook still fails the build.
 
 ## Building for production
 

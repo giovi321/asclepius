@@ -98,8 +98,30 @@ LLM providers handle document classification, data extraction, chat, and search.
 1. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **LLM** section
 2. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline
 3. Set the **model** (the credential already carries URL + API key) and optionally the timeout
-4. Drag in the **Priority** sub-tab to reorder across all LLM providers (top = highest priority)
-5. Click **Save Changes**
+4. Click **Test Connection** to verify the credential, URL, and model name without spending tokens (see [Test Connection buttons](#test-connection-buttons))
+5. Drag in the **Priority** sub-tab to reorder across all LLM providers (top = highest priority)
+6. Click **Save Changes**
+
+### Test Connection buttons
+
+Every provider row in **Settings → Document Analysis → Providers** has a **Test Connection** button. Each button hits the provider's free metadata endpoint instead of running real inference, so:
+
+- **Zero tokens consumed** — Anthropic, OpenAI, and any pay-per-call backend are billed nothing for a click.
+- **Zero GPU contention** — clicking Test on a self-hosted Ollama provider while the pipeline is mid-page on the same server doesn't queue a real inference behind it. The probe is a `GET /api/tags`, not a `_generate(...)`.
+- **Better diagnostics** — a wrong model name in the config returns *"Server reachable but model 'qwen2.5:14b' not found. Available: qwen2.5-coder:14b, llama3.2:3b, …"* instead of a generic timeout.
+
+What each backend probes:
+
+| Provider type | Probe |
+|---|---|
+| **Ollama** (LLM, Vision-LLM, LLM-vision OCR) | `GET /api/tags` — lists installed models, validates URL + that the configured model is pulled. |
+| **OpenAI / vLLM** | `GET /v1/models` with the API key — validates auth + lists accessible models. |
+| **Anthropic Claude** | `client.models.list()` (Anthropic SDK) — validates the API key + confirms the model id is in Anthropic's catalogue. |
+| **Google Vision** | `POST images:annotate` with `{"requests": []}` — Google specifically returns 200/400 for empty payloads, so this validates the API key without consuming quota. |
+| **Tesseract Remote** | `GET /` against the remote server — confirms it's up. |
+| **Tesseract local** | `tesseract --version`. |
+
+What a Test pass does **not** catch: weights that are installed but corrupt, prompt-template mismatches, or inference paths that error mid-call. For end-to-end verification, run a real reprocess on a small document.
 
 ### Provider priority and escalation
 
@@ -260,7 +282,7 @@ This is useful when:
 2. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **Vision-LLM** section.
 3. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline.
 4. Fill in the model name (the credential already supplies URL + API key).
-5. Click **Test Connection**, a trivial image round-trip confirms the wiring.
+5. Click **Test Connection** — confirms the URL is reachable, the API key is valid, and the configured model is actually available on the server. The test only hits the provider's free metadata endpoint (`GET /api/tags` for Ollama, `GET /v1/models` for OpenAI/vLLM, `client.models.list()` for Anthropic), so it consumes no tokens and doesn't spin up the model. See [Test Connection buttons](#test-connection-buttons) below.
 6. Drag to reorder priority in the **Priority** sub-tab and **Save Changes**.
 
 Asclepius also runs Phase 2 type-specific extraction after the vision call, reusing the same provider you selected for vision. That way Haiku-for-vision stays Haiku-for-extraction instead of silently falling back to the default text-LLM.

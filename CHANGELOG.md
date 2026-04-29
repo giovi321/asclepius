@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Reprocess + upload no longer race on the same Ollama**. The pipeline
+  worker queue now carries both inbox uploads and reprocess clicks, so
+  the "max one document at a time" invariant actually holds — previously
+  a `POST /documents/{id}/reprocess` ran as `asyncio.create_task` on the
+  FastAPI loop while uploads ran on the watcher's worker-thread loop, and
+  the credential gate's per-loop `cap=1` semaphores let both flows hit
+  the same Ollama in parallel. Reprocess clicks are enqueued at priority
+  0 (jump pending uploads), `retry-all-failed` at priority 10. See
+  [pipeline → Worker Queue](docs/src/content/docs/architecture/pipeline.md).
+- **Credential cap is now process-global**. The `asyncio.Semaphore` keyed
+  per `(loop_id, credential_id)` is replaced by a single
+  `threading.Semaphore` per credential, acquired from async via the
+  default executor. So a chat / AI-edit / filename suggestion firing on
+  the FastAPI loop while the pipeline is mid-page no longer doubles up
+  inflight requests against the credential's `max_concurrent`.
+- **Pre-commit hook now auto-stages OpenAPI artefacts**. When a backend
+  `.py` change drifts `frontend/src/openapi.json` /
+  `frontend/src/api/schema.ts`, the hook regenerates and `git add`s
+  them; `git commit` again to finish.
+
+### Added
+
+- **Persisted per-document stage timeline.** New `document_stage_events`
+  table records every OCR / vision / LLM / organize transition with
+  start time, finish time, status (`completed` / `failed` / `cancelled`
+  / `skipped`), job kind (`upload` / `reprocess`), and error message.
+  Surfaced via `GET /api/documents/{id}/stages` and rendered as a
+  vertical run-grouped timeline on the document detail page — every
+  upload + reprocess this doc has been through, with durations and
+  outcome pills.
+- **Dashboard PipelineProgress widget.** Replaces the old single-line
+  status with a card that shows the running job, its kind (Upload /
+  Reprocess), its flow (OCR + LLM / Vision-LLM), a connected horizontal
+  stepper across the planned stages, a live-ticking elapsed-time clock,
+  a shimmering page-progress bar, and an "Up next" rail mirroring the
+  worker queue. Idle and queued states have their own purpose-built
+  cards.
+- **Top-bar pipeline chip** now labels Upload vs Reprocess and tints the
+  ambient glow accordingly.
+
+### Changed
+
+- **Test Connection buttons** in Settings → Providers now hit each
+  backend's free metadata endpoint instead of running real inference.
+  `GET /api/tags` for Ollama, `GET /v1/models` for OpenAI/vLLM,
+  `client.models.list()` for Anthropic. Zero tokens, zero GPU contention
+  with the live pipeline. A wrong model name now returns "Server
+  reachable but model 'X' not found. Available: Y, Z, …" instead of a
+  generic timeout.
+- **Pipeline status response** carries new `current_job` and
+  `queued_jobs` fields. Legacy `processing` / `processing_step` /
+  `processing_pages` are kept populated for backward compatibility.
+
 ## [0.9.13] - 2026-04-29 - prancy lemon: editor polish + DICOM viewer overhaul
 
 ### Added

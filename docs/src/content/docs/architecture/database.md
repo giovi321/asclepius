@@ -171,6 +171,12 @@ The diagram above is the core hub-and-spoke shape: `documents` in the middle, `p
 |-------|---------|
 | `extraction_corrections` | Tracks user edits to LLM-extracted fields (before/after values) for correction-driven learning |
 
+### Pipeline Tables
+
+| Table | Purpose |
+|-------|---------|
+| `document_stage_events` | Per-document pipeline stage timeline. One row per stage transition (`stage`, `status`, `job_kind`, `started_at`, `finished_at`, `message`, optional `page_current` / `page_total`). Persisted across runs so the document detail page can show every upload + reprocess this doc has ever been through, with durations and error messages. Cascades on `documents` delete. |
+
 ### System Tables
 
 | Table | Purpose |

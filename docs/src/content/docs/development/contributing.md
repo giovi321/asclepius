@@ -55,6 +55,19 @@ title: "Contributing"
 - Direct push to `main` branch (solo developer project)
 - Descriptive commit messages
 
+### Pre-commit hooks
+
+The repo's `.pre-commit-config.yaml` ships hooks for `ruff` (backend lint + format), `prettier` (frontend / docs / yaml format), trailing-whitespace / EOL-fixer / yaml-syntax checks, large-file detection, and an **openapi-drift** check that auto-regenerates `frontend/src/openapi.json` + `frontend/src/api/schema.ts` whenever a backend `.py` file is staged. Install once per clone:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+When the openapi-drift hook detects changes, it stages the regenerated artefacts and aborts the commit with `Files were modified by this hook`. Re-run `git commit` and it succeeds with the new artefacts included.
+
+CI runs the same `ruff`, `prettier`, and `openapi-drift` checks on every push, so a PR that skipped the hook still fails the build.
+
 ## Reporting issues
 
 Open an issue on [GitHub](https://github.com/giovi321/asclepius/issues) with:

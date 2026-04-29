@@ -30,10 +30,22 @@ PDF, PNG / JPG / TIFF, DICOM.
 
 ## 3. Watch it process
 
-The Dashboard shows pipeline status, queue depth, and recent errors. Each
-document moves through OCR → LLM extraction → organizing. For multi-page
-PDFs you may also see chunked extraction (>1 page or >8k chars), page
-classification, and section extraction.
+The Dashboard's **Pipeline** card shows the live job: filename, kind
+(Upload or Reprocess), flow type (OCR + LLM or Vision-LLM), a connected
+stepper across the planned stages, a live elapsed-time clock, and a
+shimmering page-progress bar during OCR. An "Up next" rail underneath
+lists what's queued behind the running job. Each document moves through
+OCR → LLM extraction → organizing in the default flow; the Vision-LLM
+flow shortens that to Vision → LLM extraction → organizing.
+
+The **document detail** page carries a per-doc *Pipeline stages* card
+that shows every upload + reprocess this document has been through,
+grouped by run, with durations, error messages, and outcome pills —
+useful when comparing reprocesses or debugging a failure.
+
+For multi-page PDFs you may also see chunked extraction (>1 page or
+>8k chars), page classification, and section extraction surfaced as
+their own stages.
 
 ## Next steps
 

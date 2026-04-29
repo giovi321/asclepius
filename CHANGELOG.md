@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Document detail inline-edit polish.** Inline-edit action buttons now
+  share a fixed `h-7` height so the Save / Delete / Close buttons line
+  up cleanly across the row (previously a text label and a 12px X icon
+  with the same padding still rendered different visual heights).
+  Cancel-edit buttons are now labelled "Close" via `title` /
+  `aria-label`, and clear-the-saved-value buttons are renamed to
+  "Delete" with a destructive tint. Every editor (`EditableField`,
+  `EditableSelect`, `EditableSummary`, `EditableCombobox`,
+  `IcdCodeSelect`, `DiagnosisHeading`) now exposes the Delete
+  affordance — only when a saved value exists, never on empty fields.
+- **Encounter card hierarchy.** The encounter section is restructured
+  into a three-tier card: diagnosis name (headline), ICD-10 as an
+  inline monospace pill on the same row, and Details as a stacked body
+  block with a left-rule indent. Fixes the previous mix of
+  small-caps / `text-sm` / `font-mono` / `font-medium` competing for
+  attention with no clear hierarchy.
+- **Multiline `EditableField` stacks now.** When `multiline=true`, the
+  label moves to its own line as a small-caps eyebrow and the value
+  renders left-aligned full width with `whitespace-pre-wrap`, instead
+  of fighting the one-line `flex justify-between` row. Single-line
+  fields keep the inline label-on-left, value-on-right pattern.
+
 ### Fixed
 
 - **Reprocess + upload no longer race on the same Ollama**. The pipeline

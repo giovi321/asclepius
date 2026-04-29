@@ -126,6 +126,55 @@ export function Section({
   );
 }
 
+// ─── Inline edit action buttons ────────────────────────────────
+// Fixed-height (h-7) inline action buttons. The shared height +
+// flex centering means a text label and a 12px icon end up the same
+// visual height — fixes the mismatch where "Save" looked taller than
+// the X close button despite identical padding.
+
+type ActionVariant = "primary" | "outline" | "danger";
+const ACTION_VARIANTS: Record<ActionVariant, string> = {
+  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+  outline: "border bg-background hover:bg-accent",
+  danger:
+    "border border-destructive/40 text-destructive hover:bg-destructive/10",
+};
+
+export const ActionButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ActionVariant }
+>(function ActionButton(
+  { variant = "outline", className = "", ...props },
+  ref,
+) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`h-7 inline-flex items-center justify-center rounded border-transparent px-2.5 text-xs font-medium disabled:opacity-50 ${ACTION_VARIANTS[variant]} ${className}`}
+      {...props}
+    />
+  );
+});
+
+export const IconButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { label: string }
+>(function IconButton({ label, className = "", children, ...props }, ref) {
+  return (
+    <button
+      ref={ref}
+      type="button"
+      title={label}
+      aria-label={label}
+      className={`h-7 w-7 inline-flex items-center justify-center rounded border bg-background hover:bg-accent disabled:opacity-50 ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+
 // ─── InfoRow (read-only) ───────────────────────────────────────
 
 export function InfoRow({ label, value }: { label: string; value: any }) {
@@ -188,6 +237,20 @@ export function EditableField({
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    setSaving(true);
+    try {
+      const path = apiPath || `/documents/${docId}`;
+      const res = await api.patch(path, { [field]: null });
+      setEditing(false);
+      setVal("");
+      onSave(res.data);
+    } catch {
+      toast({ title: "Failed to delete", variant: "error" });
+    }
+    setSaving(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !multiline) handleSave();
     if (e.key === "Escape") {
@@ -196,51 +259,117 @@ export function EditableField({
     }
   };
 
-  if (editing) {
+  const cancel = () => {
+    setEditing(false);
+    setVal(value || "");
+  };
+
+  // Multiline fields stack: label on its own line as a small-caps
+  // eyebrow, value (or textarea) full-width below. Single-line fields
+  // keep the inline label-on-left, value-on-right row.
+  if (editing && multiline) {
     return (
-      <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">
+      <div className="space-y-1.5 py-1">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
           {label}
-        </span>
-        <div className="flex-1 flex gap-1">
-          {multiline ? (
-            <textarea
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm"
-              rows={2}
-              autoFocus
-              disabled={saving}
-            />
-          ) : (
-            <input
-              type={type}
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm"
-              autoFocus
-              disabled={saving}
-            />
-          )}
-          <button
+        </p>
+        <textarea
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full rounded border bg-background px-2 py-1.5 text-sm"
+          rows={3}
+          autoFocus
+          disabled={saving}
+        />
+        <div className="flex justify-end gap-1">
+          <ActionButton
             onClick={handleSave}
             disabled={saving}
-            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
+            variant="primary"
           >
-            {saving ? "..." : "OK"}
-          </button>
-          <button
-            onClick={() => {
-              setEditing(false);
-              setVal(value || "");
-            }}
-            className="rounded border px-2 py-1 text-xs"
-          >
-            <X className="h-3 w-3" />
-          </button>
+            {saving ? "Saving..." : "Save"}
+          </ActionButton>
+          {value && (
+            <ActionButton
+              onClick={handleDelete}
+              disabled={saving}
+              variant="danger"
+              title="Delete the saved value"
+            >
+              Delete
+            </ActionButton>
+          )}
+          <IconButton label="Close" onClick={cancel}>
+            <X className="h-3.5 w-3.5" />
+          </IconButton>
         </div>
+      </div>
+    );
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0">
+          {label}
+        </span>
+        <div className="flex-1 flex items-center gap-1">
+          <input
+            type={type}
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 h-7 rounded border bg-background px-2 text-sm"
+            autoFocus
+            disabled={saving}
+          />
+          <ActionButton
+            onClick={handleSave}
+            disabled={saving}
+            variant="primary"
+          >
+            {saving ? "..." : "Save"}
+          </ActionButton>
+          {value && (
+            <ActionButton
+              onClick={handleDelete}
+              disabled={saving}
+              variant="danger"
+              title="Delete the saved value"
+            >
+              Delete
+            </ActionButton>
+          )}
+          <IconButton label="Close" onClick={cancel}>
+            <X className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+      </div>
+    );
+  }
+
+  if (multiline) {
+    return (
+      <div
+        className="space-y-1 py-1 group cursor-pointer rounded px-1 -mx-1 hover:bg-accent/30"
+        onClick={() => {
+          setVal(value || "");
+          setEditing(true);
+        }}
+      >
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        {value ? (
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">
+            {formatDisplay ? formatDisplay(value) : value}
+          </p>
+        ) : (
+          <p className="text-xs italic text-muted-foreground/50 group-hover:text-primary">
+            click to add
+          </p>
+        )}
       </div>
     );
   }
@@ -323,7 +452,7 @@ export function EditableSelect({
           value={val}
           onChange={(e) => handleSave(e.target.value)}
           disabled={saving}
-          className="flex-1 rounded border bg-background px-2 py-1 text-sm"
+          className="flex-1 h-7 rounded border bg-background px-2 text-sm"
           autoFocus
         >
           <option value="">— none —</option>
@@ -333,12 +462,19 @@ export function EditableSelect({
             </option>
           ))}
         </select>
-        <button
-          onClick={() => setEditing(false)}
-          className="rounded border px-2 py-1 text-xs"
-        >
-          <X className="h-3 w-3" />
-        </button>
+        {value && (
+          <ActionButton
+            onClick={() => handleSave("")}
+            disabled={saving}
+            variant="danger"
+            title="Delete the saved value"
+          >
+            Delete
+          </ActionButton>
+        )}
+        <IconButton label="Close" onClick={() => setEditing(false)}>
+          <X className="h-3.5 w-3.5" />
+        </IconButton>
       </div>
     );
   }
@@ -589,8 +725,8 @@ export function EditableCombobox({
 
   if (editing) {
     return (
-      <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">
+      <div className="flex items-center gap-2 text-sm py-0.5">
+        <span className="text-muted-foreground w-28 flex-shrink-0">
           {label}
         </span>
         <div ref={rootRef} className="relative flex-1">
@@ -616,29 +752,29 @@ export function EditableCombobox({
                   }
                 }}
                 placeholder={`Search ${normType}...`}
-                className="w-full rounded border bg-background pl-7 pr-2 py-1 text-sm"
+                className="w-full h-7 rounded border bg-background pl-7 pr-2 text-sm"
                 autoFocus
                 disabled={saving}
               />
             </div>
-            <button
+            <ActionButton
               onClick={() => commitDocOnly(null)}
               disabled={saving}
-              className="rounded border px-2 py-1 text-xs hover:bg-accent"
-              title="Clear this field"
+              variant="danger"
+              title="Delete this field's saved value"
             >
-              Clear
-            </button>
-            <button
+              Delete
+            </ActionButton>
+            <IconButton
+              label="Close"
               onClick={() => {
                 setEditing(false);
                 setQuery("");
                 setPendingChange(null);
               }}
-              className="rounded border px-2 py-1 text-xs"
             >
-              <X className="h-3 w-3" />
-            </button>
+              <X className="h-3.5 w-3.5" />
+            </IconButton>
           </div>
           {/* Dropdown panel */}
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
@@ -851,6 +987,19 @@ export function EditableSummary({
     setSaving(false);
   };
 
+  const handleDelete = async () => {
+    setSaving(true);
+    try {
+      const res = await api.patch(`/documents/${docId}`, { summary_en: null });
+      setEditing(false);
+      setVal("");
+      onSave(res.data);
+    } catch {
+      toast({ title: "Failed to delete", variant: "error" });
+    }
+    setSaving(false);
+  };
+
   return (
     <div className="rounded-lg border border-primary/20 bg-primary/5">
       <button
@@ -877,23 +1026,32 @@ export function EditableSummary({
                 autoFocus
                 disabled={saving}
               />
-              <div className="flex gap-2 mt-2">
-                <button
+              <div className="flex gap-1 mt-2">
+                <ActionButton
                   onClick={handleSave}
                   disabled={saving}
-                  className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+                  variant="primary"
                 >
                   {saving ? "Saving..." : "Save"}
-                </button>
-                <button
+                </ActionButton>
+                {value && (
+                  <ActionButton
+                    onClick={handleDelete}
+                    disabled={saving}
+                    variant="danger"
+                    title="Delete the saved summary"
+                  >
+                    Delete
+                  </ActionButton>
+                )}
+                <ActionButton
                   onClick={() => {
                     setEditing(false);
                     setVal(value || "");
                   }}
-                  className="rounded border px-3 py-1.5 text-xs hover:bg-accent"
                 >
-                  Cancel
-                </button>
+                  Close
+                </ActionButton>
               </div>
             </>
           ) : (
@@ -998,22 +1156,18 @@ export function EditableFilename({
           autoFocus
           disabled={saving}
         />
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
-        >
+        <ActionButton onClick={handleSave} disabled={saving} variant="primary">
           {saving ? "..." : "Save"}
-        </button>
-        <button
+        </ActionButton>
+        <IconButton
+          label="Close"
           onClick={() => {
             setEditing(false);
             setVal(value);
           }}
-          className="rounded border px-2 py-1.5 text-xs hover:bg-accent"
         >
-          <X className="h-3 w-3" />
-        </button>
+          <X className="h-3.5 w-3.5" />
+        </IconButton>
       </div>
     );
   }

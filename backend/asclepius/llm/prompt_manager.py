@@ -49,7 +49,7 @@ PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
         "few_shot_examples",
     ],
     "vision_extraction": [],
-    "extraction_bloodtest": ["ocr_text", "lab_test_mappings?"],
+    "extraction_lab_test": ["ocr_text", "lab_test_mappings?"],
     "extraction_specialist_report": [
         "ocr_text",
         "specialty_mappings?",
@@ -59,7 +59,8 @@ PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
     "extraction_prescription": ["ocr_text", "medication_mappings?"],
     "extraction_invoice": ["ocr_text"],
     "extraction_discharge": ["ocr_text", "diagnosis_mappings?", "medication_mappings?"],
-    "extraction_radiology": ["ocr_text"],
+    "extraction_imaging_report": ["ocr_text"],
+    "extraction_surgical_report": ["ocr_text"],
     "extraction_vaccination": ["ocr_text"],
     "document_edit": [
         "current_data",
@@ -109,9 +110,9 @@ PROMPT_REGISTRY = {
         "description": "Vision-LLM flow: single-step image → OCR + classification + metadata",
         "default_attr": "VISION_EXTRACTION_PROMPT",
     },
-    "extraction_bloodtest": {
-        "description": "Phase 2: Extract lab results from blood test documents",
-        "default_key": "bloodtest",
+    "extraction_lab_test": {
+        "description": "Phase 2: Extract lab results from lab test documents",
+        "default_key": "lab_test",
     },
     "extraction_specialist_report": {
         "description": "Phase 2: Extract diagnoses, encounters, medications from specialist reports",
@@ -129,9 +130,13 @@ PROMPT_REGISTRY = {
         "description": "Phase 2: Extract data from discharge letters",
         "default_key": "discharge",
     },
-    "extraction_radiology": {
-        "description": "Phase 2: Extract findings from radiology reports",
-        "default_key": "radiology_report",
+    "extraction_imaging_report": {
+        "description": "Phase 2: Extract findings from imaging/radiology reports",
+        "default_key": "imaging_report",
+    },
+    "extraction_surgical_report": {
+        "description": "Phase 2: Extract operative details from surgical reports",
+        "default_key": "surgical_report",
     },
     "extraction_vaccination": {
         "description": "Phase 2: Extract vaccination records",

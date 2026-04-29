@@ -332,7 +332,7 @@ CREATE TABLE IF NOT EXISTS norm_medication_aliases (
 -- Custom prompts (user-editable LLM prompts)
 CREATE TABLE IF NOT EXISTS custom_prompts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    prompt_key TEXT UNIQUE NOT NULL,  -- e.g. 'classification', 'extraction_bloodtest', 'chat_system'
+    prompt_key TEXT UNIQUE NOT NULL,  -- e.g. 'classification', 'extraction_lab_test', 'chat_system'
     prompt_text TEXT NOT NULL,
     description TEXT,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

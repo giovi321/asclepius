@@ -379,12 +379,13 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 |-----|-------------|
 | `classification` | Phase 1: Document classification and basic metadata extraction |
 | `vision_extraction` | Vision-LLM flow: single-step image → OCR + classification + metadata |
-| `extraction_bloodtest` | Phase 2: Extract lab results from blood test documents |
+| `extraction_lab_test` | Phase 2: Extract lab results from lab test documents |
 | `extraction_specialist_report` | Phase 2: Extract diagnoses, encounters, medications |
 | `extraction_prescription` | Phase 2: Extract medications from prescriptions |
 | `extraction_invoice` | Phase 2: Extract cost and line items from invoices |
 | `extraction_discharge` | Phase 2: Extract data from discharge letters |
-| `extraction_radiology` | Phase 2: Extract findings from radiology reports |
+| `extraction_imaging_report` | Phase 2: Extract findings from imaging/radiology reports |
+| `extraction_surgical_report` | Phase 2: Extract operative details from surgical reports |
 | `extraction_vaccination` | Phase 2: Extract vaccination records |
 | `document_edit` | AI-powered document metadata editing |
 | `sql_generation` | Chat: Generate SQL queries from natural language |
@@ -392,7 +393,7 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
-**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_bloodtest`, `extraction_prescription`, …) only receive `{ocr_text}`, canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat, the SQL-generation prompt is the tool-call.
+**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_lab_test`, `extraction_prescription`, …) only receive `{ocr_text}`, canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat, the SQL-generation prompt is the tool-call.
 
 ### Available variables
 
@@ -415,7 +416,7 @@ The Prompts settings page shows the exact variables available for each prompt as
 | `{diagnosis_mappings}` | JSON list of canonical diagnosis/ICD-10 aliases (optional) |
 | `{medication_mappings}` | JSON list of canonical medication aliases (optional) |
 | `{doc_id}` | ID of the current document |
-| `{doc_type}` | Classified document type (bloodtest, invoice, discharge, …) |
+| `{doc_type}` | Classified document type (lab_test, invoice, discharge, …) |
 | `{doc_date}` | Document date (YYYY-MM-DD or `unknown`) |
 | `{doctor_name}` | Treating/signing doctor's name from the extraction |
 | `{facility_name}` | Facility/hospital/clinic name from the extraction |
@@ -437,12 +438,13 @@ Variables labelled **optional** are substituted only if their placeholder actual
 |------------|-----------|
 | `classification` | `{patient_list}`, `{facility_list}`, `{doctor_list}`, `{ocr_text}`, `{few_shot_examples}` |
 | `vision_extraction` | *(none, self-contained)* |
-| `extraction_bloodtest` | `{ocr_text}`, `{lab_test_mappings}`? |
+| `extraction_lab_test` | `{ocr_text}`, `{lab_test_mappings}`? |
 | `extraction_specialist_report` | `{ocr_text}`, `{specialty_mappings}`?, `{diagnosis_mappings}`?, `{medication_mappings}`? |
 | `extraction_prescription` | `{ocr_text}`, `{medication_mappings}`? |
 | `extraction_invoice` | `{ocr_text}` |
 | `extraction_discharge` | `{ocr_text}`, `{diagnosis_mappings}`?, `{medication_mappings}`? |
-| `extraction_radiology` | `{ocr_text}` |
+| `extraction_imaging_report` | `{ocr_text}` |
+| `extraction_surgical_report` | `{ocr_text}` |
 | `extraction_vaccination` | `{ocr_text}` |
 | `document_edit` | `{current_data}`, `{patient_list}`, `{facility_list}`, `{doctor_list}`, `{user_instruction}`, `{json_schema}` |
 | `sql_generation` | `{schema}`, `{context}`, `{question}` |

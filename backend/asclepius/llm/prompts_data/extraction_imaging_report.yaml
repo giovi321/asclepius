@@ -1,4 +1,4 @@
-description: 'Phase 2: Extract findings from radiology reports'
+description: "Phase 2: Extract findings from radiology reports"
 default: |-
   You are a radiology report parser. Extract encounter details with imaging findings.
 

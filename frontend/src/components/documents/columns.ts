@@ -26,7 +26,12 @@ export const COLUMNS: ColumnDef[] = [
   { key: "patient", label: "Patient", defaultVisible: false, width: "14%" },
   { key: "specialty", label: "Specialty", defaultVisible: false, width: "14%" },
   { key: "status", label: "Status", defaultVisible: true, width: "16%" },
-  { key: "date_added", label: "Date added", defaultVisible: false, width: "14%" },
+  {
+    key: "date_added",
+    label: "Date added",
+    defaultVisible: false,
+    width: "14%",
+  },
 ];
 
 export const COLUMN_STORAGE_KEY = "asclepius_documents_columns";
@@ -62,8 +67,14 @@ export function loadVisibleColumns(): Set<ColumnKey> {
 }
 
 export const DOC_TYPES = [
-  "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
-  "insurance_claim", "referral", "discharge", "specialist_report",
-  "radiology_report", "surgical_report", "vaccination",
-  "imaging_report", "other",
+  "invoice",
+  "prescription",
+  "specialist_report",
+  "surgical_report",
+  "discharge",
+  "lab_test",
+  "vaccination",
+  "medical_certificate",
+  "imaging_report",
+  "other",
 ];

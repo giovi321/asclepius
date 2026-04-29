@@ -25,7 +25,7 @@ async def test_fts_search(client, db_path):
         await db.execute(
             """INSERT INTO documents
                (patient_id, file_path, original_filename, doc_type, status, ocr_text)
-               VALUES (?, 'test/search.pdf', 'search.pdf', 'bloodtest', 'done',
+               VALUES (?, 'test/search.pdf', 'search.pdf', 'lab_test', 'done',
                        'Patient has elevated cholesterol levels at 280 mg/dL. Recommend statin therapy.')""",
             (patient_id,),
         )

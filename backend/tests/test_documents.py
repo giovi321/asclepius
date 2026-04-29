@@ -25,9 +25,7 @@ async def test_list_documents_with_data(client, db_path):
         patient_id = cursor.lastrowid
 
         # Grant access
-        await db.execute(
-            "SELECT id FROM users WHERE username = 'admin'"
-        )
+        await db.execute("SELECT id FROM users WHERE username = 'admin'")
         user_cursor = await db.execute("SELECT id FROM users WHERE username = 'admin'")
         user = await user_cursor.fetchone()
         await db.execute(
@@ -37,7 +35,7 @@ async def test_list_documents_with_data(client, db_path):
 
         await db.execute(
             """INSERT INTO documents (patient_id, file_path, original_filename, doc_type, status)
-               VALUES (?, 'test/path.pdf', 'test.pdf', 'bloodtest', 'done')""",
+               VALUES (?, 'test/path.pdf', 'test.pdf', 'lab_test', 'done')""",
             (patient_id,),
         )
         await db.commit()
@@ -47,7 +45,7 @@ async def test_list_documents_with_data(client, db_path):
     data = resp.json()
     assert len(data["items"]) == 1
     assert data["items"][0]["original_filename"] == "test.pdf"
-    assert data["items"][0]["doc_type"] == "bloodtest"
+    assert data["items"][0]["doc_type"] == "lab_test"
 
 
 @pytest.mark.asyncio
@@ -67,7 +65,7 @@ async def test_get_document_detail(client, db_path):
         )
         cursor = await db.execute(
             """INSERT INTO documents (patient_id, file_path, original_filename, doc_type, status, ocr_text)
-               VALUES (?, 'test/detail.pdf', 'detail.pdf', 'bloodtest', 'done', 'Hemoglobin 14.5 g/dL')""",
+               VALUES (?, 'test/detail.pdf', 'detail.pdf', 'lab_test', 'done', 'Hemoglobin 14.5 g/dL')""",
             (patient_id,),
         )
         doc_id = cursor.lastrowid

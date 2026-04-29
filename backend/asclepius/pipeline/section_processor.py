@@ -163,14 +163,16 @@ async def process_with_sections(
 
     context = await build_extraction_context(db)
 
-    # Map section types to extraction doc_types
+    # Map section types to extraction doc_types (values must be in
+    # extractor.VALID_DOC_TYPES). Section type strings are the page-level
+    # categories produced by page_classification, distinct from doc_type.
     SECTION_TO_DOCTYPE = {
-        "lab_results_page": "bloodtest",
+        "lab_results_page": "lab_test",
         "clinical_notes": "specialist_report",
         "nursing_notes": "specialist_report",
         "operative_notes": "surgical_report",
         "discharge_summary": "discharge",
-        "imaging_report": "radiology_report",
+        "imaging_report": "imaging_report",
         "medication_chart": "prescription",
         "vital_signs": "specialist_report",
         "invoice_page": "invoice",

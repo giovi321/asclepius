@@ -13,13 +13,15 @@ default: |-
 
   2. DOCUMENT CLASSIFICATION (doc_type):
      - "specialist_report" = any visit report, consultation, checkup, follow-up, "visita di controllo", "referto", "Befund". This is the MOST COMMON type.
-     - "bloodtest" = ONLY if the document contains a table/list of lab test values with numbers and units
-     - "prescription" = ONLY if the document is a prescription/recipe for medications ("ricetta", "Rezept")
-     - "invoice" = ONLY if the document contains prices, amounts, payment details, billing codes, TARMED, tariff points
-     - "receipt" = payment confirmation, "Quittung", "ricevuta"
+     - "lab_test" = ONLY if the document contains a table/list of lab test values with numbers and units (blood tests, urinalysis, microbiology, etc.)
+     - "prescription" = a prescription/recipe for medications ("ricetta", "Rezept") or a referral letter to another specialist
+     - "invoice" = ONLY if the document contains prices, amounts, payment details, billing codes, TARMED, tariff points (also receipts / "Quittung" / "ricevuta")
      - "discharge" = hospital discharge letter ("lettera di dimissione", "Austrittsbrief")
-     - "radiology_report" = radiology/imaging report with findings from X-ray, CT, MRI, ultrasound
-     - "referral" = a letter referring the patient to another doctor/specialist
+     - "imaging_report" = radiology/imaging report with findings from X-ray, CT, MRI, ultrasound
+     - "surgical_report" = operative notes, surgical procedure descriptions
+     - "vaccination" = vaccination records, immunization certificates
+     - "medical_certificate" = sick leave, fitness statements, medical certificates ("certificato", "Zeugnis")
+     - "other" = anything that doesn't fit the categories above (consent forms, insurance docs, correspondence, etc.)
      - Look for the document TITLE or HEADING first — it usually tells you the type directly.
      - When in doubt, use "specialist_report" rather than "prescription" or "other".
 
@@ -42,7 +44,7 @@ default: |-
 
   {{
     "patient_name": "string or null",
-    "doc_type": "one of: bloodtest, labtest_other, prescription, invoice, receipt, insurance_claim, insurance_doc, referral, discharge, specialist_report, radiology_report, pathology_report, surgical_report, er_report, vaccination, allergy, sick_leave, medical_cert, physio_report, dental, ophthalmology, mental_health, consent, advance_directive, imaging_dicom, imaging_other, correspondence, other",
+    "doc_type": "one of: invoice, prescription, specialist_report, surgical_report, discharge, lab_test, vaccination, medical_certificate, imaging_report, other",
     "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened; canonical timeline anchor)",
     "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
     "language_detected": "ISO 639-1 code",

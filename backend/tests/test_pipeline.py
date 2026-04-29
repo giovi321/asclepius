@@ -16,48 +16,54 @@ def test_slugify():
 
 def test_build_organized_path():
     from asclepius.config import AppConfig
+
     config = AppConfig()
 
     path = build_organized_path(
-        config, "alex-smith", "2024-03-15", "drhouse", "bloodtest", "report.pdf"
+        config, "alex-smith", "2024-03-15", "drhouse", "lab_test", "report.pdf"
     )
-    assert path == "patients/alex-smith/2024/20240315_bloodtest.pdf"
+    assert path == "patients/alex-smith/2024/20240315_lab-test.pdf"
 
 
 def test_build_organized_path_unclassified():
     from asclepius.config import AppConfig
+
     config = AppConfig()
 
-    path = build_organized_path(
-        config, None, "2024-03-15", "drhouse", "bloodtest", "report.pdf"
-    )
+    path = build_organized_path(config, None, "2024-03-15", "drhouse", "lab_test", "report.pdf")
     assert path.startswith("unclassified/")
 
 
 def test_build_organized_path_missing_fields():
     from asclepius.config import AppConfig
+
     config = AppConfig()
 
-    path = build_organized_path(
-        config, "patient", None, None, None, "scan.jpg"
-    )
+    path = build_organized_path(config, "patient", None, None, None, "scan.jpg")
     assert "unknown" in path
     assert path.endswith(".jpg")
 
 
 def test_build_organized_path_with_event():
     from asclepius.config import AppConfig
+
     config = AppConfig()
 
     path = build_organized_path(
-        config, "alex-smith", "2024-03-15", "drhouse", "bloodtest", "report.pdf",
+        config,
+        "alex-smith",
+        "2024-03-15",
+        "drhouse",
+        "lab_test",
+        "report.pdf",
         event_slug="sleep-apnea-treatment",
     )
-    assert path == "patients/alex-smith/2024/sleep-apnea-treatment/20240315_bloodtest.pdf"
+    assert path == "patients/alex-smith/2024/sleep-apnea-treatment/20240315_lab-test.pdf"
 
 
 def test_slugify_event():
     from asclepius.pipeline.organizer import slugify_event
+
     assert slugify_event("Sleep Apnea Treatment") == "sleep-apnea-treatment"
     assert slugify_event("Knee Injury 2024") == "knee-injury-2024"
     assert slugify_event("  Spaces  Everywhere  ") == "spaces-everywhere"

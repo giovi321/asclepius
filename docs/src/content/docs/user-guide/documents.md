@@ -53,7 +53,7 @@ query:
   summaries, and metadata
 
 API parameters accept comma-separated values (e.g.
-`?type=bloodtest,prescription&status=done,needs_review`).
+`?type=lab_test,prescription&status=done,needs_review`).
 
 ### Persistence and sharing
 

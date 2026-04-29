@@ -2,7 +2,7 @@ import {
   Section,
   InfoRow,
   EditableField,
-  EditableSelect,
+  EditableSearchableSelect,
   EditableCombobox,
   TechnicalDetails,
 } from "@/components/document-detail/DocumentDetailHelpers";
@@ -13,31 +13,14 @@ export interface MetadataEditorProps {
 }
 
 const DOC_TYPE_OPTIONS = [
-  "bloodtest",
-  "labtest_other",
-  "prescription",
   "invoice",
-  "receipt",
-  "insurance_claim",
-  "insurance_doc",
-  "referral",
-  "discharge",
+  "prescription",
   "specialist_report",
-  "radiology_report",
-  "pathology_report",
   "surgical_report",
-  "er_report",
+  "discharge",
+  "lab_test",
   "vaccination",
-  "allergy",
-  "sick_leave",
-  "medical_cert",
-  "physio_report",
-  "dental",
-  "ophthalmology",
-  "mental_health",
-  "consent",
-  "advance_directive",
-  "correspondence",
+  "medical_certificate",
   "imaging_report",
   "other",
 ];
@@ -77,13 +60,14 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
             </pre>
           </div>
         )}
-      <EditableSelect
+      <EditableSearchableSelect
         label="Type"
         value={doc.doc_type}
         field="doc_type"
         docId={doc.id}
         onSave={onSave}
         options={DOC_TYPE_OPTIONS}
+        placeholder="Search type..."
       />
       <EditableField
         label="Event Date"

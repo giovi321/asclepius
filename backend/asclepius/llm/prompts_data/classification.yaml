@@ -1,4 +1,4 @@
-description: 'Phase 1: Document classification and basic metadata extraction'
+description: "Phase 1: Document classification and basic metadata extraction"
 default: |-
   You are a medical document classifier. Read the document below, then fill in the JSON schema that follows.
 
@@ -16,14 +16,15 @@ default: |-
   --- DOCUMENT END ---
   {few_shot_examples}
   Now classify the document above. Use these rules:
-  - "FATTURA"/"Rechnung"/"Invoice"/"TARMED" with prices → "invoice"
-  - "RICEVUTA"/"Quittung"/"Receipt" → "receipt"
-  - "RICETTA"/"Rezept"/"Prescription" → "prescription"
+  - "FATTURA"/"Rechnung"/"Invoice"/"TARMED"/"RICEVUTA"/"Quittung"/"Receipt" with prices → "invoice"
+  - "RICETTA"/"Rezept"/"Prescription"/"Referral"/"Überweisung" → "prescription"
   - "REFERTO"/"Befund"/"Report"/"visita"/"controllo" → "specialist_report"
   - "DIMISSIONE"/"Austritt"/"Discharge" → "discharge"
-  - "ANALISI"/"Blutbild"/"lab"/"emocromo" with numeric values → "bloodtest"
-  - "RADIOLOGIA"/"Röntgen"/"X-ray"/"CT"/"MRI" → "radiology_report"
+  - "ANALISI"/"Blutbild"/"lab"/"emocromo" with numeric values → "lab_test"
+  - "RADIOLOGIA"/"Röntgen"/"X-ray"/"CT"/"MRI" → "imaging_report"
+  - "INTERVENTO"/"OP-Bericht"/"surgery"/"operative" → "surgical_report"
   - "VACCINAZIONE"/"Impfung"/"Vaccination" → "vaccination"
+  - "CERTIFICATO"/"Zeugnis"/"sick note"/"medical certificate" → "medical_certificate"
   - When in doubt, use "specialist_report" rather than "other"
 
   The DOCTOR is whoever SIGNED the document or performed the exam (bottom of page), not department heads in letterheads.
@@ -32,7 +33,7 @@ default: |-
 
   {{
     "patient_name": "string or null",
-    "doc_type": "invoice|receipt|prescription|specialist_report|discharge|bloodtest|labtest_other|radiology_report|pathology_report|surgical_report|er_report|vaccination|referral|allergy|sick_leave|medical_cert|physio_report|dental|ophthalmology|mental_health|insurance_claim|insurance_doc|consent|advance_directive|correspondence|other",
+    "doc_type": "invoice|prescription|specialist_report|surgical_report|discharge|lab_test|vaccination|medical_certificate|imaging_report|other",
     "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened)",
     "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
     "language_detected": "ISO 639-1 code",

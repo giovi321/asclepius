@@ -4,7 +4,7 @@ title: "Lab Results"
 
 ## Overview
 
-The Lab Results page shows all extracted lab values for the selected patient. Values are automatically pulled from documents classified as `bloodtest` during pipeline processing, sorted by test date (newest first).
+The Lab Results page shows all extracted lab values for the selected patient. Values are automatically pulled from documents classified as `lab_test` during pipeline processing, sorted by test date (newest first).
 
 ## Layout
 

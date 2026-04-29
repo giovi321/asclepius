@@ -115,6 +115,11 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         "clear_imaging_placeholder_summary_v1",
         _migration_clear_imaging_placeholder_summary,
     )
+    await _run_once(
+        db,
+        "consolidate_doc_types_v1",
+        _migration_consolidate_doc_types,
+    )
     await _ensure_compat_view(db)
 
 
@@ -200,6 +205,109 @@ async def _migration_clear_imaging_placeholder_summary(db: aiosqlite.Connection)
             "Migration: cleared summary on %d imaging placeholder documents",
             cursor.rowcount,
         )
+    await db.commit()
+
+
+async def _migration_consolidate_doc_types(db: aiosqlite.Connection) -> None:
+    """Remap legacy doc_type values to the consolidated 10-value enum.
+
+    The old enum mixed document formats with medical specialties (e.g.
+    "ophthalmology", "dental"), and had several near-duplicates
+    (bloodtest/labtest_other, medical_cert/sick_leave). The new canonical
+    set is: invoice, prescription, specialist_report, surgical_report,
+    discharge, lab_test, vaccination, medical_certificate, imaging_report,
+    other. Specialty information remains in the separate ``specialty_*``
+    columns and is not touched by this migration.
+
+    Mapping rationale:
+      - bloodtest, labtest_other -> lab_test (renamed + merged)
+      - medical_cert, sick_leave -> medical_certificate (renamed + merged)
+      - radiology_report, imaging_dicom, imaging_other -> imaging_report
+      - receipt -> invoice (financial doc family)
+      - referral -> prescription (per project decision)
+      - pathology_report, er_report, physio_report, dental,
+        ophthalmology, mental_health -> specialist_report (specialty
+        values dropped from doc_type, format reverts to specialist report)
+      - allergy, insurance_claim, insurance_doc, consent,
+        advance_directive, correspondence -> other
+    """
+    mapping = [
+        ("bloodtest", "lab_test"),
+        ("labtest_other", "lab_test"),
+        ("medical_cert", "medical_certificate"),
+        ("sick_leave", "medical_certificate"),
+        ("radiology_report", "imaging_report"),
+        ("imaging_dicom", "imaging_report"),
+        ("imaging_other", "imaging_report"),
+        ("receipt", "invoice"),
+        ("referral", "prescription"),
+        ("pathology_report", "specialist_report"),
+        ("er_report", "specialist_report"),
+        ("physio_report", "specialist_report"),
+        ("dental", "specialist_report"),
+        ("ophthalmology", "specialist_report"),
+        ("mental_health", "specialist_report"),
+        ("allergy", "other"),
+        ("insurance_claim", "other"),
+        ("insurance_doc", "other"),
+        ("consent", "other"),
+        ("advance_directive", "other"),
+        ("correspondence", "other"),
+    ]
+    total = 0
+    for old, new in mapping:
+        cursor = await db.execute(
+            "UPDATE documents SET doc_type = ? WHERE doc_type = ?",
+            (new, old),
+        )
+        if cursor.rowcount and cursor.rowcount > 0:
+            logger.info(
+                "Migration: remapped %d documents from doc_type='%s' to '%s'",
+                cursor.rowcount,
+                old,
+                new,
+            )
+            total += cursor.rowcount
+    if total:
+        logger.info("Migration: consolidated doc_types on %d documents total", total)
+
+    # Also remap any user-customized prompt overrides whose key referenced
+    # the old per-doc_type extraction prompts. The runtime looks up
+    # ``extraction_<doc_type>`` so a stale key would silently fall back to
+    # the default prompt and lose the user's edits.
+    prompt_key_map = [
+        ("extraction_bloodtest", "extraction_lab_test"),
+        ("extraction_radiology", "extraction_imaging_report"),
+        ("extraction_radiology_report", "extraction_imaging_report"),
+    ]
+    for old_key, new_key in prompt_key_map:
+        # Only rename if the destination doesn't already exist — otherwise
+        # the UNIQUE constraint on prompt_key would trip. In that case we
+        # drop the legacy override and keep the newer one.
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM custom_prompts WHERE prompt_key = ?", (new_key,)
+        )
+        exists_new = (await cursor.fetchone())[0] > 0
+        if exists_new:
+            await db.execute("DELETE FROM custom_prompts WHERE prompt_key = ?", (old_key,))
+        else:
+            await db.execute(
+                "UPDATE custom_prompts SET prompt_key = ? WHERE prompt_key = ?",
+                (new_key, old_key),
+            )
+    # Drop overrides for prompt keys that no longer exist in the registry.
+    retired_prompt_keys = [
+        "extraction_er_report",
+        "extraction_insurance_claim",
+        "extraction_labtest_other",
+        "extraction_pathology_report",
+        "extraction_receipt",
+    ]
+    placeholders = ",".join(["?"] * len(retired_prompt_keys))
+    await db.execute(
+        f"DELETE FROM custom_prompts WHERE prompt_key IN ({placeholders})",
+        retired_prompt_keys,
+    )
     await db.commit()
 
 

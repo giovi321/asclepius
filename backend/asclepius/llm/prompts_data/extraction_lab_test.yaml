@@ -1,4 +1,4 @@
-description: 'Phase 2: Extract lab results from blood test documents'
+description: "Phase 2: Extract lab results from blood test documents"
 default: |-
   You are a medical lab result parser. Extract ONLY the lab test results from this document.
 

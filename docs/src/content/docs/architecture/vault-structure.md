@@ -49,7 +49,7 @@ The vault is the single root for every stored file and the SQLite database. It m
   <text x="604" y="212" font-family="'Geist Mono',monospace" font-size="12" font-weight="600" fill="#1c1917">provider</text>
   <text x="604" y="228" class="vs-anno">facility slug (preferred) or doctor</text>
   <text x="604" y="264" font-family="'Geist Mono',monospace" font-size="12" font-weight="600" fill="#1c1917">doctype</text>
-  <text x="604" y="280" class="vs-anno">bloodtest · prescription · discharge · …</text>
+  <text x="604" y="280" class="vs-anno">lab_test · prescription · discharge · …</text>
   <text x="604" y="316" font-family="'Geist Mono',monospace" font-size="12" font-weight="600" fill="#1c1917">ext</text>
   <text x="604" y="332" class="vs-anno">pdf · jpg · dcm (DICOM) · …</text>
   <line x1="604" y1="360" x2="880" y2="360" stroke="rgba(142,68,73,0.25)" stroke-width="0.8"/>
@@ -74,7 +74,7 @@ vault/
 │   │   │   │   ├── 20231017_st-marys-hospital_surgical-report.pdf
 │   │   │   │   ├── 20231031_st-marys-hospital_specialist-report.pdf
 │   │   │   │   └── 20231115_st-marys-hospital_invoice.pdf
-│   │   │   └── 20230315_city-clinic_bloodtest.pdf  # No event
+│   │   │   └── 20230315_city-clinic_lab-test.pdf   # No event
 │   │   ├── 2024/
 │   │   │   ├── knee-injury/
 │   │   │   │   ├── 20240722_riverside-clinic_radiology-report.pdf
@@ -136,11 +136,11 @@ Files are renamed during organization to:
 
 - **Date.** Compact date format (e.g., `20251231`) as extracted by the LLM.
 - **Provider slug.** Facility slug (preferred) or doctor slug, lowercase with hyphens.
-- **Doc type.** One of the document type codes (e.g., `bloodtest`, `prescription`, `specialist_report`).
+- **Doc type.** One of the document type codes (e.g., `lab_test`, `prescription`, `specialist_report`).
 
 Examples:
 
-- `20240315_city-clinic_bloodtest.pdf`
+- `20240315_city-clinic_lab-test.pdf`
 - `20250110_dr-jones_prescription.pdf`
 - `20241120_university-hospital_discharge.pdf`
 

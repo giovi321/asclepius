@@ -390,7 +390,7 @@ For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.pro
 | `PUT` | `/api/settings/prompts/{key}` | Yes | Update a prompt |
 | `DELETE` | `/api/settings/prompts/{key}` | Yes | Reset prompt to default |
 
-**Prompt keys:** `classification`, `vision_extraction`, `extraction_bloodtest`, `extraction_specialist_report`, `extraction_prescription`, `extraction_invoice`, `extraction_discharge`, `extraction_radiology`, `extraction_vaccination`, `document_edit`, `sql_generation`, `chat_system`, `link_suggestion`, `page_classification`
+**Prompt keys:** `classification`, `vision_extraction`, `extraction_lab_test`, `extraction_specialist_report`, `extraction_prescription`, `extraction_invoice`, `extraction_discharge`, `extraction_imaging_report`, `extraction_surgical_report`, `extraction_vaccination`, `document_edit`, `sql_generation`, `chat_system`, `link_suggestion`, `page_classification`
 
 ## Backup
 

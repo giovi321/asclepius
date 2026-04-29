@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Document type enum consolidated.** The `doc_type` enum is reduced
+  from 26 mixed values (which conflated document formats with medical
+  specialties) to a strict MECE set of 10: `invoice, prescription,
+  specialist_report, surgical_report, discharge, lab_test, vaccination,
+  medical_certificate, imaging_report, other`. Specialty information
+  remains in the dedicated `specialty_*` columns. A startup migration
+  remaps every legacy value (e.g. `bloodtest`, `labtest_other` →
+  `lab_test`; `dental`, `ophthalmology`, `mental_health`, `physio_report`,
+  `pathology_report`, `er_report` → `specialist_report`;
+  `radiology_report`, `imaging_dicom`, `imaging_other` → `imaging_report`;
+  `receipt` → `invoice`; `referral` → `prescription`;
+  `medical_cert` / `sick_leave` → `medical_certificate`;
+  `allergy`, `insurance_claim`, `insurance_doc`, `consent`,
+  `advance_directive`, `correspondence` → `other`). Affected
+  per-doc_type extraction prompts (`extraction_bloodtest` →
+  `extraction_lab_test`, `extraction_radiology_report` →
+  `extraction_imaging_report`) are renamed; the migration also
+  remaps any user-customized `custom_prompts.prompt_key` overrides.
+- **Searchable document-type picker.** The Type dropdown on the
+  document detail page now opens a searchable popover (filter as you
+  type, Enter to commit) instead of a flat native select, mirroring
+  the doctor / facility / specialty comboboxes elsewhere in the panel.
 - **Document detail inline-edit polish.** Inline-edit action buttons now
   share a fixed `h-7` height so the Save / Delete / Close buttons line
   up cleanly across the row (previously a text label and a 12px X icon

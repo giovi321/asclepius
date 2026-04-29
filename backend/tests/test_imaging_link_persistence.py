@@ -26,7 +26,7 @@ async def _seed_doc(
     db: aiosqlite.Connection,
     patient_id: int,
     filename: str,
-    doc_type: str = "bloodtest",
+    doc_type: str = "lab_test",
     file_path: str = "stub/path.pdf",
 ) -> int:
     cursor = await db.execute(

@@ -297,7 +297,7 @@ Facility detection happens heuristically by matching known facility names agains
 
 A single prompt classifies the document and extracts basic metadata. The prompt is structured with the document content first, few-shot examples in the middle, and the JSON schema last (recency bias helps smaller models follow the schema).
 
-- **Document type** (bloodtest, specialist_report, prescription, invoice, discharge, radiology_report, vaccination, surgical_report, and 15+ other types)
+- **Document type** (one of 10 canonical values: invoice, prescription, specialist_report, surgical_report, discharge, lab_test, vaccination, medical_certificate, imaging_report, other)
 - **Patient name** (matched against existing patients)
 - **Doctor name** (matched/created in the doctors table, with alias)
 - **Facility name** (matched/created in the facilities table, with alias)
@@ -315,14 +315,16 @@ Based on the classified document type, a type-specific prompt extracts detailed 
 
 | Document Type | Extracted Data |
 |--------------|----------------|
-| `bloodtest` | Lab results (test name, value, unit, reference range, abnormal flag) |
+| `lab_test` | Lab results (test name, value, unit, reference range, abnormal flag) |
 | `specialist_report` | Encounters (diagnosis, findings, follow-up), medications |
 | `prescription` | Medications (name, dosage, form, frequency, duration) |
 | `invoice` | Invoice line items (description, amount, tariff code, category) |
 | `discharge` | Encounters, medications, diagnoses, follow-up instructions |
-| `radiology_report` | Imaging findings, diagnoses |
+| `imaging_report` | Imaging findings, diagnoses |
 | `vaccination` | Vaccination records (vaccine, manufacturer, lot, dose number) |
 | `surgical_report` | Encounters with operative details |
+| `medical_certificate` | Sick leave or fitness statements (period, restrictions) |
+| `other` | No type-specific extraction; falls back to summary only |
 
 ## Smart Page-Level Sectioning
 
@@ -446,7 +448,7 @@ For documents that are not large enough for sectioning, chunking is triggered wh
 Chunked extraction runs the same two phases as the non-chunked path, but with Phase 2 repeated per chunk and merged:
 
 1. **Phase 1, classify on chunk 1.** A short-schema call that captures universal fields (doc_type, patient, doctor, facility, dates, summary, language). Keeping it separate means small models only have to fit one concern in working memory at a time, the reason qwen2.5:14b reliably returns these fields now instead of zooming in on the loudest section (lab table) and dropping everything else.
-2. **Phase 2, type-specific extraction per chunk.** Runs the prompt for the doc_type picked in Phase 1 (e.g. `bloodtest` → lab-results-only schema). Each chunk produces its own extraction; `merge_extractions` dedupes overlap.
+2. **Phase 2, type-specific extraction per chunk.** Runs the prompt for the doc_type picked in Phase 1 (e.g. `lab_test` → lab-results-only schema). Each chunk produces its own extraction; `merge_extractions` dedupes overlap.
 
 ### Page-aligned chunks
 

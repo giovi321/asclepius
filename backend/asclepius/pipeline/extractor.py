@@ -57,6 +57,7 @@ def _coerce_iso_date(value) -> str | None:
         return None
     return s
 
+
 __all__ = [
     "build_extraction_context",
     "classify_and_extract",
@@ -83,9 +84,7 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     # type-specific prompts (lab ranges, medication doses) see the context
     # they'd normally depend on. The rest of the patient profile is not
     # useful to the LLM and intentionally not stored.
-    cursor = await db.execute(
-        "SELECT id, slug, display_name, date_of_birth, sex FROM patients"
-    )
+    cursor = await db.execute("SELECT id, slug, display_name, date_of_birth, sex FROM patients")
     patients = [
         {
             "id": r[0],
@@ -118,6 +117,7 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
     # _canonical_language_directive() before the actual prompt.
     try:
         from asclepius.config import get_config as _get_config
+
         canonical_language = _get_config().llm.canonical_language or "English"
     except Exception:
         canonical_language = "English"
@@ -138,7 +138,10 @@ async def build_extraction_context(db: aiosqlite.Connection) -> dict:
 
 
 async def _extract_type_specific(
-    llm: LLMProvider, ocr_text: str, doc_type: str, context: dict,
+    llm: LLMProvider,
+    ocr_text: str,
+    doc_type: str,
+    context: dict,
     db_path: str | None = None,
 ) -> dict:
     """Call the type-specific extraction prompt for phase 2."""
@@ -148,6 +151,7 @@ async def _extract_type_specific(
     prompt_template = None
     if db_path:
         from asclepius.llm.prompt_manager import get_prompt
+
         custom_key = f"extraction_{doc_type}"
         try:
             custom = await get_prompt(db_path, custom_key)
@@ -164,6 +168,7 @@ async def _extract_type_specific(
     # Build format kwargs with only the placeholders that exist in this template
     format_kwargs: dict[str, str] = {"ocr_text": ocr_text}
     import json as _json
+
     mapping_keys = {
         "lab_test_mappings": "lab_test_mappings",
         "specialty_mappings": "specialty_mappings",
@@ -189,41 +194,114 @@ async def _extract_type_specific(
 
 
 VALID_DOC_TYPES = {
-    "bloodtest", "labtest_other", "prescription", "invoice", "receipt",
-    "insurance_claim", "insurance_doc", "referral", "discharge",
-    "specialist_report", "radiology_report", "pathology_report",
-    "surgical_report", "er_report", "vaccination", "allergy", "sick_leave",
-    "medical_cert", "physio_report", "dental", "ophthalmology",
-    "mental_health", "consent", "advance_directive", "imaging_dicom",
-    "imaging_other", "correspondence", "other",
+    "invoice",
+    "prescription",
+    "specialist_report",
+    "surgical_report",
+    "discharge",
+    "lab_test",
+    "vaccination",
+    "medical_certificate",
+    "imaging_report",
+    "other",
 }
 
-# Fuzzy mapping for common LLM mistakes
+# Fuzzy mapping for common LLM mistakes and legacy values. Maps any
+# old/aliased value to one of the canonical 10 codes in VALID_DOC_TYPES.
 _DOC_TYPE_ALIASES = {
-    "blood test": "bloodtest", "blood_test": "bloodtest", "lab": "bloodtest",
-    "lab test": "bloodtest", "lab_test": "bloodtest", "laboratory": "bloodtest",
-    "report": "specialist_report", "visit": "specialist_report",
-    "consultation": "specialist_report", "checkup": "specialist_report",
-    "follow-up": "specialist_report", "follow_up_report": "specialist_report",
-    "specialist": "specialist_report", "visit_report": "specialist_report",
-    "medical_report": "specialist_report", "clinical_report": "specialist_report",
-    "bill": "invoice", "fattura": "invoice", "rechnung": "invoice",
-    "billing": "invoice", "nota": "invoice", "conto": "invoice",
-    "tarmed": "invoice", "honorarnote": "invoice",
-    "receipt_payment": "receipt", "payment": "receipt",
-    "ricevuta": "receipt", "quittung": "receipt",
-    "referto": "specialist_report", "befund": "specialist_report",
-    "visita": "specialist_report", "controllo": "specialist_report",
-    "ricetta": "prescription", "rezept": "prescription",
-    "discharge_letter": "discharge", "discharge_summary": "discharge",
-    "radiology": "radiology_report", "xray": "radiology_report",
-    "x-ray": "radiology_report", "imaging_report": "radiology_report",
-    "pathology": "pathology_report", "histology": "pathology_report",
-    "surgery": "surgical_report", "operation": "surgical_report",
-    "emergency": "er_report", "er": "er_report",
-    "vaccine": "vaccination", "immunization": "vaccination",
-    "referral_letter": "referral", "letter": "correspondence",
-    "sick_note": "sick_leave", "certificate": "medical_cert",
+    # Lab tests
+    "bloodtest": "lab_test",
+    "blood test": "lab_test",
+    "blood_test": "lab_test",
+    "labtest_other": "lab_test",
+    "lab": "lab_test",
+    "laboratory": "lab_test",
+    "labtest": "lab_test",
+    # Specialist reports (catch-all for visits, consults, retired specialty types)
+    "report": "specialist_report",
+    "visit": "specialist_report",
+    "consultation": "specialist_report",
+    "checkup": "specialist_report",
+    "follow-up": "specialist_report",
+    "follow_up_report": "specialist_report",
+    "specialist": "specialist_report",
+    "visit_report": "specialist_report",
+    "medical_report": "specialist_report",
+    "clinical_report": "specialist_report",
+    "referto": "specialist_report",
+    "befund": "specialist_report",
+    "visita": "specialist_report",
+    "controllo": "specialist_report",
+    "pathology": "specialist_report",
+    "pathology_report": "specialist_report",
+    "histology": "specialist_report",
+    "er_report": "specialist_report",
+    "emergency": "specialist_report",
+    "er": "specialist_report",
+    "physio_report": "specialist_report",
+    "physiotherapy": "specialist_report",
+    "dental": "specialist_report",
+    "dentistry": "specialist_report",
+    "ophthalmology": "specialist_report",
+    "mental_health": "specialist_report",
+    "psychiatry": "specialist_report",
+    "psychology": "specialist_report",
+    # Surgical
+    "surgery": "surgical_report",
+    "operation": "surgical_report",
+    "operative_notes": "surgical_report",
+    "op_bericht": "surgical_report",
+    # Imaging (consolidated to imaging_report)
+    "radiology": "imaging_report",
+    "radiology_report": "imaging_report",
+    "xray": "imaging_report",
+    "x-ray": "imaging_report",
+    "imaging_dicom": "imaging_report",
+    "imaging_other": "imaging_report",
+    "imaging": "imaging_report",
+    # Invoices (incl. receipts)
+    "bill": "invoice",
+    "fattura": "invoice",
+    "rechnung": "invoice",
+    "billing": "invoice",
+    "nota": "invoice",
+    "conto": "invoice",
+    "tarmed": "invoice",
+    "honorarnote": "invoice",
+    "receipt": "invoice",
+    "receipt_payment": "invoice",
+    "payment": "invoice",
+    "ricevuta": "invoice",
+    "quittung": "invoice",
+    # Prescriptions (incl. referrals)
+    "ricetta": "prescription",
+    "rezept": "prescription",
+    "referral": "prescription",
+    "referral_letter": "prescription",
+    "ueberweisung": "prescription",
+    "uberweisung": "prescription",
+    # Discharge
+    "discharge_letter": "discharge",
+    "discharge_summary": "discharge",
+    # Vaccinations
+    "vaccine": "vaccination",
+    "immunization": "vaccination",
+    "impfung": "vaccination",
+    # Medical certificates (incl. sick leave)
+    "medical_cert": "medical_certificate",
+    "certificate": "medical_certificate",
+    "sick_leave": "medical_certificate",
+    "sick_note": "medical_certificate",
+    "zeugnis": "medical_certificate",
+    "arbeitsunfaehigkeit": "medical_certificate",
+    # Catch-all for retired types
+    "allergy": "other",
+    "insurance_claim": "other",
+    "insurance_doc": "other",
+    "consent": "other",
+    "advance_directive": "other",
+    "correspondence": "other",
+    "letter": "other",
 }
 
 
@@ -262,7 +340,9 @@ def _salvage_classification(c: dict) -> None:
                 break
 
     # Facility — LLM might use "department", "hospital", "clinic", "struttura"
-    if not c.get("facility") or (isinstance(c.get("facility"), dict) and not c["facility"].get("name")):
+    if not c.get("facility") or (
+        isinstance(c.get("facility"), dict) and not c["facility"].get("name")
+    ):
         for alt_key in ("department", "hospital", "clinic", "struttura", "krankenhaus"):
             val = c.get(alt_key)
             if val and isinstance(val, str):
@@ -342,14 +422,45 @@ def _salvage_array_keys(extraction: dict) -> None:
 # them as "no value" everywhere we read string fields, instead of letting
 # them bleed into the DB and the UI as if they were real content.
 _PLACEHOLDER_SENTINELS = {
-    "", "*", "-", "—", "–", "_", ".", "..", "...",
-    "n/a", "n/a.", "na", "n.a.", "n.a", "n/d", "nd",
-    "null", "none", "nil", "nan", "*/*",
-    "unknown", "unspecified", "not specified", "not available",
-    "not provided", "not applicable", "no value", "missing",
-    "illegible", "unreadable", "indecipherable",
-    "(empty)", "(none)", "(null)", "(unknown)", "(blank)",
-    "tbd", "to be determined",
+    "",
+    "*",
+    "-",
+    "—",
+    "–",
+    "_",
+    ".",
+    "..",
+    "...",
+    "n/a",
+    "n/a.",
+    "na",
+    "n.a.",
+    "n.a",
+    "n/d",
+    "nd",
+    "null",
+    "none",
+    "nil",
+    "nan",
+    "*/*",
+    "unknown",
+    "unspecified",
+    "not specified",
+    "not available",
+    "not provided",
+    "not applicable",
+    "no value",
+    "missing",
+    "illegible",
+    "unreadable",
+    "indecipherable",
+    "(empty)",
+    "(none)",
+    "(null)",
+    "(unknown)",
+    "(blank)",
+    "tbd",
+    "to be determined",
 }
 
 # Backwards-compatible alias for the lab-only call sites that pre-dated
@@ -430,8 +541,18 @@ def _normalize_lab_row(lab: dict) -> None:
     """
     # 1. Test name — support more aliases including 'analysis' / 'exam' / 'item'.
     if not lab.get("test_name_original"):
-        for alt in ("test_name", "name", "test", "test_name_canonical",
-                    "analyte", "parameter", "analysis", "exam", "item", "label"):
+        for alt in (
+            "test_name",
+            "name",
+            "test",
+            "test_name_canonical",
+            "analyte",
+            "parameter",
+            "analysis",
+            "exam",
+            "item",
+            "label",
+        ):
             v = lab.get(alt)
             if isinstance(v, str) and v.strip():
                 lab["test_name_original"] = v.strip()
@@ -502,6 +623,7 @@ async def classify_and_extract(
         few_shot_str = ""
         try:
             from asclepius.pipeline.few_shot import find_few_shot_examples, format_few_shot_examples
+
             examples = await find_few_shot_examples(db, ocr_text, current_doc_id=doc_id)
             few_shot_str = format_few_shot_examples(examples)
         except Exception:
@@ -513,8 +635,9 @@ async def classify_and_extract(
         # Phase 1: Classify (use custom prompt if configured)
         logger.info("Phase 1 — classifying doc %d", doc_id)
         from asclepius.llm.prompt_manager import get_prompt
+
         custom_classification = await get_prompt(config.database.path, "classification")
-        if custom_classification and hasattr(llm, '_generate'):
+        if custom_classification and hasattr(llm, "_generate"):
             try:
                 formatted = custom_classification.format(
                     patient_list=json.dumps(context.get("patient_list", []), indent=2),
@@ -523,24 +646,38 @@ async def classify_and_extract(
                     ocr_text=ocr_text,
                     few_shot_examples=few_shot_str,
                 )
-                formatted = _canonical_language_directive(context.get("canonical_language", "English")) + formatted
+                formatted = (
+                    _canonical_language_directive(context.get("canonical_language", "English"))
+                    + formatted
+                )
                 response_text = await llm._generate(formatted)
                 classification = llm._parse_json(response_text)
-                logger.info("Classification result for doc %d: doc_type=%s, summary=%s, event=%s, issued=%s, doctor=%s",
-                            doc_id,
-                            classification.get("doc_type"),
-                            repr(classification.get("summary_en", ""))[:60],
-                            classification.get("event_date") or classification.get("date_visit") or classification.get("date_issued") or classification.get("doc_date"),
-                            classification.get("issued_date") or classification.get("date_issued"),
-                            classification.get("doctor", {}).get("name") if isinstance(classification.get("doctor"), dict) else classification.get("doctor"))
+                logger.info(
+                    "Classification result for doc %d: doc_type=%s, summary=%s, event=%s, issued=%s, doctor=%s",
+                    doc_id,
+                    classification.get("doc_type"),
+                    repr(classification.get("summary_en", ""))[:60],
+                    classification.get("event_date")
+                    or classification.get("date_visit")
+                    or classification.get("date_issued")
+                    or classification.get("doc_date"),
+                    classification.get("issued_date") or classification.get("date_issued"),
+                    classification.get("doctor", {}).get("name")
+                    if isinstance(classification.get("doctor"), dict)
+                    else classification.get("doctor"),
+                )
             except Exception as e:
-                logger.warning("Classification prompt failed for doc %d: %s, using default", doc_id, e)
+                logger.warning(
+                    "Classification prompt failed for doc %d: %s, using default", doc_id, e
+                )
                 classification = await llm.classify(ocr_text, context)
         else:
             classification = await llm.classify(ocr_text, context)
 
         if "error" in classification:
-            logger.error("Classification failed for doc %d: %s", doc_id, classification.get("error"))
+            logger.error(
+                "Classification failed for doc %d: %s", doc_id, classification.get("error")
+            )
             await db.execute(
                 "UPDATE documents SET status = 'failed', raw_extraction = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (json.dumps(classification), doc_id),
@@ -557,19 +694,28 @@ async def classify_and_extract(
         classification["doc_type"] = doc_type
 
         # Phase 2: Type-specific extraction
-        logger.info("Phase 2 — extracting type-specific data for doc %d (type=%s)", doc_id, doc_type)
-        type_extraction = await _extract_type_specific(llm, ocr_text, doc_type, context, db_path=config.database.path)
+        logger.info(
+            "Phase 2 — extracting type-specific data for doc %d (type=%s)", doc_id, doc_type
+        )
+        type_extraction = await _extract_type_specific(
+            llm, ocr_text, doc_type, context, db_path=config.database.path
+        )
 
         # Merge: classification provides the base, type-specific adds structured arrays
         extraction = {**classification, **type_extraction}
 
     # Log what we're about to write — helps diagnose "no data" issues
-    _summary_keys = {k: type(v).__name__ if isinstance(v, (dict, list)) else repr(v)[:80]
-                     for k, v in extraction.items() if v}
+    _summary_keys = {
+        k: type(v).__name__ if isinstance(v, (dict, list)) else repr(v)[:80]
+        for k, v in extraction.items()
+        if v
+    }
     logger.info("Extraction for doc %d: %s", doc_id, _summary_keys)
 
     # Delegate to extract_and_store for DB writes
-    return await extract_and_store(db, llm, doc_id, ocr_text, config, extraction_override=extraction)
+    return await extract_and_store(
+        db, llm, doc_id, ocr_text, config, extraction_override=extraction
+    )
 
 
 async def extract_and_store(
@@ -612,11 +758,13 @@ async def extract_and_store(
     if "error" not in extraction:
         try:
             from asclepius.normalization.resolver import resolve_extraction
+
             await resolve_extraction(db, extraction)
         except Exception:
             logger.warning(
                 "Doc %d: normalization resolver failed (non-fatal)",
-                doc_id, exc_info=True,
+                doc_id,
+                exc_info=True,
             )
 
     if "error" in extraction:
@@ -624,7 +772,9 @@ async def extract_and_store(
             logger.error(
                 "LLM extraction failed for doc %d (TRUNCATION SUSPECTED, response_len=%s): %s — "
                 "raise llm.extraction_max_output_tokens in settings.yaml.",
-                doc_id, extraction.get("_response_length"), extraction.get("error"),
+                doc_id,
+                extraction.get("_response_length"),
+                extraction.get("error"),
             )
         else:
             logger.error("LLM extraction failed for doc %d: %s", doc_id, extraction.get("error"))
@@ -690,11 +840,11 @@ async def extract_and_store(
     issued_date_val = extraction.get("issued_date") or extraction.get("date_issued")
     if issued_date_val:
         updates["issued_date"] = issued_date_val
-    if (lang := _clean(extraction.get("language_detected"))):
+    if lang := _clean(extraction.get("language_detected")):
         updates["language_source"] = lang
-    if (sum_en := _clean(extraction.get("summary_en"))):
+    if sum_en := _clean(extraction.get("summary_en")):
         updates["summary_en"] = sum_en
-    if (sum_orig := _clean(extraction.get("summary_original"))):
+    if sum_orig := _clean(extraction.get("summary_original")):
         updates["summary_original"] = sum_orig
     cost_data = extraction.get("cost", {})
     if cost_data.get("total_amount"):
@@ -706,14 +856,14 @@ async def extract_and_store(
 
     # Insurance info from extraction
     insurance = extraction.get("insurance", {})
-    if (ins_co := _clean(insurance.get("company"))):
+    if ins_co := _clean(insurance.get("company")):
         updates["insurance_company"] = ins_co
-    if (ins_pol := _clean(insurance.get("policy_number"))):
+    if ins_pol := _clean(insurance.get("policy_number")):
         updates["insurance_policy"] = ins_pol
 
     # Specialty info on the document itself
     specialty_data = extraction.get("specialty", {})
-    if (spec_orig := _clean(specialty_data.get("original"))):
+    if spec_orig := _clean(specialty_data.get("original")):
         updates["specialty_original"] = spec_orig
     # resolve_extraction() populates specialty["norm_specialty_id"] from the
     # original text; fall back to the legacy canonical-based resolver when
@@ -790,12 +940,21 @@ async def extract_and_store(
                     value, value_text, unit, reference_range_low, reference_range_high,
                     is_abnormal, sample_type, panel_name, test_date)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, _clean(lab.get("test_name_original")),
-                 norm_id, lab.get("value"), _clean(lab.get("value_text")),
-                 _clean(lab.get("unit")), lab.get("reference_range_low"),
-                 lab.get("reference_range_high"), lab.get("is_abnormal"),
-                 _clean(lab.get("sample_type")), _clean(lab.get("panel_name")),
-                 lab_test_date),
+                (
+                    doc_id,
+                    patient_id,
+                    _clean(lab.get("test_name_original")),
+                    norm_id,
+                    lab.get("value"),
+                    _clean(lab.get("value_text")),
+                    _clean(lab.get("unit")),
+                    lab.get("reference_range_low"),
+                    lab.get("reference_range_high"),
+                    lab.get("is_abnormal"),
+                    _clean(lab.get("sample_type")),
+                    _clean(lab.get("panel_name")),
+                    lab_test_date,
+                ),
             )
 
         # Belt-and-braces: if any lab rows still have NULL test_date but the
@@ -824,9 +983,8 @@ async def extract_and_store(
             # Specialty resolution now populates doctor["norm_specialty_id"]
             # and encounter["norm_specialty_id"] directly. Prefer those, fall
             # back to the legacy doctor-specialty-canonical path.
-            norm_spec_id = (
-                encounter.get("norm_specialty_id")
-                or doctor_data.get("norm_specialty_id")
+            norm_spec_id = encounter.get("norm_specialty_id") or doctor_data.get(
+                "norm_specialty_id"
             )
             if norm_spec_id is None and doctor_data.get("specialty_canonical"):
                 norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
@@ -838,15 +996,23 @@ async def extract_and_store(
                     diagnosis_original, diagnosis_code, norm_specialty_id,
                     notes, findings, follow_up_date, follow_up_instructions)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, doctor_id, facility_id,
-                 encounter.get("encounter_date") or event_date_val,
-                 encounter.get("admission_date"), encounter.get("discharge_date"),
-                 norm_diag_id, _clean(diag.get("diagnosis_original")),
-                 _clean(diag.get("icd10_code")), norm_spec_id,
-                 _clean(extraction.get("summary_en")),
-                 _clean(encounter.get("findings")),
-                 encounter.get("follow_up_date"),
-                 _clean(encounter.get("follow_up_instructions"))),
+                (
+                    doc_id,
+                    patient_id,
+                    doctor_id,
+                    facility_id,
+                    encounter.get("encounter_date") or event_date_val,
+                    encounter.get("admission_date"),
+                    encounter.get("discharge_date"),
+                    norm_diag_id,
+                    _clean(diag.get("diagnosis_original")),
+                    _clean(diag.get("icd10_code")),
+                    norm_spec_id,
+                    _clean(extraction.get("summary_en")),
+                    _clean(encounter.get("findings")),
+                    encounter.get("follow_up_date"),
+                    _clean(encounter.get("follow_up_instructions")),
+                ),
             )
 
         # If no diagnoses but encounter data exists, still create encounter
@@ -856,12 +1022,17 @@ async def extract_and_store(
                    (document_id, patient_id, doctor_id, facility_id, encounter_date,
                     notes, findings, follow_up_date, follow_up_instructions)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, doctor_id, facility_id,
-                 encounter.get("encounter_date"),
-                 _clean(extraction.get("summary_en")),
-                 _clean(encounter.get("findings")),
-                 encounter.get("follow_up_date"),
-                 _clean(encounter.get("follow_up_instructions"))),
+                (
+                    doc_id,
+                    patient_id,
+                    doctor_id,
+                    facility_id,
+                    encounter.get("encounter_date"),
+                    _clean(extraction.get("summary_en")),
+                    _clean(encounter.get("findings")),
+                    encounter.get("follow_up_date"),
+                    _clean(encounter.get("follow_up_instructions")),
+                ),
             )
 
         # Insert medications
@@ -877,11 +1048,19 @@ async def extract_and_store(
                     active_ingredient_original, dosage, form, frequency,
                     duration, quantity, prescribed_date)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, norm_med_id, _clean(med.get("brand_name")),
-                 _clean(med.get("active_ingredient_original")), _clean(med.get("dosage")),
-                 _clean(med.get("form")), _clean(med.get("frequency")),
-                 _clean(med.get("duration")), _clean(med.get("quantity")),
-                 event_date_val),
+                (
+                    doc_id,
+                    patient_id,
+                    norm_med_id,
+                    _clean(med.get("brand_name")),
+                    _clean(med.get("active_ingredient_original")),
+                    _clean(med.get("dosage")),
+                    _clean(med.get("form")),
+                    _clean(med.get("frequency")),
+                    _clean(med.get("duration")),
+                    _clean(med.get("quantity")),
+                    event_date_val,
+                ),
             )
 
         # Insert vaccinations
@@ -893,9 +1072,15 @@ async def extract_and_store(
                    (document_id, patient_id, vaccine_name, manufacturer,
                     lot_number, dose_number, date_administered)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, _clean(vax.get("vaccine_name")),
-                 _clean(vax.get("manufacturer")), _clean(vax.get("lot_number")),
-                 _clean(vax.get("dose_number")), vax.get("date_administered")),
+                (
+                    doc_id,
+                    patient_id,
+                    _clean(vax.get("vaccine_name")),
+                    _clean(vax.get("manufacturer")),
+                    _clean(vax.get("lot_number")),
+                    _clean(vax.get("dose_number")),
+                    vax.get("date_administered"),
+                ),
             )
 
     # Insert invoice line items (not gated on patient_id — invoices may not have a patient)
@@ -910,14 +1095,19 @@ async def extract_and_store(
                (document_id, patient_id, description, quantity, unit_price,
                 amount, currency, tariff_code, tax_rate, category)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (doc_id, patient_id, _clean(item["description"]),
-             item.get("quantity", 1), item.get("unit_price"),
-             item.get("amount"), cost_data.get("currency", "CHF"),
-             _clean(item.get("tariff_code")), cost_data.get("tax_rate"),
-             _clean(item.get("category"))),
+            (
+                doc_id,
+                patient_id,
+                _clean(item["description"]),
+                item.get("quantity", 1),
+                item.get("unit_price"),
+                item.get("amount"),
+                cost_data.get("currency", "CHF"),
+                _clean(item.get("tariff_code")),
+                cost_data.get("tax_rate"),
+                _clean(item.get("category")),
+            ),
         )
 
     await db.commit()
     return extraction
-
-

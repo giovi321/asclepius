@@ -2,23 +2,42 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import {
-  Pill, Stethoscope, Syringe, Image as ImageIcon, FileImage, Pencil, X,
-  Trash2, Plus, Search,
+  Pill,
+  Stethoscope,
+  Syringe,
+  Image as ImageIcon,
+  FileImage,
+  Pencil,
+  X,
+  Trash2,
+  Plus,
+  Search,
 } from "lucide-react";
 import DicomViewer from "@/components/DicomViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDiagnoses } from "@/hooks/data";
 import {
-  Section, InfoRow, EditableField, EditableSelect, MedFormBadge, getSectionTypeStyle,
+  Section,
+  InfoRow,
+  EditableField,
+  EditableSelect,
+  MedFormBadge,
+  getSectionTypeStyle,
 } from "@/components/document-detail/DocumentDetailHelpers";
 
 /** Heading-style inline editor for an encounter's diagnosis. Uses the
  * encounter PATCH endpoint so the rest of the section stays aligned with
  * the same backend.
  */
-function DiagnosisHeading({ value, encounterId, onSaved }: {
-  value: string; encounterId: number; onSaved: () => void;
+function DiagnosisHeading({
+  value,
+  encounterId,
+  onSaved,
+}: {
+  value: string;
+  encounterId: number;
+  onSaved: () => void;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -26,13 +45,20 @@ function DiagnosisHeading({ value, encounterId, onSaved }: {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if ((val || "").trim() === (value || "").trim()) { setEditing(false); return; }
+    if ((val || "").trim() === (value || "").trim()) {
+      setEditing(false);
+      return;
+    }
     setSaving(true);
     try {
-      await api.patch(`/encounters/${encounterId}`, { diagnosis_original: val.trim() || null });
+      await api.patch(`/encounters/${encounterId}`, {
+        diagnosis_original: val.trim() || null,
+      });
       setEditing(false);
       onSaved();
-    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    } catch {
+      toast({ title: "Failed to save", variant: "error" });
+    }
     setSaving(false);
   };
 
@@ -44,18 +70,29 @@ function DiagnosisHeading({ value, encounterId, onSaved }: {
           onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") { setEditing(false); setVal(value || ""); }
+            if (e.key === "Escape") {
+              setEditing(false);
+              setVal(value || "");
+            }
           }}
           className="flex-1 rounded border bg-background px-2 py-1 text-base font-semibold"
           autoFocus
           disabled={saving}
         />
-        <button onClick={handleSave} disabled={saving}
-          className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
+        >
           {saving ? "..." : "OK"}
         </button>
-        <button onClick={() => { setEditing(false); setVal(value || ""); }}
-          className="rounded border px-2 py-1 text-xs">
+        <button
+          onClick={() => {
+            setEditing(false);
+            setVal(value || "");
+          }}
+          className="rounded border px-2 py-1 text-xs"
+        >
           <X className="h-3 w-3" />
         </button>
       </div>
@@ -64,11 +101,18 @@ function DiagnosisHeading({ value, encounterId, onSaved }: {
 
   return (
     <button
-      onClick={() => { setVal(value || ""); setEditing(true); }}
+      onClick={() => {
+        setVal(value || "");
+        setEditing(true);
+      }}
       className="group flex w-full items-center gap-2 text-left rounded px-1 -mx-1 hover:bg-accent/30"
     >
       <span className="flex-1 text-base font-semibold truncate">
-        {value || <span className="text-muted-foreground italic font-normal">No diagnosis — click to add</span>}
+        {value || (
+          <span className="text-muted-foreground italic font-normal">
+            No diagnosis — click to add
+          </span>
+        )}
       </span>
       <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0" />
     </button>
@@ -78,12 +122,20 @@ function DiagnosisHeading({ value, encounterId, onSaved }: {
 // Same DICOM modality → readable label map used in ImagingPage. Keeping
 // it co-located with the section avoids a dependency on the imaging page.
 const MODALITY_LABELS: Record<string, string> = {
-  CT: "CT scan", MR: "MRI", US: "Ultrasound", XR: "X-ray", CR: "X-ray (computed)",
-  DX: "X-ray (digital)", MG: "Mammography", PT: "PET", NM: "Nuclear medicine",
-  RF: "Fluoroscopy", OT: "Other",
+  CT: "CT scan",
+  MR: "MRI",
+  US: "Ultrasound",
+  XR: "X-ray",
+  CR: "X-ray (computed)",
+  DX: "X-ray (digital)",
+  MG: "Mammography",
+  PT: "PET",
+  NM: "Nuclear medicine",
+  RF: "Fluoroscopy",
+  OT: "Other",
 };
 const modalityLabel = (code: string | null | undefined) =>
-  !code ? "Unknown" : (MODALITY_LABELS[code.toUpperCase()] || code);
+  !code ? "Unknown" : MODALITY_LABELS[code.toUpperCase()] || code;
 const MODALITY_CODES = Object.keys(MODALITY_LABELS);
 
 /** DICOM tags routinely arrive in ALL-CAPS (e.g. body_part="ABDOMEN",
@@ -107,8 +159,14 @@ function niceCase(s: string | null | undefined): string {
  * what we save to ``encounters.diagnosis_code``. The display name from
  * the matching diagnosis row gives the user a recognisable preview.
  */
-function IcdCodeSelect({ value, encounterId, onSaved }: {
-  value: string | null; encounterId: number; onSaved: () => void;
+function IcdCodeSelect({
+  value,
+  encounterId,
+  onSaved,
+}: {
+  value: string | null;
+  encounterId: number;
+  onSaved: () => void;
 }) {
   const { toast } = useToast();
   const diagnoses = useDiagnoses();
@@ -120,14 +178,17 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
   // Map the current value back to a diagnosis row (if any) for the
   // display label. Falls back to just the raw code when the user typed
   // a code we don't have in norm_diagnoses.
-  const options = (Array.isArray(diagnoses.data) ? diagnoses.data : []) as any[];
+  const options = (
+    Array.isArray(diagnoses.data) ? diagnoses.data : []
+  ) as any[];
   const codedOptions = useMemo(
     () => options.filter((o: any) => (o.icd10_code || "").trim()),
     [options],
   );
   const currentRow = value
-    ? codedOptions.find((o: any) =>
-        (o.icd10_code || "").toLowerCase() === value.toLowerCase())
+    ? codedOptions.find(
+        (o: any) => (o.icd10_code || "").toLowerCase() === value.toLowerCase(),
+      )
     : null;
 
   useEffect(() => {
@@ -168,7 +229,9 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
   if (editing) {
     return (
       <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">ICD-10</span>
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">
+          ICD-10
+        </span>
         <div ref={rootRef} className="relative flex-1">
           <div className="flex items-center gap-1">
             <div className="relative flex-1">
@@ -178,7 +241,10 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") { setEditing(false); setQuery(""); }
+                  if (e.key === "Escape") {
+                    setEditing(false);
+                    setQuery("");
+                  }
                   if (e.key === "Enter" && filtered.length === 1) {
                     save(filtered[0].icd10_code);
                   }
@@ -189,26 +255,38 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
                 disabled={saving}
               />
             </div>
-            <button onClick={() => save(null)} disabled={saving}
+            <button
+              onClick={() => save(null)}
+              disabled={saving}
               className="rounded border px-2 py-1 text-xs hover:bg-accent"
-              title="Clear">
+              title="Clear"
+            >
               Clear
             </button>
-            <button onClick={() => { setEditing(false); setQuery(""); }}
-              className="rounded border px-2 py-1 text-xs">
+            <button
+              onClick={() => {
+                setEditing(false);
+                setQuery("");
+              }}
+              className="rounded border px-2 py-1 text-xs"
+            >
               <X className="h-3 w-3" />
             </button>
           </div>
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
             {diagnoses.loading ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
             ) : filtered.length === 0 ? (
               <div className="px-3 py-2 text-xs text-muted-foreground">
                 No matching ICD-10 codes.
               </div>
             ) : (
               filtered.map((opt: any) => {
-                const isCurrent = value && (opt.icd10_code || "").toLowerCase() === value.toLowerCase();
+                const isCurrent =
+                  value &&
+                  (opt.icd10_code || "").toLowerCase() === value.toLowerCase();
                 return (
                   <button
                     key={opt.id}
@@ -233,8 +311,13 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
   }
 
   return (
-    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
-      onClick={() => { setQuery(""); setEditing(true); }}>
+    <div
+      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => {
+        setQuery("");
+        setEditing(true);
+      }}
+    >
       <span className="text-muted-foreground">ICD-10</span>
       <span className="font-medium">
         {value ? (
@@ -247,14 +330,22 @@ function IcdCodeSelect({ value, encounterId, onSaved }: {
             )}
           </span>
         ) : (
-          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+            click to edit
+          </span>
         )}
       </span>
     </div>
   );
 }
 
-export function EncountersSection({ encounters, onUpdated }: { encounters: any[]; onUpdated?: () => void }) {
+export function EncountersSection({
+  encounters,
+  onUpdated,
+}: {
+  encounters: any[];
+  onUpdated?: () => void;
+}) {
   const confirm = useConfirm();
   const { toast } = useToast();
   if (!encounters?.length) return null;
@@ -262,7 +353,8 @@ export function EncountersSection({ encounters, onUpdated }: { encounters: any[]
   const handleDelete = async (encId: number) => {
     const ok = await confirm({
       title: "Delete this encounter?",
-      description: "The encounter row will be removed. The parent document is left untouched.",
+      description:
+        "The encounter row will be removed. The parent document is left untouched.",
       variant: "destructive",
       confirmText: "Delete",
     });
@@ -278,13 +370,18 @@ export function EncountersSection({ encounters, onUpdated }: { encounters: any[]
   return (
     <Section title="Encounters" icon={Stethoscope}>
       {encounters.map((enc, i) => (
-        <div key={enc.id} className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}>
+        <div
+          key={enc.id}
+          className={`space-y-1 ${i > 0 ? "pt-3 mt-3 border-t" : ""}`}
+        >
           {/* Diagnosis is the encounter's headline. Only Diagnosis +
               ICD-10 + Details show up here; other extracted fields are
               hidden because the user wanted a focused editor. */}
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0 space-y-1">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Diagnosis</p>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Diagnosis
+              </p>
               <DiagnosisHeading
                 value={enc.diagnosis_original || ""}
                 encounterId={enc.id}
@@ -333,8 +430,14 @@ const MED_FIELDS: Array<{ key: string; label: string }> = [
   { key: "quantity", label: "Quantity" },
 ];
 
-function MedicationRow({ med, onUpdated, onDelete }: {
-  med: any; onUpdated: () => void; onDelete: () => void;
+function MedicationRow({
+  med,
+  onUpdated,
+  onDelete,
+}: {
+  med: any;
+  onUpdated: () => void;
+  onDelete: () => void;
 }) {
   // Fields that have any DB value are always shown. The "+" menu only
   // surfaces the rest, and once a user picks one we keep it visible
@@ -358,8 +461,12 @@ function MedicationRow({ med, onUpdated, onDelete }: {
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
 
-  const visible = MED_FIELDS.filter((f) => hasValue(f.key) || revealed.has(f.key));
-  const hidden = MED_FIELDS.filter((f) => !hasValue(f.key) && !revealed.has(f.key));
+  const visible = MED_FIELDS.filter(
+    (f) => hasValue(f.key) || revealed.has(f.key),
+  );
+  const hidden = MED_FIELDS.filter(
+    (f) => !hasValue(f.key) && !revealed.has(f.key),
+  );
 
   return (
     <div className="space-y-1">
@@ -418,7 +525,13 @@ function MedicationRow({ med, onUpdated, onDelete }: {
   );
 }
 
-export function MedicationsSection({ medications, onUpdated }: { medications: any[]; onUpdated?: () => void }) {
+export function MedicationsSection({
+  medications,
+  onUpdated,
+}: {
+  medications: any[];
+  onUpdated?: () => void;
+}) {
   const confirm = useConfirm();
   const { toast } = useToast();
   if (!medications?.length) return null;
@@ -426,7 +539,8 @@ export function MedicationsSection({ medications, onUpdated }: { medications: an
   const handleDelete = async (medId: number) => {
     const ok = await confirm({
       title: "Delete this medication?",
-      description: "The medication row will be removed. The parent document is left untouched.",
+      description:
+        "The medication row will be removed. The parent document is left untouched.",
       variant: "destructive",
       confirmText: "Delete",
     });
@@ -461,35 +575,89 @@ export function VaccinationsSection({ vaccinations }: { vaccinations: any[] }) {
       {vaccinations.map((vax) => (
         <div key={vax.id} className="text-sm">
           <span className="font-medium">{vax.vaccine_name}</span>
-          {vax.date_administered && <span className="text-muted-foreground"> \u2014 {vax.date_administered}</span>}
-          {vax.dose_number && <span className="text-muted-foreground"> (dose {vax.dose_number})</span>}
+          {vax.date_administered && (
+            <span className="text-muted-foreground">
+              {" "}
+              \u2014 {vax.date_administered}
+            </span>
+          )}
+          {vax.dose_number && (
+            <span className="text-muted-foreground">
+              {" "}
+              (dose {vax.dose_number})
+            </span>
+          )}
         </div>
       ))}
     </Section>
   );
 }
 
+/** Vision-LLM emits structured DOM-like text ("<div data-bbox=...>") to
+ * preserve layout. When the LLM-summarisation step is skipped (>10 sections)
+ * the raw markup leaks into ``summary_en``. Strip tags and pull alt /
+ * data-label values up so the user sees the semantic description. */
+const _ALT_OR_LABEL = /(?:alt|data-label)\s*=\s*"([^"]+)"/gi;
+const _HTML_TAG = /<[^>]*>/g;
+
+function cleanSectionSummary(s: string | null | undefined): string {
+  if (!s) return "";
+  if (!s.includes("<")) return s.trim();
+  const semantic: string[] = [];
+  for (const m of s.matchAll(_ALT_OR_LABEL)) semantic.push(m[1].trim());
+  const stripped = s.replace(_HTML_TAG, " ");
+  const combined = (semantic.join(" ") + " " + stripped)
+    .replace(/\s+/g, " ")
+    .trim();
+  return combined.length > 280
+    ? combined.slice(0, 280).trimEnd() + "\u2026"
+    : combined;
+}
+
 export function DocumentSectionsList({ sections }: { sections: any[] }) {
   if (!sections?.length) return null;
   return (
-    <div className="rounded-lg border p-4">
-      <h3 className="mb-3 font-medium">Document Sections ({sections.length})</h3>
-      <div className="space-y-2">
-        {sections.map((section) => (
-          <div key={section.id} className="flex items-center gap-3 text-sm rounded-md border p-2">
-            <span className="text-xs text-muted-foreground w-16">
-              pp. {section.page_start}{"\u2013"}{section.page_end}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getSectionTypeStyle(section.section_type)}`}>
-              {section.section_type?.replace(/_/g, " ")}
-            </span>
-            {section.summary_en && (
-              <span className="flex-1 text-xs text-muted-foreground truncate">{section.summary_en}</span>
-            )}
-          </div>
-        ))}
+    <details className="group/sections rounded-lg border">
+      <summary className="cursor-pointer select-none list-none flex items-center justify-between p-4 hover:bg-muted/40 rounded-lg">
+        <h3 className="font-medium">Document Sections ({sections.length})</h3>
+        <span
+          className="text-xs text-muted-foreground transition-transform group-open/sections:rotate-180"
+          aria-hidden
+        >
+          \u25be
+        </span>
+      </summary>
+      <div className="border-t p-4 space-y-2">
+        {sections.map((section) => {
+          const cleaned = cleanSectionSummary(section.summary_en);
+          return (
+            <div
+              key={section.id}
+              className="flex items-center gap-3 text-sm rounded-md border p-2"
+            >
+              <span className="text-xs text-muted-foreground w-16">
+                pp. {section.page_start}
+                {"\u2013"}
+                {section.page_end}
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${getSectionTypeStyle(section.section_type)}`}
+              >
+                {section.section_type?.replace(/_/g, " ")}
+              </span>
+              {cleaned && (
+                <span
+                  className="flex-1 text-xs text-muted-foreground truncate"
+                  title={cleaned}
+                >
+                  {cleaned}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -505,7 +673,13 @@ export function DocumentSectionsList({ sections }: { sections: any[] }) {
  * ``documents.event_date`` (single source of truth) and is already
  * editable via ``MetadataEditor``.
  */
-export function ImagingStudiesSection({ studies, onUpdated }: { studies: any[]; onUpdated?: () => void }) {
+export function ImagingStudiesSection({
+  studies,
+  onUpdated,
+}: {
+  studies: any[];
+  onUpdated?: () => void;
+}) {
   if (!studies?.length) return null;
   return (
     <>
@@ -516,22 +690,36 @@ export function ImagingStudiesSection({ studies, onUpdated }: { studies: any[]; 
   );
 }
 
-function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () => void }) {
+function ImagingStudyBlock({
+  study,
+  onUpdated,
+}: {
+  study: any;
+  onUpdated?: () => void;
+}) {
   const navigate = useNavigate();
   const series = study.series || [];
   const [activeSeriesId, setActiveSeriesId] = useState<number | null>(
     series.length > 0 ? series[0].id : null,
   );
-  const [bundleFiles, setBundleFiles] = useState<{ name: string; size: number; kind: string }[]>([]);
+  const [bundleFiles, setBundleFiles] = useState<
+    { name: string; size: number; kind: string }[]
+  >([]);
   const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
 
   useEffect(() => {
-    api.get(`/imaging/${study.id}/bundle-files`).then((r) => {
-      setBundleFiles(r.data.items || []);
-    }).catch(() => setBundleFiles([]));
-    api.get(`/imaging/${study.id}/links`).then((r) => {
-      setLinkedDocs(r.data.items || []);
-    }).catch(() => setLinkedDocs([]));
+    api
+      .get(`/imaging/${study.id}/bundle-files`)
+      .then((r) => {
+        setBundleFiles(r.data.items || []);
+      })
+      .catch(() => setBundleFiles([]));
+    api
+      .get(`/imaging/${study.id}/links`)
+      .then((r) => {
+        setLinkedDocs(r.data.items || []);
+      })
+      .catch(() => setLinkedDocs([]));
   }, [study.id]);
 
   // Save handler used by every editable row in this block. The shared
@@ -587,12 +775,20 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
         apiPath={apiPath}
         onSave={handleSaved}
       />
-      <InfoRow label="Study UID" value={study.study_instance_uid || "Unknown"} />
-      <InfoRow label="Series" value={`${study.num_series ?? series.length} | ${study.num_images} images`} />
+      <InfoRow
+        label="Study UID"
+        value={study.study_instance_uid || "Unknown"}
+      />
+      <InfoRow
+        label="Series"
+        value={`${study.num_series ?? series.length} | ${study.num_images} images`}
+      />
 
       {series.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground mt-2">Series</p>
+          <p className="text-xs font-medium text-muted-foreground mt-2">
+            Series
+          </p>
           {series.map((s: any, idx: number) => (
             <button
               key={s.id}
@@ -602,9 +798,12 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
               }`}
             >
               <span className="truncate">
-                Series {s.series_number ?? idx + 1}: {niceCase(s.series_description) || s.modality || "Untitled"}
+                Series {s.series_number ?? idx + 1}:{" "}
+                {niceCase(s.series_description) || s.modality || "Untitled"}
               </span>
-              <span className="text-xs text-muted-foreground tabular-nums">{s.num_images} images</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {s.num_images} images
+              </span>
             </button>
           ))}
         </div>
@@ -625,13 +824,19 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
 
       {linkedDocs.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground mt-3 mb-1">Linked documents</p>
+          <p className="text-xs font-medium text-muted-foreground mt-3 mb-1">
+            Linked documents
+          </p>
           <ul className="space-y-1">
             {linkedDocs.map((d) => (
               <li
                 // The "report" entry is synthetic (no link_id). Build a
                 // composite key so it doesn't collide with real links.
-                key={d.link_type === "report" ? `report-${d.id}` : `link-${d.link_id}`}
+                key={
+                  d.link_type === "report"
+                    ? `report-${d.id}`
+                    : `link-${d.link_id}`
+                }
                 className="flex items-center justify-between text-sm gap-2"
               >
                 <button
@@ -645,7 +850,9 @@ function ImagingStudyBlock({ study, onUpdated }: { study: any; onUpdated?: () =>
                     Report
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">{d.doc_type}</span>
+                  <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                    {d.doc_type}
+                  </span>
                 )}
               </li>
             ))}

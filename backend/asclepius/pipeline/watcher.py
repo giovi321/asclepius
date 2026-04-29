@@ -35,6 +35,7 @@ def enqueue_job(
     *,
     queued_label: str | None = None,
     queued_doc_id: int | None = None,
+    queued_providers: dict[str, str | None] | None = None,
 ) -> None:
     """Enqueue a unit of work for the pipeline worker.
 
@@ -48,6 +49,11 @@ def enqueue_job(
 
     ``priority`` is min-heap: 0 jumps the line, file-size for uploads keeps the
     "smaller files first" behaviour. Reprocess clicks default to 0.
+
+    ``queued_providers`` previews which OCR / LLM / Vision provider IDs the
+    job will use (keys: ``ocr``, ``llm``, ``vision``) so the dashboard can
+    render model badges before the worker picks the job up. Uploads leave
+    this unset because providers are resolved per-page after extraction.
     """
     seq = next(_JOB_SEQ)
     queue.put((priority, seq, kind, payload))
@@ -55,29 +61,47 @@ def enqueue_job(
     # Mirror into pipeline_status so the topbar / dashboard reflect the queued
     # work without having to introspect the queue itself.
     from asclepius.pipeline.processor import pipeline_status
+
     pipeline_status["queue_depth"] = pipeline_status.get("queue_depth", 0) + 1
     queued_files = pipeline_status.setdefault("queued_files", [])
     label = queued_label or payload.get("file_path", "") or f"doc#{queued_doc_id}"
-    queued_files.append({"filename": Path(label).name if label else "(unknown)",
-                         "size": payload.get("file_size", 0)})
+    queued_files.append(
+        {
+            "filename": Path(label).name if label else "(unknown)",
+            "size": payload.get("file_size", 0),
+        }
+    )
     if len(queued_files) > 50:
         del queued_files[: len(queued_files) - 50]
 
+    providers = {k: v for k, v in queued_providers.items() if v} if queued_providers else None
     queued_jobs = pipeline_status.setdefault("queued_jobs", [])
-    queued_jobs.append({
-        "kind": kind,
-        "label": Path(label).name if label else "(unknown)",
-        "doc_id": queued_doc_id,
-    })
+    queued_jobs.append(
+        {
+            "kind": kind,
+            "label": Path(label).name if label else "(unknown)",
+            "doc_id": queued_doc_id,
+            "providers": providers or None,
+        }
+    )
     if len(queued_jobs) > 50:
         del queued_jobs[: len(queued_jobs) - 50]
+
 
 # Extensions the pipeline handles. ``.bin`` is reserved for opaque files
 # extracted from a zip upload (DICOMDIR, LOCKFILE, VERSION etc.) — they are
 # stored alongside the imaging study but not OCR/LLM-processed.
 SUPPORTED_EXTENSIONS = {
-    ".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif",
-    ".dcm", ".dicom", ".iso", ".bin",
+    ".pdf",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
+    ".tif",
+    ".dcm",
+    ".dicom",
+    ".iso",
+    ".bin",
 }
 
 
@@ -121,6 +145,7 @@ class InboxHandler(FileSystemEventHandler):
         # poll usually exits in ~200 ms. Cap the total wait at 2 s so a
         # genuinely slow uploader still works.
         import time
+
         deadline = time.monotonic() + 2.0
         prev_size = -1
         while time.monotonic() < deadline:
@@ -179,7 +204,11 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
     import asyncio
 
     async def _run():
-        from asclepius.pipeline.processor import process_file, ProviderUnreachableError, reprocess_document
+        from asclepius.pipeline.processor import (
+            process_file,
+            ProviderUnreachableError,
+            reprocess_document,
+        )
         from asclepius.pipeline.inbox_sweep import sweep_inbox
         import aiosqlite as _aiosqlite
 
@@ -219,27 +248,56 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
             # frontend's queued list reflects the worker actually picking
             # this one up.
             from asclepius.pipeline.processor import pipeline_status
+
             queued_jobs = pipeline_status.get("queued_jobs") or []
             for i, entry in enumerate(queued_jobs):
-                if (entry.get("kind") == kind
-                        and entry.get("doc_id") == payload.get("doc_id")
-                        and (kind == "reprocess"
-                             or entry.get("label") == Path(file_path or "").name)):
+                if (
+                    entry.get("kind") == kind
+                    and entry.get("doc_id") == payload.get("doc_id")
+                    and (kind == "reprocess" or entry.get("label") == Path(file_path or "").name)
+                ):
                     del queued_jobs[i]
                     break
+
+            # Honour cancels that arrived while the job was still queued.
+            # The /documents/{id}/cancel endpoint sets cancelled_docs and
+            # the document's status to "cancelled" immediately; without
+            # this guard the worker would still pop and start the job
+            # before the cooperative-cancel checkpoints fire.
+            from asclepius.pipeline.processor import cancelled_docs as _cancelled_docs
+
+            queued_doc_id = payload.get("doc_id")
+            if (
+                kind == "reprocess"
+                and queued_doc_id is not None
+                and queued_doc_id in _cancelled_docs
+            ):
+                logger.info(
+                    "Pipeline worker skipping cancelled queued reprocess: doc=%d",
+                    queued_doc_id,
+                )
+                _cancelled_docs.discard(queued_doc_id)
+                # Decrement queue_depth so the dashboard counter reconciles.
+                from asclepius.pipeline.processor import pipeline_status as _ps
+
+                _ps["queue_depth"] = max(0, _ps.get("queue_depth", 0) - 1)
+                continue
 
             try:
                 if kind == "reprocess":
                     logger.info(
                         "Pipeline worker processing reprocess: doc=%d mode=%s",
-                        payload["doc_id"], payload.get("mode", "both"),
+                        payload["doc_id"],
+                        payload.get("mode", "both"),
                     )
                     await reprocess_document(
-                        payload["doc_id"], config,
+                        payload["doc_id"],
+                        config,
                         mode=payload.get("mode", "both"),
                         llm_provider_id=payload.get("llm_provider_id"),
                         ocr_provider_id=payload.get("ocr_provider_id"),
                         vision_provider_id=payload.get("vision_provider_id"),
+                        resolved_providers=payload.get("resolved_providers"),
                     )
                 else:
                     logger.info("Pipeline worker processing: %s", Path(file_path).name)
@@ -247,21 +305,26 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 consecutive_provider_failures = 0  # success resets counter
             except ProviderUnreachableError as e:
                 consecutive_provider_failures += 1
-                logger.error("Provider unreachable (%d/%d): %s — %s",
-                             consecutive_provider_failures, AUTO_STOP_THRESHOLD,
-                             label, e)
+                logger.error(
+                    "Provider unreachable (%d/%d): %s — %s",
+                    consecutive_provider_failures,
+                    AUTO_STOP_THRESHOLD,
+                    label,
+                    e,
+                )
                 if consecutive_provider_failures >= AUTO_STOP_THRESHOLD:
                     logger.warning(
                         "All providers appear unreachable after %d consecutive failures. "
-                        "Auto-pausing pipeline.", AUTO_STOP_THRESHOLD)
+                        "Auto-pausing pipeline.",
+                        AUTO_STOP_THRESHOLD,
+                    )
                     if app_state is not None:
                         app_state.pipeline_auto_stopped = True
                         app_state.pipeline_auto_stop_reason = (
                             f"Auto-paused after {AUTO_STOP_THRESHOLD} consecutive provider failures"
                         )
                     # Put the job back so it's retried on restart.
-                    enqueue_job(queue, kind, payload,
-                                priority=payload.get("file_size", 0))
+                    enqueue_job(queue, kind, payload, priority=payload.get("file_size", 0))
                     break  # stop worker loop
             except Exception:
                 logger.exception("Pipeline error for: %s", label)
@@ -275,6 +338,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 # Always reset pipeline status
                 from asclepius.pipeline.processor import pipeline_status
                 from asclepius.pipeline.stage_events import end_job
+
                 pipeline_status["processing"] = None
                 pipeline_status["processing_step"] = None
                 pipeline_status["processing_doc_id"] = None
@@ -350,6 +414,7 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     try:
         import aiosqlite as _aiosqlite
         from asclepius.pipeline.inbox_sweep import sweep_inbox
+
         async with _aiosqlite.connect(config.database.path) as _db:
             _db.row_factory = _aiosqlite.Row
             await _db.execute("PRAGMA foreign_keys=ON")
@@ -373,9 +438,11 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
             except OSError:
                 file_size = 0
             enqueue_job(
-                queue, "upload",
+                queue,
+                "upload",
                 {"file_path": str(f), "file_size": file_size},
-                priority=file_size, queued_label=str(f),
+                priority=file_size,
+                queued_label=str(f),
             )
 
     # Keep the coroutine alive and periodically check for scheduled documents
@@ -385,6 +452,7 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
             # Check for scheduled documents whose process_at time has passed
             try:
                 import aiosqlite
+
                 async with aiosqlite.connect(config.database.path) as db:
                     await db.execute("PRAGMA journal_mode=WAL")
                     cursor = await db.execute(
@@ -407,25 +475,33 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
                             except OSError:
                                 file_size = 0
                             enqueue_job(
-                                queue, "upload",
+                                queue,
+                                "upload",
                                 {"file_path": str(full_path), "file_size": file_size},
-                                priority=file_size, queued_label=str(full_path),
+                                priority=file_size,
+                                queued_label=str(full_path),
                             )
                         else:
                             # Try inbox path
-                            inbox_path_for_doc = Path(config.vault.inbox_path) / Path(file_path).name
+                            inbox_path_for_doc = (
+                                Path(config.vault.inbox_path) / Path(file_path).name
+                            )
                             if inbox_path_for_doc.exists():
                                 try:
                                     file_size = inbox_path_for_doc.stat().st_size
                                 except OSError:
                                     file_size = 0
                                 enqueue_job(
-                                    queue, "upload",
+                                    queue,
+                                    "upload",
                                     {"file_path": str(inbox_path_for_doc), "file_size": file_size},
-                                    priority=file_size, queued_label=str(inbox_path_for_doc),
+                                    priority=file_size,
+                                    queued_label=str(inbox_path_for_doc),
                                 )
                             else:
-                                logger.warning("Scheduled document %d file not found: %s", doc_id, file_path)
+                                logger.warning(
+                                    "Scheduled document %d file not found: %s", doc_id, file_path
+                                )
                     if rows:
                         await db.commit()
                         logger.info("Re-queued %d scheduled document(s)", len(rows))

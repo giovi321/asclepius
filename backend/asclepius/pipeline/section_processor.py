@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from pathlib import Path
 
 import aiosqlite
@@ -14,6 +15,29 @@ logger = logging.getLogger(__name__)
 
 # Threshold: documents with more pages than this get sectioned
 SECTION_THRESHOLD = 5
+
+# Vision-LLM emits structured DOM-like output ("<div data-bbox=...>") to
+# preserve layout. That's helpful upstream but not as a human-readable summary,
+# so the fallback summarizer pulls out the semantic ``alt=`` / ``data-label=``
+# values and strips the rest of the markup.
+_ALT_OR_LABEL = re.compile(r'(?:alt|data-label)\s*=\s*"([^"]+)"', re.IGNORECASE)
+_HTML_TAG = re.compile(r"<[^>]*>")
+
+
+def _strip_markup_for_summary(text: str) -> str:
+    """Return a clean, text-only summary fragment suitable for storage in
+    ``document_sections.summary_en``.
+
+    Pulls semantic alt / data-label values to the front so the user sees
+    "Hospital logo featuring..." rather than the raw ``<img alt="...">`` HTML.
+    Leaves plain-text input untouched (regex no-ops when there are no tags).
+    """
+    if not text or "<" not in text:
+        return text.strip() if text else ""
+    semantic = " ".join(m.group(1).strip() for m in _ALT_OR_LABEL.finditer(text))
+    stripped = _HTML_TAG.sub(" ", text)
+    combined = (semantic + " " + stripped).strip()
+    return re.sub(r"\s+", " ", combined)
 
 
 async def should_section(file_path: str) -> bool:
@@ -56,17 +80,15 @@ async def process_with_sections(
     batch_size = 10
 
     for i in range(0, len(ocr_pages), batch_size):
-        batch = ocr_pages[i:i + batch_size]
-        pages_text = "\n".join(
-            f"--- PAGE {i + j + 1} ---\n{text}"
-            for j, text in enumerate(batch)
-        )
+        batch = ocr_pages[i : i + batch_size]
+        pages_text = "\n".join(f"--- PAGE {i + j + 1} ---\n{text}" for j, text in enumerate(batch))
 
         from asclepius.llm.prompt_manager import get_prompt
+
         prompt_template = await get_prompt(config.database.path, "page_classification")
         prompt = prompt_template.format(pages_text=pages_text)
 
-        if hasattr(llm, '_generate'):
+        if hasattr(llm, "_generate"):
             response = await llm._generate(prompt)
             result = llm._parse_json(response)
         else:
@@ -84,8 +106,11 @@ async def process_with_sections(
         if pg not in classified:
             classified[pg] = "other"
 
-    logger.info("Page classifications for doc %d: %s", doc_id,
-                {pg: classified[pg] for pg in sorted(classified.keys())})
+    logger.info(
+        "Page classifications for doc %d: %s",
+        doc_id,
+        {pg: classified[pg] for pg in sorted(classified.keys())},
+    )
 
     # Step 2: Group consecutive pages of the same type into sections
     sections = []
@@ -99,34 +124,44 @@ async def process_with_sections(
             current_pages.append(ocr_pages[pg - 1])
         else:
             if current_type is not None:
-                sections.append({
-                    "type": current_type,
-                    "page_start": current_start,
-                    "page_end": pg - 1,
-                    "text": "\n\n".join(current_pages),
-                })
+                sections.append(
+                    {
+                        "type": current_type,
+                        "page_start": current_start,
+                        "page_end": pg - 1,
+                        "text": "\n\n".join(current_pages),
+                    }
+                )
             current_type = pg_type
             current_start = pg
             current_pages = [ocr_pages[pg - 1]]
 
     # Don't forget the last section
     if current_type is not None:
-        sections.append({
-            "type": current_type,
-            "page_start": current_start,
-            "page_end": len(ocr_pages),
-            "text": "\n\n".join(current_pages),
-        })
+        sections.append(
+            {
+                "type": current_type,
+                "page_start": current_start,
+                "page_end": len(ocr_pages),
+                "text": "\n\n".join(current_pages),
+            }
+        )
 
-    logger.info("Doc %d split into %d sections: %s", doc_id, len(sections),
-                [(s["type"], f"pp.{s['page_start']}-{s['page_end']}") for s in sections])
+    logger.info(
+        "Doc %d split into %d sections: %s",
+        doc_id,
+        len(sections),
+        [(s["type"], f"pp.{s['page_start']}-{s['page_end']}") for s in sections],
+    )
 
     # Step 3: Extract from each section
     pipeline_status["processing_step"] = "section_extraction"
 
     from asclepius.pipeline.extractor import (
-        build_extraction_context, _extract_type_specific,
+        build_extraction_context,
+        _extract_type_specific,
     )
+
     context = await build_extraction_context(db)
 
     # Map section types to extraction doc_types
@@ -160,18 +195,23 @@ async def process_with_sections(
         if extraction_type and section["text"].strip():
             try:
                 section_extraction = await _extract_type_specific(
-                    llm, section["text"], extraction_type, context,
+                    llm,
+                    section["text"],
+                    extraction_type,
+                    context,
                     db_path=config.database.path,
                 )
             except Exception:
                 logger.exception(
                     "Failed to extract section %d (%s) of doc %d",
-                    idx, section_type, doc_id,
+                    idx,
+                    section_type,
+                    doc_id,
                 )
 
         # Generate a brief summary for the section (skip for large docs to save time)
         summary = ""
-        if len(sections) <= 10 and section["text"].strip() and hasattr(llm, '_generate'):
+        if len(sections) <= 10 and section["text"].strip() and hasattr(llm, "_generate"):
             try:
                 sum_prompt = (
                     "Summarize this medical document section in 1-2 sentences "
@@ -182,8 +222,11 @@ async def process_with_sections(
             except Exception:
                 pass
         elif section["text"].strip():
-            # For large docs, just use first ~200 chars as a crude summary
-            summary = section["text"][:200].replace("\n", " ").strip()
+            # For large docs, just use first ~200 chars as a crude summary —
+            # but strip vision-LLM markup first so we don't store raw
+            # ``<div data-bbox=...>`` HTML in summary_en.
+            cleaned = _strip_markup_for_summary(section["text"])
+            summary = cleaned[:200].replace("\n", " ").strip()
 
         # Save section to DB
         await db.execute(
@@ -191,9 +234,16 @@ async def process_with_sections(
                (document_id, section_index, page_start, page_end, section_type,
                 ocr_text, raw_extraction, summary_en)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (doc_id, idx, section["page_start"], section["page_end"],
-             section_type, section["text"], json.dumps(section_extraction),
-             summary),
+            (
+                doc_id,
+                idx,
+                section["page_start"],
+                section["page_end"],
+                section_type,
+                section["text"],
+                json.dumps(section_extraction),
+                summary,
+            ),
         )
         await db.commit()
 

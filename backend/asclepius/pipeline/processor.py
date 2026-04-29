@@ -73,6 +73,7 @@ def _count_pages(file_path: str) -> int | None:
         return None
     try:
         import fitz  # PyMuPDF
+
         doc = fitz.open(str(path))
         count = len(doc)
         doc.close()
@@ -81,6 +82,7 @@ def _count_pages(file_path: str) -> int | None:
         try:
             # Fallback: try pikepdf
             import pikepdf
+
             pdf = pikepdf.open(str(path))
             count = len(pdf.pages)
             pdf.close()
@@ -137,6 +139,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # DICOM path (handle before dedup since DICOM has its own logic)
             if ext in {".dcm", ".dicom"}:
                 from asclepius.pipeline.dicom_ingest import process_dicom
+
                 doc_id = await process_dicom(file_path, config, db)
                 if doc_id:
                     pipeline_status["total_processed"] += 1
@@ -151,6 +154,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # the topbar reflects the work.
             if ext == ".bin" and Path(str(path) + ".zip_member").exists():
                 from asclepius.pipeline.dicom_ingest import process_zip_member
+
                 await process_zip_member(file_path, config, db)
                 pipeline_status["total_processed"] += 1
                 pipeline_status["last_processed"] = path.name
@@ -192,7 +196,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     relative_parts = path.resolve().relative_to(vault_root).parts
                     for part in relative_parts:
                         if part.startswith("user-"):
-                            candidate = part[len("user-"):]
+                            candidate = part[len("user-") :]
                             if candidate.isdigit():
                                 hint_user_id = int(candidate)
                                 break
@@ -216,8 +220,16 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                    (file_path, original_filename, file_hash, file_size, page_count,
                     patient_id, event_id, uploaded_by_user_id, date_received, status)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE('now'), 'pending')""",
-                (inbox_rel, path.name, file_hash, file_size, page_count,
-                 hint_patient_id, hint_event_id, hint_user_id),
+                (
+                    inbox_rel,
+                    path.name,
+                    file_hash,
+                    file_size,
+                    page_count,
+                    hint_patient_id,
+                    hint_event_id,
+                    hint_user_id,
+                ),
             )
             # If the row already existed (uploaded via API), make sure the
             # uploader is stamped on it — older uploads never set this.
@@ -231,7 +243,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # Now SELECT the record (whether just inserted or pre-existing from upload)
             cursor = await db.execute(
-                "SELECT id, status, patient_id, event_id FROM documents WHERE file_hash = ?", (file_hash,),
+                "SELECT id, status, patient_id, event_id FROM documents WHERE file_hash = ?",
+                (file_hash,),
             )
             existing = await cursor.fetchone()
             if not existing:
@@ -270,13 +283,18 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 params,
             )
             await db.commit()
-            logger.info("Processing doc %d (patient=%s, event=%s): %s",
-                        doc_id, existing["patient_id"] or hint_patient_id,
-                        existing["event_id"] or hint_event_id, path.name)
+            logger.info(
+                "Processing doc %d (patient=%s, event=%s): %s",
+                doc_id,
+                existing["patient_id"] or hint_patient_id,
+                existing["event_id"] or hint_event_id,
+                path.name,
+            )
 
             ext = path.suffix.lower()
             if ext in {".dcm", ".dicom"}:
                 from asclepius.pipeline.dicom_ingest import process_dicom
+
                 await process_dicom(file_path, config, db)
                 pipeline_status["total_processed"] += 1
                 pipeline_status["last_processed"] = path.name
@@ -301,9 +319,28 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             if flow == "vision_llm" and not config.vision.providers:
                 logger.warning(
                     "default_flow is 'vision_llm' but no vision providers configured — "
-                    "falling back to ocr_llm for doc %d", doc_id,
+                    "falling back to ocr_llm for doc %d",
+                    doc_id,
                 )
                 flow = "ocr_llm"
+
+            # Resolve which providers will run for the dashboard model badges.
+            # Picks the first enabled OCR/LLM/Vision provider by priority — the
+            # same selection logic the upload flow itself uses, so the badge
+            # matches reality even when no explicit override is in play.
+            def _first_enabled_id(items):
+                enabled = [p for p in items if getattr(p, "enabled", False)]
+                if enabled:
+                    return min(enabled, key=lambda p: getattr(p, "priority", 0)).id
+                return items[0].id if items else None
+
+            upload_providers: dict[str, str | None] = {}
+            if flow == "vision_llm":
+                upload_providers["vision"] = _first_enabled_id(config.vision.providers)
+                upload_providers["llm"] = _first_enabled_id(config.llm.providers)
+            else:
+                upload_providers["ocr"] = _first_enabled_id(config.ocr.providers)
+                upload_providers["llm"] = _first_enabled_id(config.llm.providers)
 
             # Initialise the richer current_job block now that we have a
             # concrete doc_id and flow. The dashboard's stepper relies on
@@ -313,9 +350,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 filename=path.name,
                 kind="upload",
                 stages_planned=plan_stages(flow=flow),
+                providers=upload_providers,
             )
 
             import asyncio as _asyncio
+
             ocr_text, confidence, engine = "", 0.0, "none"
 
             if flow == "vision_llm":
@@ -328,8 +367,16 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 logger.info("Running Vision-LLM extraction on doc %d: %s", doc_id, path.name)
 
                 from asclepius.pipeline.vision_extractor import extract_with_vision
-                ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
-                    file_path, config,
+
+                (
+                    ocr_text,
+                    confidence,
+                    engine,
+                    vision_result,
+                    vision_entry,
+                ) = await extract_with_vision(
+                    file_path,
+                    config,
                 )
 
                 await db.execute(
@@ -370,8 +417,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
                 # Vision phase done — record completion before flipping to LLM.
                 await _record_stage(
-                    db, doc_id, STAGE_VISION_EXTRACTION, "completed",
-                    "upload", started_at=_stage_started_at, page_total=page_count,
+                    db,
+                    doc_id,
+                    STAGE_VISION_EXTRACTION,
+                    "completed",
+                    "upload",
+                    started_at=_stage_started_at,
+                    page_total=page_count,
                 )
                 _current_stage = STAGE_LLM_EXTRACTION
                 _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
@@ -379,15 +431,20 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing_pages"] = None
                 pipeline_status["processing_page_current"] = None
                 from asclepius.pipeline.extractor import (
-                    extract_and_store, _salvage_classification, _normalize_doc_type,
-                    _extract_type_specific, build_extraction_context,
+                    extract_and_store,
+                    _salvage_classification,
+                    _normalize_doc_type,
+                    _extract_type_specific,
+                    build_extraction_context,
                 )
+
                 _salvage_classification(vision_result)
                 doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
                 vision_result["doc_type"] = doc_type
                 # Phase 2 reuses the vision provider's config so the model the
                 # user picked for vision also handles type-specific extraction.
                 from asclepius.pipeline.provider_factory import _build_llm_provider
+
                 llm = _build_llm_provider(vision_entry)
                 # Vision handled classification + universal fields (Phase 1).
                 # Still run Phase 2 type-specific extraction on the vision OCR
@@ -395,17 +452,27 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 try:
                     context = await build_extraction_context(db)
                     type_extraction = await _extract_type_specific(
-                        llm, ocr_text, doc_type, context, db_path=config.database.path,
+                        llm,
+                        ocr_text,
+                        doc_type,
+                        context,
+                        db_path=config.database.path,
                     )
                     if type_extraction:
                         vision_result = {**vision_result, **type_extraction}
                 except Exception:
                     logger.warning(
                         "Phase 2 type-specific extraction failed for doc %d (non-fatal)",
-                        doc_id, exc_info=True,
+                        doc_id,
+                        exc_info=True,
                     )
                 extraction = await extract_and_store(
-                    db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
+                    db,
+                    llm,
+                    doc_id,
+                    ocr_text,
+                    config,
+                    extraction_override=vision_result,
                 )
             else:
                 # ── OCR phase ────────────────────────────────────────────
@@ -425,11 +492,17 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                             wait = 60 * (ocr_attempt + 1)
                             logger.warning(
                                 "OCR failed for doc %d (%s, attempt %d/3): %s — retrying in %ds",
-                                doc_id, path.name, ocr_attempt + 1, ocr_err, wait,
+                                doc_id,
+                                path.name,
+                                ocr_attempt + 1,
+                                ocr_err,
+                                wait,
                             )
                             await _asyncio.sleep(wait)
                         else:
-                            logger.error("OCR failed after 3 attempts for doc %d: %s", doc_id, ocr_err)
+                            logger.error(
+                                "OCR failed after 3 attempts for doc %d: %s", doc_id, ocr_err
+                            )
                             raise
 
                 await db.execute(
@@ -459,9 +532,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
                 # Check confidence
                 if confidence < config.ocr.confidence_threshold:
-                    logger.warning(
-                        "Low OCR confidence (%.2f) for %s", confidence, path.name
-                    )
+                    logger.warning("Low OCR confidence (%.2f) for %s", confidence, path.name)
 
                 # Check cancellation before LLM extraction
                 if doc_id in cancelled_docs:
@@ -477,8 +548,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
                 # OCR phase done — record completion before LLM.
                 await _record_stage(
-                    db, doc_id, STAGE_OCR, "completed", "upload",
-                    started_at=_stage_started_at, page_total=page_count,
+                    db,
+                    doc_id,
+                    STAGE_OCR,
+                    "completed",
+                    "upload",
+                    started_at=_stage_started_at,
+                    page_total=page_count,
                 )
                 # ── Standard LLM extraction phase ─────────────────────────────
                 _current_stage = STAGE_LLM_EXTRACTION
@@ -490,8 +566,14 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 llm = get_llm_provider(config)
 
                 from asclepius.pipeline.chunked_extraction import run_extraction
+
                 extraction = await run_extraction(
-                    db, llm, doc_id, ocr_text, config, file_path=file_path,
+                    db,
+                    llm,
+                    doc_id,
+                    ocr_text,
+                    config,
+                    file_path=file_path,
                 )
 
             if "error" in extraction:
@@ -502,10 +584,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         f"likely hit the output-token cap; raise llm.extraction_max_output_tokens)"
                     )
                 pipeline_status["total_errors"] += 1
-                pipeline_status["recent_errors"].append({
-                    "file": path.name,
-                    "error": err_msg,
-                })
+                pipeline_status["recent_errors"].append(
+                    {
+                        "file": path.name,
+                        "error": err_msg,
+                    }
+                )
                 pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
                 await db.execute(
                     """UPDATE documents SET status = 'failed', error_message = ?,
@@ -516,19 +600,21 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 return
 
             # Validate that the LLM actually produced meaningful content.
-            _has_content = any([
-                extraction.get("doc_type"),
-                extraction.get("summary_en"),
-                extraction.get("summary_original"),
-                extraction.get("event_date"),
-                extraction.get("issued_date"),
-                extraction.get("date_visit"),
-                extraction.get("date_issued"),
-                extraction.get("doc_date"),
-                extraction.get("lab_results"),
-                extraction.get("medications"),
-                extraction.get("diagnoses"),
-            ])
+            _has_content = any(
+                [
+                    extraction.get("doc_type"),
+                    extraction.get("summary_en"),
+                    extraction.get("summary_original"),
+                    extraction.get("event_date"),
+                    extraction.get("issued_date"),
+                    extraction.get("date_visit"),
+                    extraction.get("date_issued"),
+                    extraction.get("doc_date"),
+                    extraction.get("lab_results"),
+                    extraction.get("medications"),
+                    extraction.get("diagnoses"),
+                ]
+            )
             if not _has_content:
                 logger.warning("LLM extraction produced no meaningful content for doc %d", doc_id)
                 await db.execute(
@@ -539,10 +625,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 )
                 await db.commit()
                 pipeline_status["total_errors"] += 1
-                pipeline_status["recent_errors"].append({
-                    "file": path.name,
-                    "error": "LLM extraction returned empty results",
-                })
+                pipeline_status["recent_errors"].append(
+                    {
+                        "file": path.name,
+                        "error": "LLM extraction returned empty results",
+                    }
+                )
                 pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
                 return
 
@@ -560,7 +648,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             # LLM phase done — record completion before organize.
             await _record_stage(
-                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "upload",
+                db,
+                doc_id,
+                STAGE_LLM_EXTRACTION,
+                "completed",
+                "upload",
                 started_at=_stage_started_at,
             )
             # ── Organize phase ───────────────────────────────────────
@@ -595,9 +687,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 provider_slug = doc["facility_slug"] or doc["doctor_slug"]
                 if doc["event_title"]:
                     from asclepius.pipeline.organizer import slugify_event
+
                     event_slug = slugify_event(doc["event_title"])
                 # Generate AI filename
                 from asclepius.pipeline.organizer import generate_ai_filename
+
                 try:
                     doc_meta = {
                         "doc_type": doc["doc_type"],
@@ -608,10 +702,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     }
                     summary_slug = await generate_ai_filename(llm, doc_meta)
                 except Exception:
-                    logger.warning("AI filename generation failed for doc %d, using summary fallback", doc_id)
+                    logger.warning(
+                        "AI filename generation failed for doc %d, using summary fallback", doc_id
+                    )
                 # Fallback to summary slug if AI failed
                 if not summary_slug and doc["summary_en"]:
                     import re as _re
+
                     summary_slug = doc["summary_en"][:60].lower()
                     summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
                     summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
@@ -665,20 +762,29 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                             (placeholder_doc_id,),
                         )
                         old = await cursor.fetchone()
-                        if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
+                        if (
+                            old
+                            and not (old["file_path"] or "")
+                            and old["doc_type"] == "imaging_report"
+                        ):
                             await db.execute(
                                 "DELETE FROM documents WHERE id = ?",
                                 (placeholder_doc_id,),
                             )
                     logger.info(
                         "Imaging report attached: doc=%d -> study=%d",
-                        doc_id, hint_imaging_study_id,
+                        doc_id,
+                        hint_imaging_study_id,
                     )
 
             await db.commit()
 
             await _record_stage(
-                db, doc_id, STAGE_ORGANIZING, "completed", "upload",
+                db,
+                doc_id,
+                STAGE_ORGANIZING,
+                "completed",
+                "upload",
                 started_at=_stage_started_at,
             )
             _current_stage = None
@@ -707,20 +813,28 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     await db.commit()
                     if _current_stage:
                         await _record_stage(
-                            db, _doc_id, _current_stage, "cancelled", "upload",
+                            db,
+                            _doc_id,
+                            _current_stage,
+                            "cancelled",
+                            "upload",
                             started_at=_stage_started_at,
                         )
             except Exception:
                 pass
             raise
         except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else f"{type(e).__name__} (no message)"
+            error_msg = (
+                f"{type(e).__name__}: {str(e)}" if str(e) else f"{type(e).__name__} (no message)"
+            )
             logger.exception("Pipeline error for %s — %s", path.name, error_msg)
             pipeline_status["total_errors"] += 1
-            pipeline_status["recent_errors"].append({
-                "file": path.name,
-                "error": error_msg,
-            })
+            pipeline_status["recent_errors"].append(
+                {
+                    "file": path.name,
+                    "error": error_msg,
+                }
+            )
             pipeline_status["recent_errors"] = pipeline_status["recent_errors"][-10:]
 
             # Mark as failed with error message
@@ -734,8 +848,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 await db.commit()
                 if _current_stage:
                     await _record_stage(
-                        db, doc_id, _current_stage, "failed", "upload",
-                        started_at=_stage_started_at, message=error_msg[:1000],
+                        db,
+                        doc_id,
+                        _current_stage,
+                        "failed",
+                        "upload",
+                        started_at=_stage_started_at,
+                        message=error_msg[:1000],
                     )
             except Exception:
                 pass

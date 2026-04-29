@@ -19,10 +19,16 @@ from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.util.dates import best_date_with_received
 from asclepius.documents.service import (
-    get_document, list_documents, get_failed_documents,
-    get_related_records, get_document_sections, get_document_links,
-    update_document_status, update_document_fields,
-    delete_document_record, move_child_records,
+    get_document,
+    list_documents,
+    get_failed_documents,
+    get_related_records,
+    get_document_sections,
+    get_document_links,
+    update_document_status,
+    update_document_fields,
+    delete_document_record,
+    move_child_records,
 )
 from asclepius.patients.service import check_patient_access
 
@@ -45,8 +51,10 @@ router.include_router(ai_router)
 
 # ── Pydantic models ──────────────────────────────────────────────
 
+
 class DocumentUpdate(BaseModel):
     """Partial update payload. Unset fields are left untouched."""
+
     patient_id: int | None = None
     doc_type: str | None = Field(default=None, max_length=120)
     event_date: str | None = Field(default=None, max_length=40)
@@ -77,6 +85,7 @@ class ReprocessRequest(BaseModel):
 
 
 # ── Failed documents ─────────────────────────────────────────────
+
 
 @router.get("/failed")
 async def list_failed_docs(
@@ -111,16 +120,16 @@ async def retry_all_failed(
     if queue is None:
         raise HTTPException(status_code=503, detail="Pipeline worker not running")
 
-    cursor = await db.execute(
-        "SELECT id FROM documents WHERE status = 'failed'"
-    )
+    cursor = await db.execute("SELECT id FROM documents WHERE status = 'failed'")
     doc_ids = [row[0] for row in await cursor.fetchall()]
 
     for doc_id in doc_ids:
         enqueue_job(
-            queue, "reprocess",
+            queue,
+            "reprocess",
             {"doc_id": doc_id, "mode": "both"},
-            priority=10, queued_doc_id=doc_id,
+            priority=10,
+            queued_doc_id=doc_id,
             queued_label=f"doc#{doc_id}",
         )
 
@@ -128,6 +137,7 @@ async def retry_all_failed(
 
 
 # ── List & Get ───────────────────────────────────────────────────
+
 
 @router.get("")
 async def list_docs(
@@ -161,10 +171,22 @@ async def list_docs(
     effective_facility = facility_id or facility
 
     return await list_documents(
-        db, current_user["id"], patient_id, type, date_from, date_to, status, q, limit, offset,
-        specialty=specialty, doctor_id=effective_doctor, facility_id=effective_facility,
+        db,
+        current_user["id"],
+        patient_id,
+        type,
+        date_from,
+        date_to,
+        status,
+        q,
+        limit,
+        offset,
+        specialty=specialty,
+        doctor_id=effective_doctor,
+        facility_id=effective_facility,
         user_role=current_user.get("role"),
-        sort=sort, order=order,
+        sort=sort,
+        order=order,
     )
 
 
@@ -202,7 +224,8 @@ async def get_doc(
     # exactly one study; other doc types have zero — we just return an
     # empty list and the UI hides the section). Series are nested per-study.
     cursor = await db.execute(
-        "SELECT * FROM imaging_studies WHERE document_id = ?", (doc_id,),
+        "SELECT * FROM imaging_studies WHERE document_id = ?",
+        (doc_id,),
     )
     imaging_studies: list[dict] = []
     for srow in await cursor.fetchall():
@@ -233,6 +256,7 @@ async def get_doc(
 
 
 # ── Update & Delete ──────────────────────────────────────────────
+
 
 @router.patch("/{doc_id}")
 async def update_doc(
@@ -270,6 +294,7 @@ async def update_doc(
     # alias-aware _upsert_* helpers. Log the raw text as a correction first,
     # then drop the fields before they reach the UPDATE statement.
     from asclepius.pipeline.extractor import _upsert_doctor, _upsert_facility
+
     if "doctor_name" in updates and "doctor_id" not in updates:
         name = (updates["doctor_name"] or "").strip()
         updates["doctor_id"] = await _upsert_doctor(db, {"name": name}) if name else None
@@ -288,6 +313,7 @@ async def update_doc(
             updates["norm_specialty_id"] = None
         else:
             from asclepius.normalization.resolver import AliasCache, resolve_specialty
+
             cleaned = str(raw_specialty).strip()
             updates["specialty_original"] = cleaned
             cache = AliasCache()
@@ -297,6 +323,7 @@ async def update_doc(
 
     # Log corrections before applying updates (compares against raw_extraction)
     from asclepius.documents.corrections import log_corrections
+
     await log_corrections(db, doc_id, updates)
 
     # Strip API-only convenience fields before they reach the UPDATE statement
@@ -306,8 +333,13 @@ async def update_doc(
 
     await update_document_fields(db, doc_id, updates)
     await audit_log(
-        db, current_user["id"], "document.update", "document", doc_id,
-        {"fields": sorted(updates.keys())}, get_client_ip(request),
+        db,
+        current_user["id"],
+        "document.update",
+        "document",
+        doc_id,
+        {"fields": sorted(updates.keys())},
+        get_client_ip(request),
     )
     return await get_document(db, doc_id)
 
@@ -368,10 +400,14 @@ async def delete_doc(
         if doc["patient_id"]:
             role = await check_patient_access(db, current_user["id"], doc["patient_id"])
             if (not role or role == "viewer") and not uploader_match:
-                raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
+                raise HTTPException(
+                    status_code=403, detail="Insufficient permissions to delete this document"
+                )
         elif not uploader_match:
             # Unclassified doc and not the uploader → block.
-            raise HTTPException(status_code=403, detail="Insufficient permissions to delete this document")
+            raise HTTPException(
+                status_code=403, detail="Insufficient permissions to delete this document"
+            )
 
     # If document is being processed, cancel it first — both cooperatively
     # and hard-cancel so an in-flight LLM request releases its gate slot.
@@ -387,6 +423,7 @@ async def delete_doc(
     # Old-shape imaging documents (pre-migration) had file_path pointing at
     # a folder, so we still ``rmtree`` for any path that resolves to a dir.
     import shutil as _shutil
+
     config = get_config()
     raw_file_path = doc.get("file_path")
     file_path = (Path(config.vault.root_path) / raw_file_path) if raw_file_path else None
@@ -458,13 +495,21 @@ async def delete_doc(
     # Delete from DB (CASCADE will handle child tables)
     await delete_document_record(db, doc_id)
 
-    await audit_log(db, current_user["id"], "document.delete", "document", doc_id,
-                    {"filename": doc["original_filename"]}, get_client_ip(request))
+    await audit_log(
+        db,
+        current_user["id"],
+        "document.delete",
+        "document",
+        doc_id,
+        {"filename": doc["original_filename"]},
+        get_client_ip(request),
+    )
 
     return {"status": "deleted", "document_id": doc_id}
 
 
 # ── Move ─────────────────────────────────────────────────────────
+
 
 @router.post("/{doc_id}/move")
 async def move_doc(
@@ -515,7 +560,9 @@ async def move_doc(
             if row:
                 doctor_slug = row[0]
         if doc.get("facility_id"):
-            cursor = await db.execute("SELECT slug FROM facilities WHERE id = ?", (doc["facility_id"],))
+            cursor = await db.execute(
+                "SELECT slug FROM facilities WHERE id = ?", (doc["facility_id"],)
+            )
             row = await cursor.fetchone()
             if row:
                 facility_slug = row[0]
@@ -525,10 +572,13 @@ async def move_doc(
         # Get event slug if assigned
         event_slug = None
         if doc.get("event_id"):
-            cursor = await db.execute("SELECT title FROM medical_events WHERE id = ?", (doc["event_id"],))
+            cursor = await db.execute(
+                "SELECT title FROM medical_events WHERE id = ?", (doc["event_id"],)
+            )
             ev_row = await cursor.fetchone()
             if ev_row:
                 from asclepius.pipeline.organizer import slugify_event
+
                 event_slug = slugify_event(ev_row[0])
 
         # Generate summary slug for filename
@@ -541,8 +591,12 @@ async def move_doc(
 
         best = best_date_with_received(doc)
         new_relative = build_organized_path(
-            config, target_slug, best, provider_slug,
-            doc.get("doc_type"), doc["original_filename"],
+            config,
+            target_slug,
+            best,
+            provider_slug,
+            doc.get("doc_type"),
+            doc["original_filename"],
             event_slug=event_slug,
             summary_slug=summary_slug,
             uploaded_by_user_id=doc.get("uploaded_by_user_id"),
@@ -561,7 +615,11 @@ async def move_doc(
     await move_child_records(db, doc_id, body.patient_id)
     await db.commit()
     await audit_log(
-        db, current_user["id"], "document.move", "document", doc_id,
+        db,
+        current_user["id"],
+        "document.move",
+        "document",
+        doc_id,
         {"from_patient_id": doc.get("patient_id"), "to_patient_id": body.patient_id},
         get_client_ip(request),
     )
@@ -569,6 +627,7 @@ async def move_doc(
 
 
 # ── Stage timeline ───────────────────────────────────────────────
+
 
 @router.get("/{doc_id}/stages")
 async def get_doc_stages(
@@ -610,6 +669,7 @@ async def get_doc_stages(
 
 # ── Reprocess ────────────────────────────────────────────────────
 
+
 @router.post("/{doc_id}/reprocess")
 async def reprocess_doc(
     doc_id: int,
@@ -640,18 +700,57 @@ async def reprocess_doc(
     # Mark as pending immediately so the UI reflects the change.
     await update_document_status(db, doc_id, "pending")
 
+    # Resolve "use default" (None) into concrete provider ids so the dashboard
+    # can show the actual model that will run, not a vague "default" label.
+    # Only populate families that participate in the requested mode.
+    from asclepius.config import get_config as _get_config
+
+    cfg = _get_config()
+
+    def _first_enabled(items):
+        enabled = [p for p in items if getattr(p, "enabled", False)]
+        if enabled:
+            return min(enabled, key=lambda p: getattr(p, "priority", 0))
+        return items[0] if items else None
+
+    queued_providers: dict[str, str | None] = {}
+    if body.mode in ("ocr", "both", "llm"):
+        # mode=="llm" still needs OCR when no cached text exists; mode=="both"/"ocr" run OCR.
+        ocr_id = body.ocr_provider_id
+        if not ocr_id:
+            p = _first_enabled(cfg.ocr.providers)
+            ocr_id = p.id if p else None
+        if ocr_id:
+            queued_providers["ocr"] = ocr_id
+    if body.mode in ("llm", "both"):
+        llm_id = body.llm_provider_id
+        if not llm_id:
+            p = _first_enabled(cfg.llm.providers)
+            llm_id = p.id if p else None
+        if llm_id:
+            queued_providers["llm"] = llm_id
+    if body.mode == "vision_llm":
+        vision_id = body.vision_provider_id
+        if not vision_id:
+            p = _first_enabled(cfg.vision.providers)
+            vision_id = p.id if p else None
+        if vision_id:
+            queued_providers["vision"] = vision_id
+
     enqueue_job(
-        queue, "reprocess",
+        queue,
+        "reprocess",
         {
             "doc_id": doc_id,
             "mode": body.mode,
             "llm_provider_id": body.llm_provider_id,
             "ocr_provider_id": body.ocr_provider_id,
             "vision_provider_id": body.vision_provider_id,
+            "resolved_providers": queued_providers,
         },
         priority=0,  # user clicked reprocess explicitly — jump the queue
         queued_doc_id=doc_id,
         queued_label=doc.get("original_filename") or f"doc#{doc_id}",
+        queued_providers=queued_providers,
     )
     return {"status": "queued", "document_id": doc_id}
-

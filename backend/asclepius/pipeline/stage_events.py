@@ -56,8 +56,7 @@ def plan_stages(*, flow: str, mode: str | None = None, has_ocr_text: bool = Fals
         if mode == "ocr":
             return [STAGE_OCR]
         if mode == "llm":
-            return ([STAGE_OCR, STAGE_LLM_EXTRACTION]
-                    if not has_ocr_text else [STAGE_LLM_EXTRACTION])
+            return [STAGE_OCR, STAGE_LLM_EXTRACTION] if not has_ocr_text else [STAGE_LLM_EXTRACTION]
         # "both" (default)
         return [STAGE_OCR, STAGE_LLM_EXTRACTION]
     # Default upload flow.
@@ -84,6 +83,20 @@ class _ProgressHandle:
             self.page_total = total
             self._status["processing_pages"] = total
         self._status["processing_page_current"] = current
+
+
+def _provider_for_stage(stage_name: str, providers: dict[str, Any] | None) -> str | None:
+    """Pick the provider id that drives ``stage_name`` from the job's
+    resolved providers dict. ``ocr`` and ``cache_ocr`` map to the OCR
+    provider, ``vision_extraction`` to the Vision provider, everything
+    else (LLM extraction, classification, sections, etc.) to the LLM."""
+    if not providers:
+        return None
+    if stage_name in ("ocr", "cache_ocr"):
+        return providers.get("ocr")
+    if stage_name == "vision_extraction":
+        return providers.get("vision")
+    return providers.get("llm")
 
 
 @contextlib.asynccontextmanager
@@ -131,6 +144,7 @@ async def stage(
     job["stage"] = stage_name
     job["page_total"] = page_total
     job["page_current"] = 0 if page_total else None
+    job["stage_provider"] = _provider_for_stage(stage_name, job.get("providers"))
     status["current_job"] = job
 
     handle = _ProgressHandle(status, page_total)
@@ -142,7 +156,9 @@ async def stage(
         raise
     except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
-        await _record(db, doc_id, stage_name, "failed", job_kind, started, handle, message=msg[:1000])
+        await _record(
+            db, doc_id, stage_name, "failed", job_kind, started, handle, message=msg[:1000]
+        )
         raise
     else:
         await _record(db, doc_id, stage_name, "completed", job_kind, started, handle, message=None)
@@ -175,14 +191,25 @@ async def _record(
                (document_id, stage, status, job_kind, message,
                 page_current, page_total, started_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (doc_id, stage_name, event_status, job_kind, message,
-             handle.page_current or None, handle.page_total, started_at),
+            (
+                doc_id,
+                stage_name,
+                event_status,
+                job_kind,
+                message,
+                handle.page_current or None,
+                handle.page_total,
+                started_at,
+            ),
         )
         await db.commit()
     except Exception:
         logger.warning(
             "Failed to persist stage event (doc=%s stage=%s status=%s) — non-fatal",
-            doc_id, stage_name, event_status, exc_info=True,
+            doc_id,
+            stage_name,
+            event_status,
+            exc_info=True,
         )
 
 
@@ -214,14 +241,25 @@ async def record_stage(
                (document_id, stage, status, job_kind, message,
                 page_current, page_total, started_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (doc_id, stage_name, event_status, job_kind, message,
-             page_current, page_total, started_at),
+            (
+                doc_id,
+                stage_name,
+                event_status,
+                job_kind,
+                message,
+                page_current,
+                page_total,
+                started_at,
+            ),
         )
         await db.commit()
     except Exception:
         logger.warning(
             "Failed to persist stage event (doc=%s stage=%s status=%s) — non-fatal",
-            doc_id, stage_name, event_status, exc_info=True,
+            doc_id,
+            stage_name,
+            event_status,
+            exc_info=True,
         )
 
     if event_status in ("completed", "skipped"):
@@ -239,12 +277,18 @@ def begin_job(
     filename: str | None,
     kind: str,
     stages_planned: list[str],
+    providers: dict[str, str | None] | None = None,
 ) -> None:
     """Initialise ``pipeline_status['current_job']`` for a new job.
 
     Called at the start of ``process_file`` and ``reprocess_document`` so the
     dashboard's PipelineProgress widget knows what to render even before the
     first stage opens.
+
+    ``providers`` is the resolved provider id per family — keys ``ocr``,
+    ``llm``, ``vision`` (any may be absent or None when not applicable to the
+    flow). When set, the dashboard surfaces them as model badges and
+    ``stage()`` updates ``stage_provider`` to the active one as stages open.
     """
     PIPELINE_STATE.pipeline_status["current_job"] = {
         "doc_id": doc_id,
@@ -256,6 +300,8 @@ def begin_job(
         "stages_planned": list(stages_planned),
         "stages_done": [],
         "started_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "providers": {k: v for k, v in (providers or {}).items() if v} or None,
+        "stage_provider": None,
     }
 
 

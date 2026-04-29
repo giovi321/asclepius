@@ -13,8 +13,17 @@ import {
   Activity,
   Hourglass,
   AlertCircle,
+  X,
 } from "lucide-react";
-import type { PipelineStatus, PipelineJobKind } from "@/types";
+import type {
+  PipelineStatus,
+  PipelineJobKind,
+  PipelineProviders,
+} from "@/types";
+import api from "@/api/client";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
+import { useToast } from "@/contexts/ToastContext";
 
 const STAGE_LABELS: Record<string, string> = {
   ocr: "OCR",
@@ -243,6 +252,7 @@ function RunningCard({
   const now = useNow(true);
   const startedAt = job.started_at ? new Date(job.started_at).getTime() : null;
   const elapsed = startedAt ? Math.max(0, now - startedAt) : null;
+  const providers = (job.providers ?? null) as PipelineProviders | null;
 
   return (
     <div
@@ -307,7 +317,22 @@ function RunningCard({
               tone={status.total_errors > 0 ? "red" : undefined}
             />
           </div>
+          {job.doc_id != null && (
+            <CancelJobButton
+              docId={job.doc_id}
+              filename={job.filename}
+              variant="running"
+            />
+          )}
         </div>
+
+        {/* Models in use */}
+        {providers && (
+          <ProvidersRow
+            providers={providers}
+            activeProviderId={job.stage_provider ?? null}
+          />
+        )}
 
         {/* Connected stepper */}
         {planned.length > 0 && (
@@ -317,6 +342,7 @@ function RunningCard({
             currentStage={job.stage}
             progressIndex={progressIndex}
             overallPct={overallPct}
+            providers={providers}
           />
         )}
 
@@ -333,18 +359,30 @@ function RunningCard({
   );
 }
 
+function providerForStage(
+  stage: string,
+  providers: PipelineProviders | null,
+): string | null {
+  if (!providers) return null;
+  if (stage === "ocr" || stage === "cache_ocr") return providers.ocr ?? null;
+  if (stage === "vision_extraction") return providers.vision ?? null;
+  return providers.llm ?? null;
+}
+
 function Stepper({
   planned,
   done,
   currentStage,
   progressIndex,
   overallPct,
+  providers,
 }: {
   planned: string[];
   done: Set<string>;
   currentStage: string | null | undefined;
   progressIndex: number;
   overallPct: number;
+  providers?: PipelineProviders | null;
 }) {
   return (
     <div>
@@ -425,6 +463,14 @@ function Stepper({
                 >
                   {stageLabel(s)}
                 </span>
+                {providerForStage(s, providers ?? null) && (
+                  <span
+                    className="mt-0.5 text-[10px] leading-tight max-w-full truncate text-muted-foreground/80"
+                    title={providerForStage(s, providers ?? null) ?? undefined}
+                  >
+                    {providerForStage(s, providers ?? null)}
+                  </span>
+                )}
               </li>
             );
           })}
@@ -475,7 +521,7 @@ function QueueCard({
     <div className="rounded-xl border bg-card/50 p-4">
       <div className="flex items-center justify-between mb-2">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Up next
+          Queue
         </p>
         <span className="text-xs text-muted-foreground tabular-nums">
           {queued.length} waiting
@@ -484,6 +530,10 @@ function QueueCard({
       <ul className="space-y-1">
         {queued.slice(0, 5).map((q, i) => {
           const badge = kindBadge(q.kind);
+          // Upload jobs in queue have no stable doc_id and the cancel
+          // endpoint is keyed by doc_id, so we can't cancel them from here
+          // yet — disable the button with a tooltip rather than hide it.
+          const cancellable = q.kind === "reprocess" && q.doc_id != null;
           const inner = (
             <>
               <span
@@ -491,20 +541,32 @@ function QueueCard({
               >
                 {badge.label}
               </span>
-              <span className="truncate text-sm">{q.label}</span>
+              <span className="truncate text-sm flex-1">{q.label}</span>
+              {q.providers && <ProviderPills providers={q.providers} />}
             </>
           );
           const cls =
             "flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-muted/50";
           return (
-            <li key={`${q.kind}-${q.doc_id ?? "u"}-${i}`}>
-              {q.doc_id ? (
-                <Link to={`/documents/${q.doc_id}`} className={cls}>
-                  {inner}
-                </Link>
-              ) : (
-                <div className={cls}>{inner}</div>
-              )}
+            <li
+              key={`${q.kind}-${q.doc_id ?? "u"}-${i}`}
+              className="group flex items-center gap-1"
+            >
+              <div className="flex-1 min-w-0">
+                {q.doc_id ? (
+                  <Link to={`/documents/${q.doc_id}`} className={cls}>
+                    {inner}
+                  </Link>
+                ) : (
+                  <div className={cls}>{inner}</div>
+                )}
+              </div>
+              <CancelJobButton
+                docId={q.doc_id}
+                filename={q.label}
+                variant="queued"
+                disabled={!cancellable}
+              />
             </li>
           );
         })}
@@ -515,5 +577,164 @@ function QueueCard({
         )}
       </ul>
     </div>
+  );
+}
+
+function ProvidersRow({
+  providers,
+  activeProviderId,
+}: {
+  providers: PipelineProviders;
+  activeProviderId: string | null;
+}) {
+  const entries: Array<[string, string]> = [];
+  if (providers.ocr) entries.push(["OCR", providers.ocr]);
+  if (providers.vision) entries.push(["Vision", providers.vision]);
+  if (providers.llm) entries.push(["LLM", providers.llm]);
+  if (entries.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Models
+      </span>
+      {entries.map(([family, id]) => {
+        const active = id === activeProviderId;
+        return (
+          <span
+            key={family}
+            className={[
+              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono",
+              active
+                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                : "border-muted bg-muted/40 text-muted-foreground",
+            ].join(" ")}
+            title={`${family}: ${id}`}
+          >
+            <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">
+              {family}
+            </span>
+            <span className="truncate max-w-[140px]">{id}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProviderPills({ providers }: { providers: PipelineProviders }) {
+  const entries: Array<[string, string]> = [];
+  if (providers.ocr) entries.push(["OCR", providers.ocr]);
+  if (providers.vision) entries.push(["Vision", providers.vision]);
+  if (providers.llm) entries.push(["LLM", providers.llm]);
+  if (entries.length === 0) return null;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      {entries.map(([family, id]) => (
+        <span
+          key={family}
+          className="inline-flex items-center gap-0.5 rounded border border-muted bg-muted/40 px-1 py-0.5 text-[9px] font-mono text-muted-foreground"
+          title={`${family}: ${id}`}
+        >
+          <span className="font-semibold uppercase tracking-wide opacity-70">
+            {family}
+          </span>
+          <span className="truncate max-w-[80px]">{id}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Cancel button used by both the running card and queued rows. Reuses
+ * /api/documents/{id}/cancel: that endpoint sets cancelled_docs which the
+ * worker's pop-guard now honours for queued reprocess too. Confirms first. */
+function CancelJobButton({
+  docId,
+  filename,
+  variant,
+  disabled,
+}: {
+  docId: number | null;
+  filename: string | null | undefined;
+  variant: "running" | "queued";
+  disabled?: boolean;
+}) {
+  const confirm = useConfirm();
+  const { refresh } = usePipelineStatus();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const handle = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled || docId == null) return;
+    const ok = await confirm({
+      title:
+        variant === "running"
+          ? "Cancel running extraction?"
+          : "Remove from queue?",
+      description:
+        variant === "running"
+          ? `The current stage on ${filename || `doc#${docId}`} will be aborted and the document marked as cancelled.`
+          : `${filename || `doc#${docId}`} will be removed from the queue and marked as cancelled.`,
+      confirmText: "Cancel job",
+      cancelText: "Keep",
+      variant: "destructive",
+    });
+    if (!ok) return;
+    try {
+      setBusy(true);
+      await api.post(`/documents/${docId}/cancel`);
+      await refresh();
+    } catch (err: any) {
+      toast({
+        title: "Failed to cancel",
+        description: err?.response?.data?.detail || err?.message,
+        variant: "error",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const title = disabled
+    ? "Upload jobs can't be cancelled from the queue yet"
+    : variant === "running"
+      ? "Cancel this extraction"
+      : "Remove from queue";
+
+  if (variant === "running") {
+    return (
+      <button
+        type="button"
+        onClick={handle}
+        disabled={disabled || busy || docId == null}
+        title={title}
+        className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-red-800 dark:hover:bg-red-950"
+      >
+        {busy ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <X className="h-3.5 w-3.5" />
+        )}
+        Cancel
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={disabled || busy || docId == null}
+      title={title}
+      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
+    >
+      {busy ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <X className="h-3.5 w-3.5" />
+      )}
+    </button>
   );
 }

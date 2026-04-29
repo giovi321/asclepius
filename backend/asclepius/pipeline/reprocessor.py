@@ -30,11 +30,13 @@ def _is_cancelled(doc_id: int) -> bool:
     cooperative checkpoint between reprocess phases so cancel is honoured
     even when the task can't be hard-cancelled immediately."""
     from asclepius.pipeline.processor import cancelled_docs
+
     return doc_id in cancelled_docs
 
 
 async def _mark_cancelled(db: aiosqlite.Connection, doc_id: int) -> None:
     from asclepius.pipeline.processor import cancelled_docs
+
     cancelled_docs.discard(doc_id)
     await db.execute(
         """UPDATE documents SET status = 'cancelled', error_message = NULL,
@@ -51,6 +53,7 @@ async def reprocess_document(
     llm_provider_id: str | None = None,
     ocr_provider_id: str | None = None,
     vision_provider_id: str | None = None,
+    resolved_providers: dict[str, str | None] | None = None,
 ) -> dict:
     """Re-run OCR and/or LLM extraction on an existing document.
 
@@ -63,13 +66,19 @@ async def reprocess_document(
     llm_provider_id: if set, use this specific LLM provider instead of the default.
     ocr_provider_id: if set, use this specific OCR provider instead of the default.
     vision_provider_id: if set and mode == 'vision_llm', prefer this vision provider.
+    resolved_providers: concrete provider IDs (with defaults filled in) per
+        family, surfaced on ``current_job.providers`` for the dashboard.
     """
     if mode == "vision_llm":
-        return await _reprocess_vision_llm(doc_id, config, vision_provider_id)
+        return await _reprocess_vision_llm(
+            doc_id, config, vision_provider_id, resolved_providers=resolved_providers
+        )
 
     from asclepius.pipeline.processor import (
-        register_running_task, unregister_running_task,
+        register_running_task,
+        unregister_running_task,
     )
+
     _current_task = asyncio.current_task()
     if _current_task is not None:
         register_running_task(doc_id, _current_task)
@@ -100,6 +109,7 @@ async def reprocess_document(
             filename=doc["original_filename"],
             kind="reprocess",
             stages_planned=plan_stages(flow="reprocess", mode=mode, has_ocr_text=has_ocr_text),
+            providers=resolved_providers,
         )
         # Reflect on the legacy fields too so the older topbar chip still works.
         PIPELINE_STATE.pipeline_status["processing"] = doc["original_filename"]
@@ -137,7 +147,9 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
+            ocr_text, confidence, engine = await extract_text(
+                str(file_path), config, ocr_provider_id=ocr_provider_id
+            )
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
@@ -149,7 +161,11 @@ async def reprocess_document(
             except Exception:
                 pass
             await record_stage(
-                db, doc_id, STAGE_OCR, "completed", "reprocess",
+                db,
+                doc_id,
+                STAGE_OCR,
+                "completed",
+                "reprocess",
                 started_at=_stage_started,
             )
             _current_stage = None
@@ -174,7 +190,9 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
-            ocr_text, confidence, engine = await extract_text(str(file_path), config, ocr_provider_id=ocr_provider_id)
+            ocr_text, confidence, engine = await extract_text(
+                str(file_path), config, ocr_provider_id=ocr_provider_id
+            )
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
                    updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
@@ -182,7 +200,11 @@ async def reprocess_document(
             )
             await db.commit()
             await record_stage(
-                db, doc_id, STAGE_OCR, "completed", "reprocess",
+                db,
+                doc_id,
+                STAGE_OCR,
+                "completed",
+                "reprocess",
                 started_at=_stage_started,
             )
             _current_stage = None
@@ -219,7 +241,14 @@ async def reprocess_document(
         _stage_started = datetime.utcnow().isoformat(timespec="seconds")
         PIPELINE_STATE.pipeline_status["processing_step"] = "llm_extraction"
         # Clear old extracted data before re-extraction (child tables + document metadata)
-        for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
+        for table in [
+            "lab_results",
+            "encounters",
+            "medications",
+            "vaccinations",
+            "invoice_items",
+            "document_sections",
+        ]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.execute(
             """UPDATE documents SET
@@ -236,7 +265,11 @@ async def reprocess_document(
         )
         await db.commit()
 
-        logger.info("Re-running LLM extraction on doc %d (provider=%s)", doc_id, llm_provider_id or "default")
+        logger.info(
+            "Re-running LLM extraction on doc %d (provider=%s)",
+            doc_id,
+            llm_provider_id or "default",
+        )
         try:
             await db.execute(
                 """UPDATE documents SET status = 'processing', error_message = NULL,
@@ -248,6 +281,7 @@ async def reprocess_document(
             # Build LLM provider — use specific one if requested
             if llm_provider_id:
                 from asclepius.config import get_config as _get_config
+
                 cfg = _get_config()
                 entry = None
                 for p in cfg.llm.providers:
@@ -261,11 +295,13 @@ async def reprocess_document(
             else:
                 llm = get_llm_provider(config)
 
-            file_path_for_extract = str(
-                Path(config.vault.root_path) / doc["file_path"]
-            )
+            file_path_for_extract = str(Path(config.vault.root_path) / doc["file_path"])
             extraction = await run_extraction(
-                db, llm, doc_id, ocr_text, config,
+                db,
+                llm,
+                doc_id,
+                ocr_text,
+                config,
                 file_path=file_path_for_extract,
             )
 
@@ -295,22 +331,27 @@ async def reprocess_document(
                 )
 
             # Validate meaningful content
-            _has_content = any([
-                extraction.get("doc_type"),
-                extraction.get("summary_en"),
-                extraction.get("summary_original"),
-                extraction.get("event_date"),
-                extraction.get("issued_date"),
-                extraction.get("date_visit"),
-                extraction.get("date_issued"),
-                extraction.get("doc_date"),
-                extraction.get("lab_results"),
-                extraction.get("medications"),
-                extraction.get("diagnoses"),
-            ])
+            _has_content = any(
+                [
+                    extraction.get("doc_type"),
+                    extraction.get("summary_en"),
+                    extraction.get("summary_original"),
+                    extraction.get("event_date"),
+                    extraction.get("issued_date"),
+                    extraction.get("date_visit"),
+                    extraction.get("date_issued"),
+                    extraction.get("doc_date"),
+                    extraction.get("lab_results"),
+                    extraction.get("medications"),
+                    extraction.get("diagnoses"),
+                ]
+            )
             if not _has_content:
-                logger.warning("LLM extraction returned empty results for doc %d. Keys present: %s",
-                               doc_id, list(extraction.keys()))
+                logger.warning(
+                    "LLM extraction returned empty results for doc %d. Keys present: %s",
+                    doc_id,
+                    list(extraction.keys()),
+                )
                 await db.execute(
                     """UPDATE documents SET status = 'needs_review',
                        error_message = 'LLM extraction returned empty results',
@@ -326,7 +367,11 @@ async def reprocess_document(
             )
             await db.commit()
             await record_stage(
-                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "reprocess",
+                db,
+                doc_id,
+                STAGE_LLM_EXTRACTION,
+                "completed",
+                "reprocess",
                 started_at=_stage_started,
             )
             _current_stage = None
@@ -344,7 +389,11 @@ async def reprocess_document(
                 pass
             if _current_stage:
                 await record_stage(
-                    db, doc_id, _current_stage, "cancelled", "reprocess",
+                    db,
+                    doc_id,
+                    _current_stage,
+                    "cancelled",
+                    "reprocess",
                     started_at=_stage_started,
                 )
             raise
@@ -360,8 +409,13 @@ async def reprocess_document(
             await db.commit()
             if _current_stage:
                 await record_stage(
-                    db, doc_id, _current_stage, "failed", "reprocess",
-                    started_at=_stage_started, message=error_msg[:1000],
+                    db,
+                    doc_id,
+                    _current_stage,
+                    "failed",
+                    "reprocess",
+                    started_at=_stage_started,
+                    message=error_msg[:1000],
                 )
             return {"error": str(e)}
         finally:
@@ -369,7 +423,11 @@ async def reprocess_document(
 
 
 async def _reprocess_vision_llm(
-    doc_id: int, config: AppConfig, vision_provider_id: str | None,
+    doc_id: int,
+    config: AppConfig,
+    vision_provider_id: str | None,
+    *,
+    resolved_providers: dict[str, str | None] | None = None,
 ) -> dict:
     """Re-run the single-step Vision-LLM flow on a document.
 
@@ -378,11 +436,15 @@ async def _reprocess_vision_llm(
     """
     from asclepius.pipeline.vision_extractor import extract_with_vision
     from asclepius.pipeline.extractor import (
-        extract_and_store, _salvage_classification, _normalize_doc_type,
-        _extract_type_specific, build_extraction_context,
+        extract_and_store,
+        _salvage_classification,
+        _normalize_doc_type,
+        _extract_type_specific,
+        build_extraction_context,
     )
     from asclepius.pipeline.processor import (
-        register_running_task, unregister_running_task,
+        register_running_task,
+        unregister_running_task,
     )
 
     _current_task = asyncio.current_task()
@@ -395,7 +457,8 @@ async def _reprocess_vision_llm(
         await db.execute("PRAGMA foreign_keys=ON")
 
         cursor = await db.execute(
-            "SELECT id, file_path, original_filename FROM documents WHERE id = ?", (doc_id,),
+            "SELECT id, file_path, original_filename FROM documents WHERE id = ?",
+            (doc_id,),
         )
         doc = await cursor.fetchone()
         if not doc:
@@ -406,6 +469,7 @@ async def _reprocess_vision_llm(
             filename=doc["original_filename"],
             kind="reprocess",
             stages_planned=plan_stages(flow="reprocess", mode="vision_llm"),
+            providers=resolved_providers,
         )
         PIPELINE_STATE.pipeline_status["processing"] = doc["original_filename"]
         PIPELINE_STATE.pipeline_status["processing_doc_id"] = doc_id
@@ -430,8 +494,14 @@ async def _reprocess_vision_llm(
         await db.commit()
 
         # Clear previous extraction state before re-running
-        for table in ["lab_results", "encounters", "medications", "vaccinations",
-                      "invoice_items", "document_sections"]:
+        for table in [
+            "lab_results",
+            "encounters",
+            "medications",
+            "vaccinations",
+            "invoice_items",
+            "document_sections",
+        ]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
         await db.execute(
             """UPDATE documents SET
@@ -448,14 +518,19 @@ async def _reprocess_vision_llm(
         )
         await db.commit()
 
-        logger.info("Re-running Vision-LLM flow on doc %d (provider=%s)",
-                    doc_id, vision_provider_id or "default")
+        logger.info(
+            "Re-running Vision-LLM flow on doc %d (provider=%s)",
+            doc_id,
+            vision_provider_id or "default",
+        )
         _current_stage = STAGE_VISION_EXTRACTION
         _stage_started = datetime.utcnow().isoformat(timespec="seconds")
         PIPELINE_STATE.pipeline_status["processing_step"] = "vision_extraction"
         try:
             ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
-                str(file_path), config, provider_override_id=vision_provider_id,
+                str(file_path),
+                config,
+                provider_override_id=vision_provider_id,
             )
             await db.execute(
                 """UPDATE documents SET ocr_text = ?, ocr_confidence = ?, ocr_engine = ?,
@@ -479,7 +554,11 @@ async def _reprocess_vision_llm(
                 return {"error": "Vision-LLM produced no content"}
 
             await record_stage(
-                db, doc_id, STAGE_VISION_EXTRACTION, "completed", "reprocess",
+                db,
+                doc_id,
+                STAGE_VISION_EXTRACTION,
+                "completed",
+                "reprocess",
                 started_at=_stage_started,
             )
             _current_stage = STAGE_LLM_EXTRACTION
@@ -495,6 +574,7 @@ async def _reprocess_vision_llm(
             # type-specific text extraction too instead of silently falling
             # back to the default text-LLM.
             from asclepius.pipeline.provider_factory import _build_llm_provider
+
             llm = _build_llm_provider(vision_entry)
             # Phase 2 — vision only handles classification + universal fields,
             # run type-specific extraction on the vision-produced OCR text to
@@ -502,17 +582,27 @@ async def _reprocess_vision_llm(
             try:
                 context = await build_extraction_context(db)
                 type_extraction = await _extract_type_specific(
-                    llm, ocr_text, doc_type, context, db_path=config.database.path,
+                    llm,
+                    ocr_text,
+                    doc_type,
+                    context,
+                    db_path=config.database.path,
                 )
                 if type_extraction:
                     vision_result = {**vision_result, **type_extraction}
             except Exception:
                 logger.warning(
                     "Phase 2 type-specific extraction failed for doc %d (non-fatal)",
-                    doc_id, exc_info=True,
+                    doc_id,
+                    exc_info=True,
                 )
             extraction = await extract_and_store(
-                db, llm, doc_id, ocr_text, config, extraction_override=vision_result,
+                db,
+                llm,
+                doc_id,
+                ocr_text,
+                config,
+                extraction_override=vision_result,
             )
             if "error" in extraction:
                 await db.execute(
@@ -529,7 +619,11 @@ async def _reprocess_vision_llm(
             )
             await db.commit()
             await record_stage(
-                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "reprocess",
+                db,
+                doc_id,
+                STAGE_LLM_EXTRACTION,
+                "completed",
+                "reprocess",
                 started_at=_stage_started,
             )
             _current_stage = None
@@ -543,7 +637,11 @@ async def _reprocess_vision_llm(
                 pass
             if _current_stage:
                 await record_stage(
-                    db, doc_id, _current_stage, "cancelled", "reprocess",
+                    db,
+                    doc_id,
+                    _current_stage,
+                    "cancelled",
+                    "reprocess",
                     started_at=_stage_started,
                 )
             raise
@@ -559,8 +657,13 @@ async def _reprocess_vision_llm(
             await db.commit()
             if _current_stage:
                 await record_stage(
-                    db, doc_id, _current_stage, "failed", "reprocess",
-                    started_at=_stage_started, message=error_msg[:1000],
+                    db,
+                    doc_id,
+                    _current_stage,
+                    "failed",
+                    "reprocess",
+                    started_at=_stage_started,
+                    message=error_msg[:1000],
                 )
             return {"error": str(e)}
         finally:

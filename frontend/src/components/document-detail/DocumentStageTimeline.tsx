@@ -171,6 +171,69 @@ interface RunGroup {
  * changes OR whenever we see a new ``ocr`` / ``vision_extraction`` event
  * after we've already passed one in the current group — that's the signal
  * the user clicked Reprocess again. */
+/** Build a synthetic run group from ``current_job`` so the timeline reflects
+ * the in-flight run before any stage event row has been written. Real DB
+ * events that have already arrived (``persisted``) take precedence over the
+ * synthesized ones for the same stage. */
+function synthesizeLiveGroup(
+  job: NonNullable<
+    NonNullable<ReturnType<typeof usePipelineStatus>["status"]>
+  >["current_job"],
+  persisted: DocumentStageEvent[],
+): RunGroup {
+  const liveJob = job!;
+  const planned = liveJob.stages_planned ?? [];
+  const done = new Set(liveJob.stages_done ?? []);
+  const persistedByStage = new Map<string, DocumentStageEvent>();
+  for (const ev of persisted) persistedByStage.set(ev.stage, ev);
+
+  const events: DocumentStageEvent[] = [];
+  let syntheticId = -1;
+  for (const stage of planned) {
+    const real = persistedByStage.get(stage);
+    if (real) {
+      events.push(real);
+      continue;
+    }
+    if (done.has(stage)) {
+      events.push({
+        id: syntheticId--,
+        stage,
+        status: "completed",
+        job_kind: (liveJob.kind ?? "upload") as PipelineJobKind,
+        message: null,
+        page_current: null,
+        page_total: null,
+        started_at: liveJob.started_at,
+        finished_at: null,
+      });
+    } else if (stage === liveJob.stage) {
+      events.push({
+        id: syntheticId--,
+        stage,
+        status: "started",
+        job_kind: (liveJob.kind ?? "upload") as PipelineJobKind,
+        message: null,
+        page_current: liveJob.page_current ?? null,
+        page_total: liveJob.page_total ?? null,
+        started_at: liveJob.started_at,
+        finished_at: null,
+      });
+    }
+  }
+
+  // Surface persisted events for stages we didn't expect (e.g. a stage that
+  // was added mid-flow) so they don't get dropped.
+  for (const ev of persisted) {
+    if (!planned.includes(ev.stage)) events.push(ev);
+  }
+
+  return {
+    job_kind: (liveJob.kind ?? "upload") as PipelineJobKind,
+    events,
+  };
+}
+
 function groupRuns(events: DocumentStageEvent[]): RunGroup[] {
   const groups: RunGroup[] = [];
   let current: RunGroup | null = null;
@@ -279,13 +342,35 @@ export default function DocumentStageTimeline({ documentId }: Props) {
     };
   }, [documentId, isLive]);
 
-  const groups = useMemo(
-    () => (data ? groupRuns(data.events).reverse() : []),
-    [data],
-  );
+  const liveJob = isLive ? (pipeline?.current_job ?? null) : null;
+
+  const groups = useMemo(() => {
+    if (!data) return [];
+
+    // When this doc is the active pipeline job, fold the in-memory current_job
+    // block into the timeline. Without this the previous run's "completed"
+    // events keep rendering as the latest run because stage_events.stage()
+    // only persists rows on stage *exit* — long stages would otherwise leave
+    // the DB empty for the new run, and groupRuns() can't see what isn't there.
+    if (liveJob && liveJob.started_at) {
+      const liveStartedMs = new Date(liveJob.started_at).getTime();
+      const beforeLive: DocumentStageEvent[] = [];
+      const duringLive: DocumentStageEvent[] = [];
+      for (const ev of data.events) {
+        const ts = ev.started_at ? new Date(ev.started_at).getTime() : NaN;
+        if (!isNaN(ts) && ts >= liveStartedMs) duringLive.push(ev);
+        else beforeLive.push(ev);
+      }
+      const oldGroups = groupRuns(beforeLive);
+      const liveGroup = synthesizeLiveGroup(liveJob, duringLive);
+      return [...oldGroups, liveGroup].reverse();
+    }
+
+    return groupRuns(data.events).reverse();
+  }, [data, liveJob]);
 
   if (loading) return null;
-  if (!data || data.events.length === 0) return null;
+  if (!data || (data.events.length === 0 && !liveJob)) return null;
 
   return (
     <div className="rounded-xl border bg-card p-5 space-y-4">

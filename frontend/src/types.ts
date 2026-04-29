@@ -107,6 +107,12 @@ export interface DocumentSection {
 
 export type PipelineJobKind = "upload" | "reprocess";
 
+export interface PipelineProviders {
+  ocr?: string | null;
+  llm?: string | null;
+  vision?: string | null;
+}
+
 export interface PipelineCurrentJob {
   doc_id: number | null;
   filename: string | null;
@@ -117,12 +123,20 @@ export interface PipelineCurrentJob {
   stages_planned: string[];
   stages_done: string[];
   started_at: string | null;
+  /** Provider IDs that will run for this job, keyed by family.
+   * Populated by ``begin_job`` once providers are resolved. */
+  providers?: PipelineProviders | null;
+  /** Provider ID currently driving the active stage. */
+  stage_provider?: string | null;
 }
 
 export interface PipelineQueuedJob {
   kind: PipelineJobKind;
   label: string;
   doc_id: number | null;
+  /** Provider IDs the job will use once it starts (reprocess only — uploads
+   * resolve providers per-page, so this is unset for them). */
+  providers?: PipelineProviders | null;
 }
 
 export interface PipelineStatus {
@@ -235,7 +249,7 @@ export interface OcrProvider {
 
 export interface VisionLlmProvider {
   id: string;
-  type: string;   // claude | openai | ollama
+  type: string; // claude | openai | ollama
   name: string;
   enabled: boolean;
   priority: number;

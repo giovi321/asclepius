@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
@@ -11,6 +12,15 @@ from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.chunked_extraction import run_extraction
 from asclepius.pipeline.ocr_cache import cache_ocr_pages
 from asclepius.pipeline.provider_factory import get_llm_provider, _build_llm_provider
+from asclepius.pipeline.stage_events import (
+    STAGE_LLM_EXTRACTION,
+    STAGE_OCR,
+    STAGE_VISION_EXTRACTION,
+    begin_job,
+    plan_stages,
+    record_stage,
+)
+from asclepius.pipeline.state import PIPELINE_STATE
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +91,22 @@ async def reprocess_document(
         ocr_text = doc["ocr_text"]
         run_ocr = mode in ("ocr", "both")
         run_llm = mode in ("llm", "both")
+        has_ocr_text = bool(ocr_text and ocr_text.strip())
+
+        # Initialise the dashboard's current_job block so the stepper knows
+        # what to render before the first stage opens.
+        begin_job(
+            doc_id=doc_id,
+            filename=doc["original_filename"],
+            kind="reprocess",
+            stages_planned=plan_stages(flow="reprocess", mode=mode, has_ocr_text=has_ocr_text),
+        )
+        # Reflect on the legacy fields too so the older topbar chip still works.
+        PIPELINE_STATE.pipeline_status["processing"] = doc["original_filename"]
+        PIPELINE_STATE.pipeline_status["processing_doc_id"] = doc_id
+
+        _current_stage: str | None = None
+        _stage_started: str | None = None
 
         # Cooperative cancel checkpoint before OCR.
         if _is_cancelled(doc_id):
@@ -90,6 +116,9 @@ async def reprocess_document(
 
         # --- OCR phase ---
         if run_ocr:
+            _current_stage = STAGE_OCR
+            _stage_started = datetime.utcnow().isoformat(timespec="seconds")
+            PIPELINE_STATE.pipeline_status["processing_step"] = "ocr"
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
@@ -119,8 +148,16 @@ async def reprocess_document(
                 await cache_ocr_pages(db, doc_id, ocr_text, engine, confidence)
             except Exception:
                 pass
+            await record_stage(
+                db, doc_id, STAGE_OCR, "completed", "reprocess",
+                started_at=_stage_started,
+            )
+            _current_stage = None
         elif run_llm and (not ocr_text or not ocr_text.strip()):
             # LLM-only but no OCR text — need to OCR first
+            _current_stage = STAGE_OCR
+            _stage_started = datetime.utcnow().isoformat(timespec="seconds")
+            PIPELINE_STATE.pipeline_status["processing_step"] = "ocr"
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
@@ -144,6 +181,11 @@ async def reprocess_document(
                 (ocr_text, confidence, engine, doc_id),
             )
             await db.commit()
+            await record_stage(
+                db, doc_id, STAGE_OCR, "completed", "reprocess",
+                started_at=_stage_started,
+            )
+            _current_stage = None
 
         if not ocr_text or not ocr_text.strip():
             await db.execute(
@@ -173,6 +215,9 @@ async def reprocess_document(
             return {"status": "cancelled", "document_id": doc_id}
 
         # --- LLM phase ---
+        _current_stage = STAGE_LLM_EXTRACTION
+        _stage_started = datetime.utcnow().isoformat(timespec="seconds")
+        PIPELINE_STATE.pipeline_status["processing_step"] = "llm_extraction"
         # Clear old extracted data before re-extraction (child tables + document metadata)
         for table in ["lab_results", "encounters", "medications", "vaccinations", "invoice_items", "document_sections"]:
             await db.execute(f"DELETE FROM {table} WHERE document_id = ?", (doc_id,))
@@ -280,6 +325,11 @@ async def reprocess_document(
                 (doc_id,),
             )
             await db.commit()
+            await record_stage(
+                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "reprocess",
+                started_at=_stage_started,
+            )
+            _current_stage = None
             logger.info("Reprocessing complete for doc %d", doc_id)
             return {"status": "done", "document_id": doc_id}
 
@@ -292,6 +342,11 @@ async def reprocess_document(
                 await _mark_cancelled(db, doc_id)
             except Exception:
                 pass
+            if _current_stage:
+                await record_stage(
+                    db, doc_id, _current_stage, "cancelled", "reprocess",
+                    started_at=_stage_started,
+                )
             raise
         except Exception as e:
             logger.exception("Reprocessing failed for doc %d", doc_id)
@@ -303,6 +358,11 @@ async def reprocess_document(
                 (error_msg[:2000], doc_id),
             )
             await db.commit()
+            if _current_stage:
+                await record_stage(
+                    db, doc_id, _current_stage, "failed", "reprocess",
+                    started_at=_stage_started, message=error_msg[:1000],
+                )
             return {"error": str(e)}
         finally:
             unregister_running_task(doc_id, _current_task)
@@ -335,11 +395,22 @@ async def _reprocess_vision_llm(
         await db.execute("PRAGMA foreign_keys=ON")
 
         cursor = await db.execute(
-            "SELECT id, file_path FROM documents WHERE id = ?", (doc_id,),
+            "SELECT id, file_path, original_filename FROM documents WHERE id = ?", (doc_id,),
         )
         doc = await cursor.fetchone()
         if not doc:
             return {"error": "Document not found"}
+
+        begin_job(
+            doc_id=doc_id,
+            filename=doc["original_filename"],
+            kind="reprocess",
+            stages_planned=plan_stages(flow="reprocess", mode="vision_llm"),
+        )
+        PIPELINE_STATE.pipeline_status["processing"] = doc["original_filename"]
+        PIPELINE_STATE.pipeline_status["processing_doc_id"] = doc_id
+        _current_stage: str | None = None
+        _stage_started: str | None = None
 
         file_path = Path(config.vault.root_path) / doc["file_path"]
         if not file_path.exists():
@@ -379,6 +450,9 @@ async def _reprocess_vision_llm(
 
         logger.info("Re-running Vision-LLM flow on doc %d (provider=%s)",
                     doc_id, vision_provider_id or "default")
+        _current_stage = STAGE_VISION_EXTRACTION
+        _stage_started = datetime.utcnow().isoformat(timespec="seconds")
+        PIPELINE_STATE.pipeline_status["processing_step"] = "vision_extraction"
         try:
             ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
                 str(file_path), config, provider_override_id=vision_provider_id,
@@ -403,6 +477,14 @@ async def _reprocess_vision_llm(
                 )
                 await db.commit()
                 return {"error": "Vision-LLM produced no content"}
+
+            await record_stage(
+                db, doc_id, STAGE_VISION_EXTRACTION, "completed", "reprocess",
+                started_at=_stage_started,
+            )
+            _current_stage = STAGE_LLM_EXTRACTION
+            _stage_started = datetime.utcnow().isoformat(timespec="seconds")
+            PIPELINE_STATE.pipeline_status["processing_step"] = "llm_extraction"
 
             _salvage_classification(vision_result)
             doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))
@@ -446,6 +528,11 @@ async def _reprocess_vision_llm(
                 (doc_id,),
             )
             await db.commit()
+            await record_stage(
+                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "reprocess",
+                started_at=_stage_started,
+            )
+            _current_stage = None
             return {"status": "done", "document_id": doc_id}
 
         except asyncio.CancelledError:
@@ -454,6 +541,11 @@ async def _reprocess_vision_llm(
                 await _mark_cancelled(db, doc_id)
             except Exception:
                 pass
+            if _current_stage:
+                await record_stage(
+                    db, doc_id, _current_stage, "cancelled", "reprocess",
+                    started_at=_stage_started,
+                )
             raise
         except Exception as e:
             logger.exception("Vision-LLM reprocessing failed for doc %d", doc_id)
@@ -465,6 +557,11 @@ async def _reprocess_vision_llm(
                 (error_msg[:2000], doc_id),
             )
             await db.commit()
+            if _current_stage:
+                await record_stage(
+                    db, doc_id, _current_stage, "failed", "reprocess",
+                    started_at=_stage_started, message=error_msg[:1000],
+                )
             return {"error": str(e)}
         finally:
             unregister_running_task(doc_id, _current_task)

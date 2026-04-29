@@ -26,20 +26,34 @@ export default function MetricsStrip() {
 
   const chips: ChipSpec[] = [];
 
-  // Current pipeline document.
-  if (status.processing) {
-    const step = status.processing_step ? ` · ${status.processing_step.replace(/_/g, " ")}` : "";
-    const pageInfo =
-      status.processing_pages && status.processing_page_current
-        ? `Page ${status.processing_page_current} of ${status.processing_pages}`
-        : "";
+  // Current pipeline document. Prefer the richer current_job block (gives us
+  // the upload/reprocess kind and the planned-stages stepper for the hover
+  // card); fall back to the legacy ``processing`` fields when an older
+  // backend hasn't populated current_job yet.
+  const job = status.current_job;
+  if (job || status.processing) {
+    const filename = job?.filename ?? status.processing ?? "";
+    const stageRaw = job?.stage ?? status.processing_step ?? null;
+    const step = stageRaw ? ` · ${stageRaw.replace(/_/g, " ")}` : "";
+    const kind = job?.kind ?? "upload";
+    const kindLabel = kind === "reprocess" ? "Reprocess" : "Upload";
+    const pageCurrent = job?.page_current ?? status.processing_page_current;
+    const pageTotal = job?.page_total ?? status.processing_pages;
+    const pageInfo = pageTotal && pageCurrent ? `Page ${pageCurrent} of ${pageTotal}` : "";
+    const stagesInfo = (job?.stages_planned || []).length > 0
+      ? `Stages: ${job!.stages_planned.map((s) => (job!.stages_done.includes(s) ? `✓ ${s.replace(/_/g, " ")}` : s.replace(/_/g, " "))).join(" → ")}`
+      : "";
     chips.push({
       key: "pipeline-doc",
       icon: FileText,
-      label: `${status.processing}${step}`,
-      cardTitle: status.processing,
-      cardSubtitle: [status.processing_step?.replace(/_/g, " "), pageInfo].filter(Boolean).join(" · "),
-      colorClass: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+      label: `${kindLabel}: ${filename}${step}`,
+      cardTitle: filename || "Pipeline",
+      cardSubtitle: [kindLabel, stageRaw?.replace(/_/g, " "), pageInfo, stagesInfo]
+        .filter(Boolean)
+        .join(" · "),
+      colorClass: kind === "reprocess"
+        ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"
+        : "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800",
     });
   }
 

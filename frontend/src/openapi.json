@@ -1168,7 +1168,7 @@
           "documents"
         ],
         "summary": "Retry All Failed",
-        "description": "Retry all failed documents. Admin-only (spawns N pipeline tasks).",
+        "description": "Retry all failed documents. Admin-only.\n\nEach doc is enqueued onto the same single-threaded pipeline worker as\nfresh uploads \u2014 that's the only way to keep the \"max 1 doc at a time\"\ninvariant. ``priority=10`` puts retries behind interactive reprocess\nclicks (which use 0) but ahead of large uploads.",
         "operationId": "retry_all_failed_api_documents_retry_all_failed_post",
         "responses": {
           "200": {
@@ -1661,13 +1661,54 @@
         }
       }
     },
+    "/api/documents/{doc_id}/stages": {
+      "get": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Get Doc Stages",
+        "description": "Per-document pipeline stage timeline.\n\nReturns rows in chronological order (oldest first) so the UI can group\nruns (upload \u2192 reprocess \u2192 reprocess) without re-sorting.",
+        "operationId": "get_doc_stages_api_documents__doc_id__stages_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents/{doc_id}/reprocess": {
       "post": {
         "tags": [
           "documents"
         ],
         "summary": "Reprocess Doc",
-        "description": "Queue a document for reprocessing. Requires write access.",
+        "description": "Queue a document for reprocessing. Requires write access.\n\nReprocess goes through the same single-threaded pipeline worker queue as\nfresh uploads. The previous implementation spawned the reprocess as an\nasyncio task on the FastAPI loop, which ran in parallel with the worker\nloop and let two docs hit the same Ollama server at the same time.",
         "operationId": "reprocess_doc_api_documents__doc_id__reprocess_post",
         "parameters": [
           {

@@ -32,6 +32,14 @@ def _initial_status() -> dict[str, Any]:
         "total_errors": 0,
         "recent_errors": [],
         "queued_files": [],  # list of {filename, size} in queue
+        # Richer view of the in-flight unit of work. Populated by ``begin_job``
+        # in stage_events.py at the start of process_file / reprocess_document
+        # and cleared by ``end_job`` once the worker iteration finishes. The
+        # dashboard's PipelineProgress widget renders this directly.
+        "current_job": None,
+        # Mirror of the queue contents for the UI. Each entry is
+        # {kind: "upload"|"reprocess", label: str, doc_id: int|None}.
+        "queued_jobs": [],
     }
 
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { PipelineStatus } from "@/types";
 import { formatDocType, getBestDate, getStatusClasses } from "@/lib/utils";
+import PipelineProgress from "@/components/pipeline/PipelineProgress";
 
 export default function DashboardPage() {
   const { selectedPatient } = usePatient();
@@ -95,59 +96,18 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Pipeline status */}
-      {pipeline && (
+      {/* Pipeline status — richer view of current job + queue */}
+      {pipeline && <PipelineProgress status={pipeline} />}
+      {pipeline && pipeline.recent_errors?.length > 0 && (
         <div className="rounded-lg border p-4">
-          <h2 className="mb-2 font-medium">Pipeline Status</h2>
-          {pipeline.processing ? (
-            <div className="space-y-2">
-              <p className="text-sm">
-                Processing: <span className="font-medium">{pipeline.processing}</span>
+          <p className="text-xs font-medium text-muted-foreground mb-1">Recent errors</p>
+          <div className="space-y-1">
+            {pipeline.recent_errors.slice(-3).map((err: any, i: number) => (
+              <p key={i} className="text-xs text-destructive">
+                {err.file}: {err.error}
               </p>
-              {pipeline.processing_step && (
-                <p className="text-xs text-muted-foreground">
-                  Step: <span className="font-medium">{pipeline.processing_step}</span>
-                </p>
-              )}
-              {pipeline.processing_pages && pipeline.processing_page_current != null && (
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">
-                      Page {pipeline.processing_page_current} of {pipeline.processing_pages}
-                    </span>
-                    <span className="font-medium">
-                      {Math.round((pipeline.processing_page_current / pipeline.processing_pages) * 100)}%
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all duration-500"
-                      style={{ width: `${(pipeline.processing_page_current / pipeline.processing_pages) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              {pipeline.queued_files?.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Queue: {pipeline.queued_files.length} file(s) waiting
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Idle</p>
-          )}
-          <p className="mt-1 text-sm text-muted-foreground">
-            Processed: {pipeline.total_processed} | Errors: {pipeline.total_errors}
-          </p>
-          {pipeline.recent_errors?.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {pipeline.recent_errors.slice(-3).map((err: any, i: number) => (
-                <p key={i} className="text-xs text-destructive">
-                  {err.file}: {err.error}
-                </p>
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 

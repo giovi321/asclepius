@@ -391,6 +391,23 @@ CREATE TABLE IF NOT EXISTS document_sections (
 
 CREATE INDEX IF NOT EXISTS idx_document_sections_document ON document_sections(document_id);
 
+-- Per-document pipeline stage events (timeline of what each doc went through).
+-- One row per stage transition. Persisted so the document detail view can show
+-- a complete history across uploads, reprocesses, and partial failures.
+CREATE TABLE IF NOT EXISTS document_stage_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    stage TEXT NOT NULL,          -- ocr | vision_extraction | llm_extraction | page_classification | section_extraction | organizing | thumbnail | cache_ocr
+    status TEXT NOT NULL,         -- started | completed | failed | skipped | cancelled
+    job_kind TEXT NOT NULL,       -- upload | reprocess
+    message TEXT,
+    page_current INTEGER,
+    page_total INTEGER,
+    started_at DATETIME,
+    finished_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_stage_events_doc ON document_stage_events(document_id, id DESC);
+
 -- Extraction corrections (tracks user edits to LLM-extracted fields for learning)
 CREATE TABLE IF NOT EXISTS extraction_corrections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

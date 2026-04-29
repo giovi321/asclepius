@@ -555,7 +555,12 @@ export interface paths {
         put?: never;
         /**
          * Retry All Failed
-         * @description Retry all failed documents. Admin-only (spawns N pipeline tasks).
+         * @description Retry all failed documents. Admin-only.
+         *
+         *     Each doc is enqueued onto the same single-threaded pipeline worker as
+         *     fresh uploads — that's the only way to keep the "max 1 doc at a time"
+         *     invariant. ``priority=10`` puts retries behind interactive reprocess
+         *     clicks (which use 0) but ahead of large uploads.
          */
         post: operations["retry_all_failed_api_documents_retry_all_failed_post"];
         delete?: never;
@@ -650,6 +655,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{doc_id}/stages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Doc Stages
+         * @description Per-document pipeline stage timeline.
+         *
+         *     Returns rows in chronological order (oldest first) so the UI can group
+         *     runs (upload → reprocess → reprocess) without re-sorting.
+         */
+        get: operations["get_doc_stages_api_documents__doc_id__stages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/documents/{doc_id}/reprocess": {
         parameters: {
             query?: never;
@@ -662,6 +690,11 @@ export interface paths {
         /**
          * Reprocess Doc
          * @description Queue a document for reprocessing. Requires write access.
+         *
+         *     Reprocess goes through the same single-threaded pipeline worker queue as
+         *     fresh uploads. The previous implementation spawned the reprocess as an
+         *     asyncio task on the FastAPI loop, which ran in parallel with the worker
+         *     loop and let two docs hit the same Ollama server at the same time.
          */
         post: operations["reprocess_doc_api_documents__doc_id__reprocess_post"];
         delete?: never;
@@ -3940,6 +3973,37 @@ export interface operations {
                 "application/json": components["schemas"]["DocumentMoveRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_doc_stages_api_documents__doc_id__stages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

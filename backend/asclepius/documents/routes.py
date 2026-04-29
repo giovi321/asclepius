@@ -94,21 +94,35 @@ async def list_failed_docs(
 
 @router.post("/retry-all-failed")
 async def retry_all_failed(
+    request: Request,
     current_user: dict = Depends(require_role("admin")),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Retry all failed documents. Admin-only (spawns N pipeline tasks)."""
-    import asyncio
-    from asclepius.pipeline.processor import reprocess_document
+    """Retry all failed documents. Admin-only.
 
-    config = get_config()
+    Each doc is enqueued onto the same single-threaded pipeline worker as
+    fresh uploads — that's the only way to keep the "max 1 doc at a time"
+    invariant. ``priority=10`` puts retries behind interactive reprocess
+    clicks (which use 0) but ahead of large uploads.
+    """
+    from asclepius.pipeline.watcher import enqueue_job
+
+    queue = getattr(request.app.state, "pipeline_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Pipeline worker not running")
+
     cursor = await db.execute(
         "SELECT id FROM documents WHERE status = 'failed'"
     )
     doc_ids = [row[0] for row in await cursor.fetchall()]
 
     for doc_id in doc_ids:
-        asyncio.create_task(reprocess_document(doc_id, config))
+        enqueue_job(
+            queue, "reprocess",
+            {"doc_id": doc_id, "mode": "both"},
+            priority=10, queued_doc_id=doc_id,
+            queued_label=f"doc#{doc_id}",
+        )
 
     return {"status": "retrying", "count": len(doc_ids)}
 
@@ -554,36 +568,90 @@ async def move_doc(
     return await get_document(db, doc_id)
 
 
+# ── Stage timeline ───────────────────────────────────────────────
+
+@router.get("/{doc_id}/stages")
+async def get_doc_stages(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Per-document pipeline stage timeline.
+
+    Returns rows in chronological order (oldest first) so the UI can group
+    runs (upload → reprocess → reprocess) without re-sorting.
+    """
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if current_user.get("role") != "admin":
+        has_access = False
+        if doc.get("patient_id"):
+            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
+            if role:
+                has_access = True
+        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
+            has_access = True
+        if not has_access:
+            raise HTTPException(status_code=403, detail="No access")
+
+    cursor = await db.execute(
+        """SELECT id, stage, status, job_kind, message,
+                  page_current, page_total, started_at, finished_at
+           FROM document_stage_events
+           WHERE document_id = ?
+           ORDER BY id ASC""",
+        (doc_id,),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    return {"document_id": doc_id, "events": rows}
+
+
 # ── Reprocess ────────────────────────────────────────────────────
 
 @router.post("/{doc_id}/reprocess")
 async def reprocess_doc(
     doc_id: int,
+    request: Request,
     body: ReprocessRequest = ReprocessRequest(),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Queue a document for reprocessing. Requires write access."""
+    """Queue a document for reprocessing. Requires write access.
+
+    Reprocess goes through the same single-threaded pipeline worker queue as
+    fresh uploads. The previous implementation spawned the reprocess as an
+    asyncio task on the FastAPI loop, which ran in parallel with the worker
+    loop and let two docs hit the same Ollama server at the same time.
+    """
     from asclepius.documents.file_routes import _require_write_access
+    from asclepius.pipeline.watcher import enqueue_job
 
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     await _require_write_access(db, current_user, doc)
 
-    # Mark as pending immediately so the UI reflects the change
+    queue = getattr(request.app.state, "pipeline_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Pipeline worker not running")
+
+    # Mark as pending immediately so the UI reflects the change.
     await update_document_status(db, doc_id, "pending")
 
-    # Run reprocessing in background
-    import asyncio
-    from asclepius.pipeline.processor import reprocess_document
-
-    config = get_config()
-    asyncio.create_task(reprocess_document(
-        doc_id, config, mode=body.mode,
-        llm_provider_id=body.llm_provider_id,
-        ocr_provider_id=body.ocr_provider_id,
-        vision_provider_id=body.vision_provider_id,
-    ))
-    return {"status": "reprocessing", "document_id": doc_id}
+    enqueue_job(
+        queue, "reprocess",
+        {
+            "doc_id": doc_id,
+            "mode": body.mode,
+            "llm_provider_id": body.llm_provider_id,
+            "ocr_provider_id": body.ocr_provider_id,
+            "vision_provider_id": body.vision_provider_id,
+        },
+        priority=0,  # user clicked reprocess explicitly — jump the queue
+        queued_doc_id=doc_id,
+        queued_label=doc.get("original_filename") or f"doc#{doc_id}",
+    )
+    return {"status": "queued", "document_id": doc_id}
 

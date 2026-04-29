@@ -18,6 +18,7 @@ import ReportSlot from "@/components/imaging/ReportSlot";
 import NotesEditor from "@/components/document-detail/NotesEditor";
 import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
+import DocumentStageTimeline from "@/components/document-detail/DocumentStageTimeline";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 
@@ -241,6 +242,10 @@ export default function DocumentDetailPage() {
           />
         </div>
       </div>
+
+      {/* Pipeline stage history — shows OCR/LLM/organizing transitions
+          across the original upload and any subsequent reprocesses. */}
+      <DocumentStageTimeline documentId={doc.id} />
 
       {/* OCR section: hide for placeholder imaging reports (no PDF, no
           OCR text). Real PDF reports go through OCR like any document. */}

@@ -34,6 +34,14 @@ from asclepius.pipeline.chunked_extraction import (  # noqa: F401
 )
 from asclepius.pipeline.reprocessor import reprocess_document  # noqa: F401
 from asclepius.pipeline.state import PIPELINE_STATE
+from asclepius.pipeline.stage_events import (
+    STAGE_LLM_EXTRACTION,  # noqa: F401  re-exported for callers
+    STAGE_OCR,
+    STAGE_ORGANIZING,
+    STAGE_VISION_EXTRACTION,
+    begin_job,
+    plan_stages,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +91,9 @@ def _count_pages(file_path: str) -> int | None:
 
 async def process_file(file_path: str, config: AppConfig) -> None:
     """Process a single file through the full pipeline."""
+    from datetime import datetime as _dt
+    from asclepius.pipeline.stage_events import record_stage as _record_stage
+
     path = Path(file_path)
     if not path.exists():
         logger.warning("File no longer exists: %s", file_path)
@@ -94,6 +105,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
     pipeline_status["processing_pages"] = None
     pipeline_status["processing_page_current"] = None
     pipeline_status["queue_depth"] = max(0, pipeline_status["queue_depth"] - 1)
+
+    # Track which stage we're inside for the outer exception handler so a
+    # crash mid-phase is recorded against the right stage in the timeline.
+    _stage_started_at: str | None = None
+    _current_stage: str | None = None
     # Pop this file out of the visible queued list so the topbar reflects
     # the new processing target (which is shown via "processing", not the
     # queue list).
@@ -289,11 +305,23 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 )
                 flow = "ocr_llm"
 
+            # Initialise the richer current_job block now that we have a
+            # concrete doc_id and flow. The dashboard's stepper relies on
+            # ``stages_planned`` being filled before the first stage opens.
+            begin_job(
+                doc_id=doc_id,
+                filename=path.name,
+                kind="upload",
+                stages_planned=plan_stages(flow=flow),
+            )
+
             import asyncio as _asyncio
             ocr_text, confidence, engine = "", 0.0, "none"
 
             if flow == "vision_llm":
                 # ── Vision-LLM flow ─────────────────────────────────
+                _current_stage = STAGE_VISION_EXTRACTION
+                _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
                 pipeline_status["processing_step"] = "vision_extraction"
                 pipeline_status["processing_doc_id"] = doc_id
                 pipeline_status["processing_pages"] = page_count
@@ -340,6 +368,13 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["processing"] = None
                     return
 
+                # Vision phase done — record completion before flipping to LLM.
+                await _record_stage(
+                    db, doc_id, STAGE_VISION_EXTRACTION, "completed",
+                    "upload", started_at=_stage_started_at, page_total=page_count,
+                )
+                _current_stage = STAGE_LLM_EXTRACTION
+                _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
                 pipeline_status["processing_step"] = "llm_extraction"
                 pipeline_status["processing_pages"] = None
                 pipeline_status["processing_page_current"] = None
@@ -374,6 +409,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 )
             else:
                 # ── OCR phase ────────────────────────────────────────────
+                _current_stage = STAGE_OCR
+                _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
                 pipeline_status["processing_step"] = "ocr"
                 pipeline_status["processing_doc_id"] = doc_id
                 pipeline_status["processing_pages"] = page_count
@@ -438,7 +475,14 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     pipeline_status["processing"] = None
                     return
 
+                # OCR phase done — record completion before LLM.
+                await _record_stage(
+                    db, doc_id, STAGE_OCR, "completed", "upload",
+                    started_at=_stage_started_at, page_total=page_count,
+                )
                 # ── Standard LLM extraction phase ─────────────────────────────
+                _current_stage = STAGE_LLM_EXTRACTION
+                _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
                 pipeline_status["processing_step"] = "llm_extraction"
                 pipeline_status["processing_pages"] = None
                 pipeline_status["processing_page_current"] = None
@@ -514,7 +558,14 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                 pipeline_status["processing"] = None
                 return
 
+            # LLM phase done — record completion before organize.
+            await _record_stage(
+                db, doc_id, STAGE_LLM_EXTRACTION, "completed", "upload",
+                started_at=_stage_started_at,
+            )
             # ── Organize phase ───────────────────────────────────────
+            _current_stage = STAGE_ORGANIZING
+            _stage_started_at = _dt.utcnow().isoformat(timespec="seconds")
             pipeline_status["processing_step"] = "organizing"
 
             # Get document metadata for file organization
@@ -626,6 +677,12 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
             await db.commit()
 
+            await _record_stage(
+                db, doc_id, STAGE_ORGANIZING, "completed", "upload",
+                started_at=_stage_started_at,
+            )
+            _current_stage = None
+
             pipeline_status["total_processed"] += 1
             pipeline_status["last_processed"] = path.name
             logger.info("Completed processing doc %d: %s -> %s", doc_id, path.name, final_path)
@@ -648,6 +705,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         (_doc_id,),
                     )
                     await db.commit()
+                    if _current_stage:
+                        await _record_stage(
+                            db, _doc_id, _current_stage, "cancelled", "upload",
+                            started_at=_stage_started_at,
+                        )
             except Exception:
                 pass
             raise
@@ -670,6 +732,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     (error_msg[:2000], doc_id),
                 )
                 await db.commit()
+                if _current_stage:
+                    await _record_stage(
+                        db, doc_id, _current_stage, "failed", "upload",
+                        started_at=_stage_started_at, message=error_msg[:1000],
+                    )
             except Exception:
                 pass
 

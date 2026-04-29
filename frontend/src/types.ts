@@ -105,6 +105,26 @@ export interface DocumentSection {
 
 // ─── Pipeline ──────────────────────────────────────────
 
+export type PipelineJobKind = "upload" | "reprocess";
+
+export interface PipelineCurrentJob {
+  doc_id: number | null;
+  filename: string | null;
+  kind: PipelineJobKind | null;
+  stage: string | null;
+  page_current: number | null;
+  page_total: number | null;
+  stages_planned: string[];
+  stages_done: string[];
+  started_at: string | null;
+}
+
+export interface PipelineQueuedJob {
+  kind: PipelineJobKind;
+  label: string;
+  doc_id: number | null;
+}
+
 export interface PipelineStatus {
   queue_depth: number;
   processing: string | null;
@@ -117,10 +137,36 @@ export interface PipelineStatus {
   last_processed: string | null;
   recent_errors: { file: string; error: string }[];
   queued_files: { filename: string; size: number }[];
+  current_job?: PipelineCurrentJob | null;
+  queued_jobs?: PipelineQueuedJob[];
   watcher_active: boolean;
   auto_stopped: boolean;
   auto_stop_reason: string;
   llm_queues?: LlmQueueSnapshot[];
+}
+
+export type DocumentStageStatus =
+  | "started"
+  | "completed"
+  | "failed"
+  | "skipped"
+  | "cancelled";
+
+export interface DocumentStageEvent {
+  id: number;
+  stage: string;
+  status: DocumentStageStatus;
+  job_kind: PipelineJobKind;
+  message: string | null;
+  page_current: number | null;
+  page_total: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface DocumentStagesResponse {
+  document_id: number;
+  events: DocumentStageEvent[];
 }
 
 // ─── Providers ─────────────────────────────────────────

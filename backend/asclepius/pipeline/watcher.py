@@ -1,11 +1,13 @@
 """File system watcher for inbox directory."""
 
 import asyncio
+import itertools
 import logging
 import os
 import threading
 from pathlib import Path
 from queue import PriorityQueue, Empty
+from typing import Any
 
 from watchdog.events import (
     FileCreatedEvent,
@@ -17,6 +19,58 @@ from watchdog.observers import Observer
 from asclepius.config import AppConfig
 
 logger = logging.getLogger(__name__)
+
+
+# Monotonic tiebreaker for queue tuples — without it, two jobs that share a
+# priority would compare on the payload dict, which raises TypeError. The
+# counter is process-global, which is fine because one worker reads it.
+_JOB_SEQ = itertools.count()
+
+
+def enqueue_job(
+    queue: PriorityQueue,
+    kind: str,
+    payload: dict[str, Any],
+    priority: int,
+    *,
+    queued_label: str | None = None,
+    queued_doc_id: int | None = None,
+) -> None:
+    """Enqueue a unit of work for the pipeline worker.
+
+    ``kind`` is ``"upload"`` (file_path payload) or ``"reprocess"`` (doc_id +
+    mode + provider overrides). Both flow through the SAME single-threaded
+    worker, which is what enforces the "max 1 doc at a time" invariant — the
+    earlier ``asyncio.create_task(reprocess_document(...))`` from the API
+    handler ran in the FastAPI loop and bypassed the queue entirely, which is
+    why a reprocess could double up with a fresh upload on the same Ollama
+    server.
+
+    ``priority`` is min-heap: 0 jumps the line, file-size for uploads keeps the
+    "smaller files first" behaviour. Reprocess clicks default to 0.
+    """
+    seq = next(_JOB_SEQ)
+    queue.put((priority, seq, kind, payload))
+
+    # Mirror into pipeline_status so the topbar / dashboard reflect the queued
+    # work without having to introspect the queue itself.
+    from asclepius.pipeline.processor import pipeline_status
+    pipeline_status["queue_depth"] = pipeline_status.get("queue_depth", 0) + 1
+    queued_files = pipeline_status.setdefault("queued_files", [])
+    label = queued_label or payload.get("file_path", "") or f"doc#{queued_doc_id}"
+    queued_files.append({"filename": Path(label).name if label else "(unknown)",
+                         "size": payload.get("file_size", 0)})
+    if len(queued_files) > 50:
+        del queued_files[: len(queued_files) - 50]
+
+    queued_jobs = pipeline_status.setdefault("queued_jobs", [])
+    queued_jobs.append({
+        "kind": kind,
+        "label": Path(label).name if label else "(unknown)",
+        "doc_id": queued_doc_id,
+    })
+    if len(queued_jobs) > 50:
+        del queued_jobs[: len(queued_jobs) - 50]
 
 # Extensions the pipeline handles. ``.bin`` is reserved for opaque files
 # extracted from a zip upload (DICOMDIR, LOCKFILE, VERSION etc.) — they are
@@ -88,26 +142,19 @@ class InboxHandler(FileSystemEventHandler):
             logger.warning("File disappeared before processing: %s", path.name)
             return
 
-        # Use file size as priority — smaller files processed first
+        # Use file size as priority — smaller files processed first.
         try:
             file_size = os.path.getsize(src_path)
         except OSError:
             file_size = 0
 
-        # Reflect the new queue entry in pipeline_status so the topbar
-        # shows a non-zero queue depth between processing ticks. Without
-        # this the counter only ever decrements (in process_file) and
-        # stays clamped at 0 forever.
-        from asclepius.pipeline.processor import pipeline_status
-        pipeline_status["queue_depth"] = pipeline_status.get("queue_depth", 0) + 1
-        queued_files = pipeline_status.setdefault("queued_files", [])
-        queued_files.append({"filename": path.name, "size": file_size})
-        # Cap the visible list so a 1000-file zip doesn't grow the snapshot
-        # without bound; the depth counter is the source of truth.
-        if len(queued_files) > 50:
-            del queued_files[: len(queued_files) - 50]
-
-        self.queue.put((file_size, str(path)))
+        enqueue_job(
+            self.queue,
+            "upload",
+            {"file_path": str(path), "file_size": file_size},
+            priority=file_size,
+            queued_label=str(path),
+        )
 
     def on_created(self, event: FileCreatedEvent) -> None:
         if event.is_directory:
@@ -132,7 +179,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
     import asyncio
 
     async def _run():
-        from asclepius.pipeline.processor import process_file, ProviderUnreachableError
+        from asclepius.pipeline.processor import process_file, ProviderUnreachableError, reprocess_document
         from asclepius.pipeline.inbox_sweep import sweep_inbox
         import aiosqlite as _aiosqlite
 
@@ -141,7 +188,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
 
         while True:
             try:
-                _priority, file_path = queue.get(timeout=2)
+                _priority, _seq, kind, payload = queue.get(timeout=2)
             except Empty:
                 # Run the inbox sweep after a stretch of idle ticks (~30s)
                 # so duplicate / orphan files left behind by a crashed
@@ -165,15 +212,44 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
             # mid-batch.
             idle_ticks_since_sweep = 0
 
+            file_path = payload.get("file_path") if kind == "upload" else None
+            label = file_path or f"doc#{payload.get('doc_id')}"
+
+            # Pop the matching entry off pipeline_status.queued_jobs so the
+            # frontend's queued list reflects the worker actually picking
+            # this one up.
+            from asclepius.pipeline.processor import pipeline_status
+            queued_jobs = pipeline_status.get("queued_jobs") or []
+            for i, entry in enumerate(queued_jobs):
+                if (entry.get("kind") == kind
+                        and entry.get("doc_id") == payload.get("doc_id")
+                        and (kind == "reprocess"
+                             or entry.get("label") == Path(file_path or "").name)):
+                    del queued_jobs[i]
+                    break
+
             try:
-                logger.info("Pipeline worker processing: %s", Path(file_path).name)
-                await process_file(file_path, config)
+                if kind == "reprocess":
+                    logger.info(
+                        "Pipeline worker processing reprocess: doc=%d mode=%s",
+                        payload["doc_id"], payload.get("mode", "both"),
+                    )
+                    await reprocess_document(
+                        payload["doc_id"], config,
+                        mode=payload.get("mode", "both"),
+                        llm_provider_id=payload.get("llm_provider_id"),
+                        ocr_provider_id=payload.get("ocr_provider_id"),
+                        vision_provider_id=payload.get("vision_provider_id"),
+                    )
+                else:
+                    logger.info("Pipeline worker processing: %s", Path(file_path).name)
+                    await process_file(file_path, config)
                 consecutive_provider_failures = 0  # success resets counter
             except ProviderUnreachableError as e:
                 consecutive_provider_failures += 1
                 logger.error("Provider unreachable (%d/%d): %s — %s",
                              consecutive_provider_failures, AUTO_STOP_THRESHOLD,
-                             Path(file_path).name, e)
+                             label, e)
                 if consecutive_provider_failures >= AUTO_STOP_THRESHOLD:
                     logger.warning(
                         "All providers appear unreachable after %d consecutive failures. "
@@ -183,17 +259,14 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                         app_state.pipeline_auto_stop_reason = (
                             f"Auto-paused after {AUTO_STOP_THRESHOLD} consecutive provider failures"
                         )
-                    # Put the file back in the queue so it's retried on restart
-                    try:
-                        file_size = os.path.getsize(file_path)
-                    except OSError:
-                        file_size = 0
-                    queue.put((file_size, file_path))
+                    # Put the job back so it's retried on restart.
+                    enqueue_job(queue, kind, payload,
+                                priority=payload.get("file_size", 0))
                     break  # stop worker loop
             except Exception:
-                logger.exception("Pipeline error for: %s", file_path)
+                logger.exception("Pipeline error for: %s", label)
             except BaseException:
-                logger.exception("Pipeline critical error for: %s", file_path)
+                logger.exception("Pipeline critical error for: %s", label)
             finally:
                 try:
                     queue.task_done()
@@ -201,26 +274,25 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                     pass  # task_done called too many times
                 # Always reset pipeline status
                 from asclepius.pipeline.processor import pipeline_status
+                from asclepius.pipeline.stage_events import end_job
                 pipeline_status["processing"] = None
                 pipeline_status["processing_step"] = None
                 pipeline_status["processing_doc_id"] = None
-                # Walk up the inbox tree from the file we just handled and
-                # rmdir any empty directories. Without this, every zip
-                # upload leaves an empty ``inbox/{slug}/{zip_stem}/`` shell
-                # behind once its frames are processed. Stop at the inbox
-                # root itself.
-                try:
-                    inbox_root = Path(config.vault.inbox_path).resolve()
-                    parent = Path(file_path).parent.resolve()
-                    while inbox_root in parent.parents:
-                        try:
-                            parent.rmdir()
-                        except OSError:
-                            # Not empty (or already gone) — stop walking up.
-                            break
-                        parent = parent.parent
-                except Exception:
-                    pass
+                end_job()
+                # For uploads, walk up the inbox tree and rmdir any empty
+                # directories left behind by zip extraction.
+                if file_path:
+                    try:
+                        inbox_root = Path(config.vault.inbox_path).resolve()
+                        parent = Path(file_path).parent.resolve()
+                        while inbox_root in parent.parents:
+                            try:
+                                parent.rmdir()
+                            except OSError:
+                                break
+                            parent = parent.parent
+                    except Exception:
+                        pass
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -241,8 +313,13 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     inbox_path = config.vault.inbox_path
     Path(inbox_path).mkdir(parents=True, exist_ok=True)
 
-    # Thread-safe priority queue (not asyncio.Queue) — smaller files first
-    queue: PriorityQueue[tuple[int, str]] = PriorityQueue()
+    # Thread-safe priority queue (not asyncio.Queue) — smaller files first.
+    # Tuples: (priority:int, seq:int, kind:str, payload:dict). The seq breaks
+    # ties without comparing payload dicts. Both upload and reprocess flow
+    # through this queue — that's what enforces "max 1 doc at a time".
+    queue: PriorityQueue = PriorityQueue()
+    if app_state is not None:
+        app_state.pipeline_queue = queue
 
     # Reset auto-stop state on start
     if app_state is not None:
@@ -295,7 +372,11 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
                 file_size = f.stat().st_size
             except OSError:
                 file_size = 0
-            queue.put((file_size, str(f)))
+            enqueue_job(
+                queue, "upload",
+                {"file_path": str(f), "file_size": file_size},
+                priority=file_size, queued_label=str(f),
+            )
 
     # Keep the coroutine alive and periodically check for scheduled documents
     try:
@@ -325,16 +406,24 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
                                 file_size = full_path.stat().st_size
                             except OSError:
                                 file_size = 0
-                            queue.put((file_size, str(full_path)))
+                            enqueue_job(
+                                queue, "upload",
+                                {"file_path": str(full_path), "file_size": file_size},
+                                priority=file_size, queued_label=str(full_path),
+                            )
                         else:
                             # Try inbox path
-                            inbox_path = Path(config.vault.inbox_path) / Path(file_path).name
-                            if inbox_path.exists():
+                            inbox_path_for_doc = Path(config.vault.inbox_path) / Path(file_path).name
+                            if inbox_path_for_doc.exists():
                                 try:
-                                    file_size = inbox_path.stat().st_size
+                                    file_size = inbox_path_for_doc.stat().st_size
                                 except OSError:
                                     file_size = 0
-                                queue.put((file_size, str(inbox_path)))
+                                enqueue_job(
+                                    queue, "upload",
+                                    {"file_path": str(inbox_path_for_doc), "file_size": file_size},
+                                    priority=file_size, queued_label=str(inbox_path_for_doc),
+                                )
                             else:
                                 logger.warning("Scheduled document %d file not found: %s", doc_id, file_path)
                     if rows:

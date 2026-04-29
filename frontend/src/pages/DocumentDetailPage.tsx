@@ -4,15 +4,21 @@ import api from "@/api/client";
 import { FileText, Trash2, X, Image as ImageIcon } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
-  EditableSummary, EditableFilename, OcrSection,
+  EditableSummary,
+  EditableFilename,
+  OcrSection,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
 import LabResultsEditor from "@/components/document-detail/LabResultsEditor";
 import DocumentViewer from "@/components/document-detail/DocumentViewer";
 import ReprocessMenu from "@/components/document-detail/ReprocessMenu";
+import DocumentQueueStatus from "@/components/document-detail/DocumentQueueStatus";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import {
-  EncountersSection, MedicationsSection, VaccinationsSection, DocumentSectionsList,
+  EncountersSection,
+  MedicationsSection,
+  VaccinationsSection,
+  DocumentSectionsList,
 } from "@/components/document-detail/ChildRecordSections";
 import ReportSlot from "@/components/imaging/ReportSlot";
 import NotesEditor from "@/components/document-detail/NotesEditor";
@@ -26,7 +32,9 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 // share most of the layout but skip OCR / AI-edit features that don't
 // apply to DICOM bundles.
 function isImagingDoc(doc: any): boolean {
-  return doc?.doc_type === "imaging_dicom" || doc?.doc_type === "imaging_report";
+  return (
+    doc?.doc_type === "imaging_dicom" || doc?.doc_type === "imaging_report"
+  );
 }
 function isImagingPlaceholder(doc: any): boolean {
   return isImagingDoc(doc) && !doc?.file_path;
@@ -74,7 +82,11 @@ export default function DocumentDetailPage() {
       await api.post(`/documents/${id}/rotate`, { degrees, pages });
       await loadDoc(false);
     } catch (e: any) {
-      toast({ title: "Rotation failed", description: e.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Rotation failed",
+        description: e.response?.data?.detail || e.message,
+        variant: "error",
+      });
       throw e;
     }
   };
@@ -86,8 +98,7 @@ export default function DocumentDetailPage() {
     if (pageCount > 5) {
       const ok = await confirm({
         title: `Reprocess ${pageCount}-page document?`,
-        description:
-          `This document has ${pageCount} pages. Reprocessing will run OCR and the LLM on every page, which can take a while and consume tokens if you're on a paid provider. Continue?`,
+        description: `This document has ${pageCount} pages. Reprocessing will run OCR and the LLM on every page, which can take a while and consume tokens if you're on a paid provider. Continue?`,
         confirmText: "Reprocess",
         cancelText: "Cancel",
       });
@@ -107,7 +118,8 @@ export default function DocumentDetailPage() {
   const handleDelete = async () => {
     const ok = await confirm({
       title: "Delete this document?",
-      description: "The file will be removed from disk and all related records (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
+      description:
+        "The file will be removed from disk and all related records (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
       variant: "destructive",
     });
     if (!ok) return;
@@ -127,9 +139,14 @@ export default function DocumentDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <EditableFilename value={doc.original_filename} docId={doc.id} onSave={updateDocFields} />
+          <EditableFilename
+            value={doc.original_filename}
+            docId={doc.id}
+            onSave={updateDocFields}
+          />
           <p className="text-sm text-muted-foreground">
-            {formatDocType(doc.doc_type)} | {getBestDate(doc) || "No date"} | {doc.patient_name || "Unclassified"}
+            {formatDocType(doc.doc_type)} | {getBestDate(doc) || "No date"} |{" "}
+            {doc.patient_name || "Unclassified"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -160,7 +177,9 @@ export default function DocumentDetailPage() {
               <X className="h-4 w-4" /> Cancel
             </button>
           )}
-          {doc.status !== "processing" && (
+          {doc.status === "processing" || doc.status === "pending" ? (
+            <DocumentQueueStatus docId={Number(id)} />
+          ) : (
             <ReprocessMenu
               docId={id!}
               onBeforeReprocess={handleReprocessRequested}
@@ -177,7 +196,11 @@ export default function DocumentDetailPage() {
       </div>
 
       {/* Summary */}
-      <EditableSummary value={doc.summary_en} docId={doc.id} onSave={updateDocFields} />
+      <EditableSummary
+        value={doc.summary_en}
+        docId={doc.id}
+        onSave={updateDocFields}
+      />
 
       <DocumentSectionsList sections={doc.sections || []} />
 
@@ -214,7 +237,9 @@ export default function DocumentDetailPage() {
             docId={doc.id}
             patientId={doc.patient_id}
             currentEventId={doc.event_id}
-            onUpdate={(eventId) => setDoc((prev: any) => ({ ...prev, event_id: eventId }))}
+            onUpdate={(eventId) =>
+              setDoc((prev: any) => ({ ...prev, event_id: eventId }))
+            }
           />
 
           <LabResultsEditor
@@ -225,8 +250,14 @@ export default function DocumentDetailPage() {
             onChange={() => loadDoc(false)}
           />
 
-          <EncountersSection encounters={doc.encounters || []} onUpdated={() => loadDoc(false)} />
-          <MedicationsSection medications={doc.medications || []} onUpdated={() => loadDoc(false)} />
+          <EncountersSection
+            encounters={doc.encounters || []}
+            onUpdated={() => loadDoc(false)}
+          />
+          <MedicationsSection
+            medications={doc.medications || []}
+            onUpdated={() => loadDoc(false)}
+          />
           <VaccinationsSection vaccinations={doc.vaccinations || []} />
 
           <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />

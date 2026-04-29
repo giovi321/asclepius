@@ -121,6 +121,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await _migration_0_9_7_drop_dead_imaging_columns(db)
     await _migration_0_9_8_drop_imaging_study_date(db)
     await _migration_clear_llm_placeholders(db)
+    await _migration_backfill_lab_test_date(db)
     await _ensure_compat_view(db)
 
 
@@ -619,6 +620,48 @@ async def _migration_clear_llm_placeholders(db: aiosqlite.Connection) -> None:
                     "Migration: cleared %d LLM placeholder rows from %s.%s",
                     cursor.rowcount, table, col,
                 )
+    await db.commit()
+
+
+async def _migration_backfill_lab_test_date(db: aiosqlite.Connection) -> None:
+    """Backfill ``lab_results.test_date`` from the parent document.
+
+    The extractor already copies ``documents.event_date`` onto lab rows
+    that were missing one at the end of every extraction, but rows
+    written before that belt-and-braces step landed (or extracted via
+    older code paths) can still have ``test_date IS NULL``. The
+    document detail and timeline views rely on a real date to position
+    lab values, so we fill the gap here.
+
+    Preference order, for each lab row whose ``test_date`` is NULL:
+      1. ``documents.event_date`` (the canonical timeline anchor).
+      2. ``documents.issued_date`` (secondary fallback when the document
+         only carries an issue date — typical for invoices that double
+         as lab reports).
+
+    Idempotent: only touches rows where ``test_date IS NULL`` and the
+    parent document has a non-null source date. Logs once at INFO when
+    at least one row changed; silent on a clean DB.
+    """
+    cursor = await db.execute(
+        """UPDATE lab_results
+              SET test_date = (
+                  SELECT COALESCE(d.event_date, d.issued_date)
+                  FROM documents d
+                  WHERE d.id = lab_results.document_id
+              )
+            WHERE test_date IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM documents d
+                  WHERE d.id = lab_results.document_id
+                    AND COALESCE(d.event_date, d.issued_date) IS NOT NULL
+              )"""
+    )
+    if cursor.rowcount and cursor.rowcount > 0:
+        logger.info(
+            "Migration: backfilled test_date on %d lab_results rows from parent document",
+            cursor.rowcount,
+        )
     await db.commit()
 
 

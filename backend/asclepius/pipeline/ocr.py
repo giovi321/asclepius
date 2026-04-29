@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_vision_gate_key(
-    provider_entry: OcrProviderEntry | None, config: AppConfig,
+    provider_entry: OcrProviderEntry | None,
+    config: AppConfig,
 ) -> tuple[str, str, int]:
     """Return ``(credential_id, credential_name, cap)`` for an LLM-vision
     OCR request.
@@ -33,7 +34,11 @@ def _resolve_vision_gate_key(
     if cred is not None:
         return cred.id, cred.name or cred.type, max(1, int(cred.max_concurrent or 1))
     synthetic_id = f"legacy-vision-{getattr(provider_entry, 'id', 'default') or 'default'}"
-    name = (getattr(provider_entry, "name", "") or "Vision (legacy)") if provider_entry else "Vision (legacy)"
+    name = (
+        (getattr(provider_entry, "name", "") or "Vision (legacy)")
+        if provider_entry
+        else "Vision (legacy)"
+    )
     cap = max(1, int(config.ocr.max_concurrent_vision_requests or 1))
     return synthetic_id, name, cap
 
@@ -63,10 +68,14 @@ async def extract_text(
                 text, confidence, engine = await _extract_with_provider(file_path, config, p)
                 if text.strip():
                     return text, confidence, p.name or engine
-                logger.warning("OCR provider %s returned empty text, trying next providers", p.name or p.id)
+                logger.warning(
+                    "OCR provider %s returned empty text, trying next providers", p.name or p.id
+                )
                 break
         else:
-            logger.warning("OCR provider %s not found or disabled, falling back to default", ocr_provider_id)
+            logger.warning(
+                "OCR provider %s not found or disabled, falling back to default", ocr_provider_id
+            )
 
     # Try providers in priority order, falling back to next if empty
     enabled_providers = sorted(
@@ -78,9 +87,18 @@ async def extract_text(
             text, confidence, engine = await _extract_with_provider(file_path, config, provider)
             if text.strip():
                 return text, confidence, provider.name or engine
-            logger.warning("OCR provider '%s' (priority %d) returned empty text, trying next", provider.name or provider.id, provider.priority)
+            logger.warning(
+                "OCR provider '%s' (priority %d) returned empty text, trying next",
+                provider.name or provider.id,
+                provider.priority,
+            )
         except Exception as e:
-            logger.warning("OCR provider '%s' (priority %d) failed: %s, trying next", provider.name or provider.id, provider.priority, e)
+            logger.warning(
+                "OCR provider '%s' (priority %d) failed: %s, trying next",
+                provider.name or provider.id,
+                provider.priority,
+                e,
+            )
 
     # Legacy fallback (no provider list configured)
     if not enabled_providers:
@@ -106,11 +124,15 @@ async def _extract_with_provider(
 
     if provider.type == "llm_vision":
         return await _extract_llm_vision(
-            file_path, config, provider_entry=provider,
+            file_path,
+            config,
+            provider_entry=provider,
         )
     elif provider.type == "tesseract_remote" and provider.remote_url:
         return await _extract_remote_ocr(
-            file_path, config, provider_entry=provider,
+            file_path,
+            config,
+            provider_entry=provider,
         )
     elif provider.type == "google_vision":
         # Google Vision — placeholder, uses the existing cloud fallback path
@@ -145,7 +167,8 @@ async def extract_text_per_page(file_path: str, config: AppConfig) -> list[str]:
         for page_idx, page in enumerate(doc):
             b64_image = _render_page_for_vision(page)
             page_text = await _llm_vision_page_with_retry(
-                b64_image, config,
+                b64_image,
+                config,
                 config.ocr.llm_vision_model,
             )
             pages.append(page_text)
@@ -182,10 +205,14 @@ async def extract_text_per_page(file_path: str, config: AppConfig) -> list[str]:
     return ocr_pages
 
 
-async def _extract_from_pdf(path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
+async def _extract_from_pdf(
+    path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None
+) -> tuple[str, float, str]:
     """Extract text from PDF — try embedded text first, fall back to OCR."""
     ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
-    confidence_threshold = (provider_entry.confidence_threshold if provider_entry else None) or config.ocr.confidence_threshold
+    confidence_threshold = (
+        provider_entry.confidence_threshold if provider_entry else None
+    ) or config.ocr.confidence_threshold
     doc = fitz.open(str(path))
     text_parts = []
     has_text = False
@@ -230,9 +257,7 @@ async def _extract_from_pdf(path: Path, config: AppConfig, provider_entry: OcrPr
         ocr_parts.append(page_text)
 
         # Calculate average confidence
-        confidences = [
-            int(c) for c in ocr_data["conf"] if str(c).isdigit() and int(c) > 0
-        ]
+        confidences = [int(c) for c in ocr_data["conf"] if str(c).isdigit() and int(c) > 0]
         if confidences:
             total_confidence += sum(confidences) / len(confidences)
             page_count += 1
@@ -250,7 +275,9 @@ async def _extract_from_pdf(path: Path, config: AppConfig, provider_entry: OcrPr
     return full_text, avg_confidence, "tesseract"
 
 
-async def _extract_from_image(path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
+async def _extract_from_image(
+    path: Path, config: AppConfig, provider_entry: OcrProviderEntry | None = None
+) -> tuple[str, float, str]:
     """Extract text from an image file."""
     ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
     img = Image.open(str(path))
@@ -260,15 +287,15 @@ async def _extract_from_image(path: Path, config: AppConfig, provider_entry: Ocr
     )
     text = pytesseract.image_to_string(img, lang=ocr_language)
 
-    confidences = [
-        int(c) for c in ocr_data["conf"] if str(c).isdigit() and int(c) > 0
-    ]
+    confidences = [int(c) for c in ocr_data["conf"] if str(c).isdigit() and int(c) > 0]
     avg_confidence = (sum(confidences) / len(confidences) / 100.0) if confidences else 0.0
 
     return text, avg_confidence, "tesseract"
 
 
-async def _extract_llm_vision(file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
+async def _extract_llm_vision(
+    file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None
+) -> tuple[str, float, str]:
     """Use LLM with vision capability to OCR document pages.
 
     Renders each page as an image and sends it to the LLM.
@@ -297,7 +324,9 @@ async def _extract_llm_vision(file_path: str, config: AppConfig, provider_entry:
             logger.info("LLM vision OCR: page %d/%d of %s", page_idx + 1, total_pages, path.name)
 
             b64_image = _render_page_for_vision(page)
-            page_text = await _llm_vision_page_with_retry(b64_image, config, vision_model, provider_entry=provider_entry)
+            page_text = await _llm_vision_page_with_retry(
+                b64_image, config, vision_model, provider_entry=provider_entry
+            )
             text_parts.append(page_text)
 
         doc.close()
@@ -308,7 +337,9 @@ async def _extract_llm_vision(file_path: str, config: AppConfig, provider_entry:
         img = Image.open(str(path))
         b64_image = _compress_image_for_vision(img)
 
-        text = await _llm_vision_page_with_retry(b64_image, config, vision_model, provider_entry=provider_entry)
+        text = await _llm_vision_page_with_retry(
+            b64_image, config, vision_model, provider_entry=provider_entry
+        )
         return text, 0.95, "llm_vision"
 
     return "", 0.0, "none"
@@ -362,8 +393,11 @@ def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
 
 
 async def _llm_vision_page_with_retry(
-    b64_image: str, config: AppConfig, vision_model: str,
-    max_retries: int = 3, provider_entry: OcrProviderEntry | None = None,
+    b64_image: str,
+    config: AppConfig,
+    vision_model: str,
+    max_retries: int = 3,
+    provider_entry: OcrProviderEntry | None = None,
 ) -> str:
     """Call _llm_vision_page with retry + backoff for rate limits and timeouts.
 
@@ -382,10 +416,17 @@ async def _llm_vision_page_with_retry(
 
     async def _call() -> str:
         async with credential_slot(
-            cred_id, cap, model=vision_model or "", kind="ocr", credential_name=cred_name,
+            cred_id,
+            cap,
+            model=vision_model or "",
+            kind="ocr",
+            credential_name=cred_name,
         ):
             return await _llm_vision_page(
-                b64_image, config, vision_model, provider_entry=provider_entry,
+                b64_image,
+                config,
+                vision_model,
+                provider_entry=provider_entry,
             )
 
     for attempt in range(max_retries):
@@ -395,7 +436,10 @@ async def _llm_vision_page_with_retry(
             wait = 30 * (attempt + 1)  # 30s, 60s, 90s
             logger.warning(
                 "Vision OCR %s (attempt %d/%d), retrying in %ds...",
-                type(e).__name__, attempt + 1, max_retries, wait,
+                type(e).__name__,
+                attempt + 1,
+                max_retries,
+                wait,
             )
             if attempt < max_retries - 1:
                 await _asyncio.sleep(wait)
@@ -406,7 +450,12 @@ async def _llm_vision_page_with_retry(
             error_str = str(e)
             if "rate_limit" in error_str or "429" in error_str:
                 wait = 30 * (attempt + 1)
-                logger.warning("Rate limited, waiting %ds before retry (attempt %d/%d)", wait, attempt + 1, max_retries)
+                logger.warning(
+                    "Rate limited, waiting %ds before retry (attempt %d/%d)",
+                    wait,
+                    attempt + 1,
+                    max_retries,
+                )
                 await _asyncio.sleep(wait)
             elif "exceeds" in error_str and "MB" in error_str:
                 logger.error("Image still too large after compression: %s", error_str)
@@ -414,8 +463,13 @@ async def _llm_vision_page_with_retry(
             else:
                 if attempt < max_retries - 1:
                     wait = 30 * (attempt + 1)
-                    logger.warning("Vision OCR error (attempt %d/%d): %s, retrying in %ds...",
-                                   attempt + 1, max_retries, e, wait)
+                    logger.warning(
+                        "Vision OCR error (attempt %d/%d): %s, retrying in %ds...",
+                        attempt + 1,
+                        max_retries,
+                        e,
+                        wait,
+                    )
                     await _asyncio.sleep(wait)
                 else:
                     raise
@@ -424,7 +478,9 @@ async def _llm_vision_page_with_retry(
 
 
 async def _llm_vision_page(
-    b64_image: str, config: AppConfig, vision_model: str,
+    b64_image: str,
+    config: AppConfig,
+    vision_model: str,
     provider_entry: OcrProviderEntry | None = None,
 ) -> str:
     """Send a single page image to the LLM for text extraction.
@@ -447,7 +503,8 @@ async def _llm_vision_page(
     fallback_llm = _first_enabled_llm(config)
     cred = (
         resolve_credential(config, getattr(provider_entry, "credential_id", "") or "")
-        if provider_entry else None
+        if provider_entry
+        else None
     )
 
     if cred is not None:
@@ -455,7 +512,9 @@ async def _llm_vision_page(
     elif provider_entry:
         vision_provider = provider_entry.llm_provider
     else:
-        vision_provider = config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama")
+        vision_provider = config.ocr.llm_vision_provider or (
+            fallback_llm.type if fallback_llm else "ollama"
+        )
 
     # Get API key from credential, provider entry, or fall back to the
     # first matching LLM provider.
@@ -471,6 +530,7 @@ async def _llm_vision_page(
 
     if vision_provider == "claude" and vision_api_key:
         from anthropic import AsyncAnthropic
+
         client = AsyncAnthropic(api_key=vision_api_key)
         default_claude_model = next(
             (p.model for p in config.llm.providers if p.type == "claude" and p.enabled),
@@ -481,20 +541,22 @@ async def _llm_vision_page(
         response = await client.messages.create(
             model=model,
             max_tokens=4096,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": b64_image,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/jpeg",
+                                "data": b64_image,
+                            },
                         },
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }],
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ],
         )
         return response.content[0].text
 
@@ -516,13 +578,18 @@ async def _llm_vision_page(
                 headers=headers,
                 json={
                     "model": model,
-                    "messages": [{
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
-                            {"type": "text", "text": prompt},
-                        ],
-                    }],
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                                },
+                                {"type": "text", "text": prompt},
+                            ],
+                        }
+                    ],
                     "max_tokens": 4096,
                 },
             )
@@ -532,10 +599,13 @@ async def _llm_vision_page(
 
     else:
         # Ollama with vision model — can use a different URL than the extraction LLM
-        default_ollama = next(
-            (p for p in config.llm.providers if p.type == "ollama" and p.enabled),
-            None,
-        ) or fallback_llm
+        default_ollama = (
+            next(
+                (p for p in config.llm.providers if p.type == "ollama" and p.enabled),
+                None,
+            )
+            or fallback_llm
+        )
         model = vision_model or (default_ollama.model if default_ollama else "llama3.1")
         if cred is not None and cred.base_url:
             ollama_url = cred.base_url.rstrip("/")
@@ -559,6 +629,17 @@ async def _llm_vision_page(
                     "prompt": prompt,
                     "images": [b64_image],
                     "stream": False,
+                    # Without an explicit num_predict, Ollama caps generation
+                    # at the model's Modelfile default (often 2048 or even
+                    # 128 tokens). Dense pages and HTML-tagged Chandra
+                    # output blow past that and the response gets cut
+                    # mid-sentence. -1 = generate until the model emits
+                    # eos. num_ctx is also raised so the request doesn't
+                    # quietly truncate the input prompt + image embedding.
+                    "options": {
+                        "num_predict": -1,
+                        "num_ctx": 16384,
+                    },
                 },
             )
             resp.raise_for_status()
@@ -566,7 +647,9 @@ async def _llm_vision_page(
             return data.get("response", "")
 
 
-async def _extract_remote_ocr(file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None) -> tuple[str, float, str]:
+async def _extract_remote_ocr(
+    file_path: str, config: AppConfig, provider_entry: OcrProviderEntry | None = None
+) -> tuple[str, float, str]:
     """Send file to a remote Tesseract OCR server.
 
     The remote server is expected to accept POST with a file upload
@@ -574,7 +657,9 @@ async def _extract_remote_ocr(file_path: str, config: AppConfig, provider_entry:
     """
     path = Path(file_path)
     remote_url = (provider_entry.remote_url if provider_entry else None) or config.ocr.remote_url
-    remote_api_key = (provider_entry.remote_api_key if provider_entry else None) or config.ocr.remote_api_key
+    remote_api_key = (
+        provider_entry.remote_api_key if provider_entry else None
+    ) or config.ocr.remote_api_key
     ocr_language = (provider_entry.language if provider_entry else None) or config.ocr.language
     logger.info("Sending %s to remote OCR server: %s", path.name, remote_url)
 

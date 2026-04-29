@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/api/client";
 import { FileText, Trash2, X, Image as ImageIcon } from "lucide-react";
@@ -29,6 +29,7 @@ import LinksSection from "@/components/document-detail/LinksSection";
 import DocumentStageTimeline from "@/components/document-detail/DocumentStageTimeline";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 
 // Imaging documents (legacy ``imaging_dicom`` and 0.9.6 ``imaging_report``)
 // share most of the layout but skip OCR / AI-edit features that don't
@@ -47,9 +48,22 @@ export default function DocumentDetailPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const { status: pipelineStatus } = usePipelineStatus();
   const [doc, setDoc] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
+
+  // Translation jobs deliberately don't flip documents.status to
+  // "processing" (they are an independent side-job that doesn't disturb
+  // the doc's main lifecycle). To still show the queued/running pill +
+  // cancel button while a translate is in flight, derive the in-pipeline
+  // flag from PipelineStatusContext rather than from doc.status alone.
+  const numericId = id != null ? Number(id) : null;
+  const inPipeline =
+    numericId != null &&
+    !!pipelineStatus &&
+    (pipelineStatus.current_job?.doc_id === numericId ||
+      (pipelineStatus.queued_jobs ?? []).some((j) => j.doc_id === numericId));
 
   const loadDoc = async (showLoading = true) => {
     const scrollY = window.scrollY;
@@ -109,13 +123,25 @@ export default function DocumentDetailPage() {
     return true;
   };
 
-  // Auto-refresh while processing
+  // Auto-refresh while processing OR while this doc has any pipeline job
+  // in flight (covers translation, which doesn't change doc.status).
+  // Also fires one final reload when the in-pipeline flag flips off so
+  // the freshly-written ocr_text_en / extraction lands in the UI without
+  // the user having to refresh.
+  const wasInPipeline = useRef(false);
   useEffect(() => {
-    if (doc?.status === "processing" || doc?.status === "pending") {
+    const docBusy = doc?.status === "processing" || doc?.status === "pending";
+    const busy = docBusy || inPipeline;
+    if (busy) {
+      wasInPipeline.current = true;
       const interval = setInterval(loadDoc, 3000);
       return () => clearInterval(interval);
     }
-  }, [doc?.status]);
+    if (wasInPipeline.current) {
+      wasInPipeline.current = false;
+      loadDoc(false);
+    }
+  }, [doc?.status, inPipeline]);
 
   const handleDelete = async () => {
     const ok = await confirm({
@@ -171,7 +197,9 @@ export default function DocumentDetailPage() {
               <FileText className="h-4 w-4" /> View file
             </a>
           )}
-          {(doc.status === "processing" || doc.status === "pending") && (
+          {(doc.status === "processing" ||
+            doc.status === "pending" ||
+            inPipeline) && (
             <button
               onClick={handleCancel}
               className="flex items-center gap-1 rounded-md border border-yellow-300 px-3 py-1.5 text-sm text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:hover:bg-yellow-950"
@@ -179,7 +207,9 @@ export default function DocumentDetailPage() {
               <X className="h-4 w-4" /> Cancel
             </button>
           )}
-          {doc.status === "processing" || doc.status === "pending" ? (
+          {doc.status === "processing" ||
+          doc.status === "pending" ||
+          inPipeline ? (
             <DocumentQueueStatus docId={Number(id)} />
           ) : (
             <>

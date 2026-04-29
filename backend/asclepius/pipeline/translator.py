@@ -148,7 +148,16 @@ async def translate_document(
                 if not translated:
                     raise RuntimeError("LLM returned empty translation")
 
-                model_label = getattr(llm, "provider_label", None) or llm_provider_id or "default"
+                # Store just the model id, not the verbose provider_label
+                # ("DisplayName · model_id"). Otherwise the frontend chip
+                # reads like duplicated information when the credential's
+                # display name happens to match the model name.
+                model_label = (
+                    getattr(llm, "_gate_model", None)
+                    or getattr(llm, "model", None)
+                    or llm_provider_id
+                    or "default"
+                )
                 await db.execute(
                     """UPDATE documents SET
                            ocr_text_en = ?,

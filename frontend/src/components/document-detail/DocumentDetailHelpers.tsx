@@ -1060,24 +1060,40 @@ export function TranslatedTextSection({
 }) {
   const [open, setOpen] = useState(true);
   if (!text) return null;
+  // Old rows persisted the verbose provider_label ("Display · model_id");
+  // newer ones store just the model. Strip the "Display · " prefix when
+  // present so the chip stays narrow and reads cleanly.
+  const modelShort = model?.includes(" · ")
+    ? model.split(" · ").pop() || model
+    : model;
+  const ts = translatedAt ? new Date(translatedAt) : null;
   return (
     <div className="rounded-lg border">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between p-4 hover:bg-accent/50"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 hover:bg-accent/50"
       >
-        <h3 className="flex items-center gap-2 font-medium">
-          {open ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          English translation
-          {model && (
-            <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-              {model}
+        <div className="flex min-w-0 items-center gap-2">
+          {open ? (
+            <EyeOff className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          ) : (
+            <Eye className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="text-sm font-medium">English translation</span>
+          {modelShort && (
+            <span
+              className="hidden truncate rounded border px-1.5 py-0 font-mono text-[10px] text-muted-foreground sm:inline-block max-w-[180px]"
+              title={model || undefined}
+            >
+              {modelShort}
             </span>
           )}
-        </h3>
-        <span className="text-xs text-muted-foreground">
-          {open ? "Hide" : "Show"} ({text.length} chars
-          {translatedAt ? `, ${new Date(translatedAt).toLocaleString()}` : ""})
+        </div>
+        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+          {open ? "Hide" : "Show"} · {text.length.toLocaleString()} chars
+          {ts
+            ? ` · ${ts.toLocaleDateString()} ${ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            : ""}
         </span>
       </button>
       {open && (

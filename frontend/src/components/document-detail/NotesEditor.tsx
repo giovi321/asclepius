@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { StickyNote } from "lucide-react";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
@@ -25,6 +26,7 @@ export default function NotesEditor({ docId, initialNotes }: NotesEditorProps) {
   return (
     <Section
       title="Notes"
+      icon={StickyNote}
       sectionId="notes"
       defaultOpen={!!initialNotes?.trim()}
     >

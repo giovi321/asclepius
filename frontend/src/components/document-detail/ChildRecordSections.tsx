@@ -252,7 +252,7 @@ function IcdCodeSelect({
   if (editing) {
     return (
       <div ref={rootRef} className="relative w-72 max-w-full">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
             <input

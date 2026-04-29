@@ -314,7 +314,7 @@ export function EditableField({
         <span className="text-muted-foreground w-28 flex-shrink-0">
           {label}
         </span>
-        <div className="flex-1 flex items-center gap-1">
+        <div className="flex-1 flex items-center gap-2">
           <input
             type={type}
             value={val}
@@ -730,7 +730,7 @@ export function EditableCombobox({
           {label}
         </span>
         <div ref={rootRef} className="relative flex-1">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
               <input

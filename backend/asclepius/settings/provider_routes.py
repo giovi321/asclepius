@@ -16,10 +16,180 @@ from asclepius.config import (
     OcrProviderEntry,
     VisionLlmProviderEntry,
     get_config,
+    resolve_credential,
 )
 from asclepius.config.resolver import _new_credential_id
 
 router = APIRouter()
+
+
+# ── Metadata-only connectivity probes ────────────────────────────
+#
+# Connectivity tests used to send a real "Reply with exactly: OK" prompt to
+# every backend, which validated end-to-end inference but cost tokens
+# (Anthropic / OpenAI) and tied up the same Ollama GPU the pipeline was
+# trying to use. The probes below hit each provider's free metadata
+# endpoint instead — list-models / list-tags. They confirm:
+#   1. the base URL is reachable,
+#   2. the API key (if any) is valid,
+#   3. the configured model is actually available on the server.
+#
+# What they DON'T catch: the model is installed but its weights are corrupt,
+# the prompt template is broken, or the inference path errors. For that
+# the user can run a real reprocess.
+
+
+def _resolve_test_connection(
+    entry, *, kind: str,
+) -> tuple[str, str, str, str, str]:
+    """Resolve the effective ``(type, base_url, api_key, model, label)`` for
+    a test request, mirroring how the real provider builders treat the
+    entry's ``credential_id`` (when set) as the source of truth for type /
+    base_url / api_key, with the entry's inline fields as fallback.
+
+    ``kind`` selects which inline fields to read:
+      - ``"llm"``   → entry.type / base_url / api_key / model
+      - ``"vision"``→ same fields, on a VisionLlmProviderEntry
+      - ``"llm_vision"`` → entry.llm_provider / llm_base_url / llm_api_key / llm_model
+    """
+    config = get_config()
+    cred = resolve_credential(config, getattr(entry, "credential_id", "") or "")
+
+    if kind == "llm_vision":
+        eff_type = (cred.type if cred else None) or entry.llm_provider
+        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (entry.llm_base_url or "")
+        eff_api_key = (cred.api_key if cred and cred.api_key else None) or (entry.llm_api_key or "")
+        eff_model = entry.llm_model or ""
+    else:
+        eff_type = (cred.type if cred else None) or getattr(entry, "type", "")
+        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (getattr(entry, "base_url", "") or "")
+        eff_api_key = (cred.api_key if cred and cred.api_key else None) or (getattr(entry, "api_key", "") or "")
+        eff_model = getattr(entry, "model", "") or ""
+
+    label = (cred.name if cred else "") or getattr(entry, "name", "") or eff_type
+    return eff_type, eff_base_url, eff_api_key, eff_model, label
+
+
+async def _probe_metadata(
+    eff_type: str, base_url: str, api_key: str, model: str, *, timeout: float = 10.0,
+) -> dict:
+    """Hit the provider's free metadata endpoint to verify connectivity, auth
+    and model availability — without consuming any inference tokens.
+
+    Returns ``{"ok": True, "detail": "..."}`` on success or
+    ``{"ok": False, "error": "..."}`` on failure.
+    """
+    eff_type = (eff_type or "").lower()
+
+    try:
+        if eff_type == "ollama":
+            # ``GET /api/tags`` lists installed models. Free, instant. We then
+            # check that the configured model is actually pulled — a typo in
+            # the model name is the most common Ollama-side test failure.
+            url = (base_url or "http://ollama:11434").rstrip("/") + "/api/tags"
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                tags = resp.json().get("models", []) or []
+            available = [t.get("name", "") for t in tags]
+            if model and not _model_in_list(model, available):
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Server reachable but model '{model}' not found. "
+                        f"Available: {', '.join(available[:10]) or '(none)'}"
+                    ),
+                }
+            return {"ok": True, "detail": f"Ollama reachable · {len(available)} model(s) installed"}
+
+        if eff_type in ("openai", "vllm"):
+            # Standard OpenAI-compatible ``GET /v1/models``. vLLM and most
+            # local OpenAI-compatible servers expose this too.
+            base = (base_url or "https://api.openai.com/v1").rstrip("/")
+            url = f"{base}/models"
+            headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                data = resp.json() or {}
+            available = [m.get("id", "") for m in data.get("data", [])]
+            if model and not _model_in_list(model, available):
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Server reachable, key valid, but model '{model}' not listed. "
+                        f"Available: {', '.join(available[:10]) or '(none)'}"
+                    ),
+                }
+            return {"ok": True, "detail": f"{eff_type.upper()} reachable · {len(available)} model(s) accessible"}
+
+        if eff_type == "claude":
+            # Anthropic SDK exposes ``client.models.list()`` — free, validates
+            # the API key. Catches the most common test failure (bad key).
+            from anthropic import AsyncAnthropic
+            client = AsyncAnthropic(api_key=api_key)
+            try:
+                listing = await client.models.list()
+            finally:
+                # Older SDK versions don't have aclose; ignore if missing.
+                aclose = getattr(client, "aclose", None)
+                if aclose is not None:
+                    try:
+                        await aclose()
+                    except Exception:
+                        pass
+            ids = [m.id for m in getattr(listing, "data", []) or []]
+            if model and not _model_in_list(model, ids):
+                return {
+                    "ok": False,
+                    "error": (
+                        f"API key valid but model '{model}' not in Anthropic's model list. "
+                        f"Available: {', '.join(ids[:8]) or '(none)'}"
+                    ),
+                }
+            return {"ok": True, "detail": f"Anthropic API key valid · {len(ids)} model(s) accessible"}
+
+        return {"ok": False, "error": f"Unknown provider type: {eff_type}"}
+
+    except httpx.HTTPStatusError as e:
+        body = ""
+        try:
+            body = e.response.text[:300]
+        except Exception:
+            pass
+        return {"ok": False, "error": f"HTTP {e.response.status_code}: {body or str(e)}"}
+    except httpx.HTTPError as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e) or e.__class__.__name__}"}
+    except Exception as e:  # pragma: no cover — SDK errors vary
+        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
+
+
+def _model_in_list(model: str, available: list[str]) -> bool:
+    """Tolerant model-name comparison.
+
+    Ollama tags often carry an explicit ``:latest`` suffix even when the
+    user wrote the bare name (and vice versa); OpenAI lists model ids
+    verbatim. We accept exact match, suffix-stripped match, or
+    case-insensitive match so the test doesn't false-fail on a trivial
+    naming discrepancy.
+    """
+    if not model:
+        return True
+    m = model.strip()
+    m_low = m.lower()
+    m_bare = m.split(":", 1)[0].lower()
+    for entry in available or []:
+        e = (entry or "").strip()
+        if not e:
+            continue
+        if e == m:
+            return True
+        e_low = e.lower()
+        if e_low == m_low:
+            return True
+        if e_low.split(":", 1)[0] == m_bare:
+            return True
+    return False
 
 
 # --- LLM Providers ---
@@ -353,18 +523,18 @@ async def test_llm_provider(
     body: TestProviderRequest,
     current_user: dict = Depends(require_role("admin")),
 ):
-    """Test connectivity to an LLM provider by sending a tiny prompt."""
+    """Test connectivity to an LLM provider via its metadata endpoint.
+
+    Hits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),
+    or ``client.models.list()`` (Anthropic). Free, instant, validates auth
+    and that the configured model is available — without acquiring an
+    inference slot or burning tokens.
+    """
     config = get_config()
     entry = _resolve_test_entry(body, config.llm.providers, LlmProviderEntry,
                                 preserve_secret_fields=("api_key",))
-
-    try:
-        from asclepius.pipeline.processor import _build_llm_provider
-        provider = _build_llm_provider(entry)
-        response = await provider._generate("Reply with exactly: OK", force_json=False, timeout_override=15)
-        return {"ok": True, "response": response.strip()[:200]}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
+    eff_type, base_url, api_key, model, _ = _resolve_test_connection(entry, kind="llm")
+    return await _probe_metadata(eff_type, base_url, api_key, model)
 
 
 @router.post("/test-ocr-provider")
@@ -395,20 +565,10 @@ async def test_ocr_provider(
                 return {"ok": True, "detail": f"Remote OCR reachable (HTTP {resp.status_code})"}
 
         elif entry.type == "llm_vision":
-            from asclepius.config import LlmProviderEntry
-            from asclepius.pipeline.processor import _build_llm_provider
-            llm_entry = LlmProviderEntry(
-                id="test-vision",
-                type=entry.llm_provider,
-                name="test",
-                base_url=entry.llm_base_url,
-                model=entry.llm_model,
-                api_key=entry.llm_api_key,
-                timeout=15,
+            eff_type, base_url, api_key, model, _ = _resolve_test_connection(
+                entry, kind="llm_vision",
             )
-            provider = _build_llm_provider(llm_entry)
-            response = await provider._generate("Reply with exactly: OK", force_json=False, timeout_override=15)
-            return {"ok": True, "detail": f"LLM Vision OK: {response.strip()[:100]}"}
+            return await _probe_metadata(eff_type, base_url, api_key, model)
 
         elif entry.type == "google_vision":
             if not entry.google_vision_key:
@@ -434,30 +594,14 @@ async def test_vision_provider(
     body: TestProviderRequest,
     current_user: dict = Depends(require_role("admin")),
 ):
-    """Test connectivity to a Vision-LLM provider with a trivial prompt."""
+    """Test connectivity to a Vision-LLM provider via its metadata endpoint.
+
+    Same probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),
+    ``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).
+    No image is uploaded, no inference is run.
+    """
     config = get_config()
     entry = _resolve_test_entry(body, config.vision.providers, VisionLlmProviderEntry,
                                 preserve_secret_fields=("api_key",))
-
-    try:
-        import base64 as _b64
-        import io as _io
-
-        from PIL import Image as _Image
-        img = _Image.new("RGB", (280, 280), "white")
-        buf = _io.BytesIO()
-        img.save(buf, format="JPEG", quality=85)
-        b64 = _b64.b64encode(buf.getvalue()).decode("utf-8")
-
-        from asclepius.pipeline.vision_extractor import _vision_call
-        response = await _vision_call(b64, "Reply with exactly: OK", entry, force_json=False)
-        return {"ok": True, "detail": response.strip()[:200]}
-    except httpx.HTTPStatusError as e:
-        body = ""
-        try:
-            body = e.response.text[:500]
-        except Exception:
-            pass
-        return {"ok": False, "error": f"HTTP {e.response.status_code}: {body or str(e)}"}
-    except Exception as e:
-        return {"ok": False, "error": f"{type(e).__name__}: {str(e)}"}
+    eff_type, base_url, api_key, model, _ = _resolve_test_connection(entry, kind="vision")
+    return await _probe_metadata(eff_type, base_url, api_key, model)

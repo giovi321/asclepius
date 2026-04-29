@@ -11,7 +11,7 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig
-from asclepius.documents.service import compute_file_hash
+from asclepius.documents.service import compute_file_hash, migrate_document_links
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.organizer import build_organized_path, move_file
 from asclepius.util.dates import best_date_with_received
@@ -756,6 +756,11 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                         "report_status = 'attached' WHERE id = ?",
                         (doc_id, hint_imaging_study_id),
                     )
+                    # Repoint document_links anchored on the placeholder so
+                    # the imaging study's "linked documents" survive the
+                    # placeholder delete below (otherwise ON DELETE CASCADE
+                    # wipes them silently).
+                    await migrate_document_links(db, placeholder_doc_id, doc_id)
                     if placeholder_doc_id and placeholder_doc_id != doc_id:
                         cursor = await db.execute(
                             "SELECT file_path, doc_type FROM documents WHERE id = ?",

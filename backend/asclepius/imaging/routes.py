@@ -10,6 +10,7 @@ import aiosqlite
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.documents.service import migrate_document_links
 from asclepius.patients.service import check_patient_access
 
 router = APIRouter()
@@ -21,8 +22,7 @@ async def _study_with_access(
     db: aiosqlite.Connection,
 ) -> dict:
     cursor = await db.execute(
-        "SELECT id, document_id, patient_id, folder_path "
-        "FROM imaging_studies WHERE id = ?",
+        "SELECT id, document_id, patient_id, folder_path " "FROM imaging_studies WHERE id = ?",
         (study_id,),
     )
     row = await cursor.fetchone()
@@ -42,14 +42,14 @@ _LIST_SORT_COLUMNS: dict[str, str] = {
     # joined through documents → doctors / facilities so the sort lines
     # up with the canonical names shown in the UI. Study date now lives
     # on the parent ``documents.event_date`` (single source of truth).
-    "modality":          "s.modality",
-    "body_part":         "s.body_part",
-    "study_date":        "d.event_date",
-    "doctor":            "doc.name",
-    "facility":          "f.name",
-    "patient":           "p.display_name",
-    "report_status":     "s.report_status",
-    "date_added":        "d.created_at",
+    "modality": "s.modality",
+    "body_part": "s.body_part",
+    "study_date": "d.event_date",
+    "doctor": "doc.name",
+    "facility": "f.name",
+    "patient": "p.display_name",
+    "report_status": "s.report_status",
+    "date_added": "d.created_at",
 }
 
 
@@ -59,7 +59,10 @@ async def list_imaging_studies(
     modality: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    q: str | None = Query(default=None, description="Search across body part, study description, doctor name, facility name"),
+    q: str | None = Query(
+        default=None,
+        description="Search across body part, study description, doctor name, facility name",
+    ),
     report_status: str | None = Query(default=None, pattern="^(placeholder|attached)$"),
     sort: str | None = None,
     order: str | None = Query(default=None, pattern="^(asc|desc)$"),
@@ -274,9 +277,7 @@ async def get_frame(
     series_path = Path(config.vault.root_path) / folder
     if not series_path.exists():
         raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted(
-        [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
-    )
+    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
 
     if index < 0 or index >= len(frames):
         raise HTTPException(status_code=404, detail="Frame not found")
@@ -311,8 +312,16 @@ async def get_frame(
         file_wc: float | None = None
         file_ww: float | None = None
         if hasattr(ds, "WindowCenter") and hasattr(ds, "WindowWidth"):
-            file_wc = float(ds.WindowCenter) if not isinstance(ds.WindowCenter, pydicom.multival.MultiValue) else float(ds.WindowCenter[0])
-            file_ww = float(ds.WindowWidth) if not isinstance(ds.WindowWidth, pydicom.multival.MultiValue) else float(ds.WindowWidth[0])
+            file_wc = (
+                float(ds.WindowCenter)
+                if not isinstance(ds.WindowCenter, pydicom.multival.MultiValue)
+                else float(ds.WindowCenter[0])
+            )
+            file_ww = (
+                float(ds.WindowWidth)
+                if not isinstance(ds.WindowWidth, pydicom.multival.MultiValue)
+                else float(ds.WindowWidth[0])
+            )
 
         wc_val = wc if wc is not None else file_wc
         ww_val = ww if ww is not None else file_ww
@@ -334,7 +343,11 @@ async def get_frame(
             # No window info — fall back to a min-max stretch so blank-tag
             # files still render with reasonable contrast.
             if pixel_array.max() != pixel_array.min():
-                pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min()) * 255
+                pixel_array = (
+                    (pixel_array - pixel_array.min())
+                    / (pixel_array.max() - pixel_array.min())
+                    * 255
+                )
 
         pixel_array = pixel_array.astype(np.uint8)
         if invert:
@@ -351,6 +364,7 @@ async def get_frame(
         buf.seek(0)
 
         from fastapi.responses import StreamingResponse
+
         return StreamingResponse(buf, media_type="image/png")
 
     except Exception:
@@ -382,9 +396,7 @@ async def get_frame_metadata(
     series_path = Path(config.vault.root_path) / folder
     if not series_path.exists():
         raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted(
-        [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
-    )
+    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
     if index < 0 or index >= len(frames):
         raise HTTPException(status_code=404, detail="Frame not found")
 
@@ -426,13 +438,15 @@ async def get_frame_metadata(
                     value = str(raw)
             except Exception:
                 value = None
-        items.append({
-            "tag": str(elem.tag),
-            "keyword": kw or None,
-            "vr": elem.VR,
-            "name": elem.name,
-            "value": value,
-        })
+        items.append(
+            {
+                "tag": str(elem.tag),
+                "keyword": kw or None,
+                "vr": elem.VR,
+                "name": elem.name,
+                "value": value,
+            }
+        )
     return {"items": items, "count": len(items)}
 
 
@@ -457,14 +471,13 @@ async def get_frame_window(
     series_path = Path(config.vault.root_path) / folder
     if not series_path.exists():
         raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted(
-        [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
-    )
+    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
     if index < 0 or index >= len(frames):
         raise HTTPException(status_code=404, detail="Frame not found")
 
     try:
         import pydicom
+
         ds = pydicom.dcmread(str(frames[index]), stop_before_pixels=True)
     except Exception:
         return {"window_center": None, "window_width": None}
@@ -548,17 +561,21 @@ async def list_bundle_files(
         if sub.is_dir():
             for f in sub.iterdir():
                 if f.is_file():
-                    items.append({
-                        "name": f"{sub.name}/{f.name}",
-                        "size": f.stat().st_size,
-                        "kind": _kind_for_extension(f.suffix.lower()),
-                    })
+                    items.append(
+                        {
+                            "name": f"{sub.name}/{f.name}",
+                            "size": f.stat().st_size,
+                            "kind": _kind_for_extension(f.suffix.lower()),
+                        }
+                    )
         elif sub.is_file():
-            items.append({
-                "name": sub.name,
-                "size": sub.stat().st_size,
-                "kind": _kind_for_extension(sub.suffix.lower()),
-            })
+            items.append(
+                {
+                    "name": sub.name,
+                    "size": sub.stat().st_size,
+                    "kind": _kind_for_extension(sub.suffix.lower()),
+                }
+            )
     items.sort(key=lambda i: i["name"])
     return {"items": items}
 
@@ -637,20 +654,21 @@ async def list_imaging_links(
     # entry to the document detail.
     if document_id:
         cursor = await db.execute(
-            "SELECT id, original_filename, doc_type, event_date "
-            "FROM documents WHERE id = ?",
+            "SELECT id, original_filename, doc_type, event_date " "FROM documents WHERE id = ?",
             (document_id,),
         )
         report_row = await cursor.fetchone()
         if report_row:
-            items.append({
-                "link_id": None,
-                "link_type": "report",
-                "id": report_row["id"],
-                "original_filename": report_row["original_filename"],
-                "doc_type": report_row["doc_type"],
-                "event_date": report_row["event_date"],
-            })
+            items.append(
+                {
+                    "link_id": None,
+                    "link_type": "report",
+                    "id": report_row["id"],
+                    "original_filename": report_row["original_filename"],
+                    "doc_type": report_row["doc_type"],
+                    "event_date": report_row["event_date"],
+                }
+            )
 
     cursor = await db.execute(
         """SELECT dl.id AS link_id, dl.link_type, d.id, d.original_filename,
@@ -796,8 +814,7 @@ async def remove_imaging_link(
     """Remove a document_links row. Validates the link belongs to this study."""
     study = await _study_with_access(study_id, current_user, db)
     cursor = await db.execute(
-        "SELECT source_document_id, target_document_id FROM document_links "
-        "WHERE id = ?",
+        "SELECT source_document_id, target_document_id FROM document_links " "WHERE id = ?",
         (link_id,),
     )
     row = await cursor.fetchone()
@@ -885,6 +902,10 @@ async def attach_imaging_report(
             "UPDATE imaging_studies SET document_id = ?, report_status = 'attached' WHERE id = ?",
             (document_id, study_id),
         )
+        # Repoint any document_links anchored on the OLD parent so the
+        # imaging study's "linked documents" survive the swap. Without this
+        # the placeholder delete below would cascade-wipe them.
+        await migrate_document_links(db, placeholder_doc_id, document_id)
         if placeholder_doc_id and placeholder_doc_id != document_id:
             cursor = await db.execute(
                 "SELECT file_path, doc_type FROM documents WHERE id = ?",
@@ -1017,8 +1038,13 @@ async def detach_imaging_report(
             doctor_id, facility_id, file_hash, file_size,
             status, ocr_engine, ocr_text)
            VALUES (?, '', ?, 'imaging_report', ?, ?, ?, NULL, NULL, 'done', 'dicom', '')""",
-        (study["patient_id"], placeholder_name, full.get("study_date"),
-         full.get("doctor_id"), full.get("facility_id")),
+        (
+            study["patient_id"],
+            placeholder_name,
+            full.get("study_date"),
+            full.get("doctor_id"),
+            full.get("facility_id"),
+        ),
     )
     new_placeholder_id = cursor.lastrowid
 
@@ -1026,6 +1052,13 @@ async def detach_imaging_report(
         "UPDATE imaging_studies SET document_id = ?, report_status = 'placeholder' WHERE id = ?",
         (new_placeholder_id, study_id),
     )
+
+    # Repoint document_links anchored on the previously-attached doc onto
+    # the fresh placeholder. Done unconditionally (even when the OLD parent
+    # is a real PDF that survives) so links follow the imaging study, not
+    # whichever document happens to be the parent today. Without this,
+    # detaching would strand them on a now-orphaned doc id.
+    await migrate_document_links(db, old_doc_id, new_placeholder_id)
 
     # If the previously-attached row was itself a placeholder (defensive
     # check — shouldn't happen given the report_status guard above), we

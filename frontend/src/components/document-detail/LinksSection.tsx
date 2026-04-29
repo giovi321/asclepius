@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { FileText, Link2, Plus, Search, X } from "lucide-react";
+import {
+  FileText,
+  Image as ImageIcon,
+  Link2,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
@@ -25,6 +33,7 @@ export default function LinksSection({
   onLinksChange,
 }: LinksSectionProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [relevantDocs, setRelevantDocs] = useState<any[]>([]);
   const [loadingRelevant, setLoadingRelevant] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -42,8 +51,12 @@ export default function LinksSection({
       .finally(() => setLoadingRelevant(false));
   }, [docId, patientId]);
 
+  // Filter out the docs already shown (real links + synthetic imaging entries)
+  // so the manual-link search doesn't surface them as candidates again.
   const alreadyLinkedIds = new Set<number>(
-    links.flatMap((l: any) => [l.source_document_id, l.target_document_id]),
+    links
+      .flatMap((l: any) => [l.source_document_id, l.target_document_id])
+      .filter((v: any) => typeof v === "number"),
   );
   alreadyLinkedIds.add(docId);
 
@@ -172,36 +185,53 @@ export default function LinksSection({
       {links.length > 0 ? (
         <div className="space-y-2">
           {links.map((link: any) => {
-            const linkedId =
-              link.source_document_id === docId
-                ? link.target_document_id
-                : link.source_document_id;
+            // The link row carries metadata for both ends. Pick the side
+            // that ISN'T this document so we render "the other end".
+            const otherSide =
+              link.source_document_id === docId ? "target" : "source";
+            const linkedDocId = link[`${otherSide}_document_id`];
             const linkedName =
-              link.source_document_id === docId
-                ? link.target_filename || `Document #${link.target_document_id}`
-                : link.source_filename ||
-                  `Document #${link.source_document_id}`;
+              link[`${otherSide}_filename`] || `Document #${linkedDocId}`;
+            const studyId = link[`${otherSide}_imaging_study_id`];
+            const modality = link[`${otherSide}_modality`];
+            const isImaging = Boolean(studyId);
+            // ``link.id == null`` flags a synthetic row appended by
+            // get_document_links() to represent imaging_studies.document_id.
+            // Synthetic rows can't be unlinked here — the imaging↔report
+            // binding is managed by ReportSlot's Detach action.
+            const isSynthetic = link.id == null;
+            const target = isImaging
+              ? `/imaging/${studyId}`
+              : `/documents/${linkedDocId}`;
             return (
               <div
-                key={link.id}
+                key={isSynthetic ? `imaging-${studyId}` : `link-${link.id}`}
                 className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
               >
-                <a
-                  href={`/documents/${linkedId}`}
-                  className="text-primary hover:underline truncate flex-1"
+                <button
+                  onClick={() => navigate(target)}
+                  className="text-primary hover:underline truncate flex-1 text-left"
                 >
                   {linkedName}
-                </a>
+                </button>
+                {isImaging && (
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                    <ImageIcon className="h-3 w-3" />
+                    Imaging{modality ? ` · ${modality}` : ""}
+                  </span>
+                )}
                 <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {link.link_type || "related"}
                 </span>
-                <button
-                  onClick={() => unlink(link.id)}
-                  className="ml-2 rounded p-1 text-muted-foreground hover:text-destructive"
-                  title="Remove link"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+                {!isSynthetic && (
+                  <button
+                    onClick={() => unlink(link.id)}
+                    className="ml-2 rounded p-1 text-muted-foreground hover:text-destructive"
+                    title="Remove link"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
             );
           })}

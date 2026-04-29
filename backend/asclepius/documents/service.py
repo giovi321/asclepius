@@ -41,14 +41,14 @@ _SORT_COLUMNS: dict[str, str] = {
     # Frontend column key → SQL expression. Whitelist only — anything not in
     # here falls back to the default "best date" ordering, which also
     # prevents SQL injection via untrusted sort params.
-    "file":       "d.original_filename",
-    "type":       "d.doc_type",
-    "date":       BEST_DATE_SQL,
-    "doctor":     "doc.name",
-    "facility":   "f.name",
-    "patient":    "p.display_name",
-    "specialty":  "COALESCE(ns.canonical_display, d.specialty_original)",
-    "status":     "d.status",
+    "file": "d.original_filename",
+    "type": "d.doc_type",
+    "date": BEST_DATE_SQL,
+    "doctor": "doc.name",
+    "facility": "f.name",
+    "patient": "p.display_name",
+    "specialty": "COALESCE(ns.canonical_display, d.specialty_original)",
+    "status": "d.status",
     "date_added": "d.created_at",
 }
 
@@ -251,6 +251,7 @@ def compute_file_hash(file_path: str | Path) -> str:
 
 # ── Repository helpers ───────────────────────────────────────────
 
+
 async def update_document_status(
     db: aiosqlite.Connection,
     doc_id: int,
@@ -267,15 +268,11 @@ async def update_document_status(
     if increment_retry:
         parts.append("retry_count = COALESCE(retry_count, 0) + 1")
     params.append(doc_id)
-    await db.execute(
-        f"UPDATE documents SET {', '.join(parts)} WHERE id = ?", params
-    )
+    await db.execute(f"UPDATE documents SET {', '.join(parts)} WHERE id = ?", params)
     await db.commit()
 
 
-async def update_document_fields(
-    db: aiosqlite.Connection, doc_id: int, updates: dict
-) -> None:
+async def update_document_fields(db: aiosqlite.Connection, doc_id: int, updates: dict) -> None:
     """Generic field update on a document row.
 
     Changes to ``doctor_id`` / ``facility_id`` / ``norm_specialty_id``
@@ -306,9 +303,7 @@ async def update_document_fields(
 _VALID_RELATED_TABLES = {"lab_results", "encounters", "medications", "vaccinations"}
 
 
-async def get_related_records(
-    db: aiosqlite.Connection, table: str, doc_id: int
-) -> list[dict]:
+async def get_related_records(db: aiosqlite.Connection, table: str, doc_id: int) -> list[dict]:
     """Get related records from a child table."""
     if table not in _VALID_RELATED_TABLES:
         raise ValueError(f"Invalid related table: {table}")
@@ -351,15 +346,11 @@ async def get_related_records(
             (doc_id,),
         )
     else:
-        cursor = await db.execute(
-            f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,)
-        )
+        cursor = await db.execute(f"SELECT * FROM {table} WHERE document_id = ?", (doc_id,))
     return [dict(r) for r in await cursor.fetchall()]
 
 
-async def get_document_sections(
-    db: aiosqlite.Connection, doc_id: int
-) -> list[dict]:
+async def get_document_sections(db: aiosqlite.Connection, doc_id: int) -> list[dict]:
     """Get page-level sections for a document."""
     cursor = await db.execute(
         """SELECT id, section_index, page_start, page_end, section_type, summary_en
@@ -369,27 +360,69 @@ async def get_document_sections(
     return [dict(r) for r in await cursor.fetchall()]
 
 
-async def get_document_links(
-    db: aiosqlite.Connection, doc_id: int
-) -> list[dict]:
-    """Get all document links (both directions) for a document."""
+async def get_document_links(db: aiosqlite.Connection, doc_id: int) -> list[dict]:
+    """Linked documents (both directions) plus a synthetic entry for any
+    imaging study this document parents.
+
+    Each row is enriched with ``{source,target}_imaging_study_id`` (plus
+    modality / body_part) so the frontend can render an *Imaging* badge and
+    route the click to ``/imaging/{id}``. Real ``document_links`` rows have
+    ``id`` populated; the synthetic row representing
+    ``imaging_studies.document_id = doc_id`` carries ``id = None`` so the UI
+    hides the unlink affordance for it (the imaging↔report binding is
+    managed via ReportSlot Detach, not the LinksSection).
+    """
     cursor = await db.execute(
         """SELECT dl.id, dl.link_type, dl.created_at,
                   dl.source_document_id, dl.target_document_id,
                   sd.original_filename as source_filename, sd.doc_type as source_doc_type,
-                  td.original_filename as target_filename, td.doc_type as target_doc_type
+                  td.original_filename as target_filename, td.doc_type as target_doc_type,
+                  si.id AS source_imaging_study_id, si.modality AS source_modality,
+                  si.body_part AS source_body_part,
+                  ti.id AS target_imaging_study_id, ti.modality AS target_modality,
+                  ti.body_part AS target_body_part
            FROM document_links dl
            JOIN documents sd ON dl.source_document_id = sd.id
            JOIN documents td ON dl.target_document_id = td.id
+           LEFT JOIN imaging_studies si ON si.document_id = sd.id
+           LEFT JOIN imaging_studies ti ON ti.document_id = td.id
            WHERE dl.source_document_id = ? OR dl.target_document_id = ?""",
         (doc_id, doc_id),
     )
-    return [dict(r) for r in await cursor.fetchall()]
+    rows = [dict(r) for r in await cursor.fetchall()]
+
+    cursor = await db.execute(
+        """SELECT i.id AS imaging_study_id, i.modality, i.body_part,
+                  d.id AS doc_id, d.original_filename, d.doc_type
+           FROM imaging_studies i
+           JOIN documents d ON d.id = i.document_id
+           WHERE i.document_id = ?""",
+        (doc_id,),
+    )
+    for ir in await cursor.fetchall():
+        rows.append(
+            {
+                "id": None,
+                "link_type": "imaging_report",
+                "created_at": None,
+                "source_document_id": doc_id,
+                "target_document_id": ir["doc_id"],
+                "source_filename": None,
+                "source_doc_type": None,
+                "target_filename": ir["original_filename"],
+                "target_doc_type": ir["doc_type"],
+                "source_imaging_study_id": None,
+                "source_modality": None,
+                "source_body_part": None,
+                "target_imaging_study_id": ir["imaging_study_id"],
+                "target_modality": ir["modality"],
+                "target_body_part": ir["body_part"],
+            }
+        )
+    return rows
 
 
-async def get_failed_documents(
-    db: aiosqlite.Connection, limit: int = 50
-) -> list[dict]:
+async def get_failed_documents(db: aiosqlite.Connection, limit: int = 50) -> list[dict]:
     """List failed documents with error messages for the review queue."""
     cursor = await db.execute(
         """SELECT d.id, d.original_filename, d.file_path, d.status, d.error_message,
@@ -405,17 +438,68 @@ async def get_failed_documents(
     return [dict(r) for r in await cursor.fetchall()]
 
 
-async def delete_document_record(
-    db: aiosqlite.Connection, doc_id: int
-) -> None:
+async def delete_document_record(db: aiosqlite.Connection, doc_id: int) -> None:
     """Delete a document record (CASCADE handles child tables)."""
     await db.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
     await db.commit()
 
 
-async def move_child_records(
-    db: aiosqlite.Connection, doc_id: int, new_patient_id: int
+async def migrate_document_links(
+    db: aiosqlite.Connection, old_id: int | None, new_id: int | None
 ) -> None:
+    """Repoint document_links from ``old_id`` to ``new_id`` so links survive
+    when an imaging study's parent document changes (placeholder ↔ real PDF).
+
+    Without this, attaching a real-PDF report deletes the placeholder, the
+    ``ON DELETE CASCADE`` on ``document_links.{source,target}_document_id``
+    silently wipes every link the user wrote on the imaging detail page, and
+    detaching strands the same links on a now-orphaned real-PDF id.
+
+    Handles two corner cases that would otherwise break:
+
+      - ``UNIQUE(source_document_id, target_document_id, link_type)`` —
+        a rewrite that would collide with an existing (new_id, X, link_type)
+        row would raise IntegrityError. We delete the colliding old-id row
+        first (in both source and target roles, since reads union both).
+      - **Self-loops** — if a link OLD↔NEW already exists in either
+        direction, the rewrite would set source_document_id = target_document_id.
+        We delete the OLD↔NEW row before rewriting so no self-loop survives.
+    """
+    if not old_id or not new_id or old_id == new_id:
+        return
+    await db.execute(
+        """DELETE FROM document_links
+           WHERE source_document_id = ?
+             AND (target_document_id, link_type) IN (
+                 SELECT target_document_id, link_type FROM document_links
+                 WHERE source_document_id = ?)""",
+        (old_id, new_id),
+    )
+    await db.execute(
+        """DELETE FROM document_links
+           WHERE target_document_id = ?
+             AND (source_document_id, link_type) IN (
+                 SELECT source_document_id, link_type FROM document_links
+                 WHERE target_document_id = ?)""",
+        (old_id, new_id),
+    )
+    await db.execute(
+        """DELETE FROM document_links
+           WHERE (source_document_id = ? AND target_document_id = ?)
+              OR (source_document_id = ? AND target_document_id = ?)""",
+        (old_id, new_id, new_id, old_id),
+    )
+    await db.execute(
+        "UPDATE document_links SET source_document_id = ? WHERE source_document_id = ?",
+        (new_id, old_id),
+    )
+    await db.execute(
+        "UPDATE document_links SET target_document_id = ? WHERE target_document_id = ?",
+        (new_id, old_id),
+    )
+
+
+async def move_child_records(db: aiosqlite.Connection, doc_id: int, new_patient_id: int) -> None:
     """Update patient_id on all child records when moving a document."""
     for table in ["lab_results", "encounters", "medications", "vaccinations"]:
         await db.execute(

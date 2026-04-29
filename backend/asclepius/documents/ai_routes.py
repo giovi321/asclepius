@@ -399,11 +399,21 @@ async def _scoped_page_reprocess(
         except ProviderUnreachableError as e:
             raise HTTPException(status_code=503, detail=str(e))
 
-    file_path = doc.get("file_path") or ""
-    if re_run_ocr and not file_path:
+    # ``documents.file_path`` is vault-relative (e.g.
+    # ``patients/alex-smith/2024/20240315_lab-test.pdf``); resolve against
+    # ``config.vault.root_path`` to get the absolute path the OCR helpers
+    # expect. Mirrors what reprocessor.py does at every OCR call site.
+    rel_path = doc.get("file_path") or ""
+    if re_run_ocr and not rel_path:
         raise HTTPException(
             status_code=400,
             detail="Document has no file on disk to re-OCR.",
+        )
+    file_path = str(Path(config.vault.root_path) / rel_path) if rel_path else ""
+    if re_run_ocr and not Path(file_path).exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"File not found on disk: {rel_path}",
         )
 
     # Phase B: do the work. Surface it as a tracked job so the dashboard's

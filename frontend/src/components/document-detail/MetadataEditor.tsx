@@ -60,14 +60,12 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
       {!isImaging && (
         <EditableCombobox label="Specialty" value={doc.specialty_display || doc.specialty_original} field="specialty_original" docId={doc.id} onSave={onSave} normType="specialties" currentEntityId={doc.norm_specialty_id} />
       )}
-      {!isImaging && (
-        <InfoRow label="Language" value={doc.language_source} />
-      )}
-      {!isImaging && (doc.ocr_engine || doc.ocr_confidence != null || doc.llm_provider) && (
+      {!isImaging && (doc.ocr_engine || doc.ocr_confidence != null || doc.llm_provider || doc.language_source) && (
         <TechnicalDetails
           ocrEngine={doc.ocr_engine}
           ocrConfidence={doc.ocr_confidence}
           llmProvider={doc.llm_provider}
+          language={doc.language_source}
         />
       )}
     </Section>

@@ -359,20 +359,20 @@ export default function LabResultsEditor({
                 <tr key={lr.id} className={lr.is_abnormal ? "text-red-600" : ""}>
                   <td className="py-1 pr-2">
                     <div className="font-medium">
-                      {lr.test_name_canonical || lr.test_name_original || "\u2014"}
+                      {lr.test_name_canonical || lr.test_name_original || ""}
                     </div>
                     {lr.test_name_canonical && lr.test_name_original && lr.test_name_canonical !== lr.test_name_original && (
                       <div className="text-[11px] text-muted-foreground">{lr.test_name_original}</div>
                     )}
                   </td>
-                  <td className="py-1 pr-2 font-medium">{lr.value ?? lr.value_text ?? "\u2014"}</td>
+                  <td className="py-1 pr-2 font-medium">{lr.value ?? lr.value_text ?? ""}</td>
                   <td className="py-1 pr-2">{lr.unit || ""}</td>
                   <td className="py-1 pr-2 text-muted-foreground">
                     {lr.reference_range_low != null && lr.reference_range_high != null
                       ? `${lr.reference_range_low}\u2013${lr.reference_range_high}`
-                      : "\u2014"}
+                      : ""}
                   </td>
-                  <td className="py-1 pr-2 text-muted-foreground">{lr.test_date || "\u2014"}</td>
+                  <td className="py-1 pr-2 text-muted-foreground">{lr.test_date || ""}</td>
                   <td className="py-1 text-right">
                     <div className="inline-flex gap-1">
                       <button type="button" onClick={() => setEditingId(lr.id!)}

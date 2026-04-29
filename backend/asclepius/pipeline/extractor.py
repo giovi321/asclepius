@@ -338,7 +338,23 @@ def _salvage_array_keys(extraction: dict) -> None:
                 break
 
 
-_LAB_MISSING_SENTINELS = {"", "*", "-", "—", "–", "n/a", "na", "null", "none", "*/*"}
+# Strings the LLM emits when it could not find a real value. We treat
+# them as "no value" everywhere we read string fields, instead of letting
+# them bleed into the DB and the UI as if they were real content.
+_PLACEHOLDER_SENTINELS = {
+    "", "*", "-", "—", "–", "_", ".", "..", "...",
+    "n/a", "n/a.", "na", "n.a.", "n.a", "n/d", "nd",
+    "null", "none", "nil", "nan", "*/*",
+    "unknown", "unspecified", "not specified", "not available",
+    "not provided", "not applicable", "no value", "missing",
+    "illegible", "unreadable", "indecipherable",
+    "(empty)", "(none)", "(null)", "(unknown)", "(blank)",
+    "tbd", "to be determined",
+}
+
+# Backwards-compatible alias for the lab-only call sites that pre-dated
+# the broader sanitization sweep.
+_LAB_MISSING_SENTINELS = _PLACEHOLDER_SENTINELS
 
 
 def _is_missing(val) -> bool:
@@ -346,8 +362,29 @@ def _is_missing(val) -> bool:
     if val is None:
         return True
     if isinstance(val, str):
-        return val.strip().lower() in _LAB_MISSING_SENTINELS
+        return val.strip().lower() in _PLACEHOLDER_SENTINELS
     return False
+
+
+def _clean(val):
+    """Normalize an LLM-extracted string field for DB insert.
+
+    Returns ``None`` for ``None``, empty strings, and any of the
+    ``_PLACEHOLDER_SENTINELS`` markers (case- and whitespace-insensitive).
+    Otherwise returns the value with surrounding whitespace stripped.
+    Non-string values pass through unchanged so numeric / boolean / date
+    fields aren't mangled.
+    """
+    if val is None:
+        return None
+    if not isinstance(val, str):
+        return val
+    stripped = val.strip()
+    if not stripped:
+        return None
+    if stripped.lower() in _PLACEHOLDER_SENTINELS:
+        return None
+    return stripped
 
 
 def _parse_reference_range(raw: str) -> tuple[float | None, float | None]:
@@ -653,12 +690,12 @@ async def extract_and_store(
     issued_date_val = extraction.get("issued_date") or extraction.get("date_issued")
     if issued_date_val:
         updates["issued_date"] = issued_date_val
-    if extraction.get("language_detected"):
-        updates["language_source"] = extraction["language_detected"]
-    if extraction.get("summary_en"):
-        updates["summary_en"] = extraction["summary_en"]
-    if extraction.get("summary_original"):
-        updates["summary_original"] = extraction["summary_original"]
+    if (lang := _clean(extraction.get("language_detected"))):
+        updates["language_source"] = lang
+    if (sum_en := _clean(extraction.get("summary_en"))):
+        updates["summary_en"] = sum_en
+    if (sum_orig := _clean(extraction.get("summary_original"))):
+        updates["summary_original"] = sum_orig
     cost_data = extraction.get("cost", {})
     if cost_data.get("total_amount"):
         updates["cost_amount"] = cost_data["total_amount"]
@@ -669,15 +706,15 @@ async def extract_and_store(
 
     # Insurance info from extraction
     insurance = extraction.get("insurance", {})
-    if insurance.get("company"):
-        updates["insurance_company"] = insurance["company"]
-    if insurance.get("policy_number"):
-        updates["insurance_policy"] = insurance["policy_number"]
+    if (ins_co := _clean(insurance.get("company"))):
+        updates["insurance_company"] = ins_co
+    if (ins_pol := _clean(insurance.get("policy_number"))):
+        updates["insurance_policy"] = ins_pol
 
     # Specialty info on the document itself
     specialty_data = extraction.get("specialty", {})
-    if specialty_data.get("original"):
-        updates["specialty_original"] = specialty_data["original"]
+    if (spec_orig := _clean(specialty_data.get("original"))):
+        updates["specialty_original"] = spec_orig
     # resolve_extraction() populates specialty["norm_specialty_id"] from the
     # original text; fall back to the legacy canonical-based resolver when
     # that wasn't run (error / override path).
@@ -753,11 +790,11 @@ async def extract_and_store(
                     value, value_text, unit, reference_range_low, reference_range_high,
                     is_abnormal, sample_type, panel_name, test_date)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, lab.get("test_name_original"),
-                 norm_id, lab.get("value"), lab.get("value_text"),
-                 lab.get("unit"), lab.get("reference_range_low"),
+                (doc_id, patient_id, _clean(lab.get("test_name_original")),
+                 norm_id, lab.get("value"), _clean(lab.get("value_text")),
+                 _clean(lab.get("unit")), lab.get("reference_range_low"),
                  lab.get("reference_range_high"), lab.get("is_abnormal"),
-                 lab.get("sample_type"), lab.get("panel_name"),
+                 _clean(lab.get("sample_type")), _clean(lab.get("panel_name")),
                  lab_test_date),
             )
 
@@ -804,12 +841,12 @@ async def extract_and_store(
                 (doc_id, patient_id, doctor_id, facility_id,
                  encounter.get("encounter_date") or event_date_val,
                  encounter.get("admission_date"), encounter.get("discharge_date"),
-                 norm_diag_id, diag.get("diagnosis_original"),
-                 diag.get("icd10_code"), norm_spec_id,
-                 extraction.get("summary_en"),
-                 encounter.get("findings"),
+                 norm_diag_id, _clean(diag.get("diagnosis_original")),
+                 _clean(diag.get("icd10_code")), norm_spec_id,
+                 _clean(extraction.get("summary_en")),
+                 _clean(encounter.get("findings")),
                  encounter.get("follow_up_date"),
-                 encounter.get("follow_up_instructions")),
+                 _clean(encounter.get("follow_up_instructions"))),
             )
 
         # If no diagnoses but encounter data exists, still create encounter
@@ -821,10 +858,10 @@ async def extract_and_store(
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (doc_id, patient_id, doctor_id, facility_id,
                  encounter.get("encounter_date"),
-                 extraction.get("summary_en"),
-                 encounter.get("findings"),
+                 _clean(extraction.get("summary_en")),
+                 _clean(encounter.get("findings")),
                  encounter.get("follow_up_date"),
-                 encounter.get("follow_up_instructions")),
+                 _clean(encounter.get("follow_up_instructions"))),
             )
 
         # Insert medications
@@ -840,10 +877,10 @@ async def extract_and_store(
                     active_ingredient_original, dosage, form, frequency,
                     duration, quantity, prescribed_date)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, norm_med_id, med.get("brand_name"),
-                 med.get("active_ingredient_original"), med.get("dosage"),
-                 med.get("form"), med.get("frequency"),
-                 med.get("duration"), med.get("quantity"),
+                (doc_id, patient_id, norm_med_id, _clean(med.get("brand_name")),
+                 _clean(med.get("active_ingredient_original")), _clean(med.get("dosage")),
+                 _clean(med.get("form")), _clean(med.get("frequency")),
+                 _clean(med.get("duration")), _clean(med.get("quantity")),
                  event_date_val),
             )
 
@@ -856,9 +893,9 @@ async def extract_and_store(
                    (document_id, patient_id, vaccine_name, manufacturer,
                     lot_number, dose_number, date_administered)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (doc_id, patient_id, vax.get("vaccine_name"),
-                 vax.get("manufacturer"), vax.get("lot_number"),
-                 vax.get("dose_number"), vax.get("date_administered")),
+                (doc_id, patient_id, _clean(vax.get("vaccine_name")),
+                 _clean(vax.get("manufacturer")), _clean(vax.get("lot_number")),
+                 _clean(vax.get("dose_number")), vax.get("date_administered")),
             )
 
     # Insert invoice line items (not gated on patient_id — invoices may not have a patient)
@@ -873,11 +910,11 @@ async def extract_and_store(
                (document_id, patient_id, description, quantity, unit_price,
                 amount, currency, tariff_code, tax_rate, category)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (doc_id, patient_id, item["description"],
+            (doc_id, patient_id, _clean(item["description"]),
              item.get("quantity", 1), item.get("unit_price"),
              item.get("amount"), cost_data.get("currency", "CHF"),
-             item.get("tariff_code"), cost_data.get("tax_rate"),
-             item.get("category")),
+             _clean(item.get("tariff_code")), cost_data.get("tax_rate"),
+             _clean(item.get("category"))),
         )
 
     await db.commit()

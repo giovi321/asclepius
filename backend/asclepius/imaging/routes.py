@@ -59,7 +59,7 @@ async def list_imaging_studies(
     modality: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
-    q: str | None = Query(default=None, description="Search across body part, institution, referring physician, study description"),
+    q: str | None = Query(default=None, description="Search across body part, study description, doctor name, facility name"),
     report_status: str | None = Query(default=None, pattern="^(placeholder|attached)$"),
     sort: str | None = None,
     order: str | None = Query(default=None, pattern="^(asc|desc)$"),

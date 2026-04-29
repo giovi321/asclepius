@@ -120,6 +120,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await _migration_0_9_6_imaging_report(db)
     await _migration_0_9_7_drop_dead_imaging_columns(db)
     await _migration_0_9_8_drop_imaging_study_date(db)
+    await _migration_clear_llm_placeholders(db)
     await _ensure_compat_view(db)
 
 
@@ -506,6 +507,93 @@ async def _migration_0_9_8_drop_imaging_study_date(db: aiosqlite.Connection) -> 
             "Migration: ALTER TABLE DROP COLUMN study_date failed "
             "(older SQLite?); leaving column in place",
         )
+
+
+# Strings the LLM emits when it could not find a real value. Mirrors the
+# Python sanitizer in pipeline/extractor.py — keep both lists in sync. We
+# match case-insensitively after stripping whitespace.
+_LLM_PLACEHOLDER_VALUES = (
+    "*", "-", "—", "–", "_", ".", "..", "...",
+    "n/a", "n/a.", "na", "n.a.", "n.a", "n/d", "nd",
+    "null", "none", "nil", "nan", "*/*",
+    "unknown", "unspecified", "not specified", "not available",
+    "not provided", "not applicable", "no value", "missing",
+    "illegible", "unreadable", "indecipherable",
+    "(empty)", "(none)", "(null)", "(unknown)", "(blank)",
+    "tbd", "to be determined",
+)
+
+
+# Each entry is (table, [columns]). Listed columns are NULL'd when their
+# value is one of _LLM_PLACEHOLDER_VALUES (case-insensitive, trimmed). The
+# tuple stays in this module rather than the extractor because the
+# migration also wants to clean rows that pre-dated the in-extractor
+# sanitiser.
+_PLACEHOLDER_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("lab_results", ("test_name_original", "value_text", "unit",
+                     "sample_type", "panel_name")),
+    ("encounters", ("diagnosis_original", "diagnosis_code", "notes",
+                    "findings", "follow_up_instructions")),
+    ("medications", ("brand_name", "active_ingredient_original", "dosage",
+                     "form", "frequency", "duration", "quantity")),
+    ("vaccinations", ("vaccine_name", "manufacturer", "lot_number",
+                      "dose_number")),
+    ("invoice_items", ("description", "tariff_code", "category")),
+    ("documents", ("specialty_original", "summary_en", "summary_original",
+                   "language_source", "insurance_company", "insurance_policy")),
+)
+
+
+async def _migration_clear_llm_placeholders(db: aiosqlite.Connection) -> None:
+    """Replace LLM placeholder strings ("Null", "Illegible", "—", etc.)
+    with NULL in user-visible text columns across the structured tables.
+
+    Idempotent: re-running just NULLs the same set again, which is a no-op
+    once the rows already match. Logs once per table at INFO when at least
+    one row changed; silent otherwise so a clean DB doesn't spam the logs.
+
+    Two cleanup steps run per column:
+      1. Trim values that are surrounded by whitespace ("  null  " → "null"
+         is matched by the next step). We do this with TRIM() in SQL.
+      2. NULL anything whose lowercased trimmed value is in the sentinel
+         list. Empty strings ("") and pure-whitespace values are NULL'd
+         too — they were never useful data.
+    """
+    # Build a single CASE expression once and reuse per (table, column).
+    # Using bound parameters keeps the placeholder list out of the SQL
+    # string itself.
+    placeholders_marker = ",".join(["?"] * len(_LLM_PLACEHOLDER_VALUES))
+    for table, cols in _PLACEHOLDER_TARGETS:
+        # Skip tables that don't exist on this DB (e.g. fresh installs of
+        # an older shape, or tables that were renamed in a future version).
+        cursor = await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
+            (table,),
+        )
+        if not await cursor.fetchone():
+            continue
+        # Filter to columns that actually exist on this DB shape so older
+        # databases that pre-date a column's introduction don't error.
+        cursor = await db.execute(f"PRAGMA table_info({table})")
+        existing = {row[1] for row in await cursor.fetchall()}
+        applicable = [c for c in cols if c in existing]
+        if not applicable:
+            continue
+        for col in applicable:
+            cursor = await db.execute(
+                f"""UPDATE {table}
+                       SET {col} = NULL
+                     WHERE {col} IS NOT NULL
+                       AND (TRIM({col}) = ''
+                            OR LOWER(TRIM({col})) IN ({placeholders_marker}))""",
+                _LLM_PLACEHOLDER_VALUES,
+            )
+            if cursor.rowcount and cursor.rowcount > 0:
+                logger.info(
+                    "Migration: cleared %d LLM placeholder rows from %s.%s",
+                    cursor.rowcount, table, col,
+                )
+    await db.commit()
 
 
 async def _seed_normalization_tables(db: aiosqlite.Connection) -> None:

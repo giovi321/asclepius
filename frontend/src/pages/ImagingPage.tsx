@@ -36,8 +36,6 @@ interface Study {
   modality: string | null;
   body_part: string | null;
   study_date: string | null;
-  institution_name: string | null;
-  referring_physician: string | null;
   doctor_name: string | null;
   facility_name: string | null;
   num_series: number;
@@ -136,7 +134,7 @@ export default function ImagingPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search body part, institution, referring physician..."
+            placeholder="Search body part, facility, doctor, description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm"
@@ -242,11 +240,11 @@ function ImagingTable({ items, loading, sort, order, toggleSort, navigate }: {
       case "body_part":
         return <td key={key} className="px-3 py-2 text-muted-foreground">{niceCase(s.body_part) || "Unknown"}</td>;
       case "study_date":
-        return <td key={key} className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || "—"}</td>;
-      case "institution":
-        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.institution_name || "Unknown"}</td>;
+        return <td key={key} className="px-3 py-2 text-muted-foreground tabular-nums">{s.study_date || ""}</td>;
+      case "facility":
+        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.facility_name || ""}</td>;
       case "doctor":
-        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || s.referring_physician || "Unknown"}</td>;
+        return <td key={key} className="px-3 py-2 text-muted-foreground truncate">{s.doctor_name || ""}</td>;
       case "report_status":
         return (
           <td key={key} className="px-3 py-2">

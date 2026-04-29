@@ -4460,7 +4460,7 @@ export interface operations {
                 modality?: string | null;
                 date_from?: string | null;
                 date_to?: string | null;
-                /** @description Search across body part, institution, referring physician, study description */
+                /** @description Search across body part, study description, doctor name, facility name */
                 q?: string | null;
                 report_status?: string | null;
                 sort?: string | null;

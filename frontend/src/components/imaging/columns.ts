@@ -6,7 +6,7 @@ export type ImagingColumnKey =
   | "modality"
   | "body_part"
   | "study_date"
-  | "institution"
+  | "facility"
   | "doctor"
   | "report_status"
   | "date_added";
@@ -22,7 +22,7 @@ export const IMAGING_COLUMNS: ImagingColumnDef[] = [
   { key: "modality", label: "Type", defaultVisible: true, width: "12%" },
   { key: "body_part", label: "Body part", defaultVisible: true, width: "16%" },
   { key: "study_date", label: "Date", defaultVisible: true, width: "10%" },
-  { key: "institution", label: "Institution", defaultVisible: true, width: "20%" },
+  { key: "facility", label: "Facility", defaultVisible: true, width: "20%" },
   { key: "doctor", label: "Doctor", defaultVisible: false, width: "16%" },
   { key: "report_status", label: "Report", defaultVisible: true, width: "12%" },
   { key: "date_added", label: "Added", defaultVisible: false, width: "10%" },

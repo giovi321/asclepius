@@ -661,8 +661,12 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
 
 // ─── TechnicalDetails (collapsible) ───────────────────────────
 
-export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider }: {
+export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider, language }: {
   ocrEngine: string | null; ocrConfidence: number | null; llmProvider: string | null;
+  /** Detected source language (the previously top-level "Language" row).
+   * Lives inside the disclosure now so the metadata card stays focused on
+   * fields the user is actually likely to edit. */
+  language?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -676,6 +680,12 @@ export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider }: {
       </button>
       {open && (
         <div className="mt-1.5 ml-4 space-y-1 text-xs text-muted-foreground">
+          {language && (
+            <div className="flex justify-between">
+              <span>Language</span>
+              <span className="font-medium text-foreground/70">{language}</span>
+            </div>
+          )}
           {ocrEngine && (
             <div className="flex justify-between">
               <span>OCR Engine</span>

@@ -268,13 +268,10 @@ export interface ImagingStudy {
   modality: string | null;
   body_part: string | null;
   study_description: string | null;
-  institution_name: string | null;
-  referring_physician: string | null;
   accession_number: string | null;
   study_instance_uid: string | null;
   num_series: number;
   num_images: number;
-  is_dicom: boolean;
   folder_path: string | null;
   series?: ImagingSeries[];
 }

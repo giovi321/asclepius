@@ -436,6 +436,42 @@ async def upload_document(
         }
         return result
 
+    # Duplicate detection by SHA-256 file hash. The documents table has a
+    # UNIQUE constraint on file_hash; without this pre-check we would either
+    # silently swallow the INSERT failure (current behaviour) and let the
+    # pipeline rediscover the dup, or surface a 500 to the user. Instead,
+    # tell the user the file already exists and point them at the record.
+    file_hash = compute_file_hash(str(dest))
+    file_size = os.path.getsize(str(dest))
+    existing_doc = None
+    try:
+        async with aiosqlite.connect(config.database.path) as db:
+            cursor = await db.execute(
+                "SELECT id, original_filename, patient_id FROM documents WHERE file_hash = ?",
+                (file_hash,),
+            )
+            row = await cursor.fetchone()
+            if row:
+                existing_doc = {
+                    "id": int(row[0]),
+                    "original_filename": row[1],
+                    "patient_id": int(row[2]) if row[2] is not None else None,
+                }
+    except Exception as e:
+        logger.warning("Duplicate-hash lookup failed: %s", e)
+
+    if existing_doc:
+        # Drop the just-uploaded copy so the pipeline does not re-process it.
+        dest.unlink(missing_ok=True)
+        return {
+            "filename": dest.name,
+            "status": "duplicate",
+            "existing_document_id": existing_doc["id"],
+            "existing_filename": existing_doc["original_filename"],
+            "existing_patient_id": existing_doc["patient_id"],
+            "message": "This document is already in the system.",
+        }
+
     # Optional patient/event hints for the pipeline.
     if patient_id:
         (dest.parent / f"{dest.name}.patient_hint").write_text(str(patient_id))
@@ -449,8 +485,6 @@ async def upload_document(
     # Create a DB record immediately so the document shows up in the UI.
     # The pipeline will find this row by file_hash rather than duplicating.
     try:
-        file_hash = compute_file_hash(str(dest))
-        file_size = os.path.getsize(str(dest))
         async with aiosqlite.connect(config.database.path) as db:
             await db.execute("PRAGMA journal_mode=WAL")
             await db.execute("PRAGMA foreign_keys=ON")

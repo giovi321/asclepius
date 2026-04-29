@@ -1,7 +1,8 @@
 import { useCallback, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
-import { Upload, CheckCircle, AlertCircle, X, Calendar } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Info, X, Calendar } from "lucide-react";
 import SearchableSelect from "@/components/SearchableSelect";
 import { usePatients, useEvents } from "@/hooks/data";
 
@@ -20,13 +21,30 @@ interface UploadResult {
   extracted?: number;
   dicom?: number;
   other?: number;
+  // Returned when the uploaded file's SHA-256 matches a document already in
+  // the database. The frontend uses these fields to link the user to the
+  // existing record instead of treating it as a fresh upload.
+  existing_document_id?: number;
+  existing_filename?: string;
+  existing_patient_id?: number | null;
+}
+
+interface DuplicateInfo {
+  file: string;
+  existingId: number;
+  existingFilename?: string;
 }
 
 export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const { selectedPatient } = usePatient();
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<{ ok: boolean; message: string; failures?: { file: string; reason: string }[] } | null>(null);
+  const [result, setResult] = useState<{
+    ok: boolean;
+    message: string;
+    failures?: { file: string; reason: string }[];
+    duplicates?: DuplicateInfo[];
+  } | null>(null);
   const [showFailures, setShowFailures] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [showPatientPrompt, setShowPatientPrompt] = useState(false);
@@ -84,12 +102,14 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
 
       let successCount = 0;
       let errorCount = 0;
+      let duplicateCount = 0;
       let hasSuggestion = false;
       let zipExtracted = 0;
       let zipDicom = 0;
       let zipOther = 0;
       let sawZip = false;
       const failures: { file: string; reason: string }[] = [];
+      const duplicates: DuplicateInfo[] = [];
       for (const file of files) {
         try {
           const form = new FormData();
@@ -101,8 +121,17 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           const res = await api.post(`/documents/upload${params}`, form, {
             headers: { "Content-Type": "multipart/form-data" },
           });
-          successCount++;
           const data = res.data as UploadResult;
+          if (data.status === "duplicate" && data.existing_document_id) {
+            duplicateCount++;
+            duplicates.push({
+              file: file.name,
+              existingId: data.existing_document_id,
+              existingFilename: data.existing_filename,
+            });
+            continue;
+          }
+          successCount++;
           if (data.suggestion === "batch_schedule") {
             hasSuggestion = true;
           }
@@ -130,16 +159,29 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       setUploadedCount(successCount);
       setShowFailures(false);
 
+      const dupSegment = duplicateCount > 0 ? `, ${duplicateCount} already in system` : "";
       if (errorCount === 0) {
-        const baseMsg = sawZip
-          ? `Extracted ${zipExtracted} files (${zipDicom} DICOM frames, ${zipOther} other) and queued for processing`
-          : `${successCount} file(s) uploaded`;
-        setResult({ ok: true, message: baseMsg });
+        let baseMsg: string;
+        if (sawZip) {
+          baseMsg = `Extracted ${zipExtracted} files (${zipDicom} DICOM frames, ${zipOther} other) and queued for processing`;
+        } else if (successCount === 0 && duplicateCount > 0) {
+          baseMsg = duplicateCount === 1
+            ? "File already in system"
+            : `All ${duplicateCount} files already in system`;
+        } else {
+          baseMsg = `${successCount} file(s) uploaded${dupSegment}`;
+        }
+        setResult({
+          ok: true,
+          message: baseMsg,
+          duplicates: duplicates.length > 0 ? duplicates : undefined,
+        });
       } else {
         setResult({
           ok: false,
-          message: `${successCount} uploaded, ${errorCount} failed`,
+          message: `${successCount} uploaded${dupSegment}, ${errorCount} failed`,
           failures,
+          duplicates: duplicates.length > 0 ? duplicates : undefined,
         });
       }
 
@@ -360,6 +402,27 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                   <li key={i} className="flex flex-col">
                     <span className="font-medium truncate">{f.file}</span>
                     <span className="text-muted-foreground">{f.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {result.duplicates && result.duplicates.length > 0 && (
+              <ul className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs space-y-1 max-h-48 overflow-y-auto text-left">
+                {result.duplicates.map((d, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Info className="h-3 w-3 mt-0.5 shrink-0 text-amber-600" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{d.file}</div>
+                      <div className="text-muted-foreground">
+                        Already in system as{" "}
+                        <Link
+                          to={`/documents/${d.existingId}`}
+                          className="text-primary underline hover:no-underline"
+                        >
+                          {d.existingFilename || `document #${d.existingId}`}
+                        </Link>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>

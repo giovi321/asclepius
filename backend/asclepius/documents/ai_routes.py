@@ -53,16 +53,20 @@ async def edit_document_with_ai(
     context = await build_extraction_context(db)
 
     # Build a compact current data summary (only non-null fields)
-    current_data = {k: v for k, v in {
-        "patient_name": doc.get("patient_name"),
-        "doc_type": doc.get("doc_type"),
-        "event_date": doc.get("event_date"),
-        "issued_date": doc.get("issued_date"),
-        "doctor_name": doc.get("doctor_name"),
-        "facility_name": doc.get("facility_name"),
-        "specialty_original": doc.get("specialty_original"),
-        "summary_en": doc.get("summary_en"),
-    }.items() if v}
+    current_data = {
+        k: v
+        for k, v in {
+            "patient_name": doc.get("patient_name"),
+            "doc_type": doc.get("doc_type"),
+            "event_date": doc.get("event_date"),
+            "issued_date": doc.get("issued_date"),
+            "doctor_name": doc.get("doctor_name"),
+            "facility_name": doc.get("facility_name"),
+            "specialty_original": doc.get("specialty_original"),
+            "summary_en": doc.get("summary_en"),
+        }.items()
+        if v
+    }
 
     # Compact prompt
     prompt = (
@@ -82,18 +86,22 @@ async def edit_document_with_ai(
     # Call LLM with retry for rate limits
     for attempt in range(3):
         try:
-            if hasattr(llm, '_generate'):
+            if hasattr(llm, "_generate"):
                 response_text = await llm._generate(prompt)
                 changes = llm._parse_json(response_text)
             else:
-                raise HTTPException(status_code=500, detail="LLM provider does not support direct generation")
+                raise HTTPException(
+                    status_code=500, detail="LLM provider does not support direct generation"
+                )
             break
         except Exception as e:
             if "429" in str(e) or "rate_limit" in str(e):
                 wait = 30 * (attempt + 1)
                 await _asyncio.sleep(wait)
                 if attempt == 2:
-                    raise HTTPException(status_code=429, detail="Rate limited \u2014 please try again in a minute")
+                    raise HTTPException(
+                        status_code=429, detail="Rate limited \u2014 please try again in a minute"
+                    )
             else:
                 raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
 
@@ -122,11 +130,14 @@ async def edit_document_with_ai(
     if "summary_original" in changes:
         updates["summary_original"] = changes["summary_original"]
     if "specialty_original" in changes.get("specialty", changes):
-        updates["specialty_original"] = changes.get("specialty", {}).get("original", changes.get("specialty_original"))
+        updates["specialty_original"] = changes.get("specialty", {}).get(
+            "original", changes.get("specialty_original")
+        )
 
     # Handle patient name change
     if "patient_name" in changes:
         from asclepius.pipeline.extractor import _match_patient
+
         patient_id = await _match_patient(db, changes["patient_name"])
         if patient_id:
             updates["patient_id"] = patient_id
@@ -139,9 +150,11 @@ async def edit_document_with_ai(
         doctor_data = None
     if doctor_data and isinstance(doctor_data, dict) and doctor_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_doctor
+
         updates["doctor_id"] = await _upsert_doctor(db, doctor_data)
     elif doctor_name_str:
         from asclepius.pipeline.extractor import _upsert_doctor
+
         updates["doctor_id"] = await _upsert_doctor(db, {"name": doctor_name_str})
 
     # Handle facility change
@@ -152,14 +165,17 @@ async def edit_document_with_ai(
         facility_data = None
     if facility_data and isinstance(facility_data, dict) and facility_data.get("name"):
         from asclepius.pipeline.extractor import _upsert_facility
+
         updates["facility_id"] = await _upsert_facility(db, facility_data)
     elif facility_name_str:
         from asclepius.pipeline.extractor import _upsert_facility
+
         updates["facility_id"] = await _upsert_facility(db, {"name": facility_name_str})
 
     if updates:
         # Log corrections before applying updates
         from asclepius.documents.corrections import log_corrections
+
         await log_corrections(db, doc_id, updates)
 
         await update_document_fields(db, doc_id, updates)
@@ -178,20 +194,21 @@ async def generate_filename(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    ext = Path(doc.get("original_filename", "doc")).suffix.lower() or ".pdf"
+    # Mirror whatever extension (or lack of one) the original has. Imaging
+    # placeholders carry names like "MR Brain (report pending)" with no
+    # extension at all; using a ``.pdf`` fallback here would force-suggest a
+    # name that the rename endpoint then rejects ("can't change extension
+    # from '' to '.pdf'"), so suggest the same suffix the doc already has.
+    ext = Path(doc.get("original_filename") or "").suffix.lower()
 
     # Look for a date across every plausible source. raw_extraction is the
     # last resort — LLM output that never landed on a dedicated column. The
     # raw_extraction JSON can carry either the new event_date or the legacy
     # date_visit / date_issued / doc_date trio.
-    doc_date = (
-        doc.get("event_date")
-        or doc.get("issued_date")
-        or doc.get("date_received")
-        or ""
-    )
+    doc_date = doc.get("event_date") or doc.get("issued_date") or doc.get("date_received") or ""
     if not doc_date and doc.get("raw_extraction"):
         import json as _json
+
         try:
             raw = doc["raw_extraction"]
             if isinstance(raw, str):
@@ -246,6 +263,9 @@ async def generate_filename(
     suggested = f"{date_prefix}_{slug}{ext}"
     logger.info(
         "generate_filename doc=%d date_prefix=%s slug=%s suggested=%s",
-        doc_id, date_prefix, slug, suggested,
+        doc_id,
+        date_prefix,
+        slug,
+        suggested,
     )
     return {"suggested_filename": suggested}

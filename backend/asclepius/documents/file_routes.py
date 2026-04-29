@@ -29,7 +29,9 @@ router = APIRouter()
 
 
 async def _require_write_access(
-    db: aiosqlite.Connection, current_user: dict, doc: dict,
+    db: aiosqlite.Connection,
+    current_user: dict,
+    doc: dict,
 ) -> None:
     """Raise 403 unless the caller may mutate this document.
 
@@ -140,7 +142,8 @@ async def serve_file(
         # have moved yet. Still goes through ``safe_vault_join``.
         safe_name = safe_filename(doc["original_filename"])
         inbox_candidate = _resolve_vault_file(
-            vault_root, f"inbox/{safe_name}",
+            vault_root,
+            f"inbox/{safe_name}",
         )
         if inbox_candidate.is_file():
             file_path = inbox_candidate
@@ -200,7 +203,7 @@ async def rotate_document(
                     pdf.close()
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Page {p} is out of range (document has {total_pages} pages)"
+                        detail=f"Page {p} is out of range (document has {total_pages} pages)",
                     )
             target_pages = [p - 1 for p in body.pages]
         else:
@@ -225,10 +228,7 @@ async def rotate_document(
                 Path(tmp_path).unlink()
             raise
 
-        rotated_desc = (
-            f"pages {body.pages}" if body.pages
-            else f"all {total_pages} pages"
-        )
+        rotated_desc = f"pages {body.pages}" if body.pages else f"all {total_pages} pages"
         return {
             "status": "rotated",
             "document_id": doc_id,
@@ -269,11 +269,15 @@ async def rename_document(
         raise HTTPException(status_code=400, detail="Filename cannot be empty")
 
     # Lock the extension to the original — prevents content-type confusion.
+    # Exception: when the original has *no* extension at all (e.g. imaging
+    # placeholders named "MR Brain (report pending)"), allow the user to
+    # add one. There's nothing to confuse here — extension-less names are
+    # display labels, not on-disk filenames the server serves.
     old_ext = Path(doc["original_filename"]).suffix.lower()
     new_ext = Path(raw_new).suffix.lower()
     if not new_ext:
         raw_new += old_ext
-    elif new_ext != old_ext:
+    elif old_ext and new_ext != old_ext:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot change file extension from {old_ext} to {new_ext}",
@@ -469,7 +473,8 @@ async def replace_document_file(
     else:
         # Fall back to patients/{slug}/{year} (or unclassified).
         cursor = await db.execute(
-            "SELECT slug FROM patients WHERE id = ?", (doc.get("patient_id"),),
+            "SELECT slug FROM patients WHERE id = ?",
+            (doc.get("patient_id"),),
         )
         row = await cursor.fetchone()
         slug = row[0] if row else None

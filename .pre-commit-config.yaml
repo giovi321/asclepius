@@ -24,14 +24,24 @@ repos:
         exclude: ^(docs/|CHANGELOG\.md$)
 
   # Regenerate the OpenAPI schema + frontend schema.ts whenever a backend
-  # Python file changes, and fail if either regenerated file differs from
-  # what's committed. Mirrored by the openapi-drift CI job so the check is
-  # authoritative even if a contributor skips the hook (see issue #15).
+  # Python file changes, and stage the regenerated artefacts. Mirrored by
+  # the openapi-drift CI job so the check is authoritative even if a
+  # contributor skips the hook (see issue #15).
+  #
+  # If the regen produces a diff, pre-commit auto-stages the new artefacts
+  # and aborts the commit with a "files were modified by this hook"
+  # message. Re-running ``git commit`` will then succeed with the
+  # regenerated openapi.json / schema.ts included — no manual regen step.
+  #
+  # Env vars mirror the CI workflow's "Regenerate OpenAPI" step: a
+  # placeholder secret long enough to pass the production-config validator,
+  # plus ``ASCLEPIUS_ENV=development`` so cookie-secure / TLS checks don't
+  # fire when the schema export imports ``main.create_app``.
   - repo: local
     hooks:
       - id: openapi-drift
         name: OpenAPI / schema.ts drift
         language: system
-        entry: bash -c 'python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git diff --exit-code -- frontend/src/openapi.json frontend/src/api/schema.ts'
+        entry: bash -c 'ASCLEPIUS_ENV=development ASCLEPIUS_COOKIE_SECURE=0 ASCLEPIUS_SECRET_KEY=pre-commit-hook-placeholder-secret-not-for-production-use python backend/scripts/export_openapi.py && npm --prefix frontend run gen:api && git add frontend/src/openapi.json frontend/src/api/schema.ts'
         files: ^backend/.*\.py$
         pass_filenames: false

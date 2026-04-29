@@ -703,6 +703,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/documents/{doc_id}/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Translate Doc
+         * @description Queue an on-demand English translation of the document body.
+         *
+         *     Re-uses the cached ``ocr_text`` — does not run OCR again. Result is
+         *     persisted to ``documents.ocr_text_en``, overwriting any prior run.
+         */
+        post: operations["translate_doc_api_documents__doc_id__translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/encounters/{encounter_id}": {
         parameters: {
             query?: never;
@@ -2859,6 +2882,11 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** TranslateRequest */
+        TranslateRequest: {
+            /** Llm Provider Id */
+            llm_provider_id?: string | null;
+        };
         /** UserCreate */
         UserCreate: {
             /** Username */
@@ -4046,6 +4074,41 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": components["schemas"]["ReprocessRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    translate_doc_api_documents__doc_id__translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                doc_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TranslateRequest"];
             };
         };
         responses: {

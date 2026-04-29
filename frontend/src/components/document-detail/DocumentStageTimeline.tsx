@@ -15,6 +15,7 @@ import {
   Hourglass,
   Upload as UploadIcon,
   RefreshCw,
+  Languages,
 } from "lucide-react";
 import api from "@/api/client";
 import type {
@@ -33,6 +34,7 @@ const STAGE_LABELS: Record<string, string> = {
   organizing: "Organizing",
   thumbnail: "Thumbnail",
   cache_ocr: "Cache OCR",
+  translation: "Translation",
 };
 
 const STAGE_ICONS: Record<string, any> = {
@@ -42,6 +44,7 @@ const STAGE_ICONS: Record<string, any> = {
   organizing: FolderOutput,
   page_classification: FileSearch,
   section_extraction: Layers,
+  translation: Languages,
 };
 
 function stageLabel(stage: string): string {
@@ -405,19 +408,33 @@ export default function DocumentStageTimeline({ documentId }: Props) {
 
 function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
   const isReprocess = group.job_kind === "reprocess";
-  const KindIcon = isReprocess ? RefreshCw : UploadIcon;
+  const isTranslate = group.job_kind === "translate";
+  const KindIcon = isTranslate
+    ? Languages
+    : isReprocess
+      ? RefreshCw
+      : UploadIcon;
+  const runLabel = isTranslate
+    ? "Translate"
+    : isReprocess
+      ? "Reprocess"
+      : "Upload";
   const startTs = group.events[0]?.started_at || group.events[0]?.finished_at;
   const totalMs = runDuration(group.events);
   const outcome = runOutcome(group.events);
   const outcomeVis = statusVisuals(outcome);
   const flow = runFlowBadge(group.events);
 
-  const headerColor = isReprocess
-    ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
-    : "bg-blue-50/60 dark:bg-blue-900/15 border-blue-200/60 dark:border-blue-900";
-  const kindIconColor = isReprocess
-    ? "bg-purple-500 text-white"
-    : "bg-blue-500 text-white";
+  const headerColor = isTranslate
+    ? "bg-emerald-50/60 dark:bg-emerald-900/15 border-emerald-200/60 dark:border-emerald-900"
+    : isReprocess
+      ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
+      : "bg-blue-50/60 dark:bg-blue-900/15 border-blue-200/60 dark:border-blue-900";
+  const kindIconColor = isTranslate
+    ? "bg-emerald-500 text-white"
+    : isReprocess
+      ? "bg-purple-500 text-white"
+      : "bg-blue-500 text-white";
 
   return (
     <div className="overflow-hidden rounded-lg border">
@@ -432,9 +449,7 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold">
-              {isReprocess ? "Reprocess" : "Upload"} run
-            </span>
+            <span className="text-sm font-semibold">{runLabel} run</span>
             {isFirst && (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-500 text-white px-1.5 py-0.5 text-[10px] font-semibold">
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />

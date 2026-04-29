@@ -10,6 +10,7 @@ import fitz  # pymupdf
 
 from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
+from asclepius.pipeline.text_utils import _ALT_OR_LABEL, _HTML_TAG
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +21,6 @@ SECTION_THRESHOLD = 5
 # preserve layout. That's helpful upstream but not as a human-readable summary,
 # so the fallback summarizer pulls out the semantic ``alt=`` / ``data-label=``
 # values and strips the rest of the markup.
-_ALT_OR_LABEL = re.compile(r'(?:alt|data-label)\s*=\s*"([^"]+)"', re.IGNORECASE)
-_HTML_TAG = re.compile(r"<[^>]*>")
 
 
 def _strip_markup_for_summary(text: str) -> str:

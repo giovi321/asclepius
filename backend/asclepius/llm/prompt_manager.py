@@ -41,7 +41,13 @@ PROMPT_VARIABLES: dict[str, str] = {
 # Per-prompt placeholder lists. Suffix "?" marks an optional placeholder —
 # it is substituted only if it actually appears in the (custom) template.
 PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
-    "classification": ["patient_list", "facility_list", "doctor_list", "ocr_text", "few_shot_examples"],
+    "classification": [
+        "patient_list",
+        "facility_list",
+        "doctor_list",
+        "ocr_text",
+        "few_shot_examples",
+    ],
     "vision_extraction": [],
     "extraction_bloodtest": ["ocr_text", "lab_test_mappings?"],
     "extraction_specialist_report": [
@@ -75,6 +81,7 @@ PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
         "other_documents",
     ],
     "page_classification": ["pages_text"],
+    "translation_en": ["ocr_text"],
 }
 
 
@@ -150,6 +157,10 @@ PROMPT_REGISTRY = {
         "description": "Classify pages of multi-page documents into content types",
         "default_attr": "PAGE_CLASSIFICATION_PROMPT",
     },
+    "translation_en": {
+        "description": "On-demand translation of a document body to English",
+        "default_attr": "TRANSLATION_EN_PROMPT",
+    },
 }
 
 
@@ -191,7 +202,9 @@ async def get_all_prompts(db_path: str) -> list[dict]:
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
-            cursor = await db.execute("SELECT prompt_key, prompt_text, updated_at FROM custom_prompts")
+            cursor = await db.execute(
+                "SELECT prompt_key, prompt_text, updated_at FROM custom_prompts"
+            )
             for row in await cursor.fetchall():
                 custom[row["prompt_key"]] = {
                     "text": row["prompt_text"],
@@ -203,15 +216,17 @@ async def get_all_prompts(db_path: str) -> list[dict]:
     for key, info in PROMPT_REGISTRY.items():
         default_text = get_default_prompt(key)
         custom_data = custom.get(key)
-        result.append({
-            "key": key,
-            "description": info["description"],
-            "text": custom_data["text"] if custom_data else default_text,
-            "is_custom": key in custom,
-            "updated_at": custom_data["updated_at"] if custom_data else None,
-            "default_length": len(default_text),
-            "variables": _variables_for(key),
-        })
+        result.append(
+            {
+                "key": key,
+                "description": info["description"],
+                "text": custom_data["text"] if custom_data else default_text,
+                "is_custom": key in custom,
+                "updated_at": custom_data["updated_at"] if custom_data else None,
+                "default_length": len(default_text),
+                "variables": _variables_for(key),
+            }
+        )
 
     return result
 

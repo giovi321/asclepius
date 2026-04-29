@@ -70,6 +70,7 @@ CHAT_SYSTEM_PROMPT: str = prompt_body("chat_system")
 FILENAME_GENERATION_PROMPT: str = prompt_body("filename_generation")
 LINK_SUGGESTION_PROMPT: str = prompt_body("link_suggestion")
 PAGE_CLASSIFICATION_PROMPT: str = prompt_body("page_classification")
+TRANSLATION_EN_PROMPT: str = prompt_body("translation_en")
 EXTRACTION_PROMPT_LEGACY: str = prompt_body("extraction_legacy")
 EXTRACTION_PROMPT: str = EXTRACTION_PROMPT_LEGACY
 
@@ -90,6 +91,7 @@ TYPE_EXTRACTION_PROMPTS: dict[str, str] = _build_type_extraction_map()
 
 
 # ── Helpers that stay as code ───────────────────────────────────────
+
 
 def canonical_language_directive(language: str | None) -> str:
     """Prefix directive that forces the LLM to emit free-form text fields in

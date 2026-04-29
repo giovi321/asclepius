@@ -35,6 +35,7 @@ STAGE_SECTION_EXTRACTION = "section_extraction"
 STAGE_ORGANIZING = "organizing"
 STAGE_THUMBNAIL = "thumbnail"
 STAGE_CACHE_OCR = "cache_ocr"
+STAGE_TRANSLATION = "translation"
 
 
 def plan_stages(*, flow: str, mode: str | None = None, has_ocr_text: bool = False) -> list[str]:

@@ -104,6 +104,9 @@ CREATE TABLE IF NOT EXISTS documents (
     file_hash TEXT UNIQUE,  -- SHA-256 for dedup
     language_source TEXT,
     ocr_text TEXT,
+    ocr_text_en TEXT,
+    ocr_text_en_model TEXT,
+    ocr_text_en_translated_at DATETIME,
     ocr_confidence REAL,
     ocr_engine TEXT,
     llm_provider TEXT,

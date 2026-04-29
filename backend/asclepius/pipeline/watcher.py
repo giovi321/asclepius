@@ -39,8 +39,9 @@ def enqueue_job(
 ) -> None:
     """Enqueue a unit of work for the pipeline worker.
 
-    ``kind`` is ``"upload"`` (file_path payload) or ``"reprocess"`` (doc_id +
-    mode + provider overrides). Both flow through the SAME single-threaded
+    ``kind`` is ``"upload"`` (file_path payload), ``"reprocess"`` (doc_id +
+    mode + provider overrides), or ``"translate"`` (doc_id + optional
+    llm_provider_id). All flow through the SAME single-threaded
     worker, which is what enforces the "max 1 doc at a time" invariant — the
     earlier ``asyncio.create_task(reprocess_document(...))`` from the API
     handler ran in the FastAPI loop and bypassed the queue entirely, which is
@@ -209,6 +210,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
             ProviderUnreachableError,
             reprocess_document,
         )
+        from asclepius.pipeline.translator import translate_document
         from asclepius.pipeline.inbox_sweep import sweep_inbox
         import aiosqlite as _aiosqlite
 
@@ -243,6 +245,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
 
             file_path = payload.get("file_path") if kind == "upload" else None
             label = file_path or f"doc#{payload.get('doc_id')}"
+            doc_kind = kind in ("reprocess", "translate")
 
             # Pop the matching entry off pipeline_status.queued_jobs so the
             # frontend's queued list reflects the worker actually picking
@@ -254,7 +257,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 if (
                     entry.get("kind") == kind
                     and entry.get("doc_id") == payload.get("doc_id")
-                    and (kind == "reprocess" or entry.get("label") == Path(file_path or "").name)
+                    and (doc_kind or entry.get("label") == Path(file_path or "").name)
                 ):
                     del queued_jobs[i]
                     break
@@ -267,13 +270,10 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
             from asclepius.pipeline.processor import cancelled_docs as _cancelled_docs
 
             queued_doc_id = payload.get("doc_id")
-            if (
-                kind == "reprocess"
-                and queued_doc_id is not None
-                and queued_doc_id in _cancelled_docs
-            ):
+            if doc_kind and queued_doc_id is not None and queued_doc_id in _cancelled_docs:
                 logger.info(
-                    "Pipeline worker skipping cancelled queued reprocess: doc=%d",
+                    "Pipeline worker skipping cancelled queued %s: doc=%d",
+                    kind,
                     queued_doc_id,
                 )
                 _cancelled_docs.discard(queued_doc_id)
@@ -297,6 +297,17 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                         llm_provider_id=payload.get("llm_provider_id"),
                         ocr_provider_id=payload.get("ocr_provider_id"),
                         vision_provider_id=payload.get("vision_provider_id"),
+                        resolved_providers=payload.get("resolved_providers"),
+                    )
+                elif kind == "translate":
+                    logger.info(
+                        "Pipeline worker processing translate: doc=%d",
+                        payload["doc_id"],
+                    )
+                    await translate_document(
+                        payload["doc_id"],
+                        config,
+                        llm_provider_id=payload.get("llm_provider_id"),
                         resolved_providers=payload.get("resolved_providers"),
                     )
                 else:

@@ -60,6 +60,9 @@ export interface Document {
   file_hash: string | null;
   language_source: string | null;
   ocr_text: string | null;
+  ocr_text_en: string | null;
+  ocr_text_en_model: string | null;
+  ocr_text_en_translated_at: string | null;
   ocr_confidence: number | null;
   ocr_engine: string | null;
   llm_provider: string | null;
@@ -105,7 +108,7 @@ export interface DocumentSection {
 
 // ─── Pipeline ──────────────────────────────────────────
 
-export type PipelineJobKind = "upload" | "reprocess";
+export type PipelineJobKind = "upload" | "reprocess" | "translate";
 
 export interface PipelineProviders {
   ocr?: string | null;

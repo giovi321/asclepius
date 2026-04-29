@@ -84,6 +84,10 @@ class ReprocessRequest(BaseModel):
     vision_provider_id: str | None = None  # optional override, used when mode == 'vision_llm'
 
 
+class TranslateRequest(BaseModel):
+    llm_provider_id: str | None = None  # optional text-LLM override
+
+
 # ── Failed documents ─────────────────────────────────────────────
 
 
@@ -749,6 +753,72 @@ async def reprocess_doc(
             "resolved_providers": queued_providers,
         },
         priority=0,  # user clicked reprocess explicitly — jump the queue
+        queued_doc_id=doc_id,
+        queued_label=doc.get("original_filename") or f"doc#{doc_id}",
+        queued_providers=queued_providers,
+    )
+    return {"status": "queued", "document_id": doc_id}
+
+
+# ── Translate ────────────────────────────────────────────────────
+
+
+@router.post("/{doc_id}/translate")
+async def translate_doc(
+    doc_id: int,
+    request: Request,
+    body: TranslateRequest = TranslateRequest(),
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Queue an on-demand English translation of the document body.
+
+    Re-uses the cached ``ocr_text`` — does not run OCR again. Result is
+    persisted to ``documents.ocr_text_en``, overwriting any prior run.
+    """
+    from asclepius.documents.file_routes import _require_write_access
+    from asclepius.pipeline.watcher import enqueue_job
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    if not (doc.get("ocr_text") or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Document has no OCR text yet — run OCR before translating.",
+        )
+
+    queue = getattr(request.app.state, "pipeline_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Pipeline worker not running")
+
+    cfg = get_config()
+
+    def _first_enabled(items):
+        enabled = [p for p in items if getattr(p, "enabled", False)]
+        if enabled:
+            return min(enabled, key=lambda p: getattr(p, "priority", 0))
+        return items[0] if items else None
+
+    queued_providers: dict[str, str | None] = {}
+    llm_id = body.llm_provider_id
+    if not llm_id:
+        p = _first_enabled(cfg.llm.providers)
+        llm_id = p.id if p else None
+    if llm_id:
+        queued_providers["llm"] = llm_id
+
+    enqueue_job(
+        queue,
+        "translate",
+        {
+            "doc_id": doc_id,
+            "llm_provider_id": body.llm_provider_id,
+            "resolved_providers": queued_providers,
+        },
+        priority=0,
         queued_doc_id=doc_id,
         queued_label=doc.get("original_filename") or f"doc#{doc_id}",
         queued_providers=queued_providers,

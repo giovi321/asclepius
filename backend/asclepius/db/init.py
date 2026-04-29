@@ -10,7 +10,9 @@ import aiosqlite
 logger = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
-SEEDS_DIR = Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "/data/config/settings.yaml")).parent / "seeds"
+SEEDS_DIR = (
+    Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "/data/config/settings.yaml")).parent / "seeds"
+)
 # Bundled seeds inside the Docker image (fallback)
 BUNDLED_SEEDS_DIR = Path(__file__).parent.parent.parent / "bundled_config" / "seeds"
 
@@ -120,6 +122,7 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     await _migration_0_9_6_imaging_report(db)
     await _migration_0_9_7_drop_dead_imaging_columns(db)
     await _migration_0_9_8_drop_imaging_study_date(db)
+    await _migration_translation_columns(db)
     # Data-cleanup migrations: gated by schema_migrations so they run once
     # per DB instead of full-scanning every table on every startup. The
     # earlier formulation was idempotent but cost ~30 full table scans
@@ -155,13 +158,15 @@ async def _run_once(
     through this helper.
     """
     cursor = await db.execute(
-        "SELECT 1 FROM schema_migrations WHERE key = ?", (key,),
+        "SELECT 1 FROM schema_migrations WHERE key = ?",
+        (key,),
     )
     if await cursor.fetchone():
         return
     await fn(db)
     await db.execute(
-        "INSERT OR IGNORE INTO schema_migrations (key) VALUES (?)", (key,),
+        "INSERT OR IGNORE INTO schema_migrations (key) VALUES (?)",
+        (key,),
     )
     await db.commit()
 
@@ -195,6 +200,7 @@ async def _migration_0_9_5_imaging_layout(db: aiosqlite.Connection) -> None:
     """
     try:
         from asclepius.config import get_config as _get_config_for_layout
+
         vault_root = Path(_get_config_for_layout().vault.root_path)
     except Exception:
         return
@@ -208,6 +214,7 @@ async def _migration_0_9_5_imaging_layout(db: aiosqlite.Connection) -> None:
         return
 
     import shutil as _shutil_layout
+
     _moved = 0
     for lrow in rows:
         study_pk = lrow[0]
@@ -225,7 +232,8 @@ async def _migration_0_9_5_imaging_layout(db: aiosqlite.Connection) -> None:
                 if new_abs.exists():
                     logger.warning(
                         "Migration: cannot move %s to %s — destination exists; skipping disk move",
-                        old_abs, new_abs,
+                        old_abs,
+                        new_abs,
                     )
                 else:
                     _shutil_layout.move(str(old_abs), str(new_abs))
@@ -247,7 +255,9 @@ async def _migration_0_9_5_imaging_layout(db: aiosqlite.Connection) -> None:
         except Exception:
             logger.warning(
                 "Migration: failed to relocate imaging study %d (%s)",
-                study_pk, old_folder, exc_info=True,
+                study_pk,
+                old_folder,
+                exc_info=True,
             )
 
     # Sweep empty legacy ``imaging/`` directories.
@@ -311,17 +321,14 @@ async def _migration_0_9_5_collapse_imaging_docs(db: aiosqlite.Connection) -> No
             (canonical_doc_id,),
         )
         cur_row = await cursor.fetchone()
-        if cur_row is not None and (
-            cur_row[0] != folder_path or cur_row[1] != study_doc_hash
-        ):
+        if cur_row is not None and (cur_row[0] != folder_path or cur_row[1] != study_doc_hash):
             try:
                 await db.execute(
                     """UPDATE documents
                        SET file_path = ?, original_filename = ?, file_hash = ?,
                            doc_type = 'imaging_dicom'
                        WHERE id = ?""",
-                    (folder_path, study_folder_basename, study_doc_hash,
-                     canonical_doc_id),
+                    (folder_path, study_folder_basename, study_doc_hash, canonical_doc_id),
                 )
                 _rewritten += 1
             except aiosqlite.IntegrityError:
@@ -349,7 +356,9 @@ async def _migration_0_9_5_collapse_imaging_docs(db: aiosqlite.Connection) -> No
         logger.info(
             "Migration: collapsed imaging documents — rewrote %d canonical, "
             "removed %d per-frame + %d bundle-file rows",
-            _rewritten, _frame_dupes, _bundles,
+            _rewritten,
+            _frame_dupes,
+            _bundles,
         )
 
 
@@ -563,18 +572,72 @@ async def _migration_0_9_8_drop_imaging_study_date(db: aiosqlite.Connection) -> 
         )
 
 
+async def _migration_translation_columns(db: aiosqlite.Connection) -> None:
+    """Add the on-demand English-translation columns to ``documents``.
+
+    ``ocr_text_en`` holds the translated body, overwritten on each run.
+    ``ocr_text_en_model`` records which LLM produced it (for the model
+    badge in the UI). ``ocr_text_en_translated_at`` is a timestamp.
+    """
+    cursor = await db.execute("PRAGMA table_info(documents)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    added = []
+    if "ocr_text_en" not in cols:
+        await db.execute("ALTER TABLE documents ADD COLUMN ocr_text_en TEXT")
+        added.append("ocr_text_en")
+    if "ocr_text_en_model" not in cols:
+        await db.execute("ALTER TABLE documents ADD COLUMN ocr_text_en_model TEXT")
+        added.append("ocr_text_en_model")
+    if "ocr_text_en_translated_at" not in cols:
+        await db.execute("ALTER TABLE documents ADD COLUMN ocr_text_en_translated_at DATETIME")
+        added.append("ocr_text_en_translated_at")
+    if added:
+        await db.commit()
+        logger.info("Migration: added documents columns %s", ", ".join(added))
+
+
 # Strings the LLM emits when it could not find a real value. Mirrors the
 # Python sanitizer in pipeline/extractor.py — keep both lists in sync. We
 # match case-insensitively after stripping whitespace.
 _LLM_PLACEHOLDER_VALUES = (
-    "*", "-", "—", "–", "_", ".", "..", "...",
-    "n/a", "n/a.", "na", "n.a.", "n.a", "n/d", "nd",
-    "null", "none", "nil", "nan", "*/*",
-    "unknown", "unspecified", "not specified", "not available",
-    "not provided", "not applicable", "no value", "missing",
-    "illegible", "unreadable", "indecipherable",
-    "(empty)", "(none)", "(null)", "(unknown)", "(blank)",
-    "tbd", "to be determined",
+    "*",
+    "-",
+    "—",
+    "–",
+    "_",
+    ".",
+    "..",
+    "...",
+    "n/a",
+    "n/a.",
+    "na",
+    "n.a.",
+    "n.a",
+    "n/d",
+    "nd",
+    "null",
+    "none",
+    "nil",
+    "nan",
+    "*/*",
+    "unknown",
+    "unspecified",
+    "not specified",
+    "not available",
+    "not provided",
+    "not applicable",
+    "no value",
+    "missing",
+    "illegible",
+    "unreadable",
+    "indecipherable",
+    "(empty)",
+    "(none)",
+    "(null)",
+    "(unknown)",
+    "(blank)",
+    "tbd",
+    "to be determined",
 )
 
 
@@ -584,17 +647,36 @@ _LLM_PLACEHOLDER_VALUES = (
 # migration also wants to clean rows that pre-dated the in-extractor
 # sanitiser.
 _PLACEHOLDER_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("lab_results", ("test_name_original", "value_text", "unit",
-                     "sample_type", "panel_name")),
-    ("encounters", ("diagnosis_original", "diagnosis_code", "notes",
-                    "findings", "follow_up_instructions")),
-    ("medications", ("brand_name", "active_ingredient_original", "dosage",
-                     "form", "frequency", "duration", "quantity")),
-    ("vaccinations", ("vaccine_name", "manufacturer", "lot_number",
-                      "dose_number")),
+    ("lab_results", ("test_name_original", "value_text", "unit", "sample_type", "panel_name")),
+    (
+        "encounters",
+        ("diagnosis_original", "diagnosis_code", "notes", "findings", "follow_up_instructions"),
+    ),
+    (
+        "medications",
+        (
+            "brand_name",
+            "active_ingredient_original",
+            "dosage",
+            "form",
+            "frequency",
+            "duration",
+            "quantity",
+        ),
+    ),
+    ("vaccinations", ("vaccine_name", "manufacturer", "lot_number", "dose_number")),
     ("invoice_items", ("description", "tariff_code", "category")),
-    ("documents", ("specialty_original", "summary_en", "summary_original",
-                   "language_source", "insurance_company", "insurance_policy")),
+    (
+        "documents",
+        (
+            "specialty_original",
+            "summary_en",
+            "summary_original",
+            "language_source",
+            "insurance_company",
+            "insurance_policy",
+        ),
+    ),
 )
 
 
@@ -659,7 +741,9 @@ async def _migration_clear_llm_placeholders(db: aiosqlite.Connection) -> None:
             if cursor.rowcount and cursor.rowcount > 0:
                 logger.info(
                     "Migration: cleared %d LLM placeholder rows from %s.%s",
-                    cursor.rowcount, table, col,
+                    cursor.rowcount,
+                    table,
+                    col,
                 )
     await db.commit()
 
@@ -786,52 +870,70 @@ async def _seed_with_aliases(
 
 async def _seed_lab_tests(db: aiosqlite.Connection, path: Path) -> None:
     await _seed_with_aliases(
-        db, path,
+        db,
+        path,
         main_table="norm_lab_tests",
-        main_columns=["canonical_code", "canonical_display", "loinc_code", "category", "unit_preferred"],
+        main_columns=[
+            "canonical_code",
+            "canonical_display",
+            "loinc_code",
+            "category",
+            "unit_preferred",
+        ],
         alias_table="norm_lab_test_aliases",
         alias_fk="norm_lab_test_id",
         get_main_values=lambda item: (
-            item["canonical_code"], item["canonical_display"],
-            item.get("loinc_code"), item.get("category"), item.get("unit_preferred"),
+            item["canonical_code"],
+            item["canonical_display"],
+            item.get("loinc_code"),
+            item.get("category"),
+            item.get("unit_preferred"),
         ),
     )
 
 
 async def _seed_diagnoses(db: aiosqlite.Connection, path: Path) -> None:
     await _seed_with_aliases(
-        db, path,
+        db,
+        path,
         main_table="norm_diagnoses",
         main_columns=["canonical_code", "canonical_display", "icd10_code"],
         alias_table="norm_diagnosis_aliases",
         alias_fk="norm_diagnosis_id",
         get_main_values=lambda item: (
-            item["canonical_code"], item["canonical_display"], item.get("icd10_code"),
+            item["canonical_code"],
+            item["canonical_display"],
+            item.get("icd10_code"),
         ),
     )
 
 
 async def _seed_medications(db: aiosqlite.Connection, path: Path) -> None:
     await _seed_with_aliases(
-        db, path,
+        db,
+        path,
         main_table="norm_medications",
         main_columns=["canonical_code", "canonical_display", "atc_code"],
         alias_table="norm_medication_aliases",
         alias_fk="norm_medication_id",
         get_main_values=lambda item: (
-            item["canonical_code"], item["canonical_display"], item.get("atc_code"),
+            item["canonical_code"],
+            item["canonical_display"],
+            item.get("atc_code"),
         ),
     )
 
 
 async def _seed_specialties(db: aiosqlite.Connection, path: Path) -> None:
     await _seed_with_aliases(
-        db, path,
+        db,
+        path,
         main_table="norm_specialties",
         main_columns=["canonical_code", "canonical_display"],
         alias_table="norm_specialty_aliases",
         alias_fk="norm_specialty_id",
         get_main_values=lambda item: (
-            item["canonical_code"], item["canonical_display"],
+            item["canonical_code"],
+            item["canonical_display"],
         ),
     )

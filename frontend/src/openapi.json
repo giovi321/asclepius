@@ -1755,6 +1755,57 @@
         }
       }
     },
+    "/api/documents/{doc_id}/translate": {
+      "post": {
+        "tags": [
+          "documents"
+        ],
+        "summary": "Translate Doc",
+        "description": "Queue an on-demand English translation of the document body.\n\nRe-uses the cached ``ocr_text`` \u2014 does not run OCR again. Result is\npersisted to ``documents.ocr_text_en``, overwriting any prior run.",
+        "operationId": "translate_doc_api_documents__doc_id__translate_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/encounters/{encounter_id}": {
       "patch": {
         "tags": [
@@ -8791,6 +8842,23 @@
         "type": "object",
         "title": "TestProviderRequest",
         "description": "Test-connection request.\n\nEither pass ``provider_id`` (tests the persisted entry with that id) or\npass ``provider`` (an inline, possibly-unsaved entry). When both are set\nthe inline entry wins \u2014 this lets the UI test pending edits before the\nuser clicks Save."
+      },
+      "TranslateRequest": {
+        "properties": {
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id"
+          }
+        },
+        "type": "object",
+        "title": "TranslateRequest"
       },
       "UserCreate": {
         "properties": {

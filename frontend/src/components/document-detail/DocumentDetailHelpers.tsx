@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/api/client";
-import { Eye, EyeOff, Pencil, Pill, Syringe, RefreshCw, X, ChevronRight, Plus, Search } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Pencil,
+  Pill,
+  Syringe,
+  RefreshCw,
+  X,
+  ChevronRight,
+  Plus,
+  Search,
+} from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
@@ -8,15 +19,24 @@ import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
 /** Proper singular noun for each normalization entity type. The previous
  * copy used ``normType.slice(0, -1)`` which produced "facilitie" and
  * "specialtie" — close, no cigar. */
-const NORM_SINGULAR: Record<"doctors" | "facilities" | "specialties", string> = {
-  doctors: "doctor",
-  facilities: "facility",
-  specialties: "specialty",
-};
+const NORM_SINGULAR: Record<"doctors" | "facilities" | "specialties", string> =
+  {
+    doctors: "doctor",
+    facilities: "facility",
+    specialties: "specialty",
+  };
 
 // ─── Section wrapper ───────────────────────────────────────────
 
-export function Section({ title, icon: Icon, children }: { title: string; icon?: any; children: React.ReactNode }) {
+export function Section({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon?: any;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-lg border p-4">
       <h3 className="mb-3 flex items-center gap-2 font-medium">
@@ -42,9 +62,24 @@ export function InfoRow({ label, value }: { label: string; value: any }) {
 
 // ─── EditableField ─────────────────────────────────────────────
 
-export function EditableField({ label, value, field, docId, onSave, type = "text", multiline = false, apiPath, formatDisplay }: {
-  label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
-  type?: string; multiline?: boolean;
+export function EditableField({
+  label,
+  value,
+  field,
+  docId,
+  onSave,
+  type = "text",
+  multiline = false,
+  apiPath,
+  formatDisplay,
+}: {
+  label: string;
+  value: any;
+  field: string;
+  docId: number;
+  onSave: (updated?: any) => void;
+  type?: string;
+  multiline?: boolean;
   /** Override the PATCH endpoint. Defaults to ``/documents/{docId}`` so
    * regular document fields keep their behaviour. The imaging detail
    * page passes ``/imaging/{studyId}/metadata`` so modality, body_part,
@@ -69,33 +104,62 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
       setEditing(false);
       // Pass updated doc back so parent can update state without full reload
       onSave(res.data);
-    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    } catch {
+      toast({ title: "Failed to save", variant: "error" });
+    }
     setSaving(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !multiline) handleSave();
-    if (e.key === "Escape") { setEditing(false); setVal(value || ""); }
+    if (e.key === "Escape") {
+      setEditing(false);
+      setVal(value || "");
+    }
   };
 
   if (editing) {
     return (
       <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">{label}</span>
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">
+          {label}
+        </span>
         <div className="flex-1 flex gap-1">
           {multiline ? (
-            <textarea value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm" rows={2} autoFocus disabled={saving} />
+            <textarea
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 rounded border bg-background px-2 py-1 text-sm"
+              rows={2}
+              autoFocus
+              disabled={saving}
+            />
           ) : (
-            <input type={type} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={handleKeyDown}
-              className="flex-1 rounded border bg-background px-2 py-1 text-sm" autoFocus disabled={saving} />
+            <input
+              type={type}
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1 rounded border bg-background px-2 py-1 text-sm"
+              autoFocus
+              disabled={saving}
+            />
           )}
-          <button onClick={handleSave} disabled={saving}
-            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground disabled:opacity-50"
+          >
             {saving ? "..." : "OK"}
           </button>
-          <button onClick={() => { setEditing(false); setVal(value || ""); }}
-            className="rounded border px-2 py-1 text-xs">
+          <button
+            onClick={() => {
+              setEditing(false);
+              setVal(value || "");
+            }}
+            className="rounded border px-2 py-1 text-xs"
+          >
             <X className="h-3 w-3" />
           </button>
         </div>
@@ -104,13 +168,26 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
   }
 
   return (
-    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
-      onClick={() => { setVal(value || ""); setEditing(true); }}>
+    <div
+      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => {
+        setVal(value || "");
+        setEditing(true);
+      }}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">
-        {value
-          ? (formatDisplay ? formatDisplay(value) : value)
-          : <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+        {value ? (
+          formatDisplay ? (
+            formatDisplay(value)
+          ) : (
+            value
+          )
+        ) : (
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+            click to edit
+          </span>
+        )}
       </span>
     </div>
   );
@@ -118,9 +195,23 @@ export function EditableField({ label, value, field, docId, onSave, type = "text
 
 // ─── EditableSelect ───────────────────────────────────────────
 
-export function EditableSelect({ label, value, field, docId, onSave, options, formatLabel, apiPath }: {
-  label: string; value: any; field: string; docId: number; onSave: (updated?: any) => void;
-  options: string[]; formatLabel?: (v: string) => string;
+export function EditableSelect({
+  label,
+  value,
+  field,
+  docId,
+  onSave,
+  options,
+  formatLabel,
+  apiPath,
+}: {
+  label: string;
+  value: any;
+  field: string;
+  docId: number;
+  onSave: (updated?: any) => void;
+  options: string[];
+  formatLabel?: (v: string) => string;
   /** Override the PATCH endpoint. See EditableField for details. */
   apiPath?: string;
 }) {
@@ -138,23 +229,36 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
       setEditing(false);
       setVal(newVal);
       onSave(res.data);
-    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    } catch {
+      toast({ title: "Failed to save", variant: "error" });
+    }
     setSaving(false);
   };
 
   if (editing) {
     return (
       <div className="flex items-center gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0">{label}</span>
-        <select value={val} onChange={(e) => handleSave(e.target.value)} disabled={saving}
-          className="flex-1 rounded border bg-background px-2 py-1 text-sm" autoFocus>
+        <span className="text-muted-foreground w-28 flex-shrink-0">
+          {label}
+        </span>
+        <select
+          value={val}
+          onChange={(e) => handleSave(e.target.value)}
+          disabled={saving}
+          className="flex-1 rounded border bg-background px-2 py-1 text-sm"
+          autoFocus
+        >
           <option value="">— none —</option>
           {options.map((opt) => (
-            <option key={opt} value={opt}>{fmt(opt)}</option>
+            <option key={opt} value={opt}>
+              {fmt(opt)}
+            </option>
           ))}
         </select>
-        <button onClick={() => setEditing(false)}
-          className="rounded border px-2 py-1 text-xs">
+        <button
+          onClick={() => setEditing(false)}
+          className="rounded border px-2 py-1 text-xs"
+        >
           <X className="h-3 w-3" />
         </button>
       </div>
@@ -162,11 +266,22 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
   }
 
   return (
-    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
-      onClick={() => { setVal(value || ""); setEditing(true); }}>
+    <div
+      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => {
+        setVal(value || "");
+        setEditing(true);
+      }}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">
-        {value ? fmt(value) : <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+        {value ? (
+          fmt(value)
+        ) : (
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+            click to edit
+          </span>
+        )}
       </span>
     </div>
   );
@@ -180,7 +295,13 @@ export function EditableSelect({ label, value, field, docId, onSave, options, fo
 // documents will resolve it to an id via the alias-aware _upsert_* helpers.
 
 export function EditableCombobox({
-  label, value, field, docId, onSave, normType, currentEntityId,
+  label,
+  value,
+  field,
+  docId,
+  onSave,
+  normType,
+  currentEntityId,
 }: {
   label: string;
   value: any;
@@ -214,9 +335,12 @@ export function EditableCombobox({
   const doctors = useDoctors();
   const facilities = useFacilities();
   const specialties = useSpecialties();
-  const source = normType === "doctors" ? doctors
-    : normType === "facilities" ? facilities
-    : specialties;
+  const source =
+    normType === "doctors"
+      ? doctors
+      : normType === "facilities"
+        ? facilities
+        : specialties;
   const options = Array.isArray(source.data) ? source.data : [];
   const loadingOptions = source.loading;
 
@@ -251,7 +375,10 @@ export function EditableCombobox({
       setPendingChange(null);
     } catch (err: any) {
       const d = err?.response?.data?.detail || err?.message || "Failed to save";
-      toast({ title: typeof d === "string" ? d : "Failed to save", variant: "error" });
+      toast({
+        title: typeof d === "string" ? d : "Failed to save",
+        variant: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -327,8 +454,12 @@ export function EditableCombobox({
       setQuery("");
       setPendingChange(null);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Failed to apply";
-      toast({ title: typeof d === "string" ? d : "Failed to apply", variant: "error" });
+      const d =
+        err?.response?.data?.detail || err?.message || "Failed to apply";
+      toast({
+        title: typeof d === "string" ? d : "Failed to apply",
+        variant: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -348,8 +479,10 @@ export function EditableCombobox({
       commitDocOnly(null);
       return;
     }
-    if (trimmed.toLowerCase() === String(value || "").toLowerCase()
-        && targetEntityId === currentEntityId) {
+    if (
+      trimmed.toLowerCase() === String(value || "").toLowerCase() &&
+      targetEntityId === currentEntityId
+    ) {
       // No-op — same name and same entity.
       setEditing(false);
       setQuery("");
@@ -371,13 +504,17 @@ export function EditableCombobox({
         return d.includes(q) || c.includes(q);
       })
     : options;
-  const exactMatch = filtered.some((o: any) => displayOf(o).toLowerCase() === q);
+  const exactMatch = filtered.some(
+    (o: any) => displayOf(o).toLowerCase() === q,
+  );
   const canCreate = q.length > 0 && !exactMatch;
 
   if (editing) {
     return (
       <div className="flex items-start gap-2 text-sm py-0.5">
-        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">{label}</span>
+        <span className="text-muted-foreground w-28 flex-shrink-0 pt-1">
+          {label}
+        </span>
         <div ref={rootRef} className="relative flex-1">
           <div className="flex items-center gap-1">
             <div className="relative flex-1">
@@ -387,7 +524,11 @@ export function EditableCombobox({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") { setEditing(false); setQuery(""); setPendingChange(null); }
+                  if (e.key === "Escape") {
+                    setEditing(false);
+                    setQuery("");
+                    setPendingChange(null);
+                  }
                   if (e.key === "Enter") {
                     if (filtered.length === 1) {
                       handleCommit(displayOf(filtered[0]), filtered[0].id);
@@ -402,20 +543,31 @@ export function EditableCombobox({
                 disabled={saving}
               />
             </div>
-            <button onClick={() => commitDocOnly(null)} disabled={saving}
+            <button
+              onClick={() => commitDocOnly(null)}
+              disabled={saving}
               className="rounded border px-2 py-1 text-xs hover:bg-accent"
-              title="Clear this field">
+              title="Clear this field"
+            >
               Clear
             </button>
-            <button onClick={() => { setEditing(false); setQuery(""); setPendingChange(null); }}
-              className="rounded border px-2 py-1 text-xs">
+            <button
+              onClick={() => {
+                setEditing(false);
+                setQuery("");
+                setPendingChange(null);
+              }}
+              className="rounded border px-2 py-1 text-xs"
+            >
               <X className="h-3 w-3" />
             </button>
           </div>
           {/* Dropdown panel */}
           <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border bg-background shadow-lg">
             {loadingOptions ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                Loading...
+              </div>
             ) : (
               <>
                 {filtered.length === 0 && !canCreate && (
@@ -423,25 +575,27 @@ export function EditableCombobox({
                     No {normType} yet. Type a name to create one.
                   </div>
                 )}
-                {!pendingChange && filtered.slice(0, 50).map((opt: any) => {
-                  const d = displayOf(opt);
-                  const isCurrent = value && d.toLowerCase() === String(value).toLowerCase();
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => handleCommit(d, opt.id)}
-                      disabled={saving}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
-                    >
-                      <span className="truncate">{d}</span>
-                      {opt.canonical_code && (
-                        <span className="text-[10px] font-mono text-muted-foreground truncate">
-                          {opt.canonical_code}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+                {!pendingChange &&
+                  filtered.slice(0, 50).map((opt: any) => {
+                    const d = displayOf(opt);
+                    const isCurrent =
+                      value && d.toLowerCase() === String(value).toLowerCase();
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => handleCommit(d, opt.id)}
+                        disabled={saving}
+                        className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent ${isCurrent ? "bg-accent/40" : ""}`}
+                      >
+                        <span className="truncate">{d}</span>
+                        {opt.canonical_code && (
+                          <span className="text-[10px] font-mono text-muted-foreground truncate">
+                            {opt.canonical_code}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 {canCreate && !pendingChange && (
                   <button
                     onClick={() => handleCommit(query, null)}
@@ -449,9 +603,17 @@ export function EditableCombobox({
                     className="flex w-full items-center gap-2 border-t px-3 py-1.5 text-left text-xs text-primary hover:bg-primary/10"
                   >
                     <Plus className="h-3 w-3" />
-                    {currentEntityId
-                      ? <>Use <span className="font-medium">"{query.trim()}"</span></>
-                      : <>Create new: <span className="font-medium">"{query.trim()}"</span></>}
+                    {currentEntityId ? (
+                      <>
+                        Use{" "}
+                        <span className="font-medium">"{query.trim()}"</span>
+                      </>
+                    ) : (
+                      <>
+                        Create new:{" "}
+                        <span className="font-medium">"{query.trim()}"</span>
+                      </>
+                    )}
                   </button>
                 )}
                 {pendingChange && (
@@ -469,7 +631,11 @@ export function EditableCombobox({
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 text-xs">
                         <span className="rounded bg-muted px-1.5 py-0.5 font-medium break-all">
-                          {fromLabel || <span className="text-muted-foreground italic">(empty)</span>}
+                          {fromLabel || (
+                            <span className="text-muted-foreground italic">
+                              (empty)
+                            </span>
+                          )}
                         </span>
                         <span className="text-muted-foreground">→</span>
                         <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary break-all">
@@ -485,12 +651,22 @@ export function EditableCombobox({
                       >
                         <span className="font-medium">Just this document</span>
                         <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
-                          Only this document switches to <span className="font-medium">"{pendingChange.display}"</span>.
-                          Other documents labelled <span className="font-medium">"{fromLabel}"</span> stay as they are.
+                          Only this document switches to{" "}
+                          <span className="font-medium">
+                            "{pendingChange.display}"
+                          </span>
+                          . Other documents labelled{" "}
+                          <span className="font-medium">"{fromLabel}"</span>{" "}
+                          stay as they are.
                         </span>
                       </button>
                       <button
-                        onClick={() => applyToAllDocuments(pendingChange.display, pendingChange.entityId)}
+                        onClick={() =>
+                          applyToAllDocuments(
+                            pendingChange.display,
+                            pendingChange.entityId,
+                          )
+                        }
                         disabled={saving}
                         className="rounded border border-primary/40 bg-primary/5 px-2 py-1.5 text-left text-xs hover:bg-primary/10 disabled:opacity-50"
                       >
@@ -498,9 +674,30 @@ export function EditableCombobox({
                           Every document with "{fromLabel}"
                         </span>
                         <span className="mt-0.5 block text-[10px] leading-snug text-muted-foreground">
-                          {pendingChange.entityId && pendingChange.entityId !== currentEntityId
-                            ? <>All documents currently labelled <span className="font-medium">"{fromLabel}"</span> will be relabelled <span className="font-medium">"{pendingChange.display}"</span>. The two {normType} are merged. Confirmation required.</>
-                            : <>The {singular} record <span className="font-medium">"{fromLabel}"</span> is renamed to <span className="font-medium">"{pendingChange.display}"</span>, so every linked document picks up the new name. Confirmation required.</>}
+                          {pendingChange.entityId &&
+                          pendingChange.entityId !== currentEntityId ? (
+                            <>
+                              All documents currently labelled{" "}
+                              <span className="font-medium">"{fromLabel}"</span>{" "}
+                              will be relabelled{" "}
+                              <span className="font-medium">
+                                "{pendingChange.display}"
+                              </span>
+                              . The two {normType} are merged. Confirmation
+                              required.
+                            </>
+                          ) : (
+                            <>
+                              The {singular} record{" "}
+                              <span className="font-medium">"{fromLabel}"</span>{" "}
+                              is renamed to{" "}
+                              <span className="font-medium">
+                                "{pendingChange.display}"
+                              </span>
+                              , so every linked document picks up the new name.
+                              Confirmation required.
+                            </>
+                          )}
                         </span>
                       </button>
                       <button
@@ -522,11 +719,20 @@ export function EditableCombobox({
   }
 
   return (
-    <div className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
-      onClick={() => { setQuery(""); setEditing(true); }}>
+    <div
+      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      onClick={() => {
+        setQuery("");
+        setEditing(true);
+      }}
+    >
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium">
-        {value || <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">click to edit</span>}
+        {value || (
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+            click to edit
+          </span>
+        )}
       </span>
     </div>
   );
@@ -534,21 +740,35 @@ export function EditableCombobox({
 
 // ─── EditableSummary ───────────────────────────────────────────
 
-export function EditableSummary({ value, docId, onSave }: { value: string | null; docId: number; onSave: (updated?: any) => void }) {
+export function EditableSummary({
+  value,
+  docId,
+  onSave,
+}: {
+  value: string | null;
+  docId: number;
+  onSave: (updated?: any) => void;
+}) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setVal(value || ""); }, [value]);
+  useEffect(() => {
+    setVal(value || "");
+  }, [value]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await api.patch(`/documents/${docId}`, { summary_en: val || null });
+      const res = await api.patch(`/documents/${docId}`, {
+        summary_en: val || null,
+      });
       setEditing(false);
       onSave(res.data);
-    } catch { toast({ title: "Failed to save", variant: "error" }); }
+    } catch {
+      toast({ title: "Failed to save", variant: "error" });
+    }
     setSaving(false);
   };
 
@@ -556,52 +776,97 @@ export function EditableSummary({ value, docId, onSave }: { value: string | null
     return (
       <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
         <h3 className="mb-2 text-sm font-medium text-primary">Summary</h3>
-        <textarea value={val} onChange={(e) => setVal(e.target.value)}
-          className="w-full rounded border bg-background px-3 py-2 text-sm" rows={3} autoFocus disabled={saving} />
+        <textarea
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          className="w-full rounded border bg-background px-3 py-2 text-sm"
+          rows={3}
+          autoFocus
+          disabled={saving}
+        />
         <div className="flex gap-2 mt-2">
-          <button onClick={handleSave} disabled={saving}
-            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+          >
             {saving ? "Saving..." : "Save"}
           </button>
-          <button onClick={() => { setEditing(false); setVal(value || ""); }}
-            className="rounded border px-3 py-1.5 text-xs hover:bg-accent">Cancel</button>
+          <button
+            onClick={() => {
+              setEditing(false);
+              setVal(value || "");
+            }}
+            className="rounded border px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 cursor-pointer hover:bg-primary/10 transition-colors group"
-      onClick={() => setEditing(true)}>
+    <div
+      className="rounded-lg border border-primary/20 bg-primary/5 p-4 cursor-pointer hover:bg-primary/10 transition-colors group"
+      onClick={() => setEditing(true)}
+    >
       <h3 className="mb-1 text-sm font-medium text-primary flex items-center justify-between">
         Summary
-        <span className="text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">click to edit</span>
+        <span className="text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">
+          click to edit
+        </span>
       </h3>
-      <p className="text-sm">{value || <span className="text-muted-foreground italic">No summary — click to add</span>}</p>
+      <p className="text-sm">
+        {value || (
+          <span className="text-muted-foreground italic">
+            No summary — click to add
+          </span>
+        )}
+      </p>
     </div>
   );
 }
 
 // ─── EditableFilename ──────────────────────────────────────────
 
-export function EditableFilename({ value, docId, onSave }: { value: string; docId: number; onSave: (updated?: any) => void }) {
+export function EditableFilename({
+  value,
+  docId,
+  onSave,
+}: {
+  value: string;
+  docId: number;
+  onSave: (updated?: any) => void;
+}) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value || "");
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => { setVal(value || ""); }, [value]);
+  useEffect(() => {
+    setVal(value || "");
+  }, [value]);
 
   const handleSave = async () => {
-    if (!val.trim() || val === value) { setEditing(false); return; }
+    if (!val.trim() || val === value) {
+      setEditing(false);
+      return;
+    }
     setSaving(true);
     try {
-      const res = await api.post(`/documents/${docId}/rename`, { filename: val });
+      const res = await api.post(`/documents/${docId}/rename`, {
+        filename: val,
+      });
       setEditing(false);
       onSave(res.data);
     } catch (e: any) {
-      toast({ title: "Rename failed", description: e.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Rename failed",
+        description: e.response?.data?.detail || e.message,
+        variant: "error",
+      });
     }
     setSaving(false);
   };
@@ -616,7 +881,11 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
         setEditing(true);
       }
     } catch (e: any) {
-      toast({ title: "Failed to generate filename", description: e.response?.data?.detail || e.message, variant: "error" });
+      toast({
+        title: "Failed to generate filename",
+        description: e.response?.data?.detail || e.message,
+        variant: "error",
+      });
     }
     setGenerating(false);
   };
@@ -624,16 +893,34 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
   if (editing) {
     return (
       <div className="flex items-center gap-2">
-        <input value={val} onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditing(false); setVal(value); } }}
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") {
+              setEditing(false);
+              setVal(value);
+            }
+          }}
           className="text-xl font-semibold bg-background border rounded px-2 py-1 flex-1"
-          autoFocus disabled={saving} />
-        <button onClick={handleSave} disabled={saving}
-          className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50">
+          autoFocus
+          disabled={saving}
+        />
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+        >
           {saving ? "..." : "Save"}
         </button>
-        <button onClick={() => { setEditing(false); setVal(value); }}
-          className="rounded border px-2 py-1.5 text-xs hover:bg-accent">
+        <button
+          onClick={() => {
+            setEditing(false);
+            setVal(value);
+          }}
+          className="rounded border px-2 py-1.5 text-xs hover:bg-accent"
+        >
           <X className="h-3 w-3" />
         </button>
       </div>
@@ -644,15 +931,22 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
     <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2">
       <span onClick={() => setEditing(true)}>{value}</span>
       <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-        <button onClick={() => setEditing(true)}
+        <button
+          onClick={() => setEditing(true)}
           className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-          title="Edit filename">
+          title="Edit filename"
+        >
           <Pencil className="h-4 w-4" />
         </button>
-        <button onClick={handleGenerate} disabled={generating}
+        <button
+          onClick={handleGenerate}
+          disabled={generating}
           className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-50"
-          title="Generate filename from document data">
-          <RefreshCw className={`h-4 w-4 ${generating ? "animate-spin" : ""}`} />
+          title="Generate filename from document data"
+        >
+          <RefreshCw
+            className={`h-4 w-4 ${generating ? "animate-spin" : ""}`}
+          />
         </button>
       </span>
     </h1>
@@ -661,8 +955,15 @@ export function EditableFilename({ value, docId, onSave }: { value: string; docI
 
 // ─── TechnicalDetails (collapsible) ───────────────────────────
 
-export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider, language }: {
-  ocrEngine: string | null; ocrConfidence: number | null; llmProvider: string | null;
+export function TechnicalDetails({
+  ocrEngine,
+  ocrConfidence,
+  llmProvider,
+  language,
+}: {
+  ocrEngine: string | null;
+  ocrConfidence: number | null;
+  llmProvider: string | null;
   /** Detected source language (the previously top-level "Language" row).
    * Lives inside the disclosure now so the metadata card stays focused on
    * fields the user is actually likely to edit. */
@@ -675,7 +976,9 @@ export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider, langua
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 text-xs text-muted-foreground/70 hover:text-muted-foreground transition-colors"
       >
-        <ChevronRight className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`} />
+        <ChevronRight
+          className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`}
+        />
         Processing details
       </button>
       {open && (
@@ -689,19 +992,25 @@ export function TechnicalDetails({ ocrEngine, ocrConfidence, llmProvider, langua
           {ocrEngine && (
             <div className="flex justify-between">
               <span>OCR Engine</span>
-              <span className="font-medium text-foreground/70">{ocrEngine}</span>
+              <span className="font-medium text-foreground/70">
+                {ocrEngine}
+              </span>
             </div>
           )}
           {ocrConfidence != null && (
             <div className="flex justify-between">
               <span>OCR Confidence</span>
-              <span className="font-medium text-foreground/70">{ocrConfidence.toFixed(2)}</span>
+              <span className="font-medium text-foreground/70">
+                {ocrConfidence.toFixed(2)}
+              </span>
             </div>
           )}
           {llmProvider && (
             <div className="flex justify-between">
               <span>LLM Provider</span>
-              <span className="font-medium text-foreground/70">{llmProvider}</span>
+              <span className="font-medium text-foreground/70">
+                {llmProvider}
+              </span>
             </div>
           )}
         </div>
@@ -738,24 +1047,80 @@ export function OcrSection({ text }: { text: string | null }) {
   );
 }
 
+// ─── TranslatedTextSection (collapsible) ───────────────────────
+
+export function TranslatedTextSection({
+  text,
+  model,
+  translatedAt,
+}: {
+  text: string | null;
+  model: string | null;
+  translatedAt: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <div className="rounded-lg border">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between p-4 hover:bg-accent/50"
+      >
+        <h3 className="flex items-center gap-2 font-medium">
+          {open ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          English translation
+          {model && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+              {model}
+            </span>
+          )}
+        </h3>
+        <span className="text-xs text-muted-foreground">
+          {open ? "Hide" : "Show"} ({text.length} chars
+          {translatedAt ? `, ${new Date(translatedAt).toLocaleString()}` : ""})
+        </span>
+      </button>
+      {open && (
+        <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap border-t bg-muted/30 p-4 text-xs">
+          {text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 // ─── getSectionTypeStyle ───────────────────────────────────────
 
 export function getSectionTypeStyle(type: string): string {
   const styles: Record<string, string> = {
-    lab_results_page: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    clinical_notes: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    nursing_notes: "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
+    lab_results_page:
+      "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    clinical_notes:
+      "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    nursing_notes:
+      "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
     vital_signs: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    consent_form: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    cover_page: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
-    medication_chart: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-    operative_notes: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    discharge_summary: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    imaging_report: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
-    correspondence: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-    invoice_page: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    consent_form:
+      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    cover_page:
+      "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+    medication_chart:
+      "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+    operative_notes:
+      "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+    discharge_summary:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+    imaging_report:
+      "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
+    correspondence:
+      "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+    invoice_page:
+      "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   };
-  return styles[type] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  return (
+    styles[type] ||
+    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+  );
 }
 
 // ─── MedFormBadge ──────────────────────────────────────────────
@@ -766,22 +1131,46 @@ export function MedFormBadge({ form }: { form?: string }) {
   let color = "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
   let Icon: any = Pill;
 
-  if (lower.includes("tablet") || lower.includes("pill") || lower.includes("capsule")) {
+  if (
+    lower.includes("tablet") ||
+    lower.includes("pill") ||
+    lower.includes("capsule")
+  ) {
     color = "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
     Icon = Pill;
-  } else if (lower.includes("inject") || lower.includes("iv") || lower.includes("syringe")) {
-    color = "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
+  } else if (
+    lower.includes("inject") ||
+    lower.includes("iv") ||
+    lower.includes("syringe")
+  ) {
+    color =
+      "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
     Icon = Syringe;
-  } else if (lower.includes("cream") || lower.includes("ointment") || lower.includes("topical")) {
+  } else if (
+    lower.includes("cream") ||
+    lower.includes("ointment") ||
+    lower.includes("topical")
+  ) {
     color = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
-  } else if (lower.includes("liquid") || lower.includes("syrup") || lower.includes("solution")) {
-    color = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
-  } else if (lower.includes("inhaler") || lower.includes("spray") || lower.includes("nasal")) {
+  } else if (
+    lower.includes("liquid") ||
+    lower.includes("syrup") ||
+    lower.includes("solution")
+  ) {
+    color =
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
+  } else if (
+    lower.includes("inhaler") ||
+    lower.includes("spray") ||
+    lower.includes("nasal")
+  ) {
     color = "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300";
   }
 
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${color}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
+    >
       <Icon className="h-3 w-3" />
       {form}
     </span>

@@ -7,11 +7,13 @@ import {
   EditableSummary,
   EditableFilename,
   OcrSection,
+  TranslatedTextSection,
 } from "@/components/document-detail/DocumentDetailHelpers";
 import EventSelector from "@/components/document-detail/EventSelector";
 import LabResultsEditor from "@/components/document-detail/LabResultsEditor";
 import DocumentViewer from "@/components/document-detail/DocumentViewer";
 import ReprocessMenu from "@/components/document-detail/ReprocessMenu";
+import TranslateMenu from "@/components/document-detail/TranslateMenu";
 import DocumentQueueStatus from "@/components/document-detail/DocumentQueueStatus";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import {
@@ -180,11 +182,18 @@ export default function DocumentDetailPage() {
           {doc.status === "processing" || doc.status === "pending" ? (
             <DocumentQueueStatus docId={Number(id)} />
           ) : (
-            <ReprocessMenu
-              docId={id!}
-              onBeforeReprocess={handleReprocessRequested}
-              onReprocessed={() => loadDoc(false)}
-            />
+            <>
+              <ReprocessMenu
+                docId={id!}
+                onBeforeReprocess={handleReprocessRequested}
+                onReprocessed={() => loadDoc(false)}
+              />
+              <TranslateMenu
+                docId={id!}
+                hasOcrText={!!(doc.ocr_text && doc.ocr_text.trim())}
+                onTranslated={() => loadDoc(false)}
+              />
+            </>
           )}
           <button
             onClick={handleDelete}
@@ -281,6 +290,13 @@ export default function DocumentDetailPage() {
       {/* OCR section: hide for placeholder imaging reports (no PDF, no
           OCR text). Real PDF reports go through OCR like any document. */}
       {!isImagingPlaceholder(doc) && <OcrSection text={doc.ocr_text} />}
+      {!isImagingPlaceholder(doc) && (
+        <TranslatedTextSection
+          text={doc.ocr_text_en}
+          model={doc.ocr_text_en_model}
+          translatedAt={doc.ocr_text_en_translated_at}
+        />
+      )}
     </div>
   );
 }

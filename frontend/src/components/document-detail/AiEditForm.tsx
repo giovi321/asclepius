@@ -26,14 +26,19 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
       const data = resp?.data || {};
       if (data.mode === "pages") {
         const pages: number[] = Array.isArray(data.pages) ? data.pages : [];
-        const skipped: number[] = Array.isArray(data.skipped_pages)
-          ? data.skipped_pages
+        const oor: number[] = Array.isArray(data.out_of_range_pages)
+          ? data.out_of_range_pages
           : [];
-        const description =
-          `Re-extracted from page${pages.length === 1 ? "" : "s"} ${pages.join(", ")}` +
-          (skipped.length
-            ? ` (skipped out-of-range: ${skipped.join(", ")})`
-            : "");
+        const notCached: number[] = Array.isArray(data.not_in_cache_pages)
+          ? data.not_in_cache_pages
+          : [];
+        let description = `Re-extracted from page${pages.length === 1 ? "" : "s"} ${pages.join(", ")}`;
+        if (oor.length) {
+          description += ` (skipped out-of-range: ${oor.join(", ")})`;
+        }
+        if (notCached.length) {
+          description += ` (skipped not in OCR cache: ${notCached.join(", ")} — re-run full OCR to refresh)`;
+        }
         toast({ title: "Pages reprocessed", description, variant: "success" });
       }
     } catch (e: any) {

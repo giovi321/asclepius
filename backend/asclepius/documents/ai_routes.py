@@ -261,15 +261,28 @@ async def _scoped_page_reprocess(
     when the user says "reprocess page 41 for labs", they expect labs to
     come from page 41 and nothing else.
     """
-    from asclepius.pipeline.ocr_cache import load_cached_ocr_pages
     from asclepius.pipeline.extractor import extract_and_store
     from asclepius.pipeline.provider_factory import (
         ProviderUnreachableError,
         get_llm_provider,
     )
 
-    cached_pages = await load_cached_ocr_pages(db, doc_id)
-    if not cached_pages:
+    # Index cached OCR by its real ``page_number`` (1-indexed). The previous
+    # version loaded into a flat list and used positional indexing, which
+    # silently drifts whenever the cache has gaps and conflates "OCR cache
+    # only covers N pages" with "the document only has N pages". The
+    # documents row carries the true file page count; the cache may have
+    # fewer rows if OCR ran on a partial extract or its page splitter
+    # under-counted (cache_ocr_pages currently splits on ``\n\n``, so a
+    # doc whose OCR text doesn't naturally separate per page can land
+    # fewer cache rows than file pages).
+    cursor = await db.execute(
+        "SELECT page_number, ocr_text FROM ocr_page_cache "
+        "WHERE document_id = ? ORDER BY page_number",
+        (doc_id,),
+    )
+    rows = await cursor.fetchall()
+    if not rows:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -277,24 +290,52 @@ async def _scoped_page_reprocess(
                 "reprocess (OCR) once before asking to re-extract specific pages."
             ),
         )
+    cached_by_page: dict[int, str] = {int(r[0]): r[1] for r in rows}
+    cached_count = len(cached_by_page)
+    # Trust the documents row when it has a real count; fall back to the
+    # cache size for legacy rows that pre-date page_count being populated.
+    total_pages = page_count if page_count and page_count > 0 else cached_count
 
-    total = len(cached_pages)
     selected_text: list[str] = []
     used_pages: list[int] = []
-    skipped_pages: list[int] = []
+    out_of_range: list[int] = []
+    not_in_cache: list[int] = []
     for p in requested_pages:
-        if 1 <= p <= total:
-            selected_text.append(cached_pages[p - 1])
-            used_pages.append(p)
-        else:
-            skipped_pages.append(p)
+        if p < 1 or p > total_pages:
+            out_of_range.append(p)
+            continue
+        text = cached_by_page.get(p)
+        if not text:
+            not_in_cache.append(p)
+            continue
+        selected_text.append(text)
+        used_pages.append(p)
 
     if not selected_text:
+        if out_of_range and not not_in_cache:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"None of the requested pages exist — document has "
+                    f"{total_pages} page(s), instruction referenced {requested_pages}."
+                ),
+            )
+        if not_in_cache and not out_of_range:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"OCR cache only covers {cached_count} of {total_pages} "
+                    f"page(s); pages {not_in_cache} are not cached. Run a "
+                    f"full reprocess (OCR) to refresh the per-page cache, "
+                    f"then try again."
+                ),
+            )
         raise HTTPException(
             status_code=400,
             detail=(
-                f"None of the requested pages exist — document has {total} "
-                f"page(s), instruction referenced {requested_pages}."
+                f"Document has {total_pages} page(s), OCR cache covers "
+                f"{cached_count}. Pages {out_of_range} are out of range and "
+                f"pages {not_in_cache} are not cached."
             ),
         )
 
@@ -306,10 +347,11 @@ async def _scoped_page_reprocess(
         raise HTTPException(status_code=503, detail=str(e))
 
     logger.info(
-        "AI-edit scoped reprocess doc=%d pages=%s (of %d) chars=%d",
+        "AI-edit scoped reprocess doc=%d pages=%s (of %d, %d cached) chars=%d",
         doc_id,
         used_pages,
-        total,
+        total_pages,
+        cached_count,
         len(scoped_ocr),
     )
 
@@ -327,8 +369,11 @@ async def _scoped_page_reprocess(
         "mode": "pages",
         "document_id": doc_id,
         "pages": used_pages,
-        "skipped_pages": skipped_pages,
-        "page_count": total,
+        "skipped_pages": sorted(out_of_range + not_in_cache),
+        "out_of_range_pages": out_of_range,
+        "not_in_cache_pages": not_in_cache,
+        "page_count": total_pages,
+        "cached_page_count": cached_count,
     }
 
 

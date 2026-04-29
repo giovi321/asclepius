@@ -3,14 +3,14 @@ title: "Installation"
 ---
 
 :::danger[Do not expose Asclepius directly to the internet]
-Asclepius is **not hardened for direct public-internet exposure**. The built-in authentication has no rate limiting, no MFA, and no account-lockout protection — it exists to make solo / LAN installs frictionless.
+Asclepius is **not hardened for direct public-internet exposure**. The built-in authentication has no rate limiting, no MFA, and no account-lockout protection, it exists to make solo / LAN installs frictionless.
 
 For any deployment that is reachable from outside a trusted network, or that has more than a single user, you **must** front Asclepius with one of:
 
-- An **OIDC provider** such as [Authentik](https://goauthentik.io/), Keycloak, Auth0, or Google (recommended — see [User Management](../admin-guide/user-management.md)), and/or
+- An **OIDC provider** such as [Authentik](https://goauthentik.io/), Keycloak, Auth0, or Google (recommended, see [User Management](../admin-guide/user-management.md)), and/or
 - A **VPN** (WireGuard, Tailscale, …) or an **authenticating reverse proxy**.
 
-The local username/password login should be treated as a single-user convenience, not a production auth system. Bind port `8070` to `127.0.0.1` or a private subnet — never `0.0.0.0` on a public host.
+The local username/password login should be treated as a single-user convenience, not a production auth system. Bind port `8070` to `127.0.0.1` or a private subnet, never `0.0.0.0` on a public host.
 :::
 
 ## Prerequisites
@@ -59,11 +59,11 @@ Application env vars are prefixed with `ASCLEPIUS_`. The `TZ` variable is a plai
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ASCLEPIUS_SECRET_KEY` | Session signing key (change in production!) | `change-me-in-production` |
-| `ASCLEPIUS_ANTHROPIC_API_KEY` | Populates the Claude credential/provider `api_key` if one exists | — |
-| `ASCLEPIUS_OLLAMA_URL` | Populates the Ollama credential/provider `base_url` if one exists | — |
-| `ASCLEPIUS_GOOGLE_VISION_KEY` | Populates `ocr.google_vision_key` and flips `cloud_ocr_enabled` on | — |
+| `ASCLEPIUS_ANTHROPIC_API_KEY` | Populates the Claude credential/provider `api_key` if one exists | |
+| `ASCLEPIUS_OLLAMA_URL` | Populates the Ollama credential/provider `base_url` if one exists | |
+| `ASCLEPIUS_GOOGLE_VISION_KEY` | Populates `ocr.google_vision_key` and flips `cloud_ocr_enabled` on | |
 | `ASCLEPIUS_COOKIE_SECURE` | Truthy value forces `Secure` cookies (set behind HTTPS) | `false` |
-| `ASCLEPIUS_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | — |
+| `ASCLEPIUS_CORS_ORIGINS` | Comma-separated list of allowed CORS origins | |
 | `ASCLEPIUS_VAULT_PATH` | Overrides `vault.root_path` and all sub-paths | `/vault` |
 | `ASCLEPIUS_DB_PATH` | Overrides `database.path` | `/vault/asclepius.sqlite` |
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` | `config/settings.yaml` |
@@ -105,7 +105,7 @@ llm:
       timeout: 120
 ```
 
-If Ollama runs on a different machine, use that machine's IP or hostname. Vision-LLM providers reference the **same** credential — see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
+If Ollama runs on a different machine, use that machine's IP or hostname. Vision-LLM providers reference the **same** credential, see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
 
 ### Volume Mounts
 
@@ -121,12 +121,12 @@ The `vault/` directory contains all your documents and the SQLite database. Make
 
 :::
 
-### First Launch — Setup Wizard
+### First Launch, Setup Wizard
 
 1. Open [http://localhost:8070](http://localhost:8070)
 2. On first launch (no users in the database), a **setup wizard** appears
 3. Create your admin account (username, password, display name)
-4. Create your first patient profile — pre-filled with your display name, with optional date of birth and sex
+4. Create your first patient profile, pre-filled with your display name, with optional date of birth and sex
 5. After completing the wizard, you are automatically logged in and redirected to the dashboard
 
 :::note[The wizard only appears once]

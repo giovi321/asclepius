@@ -102,8 +102,7 @@ vault/
 
 `inbox/` is split into per-upload sub-folders so each upload has its own
 isolated dropzone. When the upload form names a patient (the common
-case) the sub-folder is the patient slug — e.g. ``inbox/alex-smith/`` —
-so a shell-level `ls inbox/` reads as a human roster. When there's no
+case) the sub-folder is the patient slug, e.g. ``inbox/alex-smith/``, so a shell-level `ls inbox/` reads as a human roster. When there's no
 patient yet the sub-folder falls back to ``user-<id>/``. Uploads via
 `POST /api/documents/upload` write a ``.user_hint`` sidecar so the
 pipeline can stamp `uploaded_by_user_id` regardless of the folder
@@ -117,7 +116,7 @@ so each user's unassigned queue stays isolated.
 Documents assigned to a medical event are organized into an event subfolder within the year. Documents without an event remain directly in the year folder.
 
 Imaging studies are filed as **peers of regular document files** under
-the year folder — the study folder (e.g.
+the year folder, the study folder (e.g.
 `20240722_riverside-clinic_ct-abdomen/`) takes the place a single PDF
 would, with `series-N/` subfolders for the DICOM frames. Auxiliary
 files extracted from the same zip upload (DICOMDIR, JPEG previews,
@@ -160,7 +159,7 @@ Examples:
 Each patient has a URL-safe slug derived from their display name:
 
 - "Alex Smith" becomes `alex-smith`
-- The slug is globally unique (used for the filesystem directory name and joins). When two users independently create a patient with the same display name, the second gets an auto-disambiguated slug (`alex-smith`, then `alex-smith-2`, etc.). `display_name` is allowed to repeat across users — the slug is an internal handle, not something the UI surfaces for editing.
+- The slug is globally unique (used for the filesystem directory name and joins). When two users independently create a patient with the same display name, the second gets an auto-disambiguated slug (`alex-smith`, then `alex-smith-2`, etc.). `display_name` is allowed to repeat across users, the slug is an internal handle, not something the UI surfaces for editing.
 
 ## File Deduplication
 

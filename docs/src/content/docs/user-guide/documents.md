@@ -6,9 +6,9 @@ title: "Documents"
 
 Two ingestion paths:
 
-- **Web UI** — drag-and-drop onto the upload area or use the Upload button.
+- **Web UI**, drag-and-drop onto the upload area or use the Upload button.
   Optionally pre-assign a patient via a fuzzy-search picker.
-- **Inbox folder** — drop files into `vault/inbox/`. The watcher queues
+- **Inbox folder**, drop files into `vault/inbox/`. The watcher queues
   them automatically. To pre-assign a patient, place a `<filename>.patient_hint`
   sibling file containing the patient ID.
 
@@ -37,9 +37,9 @@ the **Columns** menu. Column choices persist per user. Pages of 20.
 Excel-style multi-select dropdowns with search, combined with a free-text
 query:
 
-- **Type**, **Status**, **Specialty**, **Doctor**, **Facility** — multi-select
-- **Date range** — from/to pickers
-- **Search query** — full-text search across OCR text, filenames,
+- **Type**, **Status**, **Specialty**, **Doctor**, **Facility**, multi-select
+- **Date range**, from/to pickers
+- **Search query**, full-text search across OCR text, filenames,
   summaries, and metadata
 
 API parameters accept comma-separated values (e.g.
@@ -61,16 +61,16 @@ without `uploaded_by_user_id` stay admin-only until backfilled.
 
 Selecting rows reveals a bulk action bar:
 
-- **Delete** — one confirm, deletes all selected.
-- **Reprocess ▾** — OCR + LLM, OCR only, or LLM only, matching the
+- **Delete**, one confirm, deletes all selected.
+- **Reprocess ▾**, OCR + LLM, OCR only, or LLM only, matching the
   single-doc flow.
-- **Regenerate filename** — AI filename generation for each doc; collisions
+- **Regenerate filename**, AI filename generation for each doc; collisions
   are auto-disambiguated with `-2`, `-3`, ….
 
 Actions run sequentially and report a single summary toast. Selection
 clears automatically on filter / page / patient changes.
 
-## Document list — row click
+## Document list, row click
 
 Clicking anywhere on a row opens the document detail page. The
 checkbox column, the rename pencil, and the inline-rename input stop
@@ -79,8 +79,8 @@ event propagation so they keep their own behaviour.
 ## Document detail page
 
 The left panel shows the PDF viewer for PDFs, an inline image for
-JPEG / PNG / TIFF, or — for **imaging documents** (`doc_type =
-'imaging_report'`, see [Imaging](/user-guide/imaging)) — the same
+JPEG / PNG / TIFF, or, for **imaging documents** (`doc_type =
+'imaging_report'`, see [Imaging](/user-guide/imaging)), the same
 report-PDF slot used on the imaging detail page. When the report is
 attached, the PDF renders inline; when it is a placeholder, the slot
 shows *Upload PDF* / *Pick existing PDF* buttons. The DICOM viewer
@@ -94,12 +94,12 @@ viewer).
 The right panel holds all extracted metadata with inline-editable
 fields:
 
-- **Type** — dropdown across the 25+ supported types
-- **Dates** — document date, date issued, date of visit, date received
-- **Doctor / Facility / Specialty** — searchable comboboxes with inline
+- **Type**, dropdown across the 25+ supported types
+- **Dates**, document date, date issued, date of visit, date received
+- **Doctor / Facility / Specialty**, searchable comboboxes with inline
   *+ Create new* when the typed text has no match. Selecting resolves
   through the alias-aware upsert, so merged entities are honored.
-- **Summary** — English summary
+- **Summary**, English summary
 
 A collapsible **Processing details** section shows OCR engine, OCR
 confidence, and LLM provider/model.
@@ -123,7 +123,7 @@ medications, encounters, vaccinations.
 
 ### Linked documents and medical events
 
-Related documents can be linked with a relationship type — *invoice for*,
+Related documents can be linked with a relationship type, *invoice for*,
 *report for*, *imaging for*, *follow up*, *related*. **Suggest Links** asks
 the LLM to recommend related documents for the same patient. Documents can
 be assigned to a medical event, with a **Suggest Event** affordance for LLM
@@ -133,9 +133,9 @@ suggestions.
 
 The **Reprocess** dropdown re-runs processing on a document. Choose:
 
-- **What to reprocess** — OCR + LLM, OCR only, LLM only, or Vision-LLM (the
+- **What to reprocess**, OCR + LLM, OCR only, LLM only, or Vision-LLM (the
   single-step vision flow).
-- **Provider overrides** — pick a specific OCR, LLM, or Vision-LLM provider
+- **Provider overrides**, pick a specific OCR, LLM, or Vision-LLM provider
   instead of the default (highest priority).
 
 LLM / Vision-LLM reprocessing clears previously extracted metadata and

@@ -14,7 +14,7 @@ All endpoints require authentication unless noted. Base prefix: `/api`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/setup/status` | No | Returns `{"needs_setup": true/false}` — true when no users exist |
+| `GET` | `/api/setup/status` | No | Returns `{"needs_setup": true/false}`, true when no users exist |
 | `POST` | `/api/setup/complete` | No | Create first admin user + first patient (only works when no users exist) |
 
 ### Setup request
@@ -53,7 +53,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `PATCH` | `/api/patients/{id}` | Yes | Update patient fields |
 | `DELETE` | `/api/patients/{id}` | Yes | Delete a patient |
 
-**Patient fields:** `display_name`, `date_of_birth`, `sex` — only fields that feed the LLM extraction context are stored.
+**Patient fields:** `display_name`, `date_of_birth`, `sex`, only fields that feed the LLM extraction context are stored.
 
 ## Documents
 
@@ -101,7 +101,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 
 `event_date` is the canonical timeline anchor (when the medical event happened); `issued_date` is the administrative date the document itself carries. Both accept `YYYY-MM-DD` strings or `null`.
 
-`doctor_name` and `facility_name` are write-only convenience fields — they are not stored on the document, only on `doctors` / `facilities`. When a request sends a name without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically. A name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears the foreign key.
+`doctor_name` and `facility_name` are write-only convenience fields, they are not stored on the document, only on `doctors` / `facilities`. When a request sends a name without the matching `doctor_id` / `facility_id`, the PATCH runs the name through the alias-aware upsert and fills in the id automatically. A name that matches an existing slug or alias reuses that entry, anything else creates a new canonical row. Sending the name as `null` clears the foreign key.
 
 ### AI Edit request
 
@@ -160,7 +160,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 |--------|------|------|-------------|
 | `GET` | `/api/lab-results` | Yes | List lab results. Each row carries `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code` via JOINs. |
 | `GET` | `/api/lab-results/orphans` | Yes | Lab results whose `document_id` no longer points to an existing document. |
-| `GET` | `/api/lab-results/timeline` | Yes | Time-series for a specific test (legacy — superseded by the in-page chart picker). |
+| `GET` | `/api/lab-results/timeline` | Yes | Time-series for a specific test (legacy, superseded by the in-page chart picker). |
 | `POST` | `/api/lab-results` | Yes | Create a single lab result (add-by-hand). Requires `document_id` and `test_name_original`. |
 | `PATCH` | `/api/lab-results/{id}` | Yes | Update editable fields (value, unit, reference range, test_date, …). Viewers are blocked. |
 | `DELETE` | `/api/lab-results/{id}` | Yes | Delete a single lab result. |
@@ -190,7 +190,7 @@ Only `username`, `password`, and `patient_name` are required. All other fields a
 | `POST` | `/api/imaging/{id}/links` | Yes | Link an existing document to this study |
 | `DELETE` | `/api/imaging/{id}/links/{link_id}` | Yes | Remove a study-document link |
 | `POST` | `/api/imaging/{id}/report` | Yes | Attach a radiology report PDF to this study. Either pass ``?document_id=N`` (or JSON ``{"document_id": N}``) to link an existing PDF document, or post a multipart ``file=`` to upload a fresh PDF. PDF-only is enforced via libmagic. The placeholder document is replaced. |
-| `PATCH` | `/api/imaging/{id}/metadata` | Yes | Update imaging-specific fields (``modality``, ``body_part``, ``study_description``, ``accession_number``). Each change is also recorded in ``extraction_corrections`` against the parent document so the LLM picks it up as a few-shot example. Doctor / facility / event_date / patient are NOT accepted here — those are edited via PATCH /api/documents/{id}. |
+| `PATCH` | `/api/imaging/{id}/metadata` | Yes | Update imaging-specific fields (``modality``, ``body_part``, ``study_description``, ``accession_number``). Each change is also recorded in ``extraction_corrections`` against the parent document so the LLM picks it up as a few-shot example. Doctor / facility / event_date / patient are NOT accepted here, those are edited via PATCH /api/documents/{id}. |
 
 ### Imaging query parameters (list endpoint)
 
@@ -312,7 +312,7 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 
 **LLM:** `extraction_timeout`, `llm_max_concurrent_requests`, `llm_max_retries`, `llm_retry_backoff_seconds`, `canonical_language`
 
-**OCR (legacy flat fields — kept for the auto-migration path):** `ocr_engine`, `ocr_language`, `ocr_confidence_threshold`, `cloud_ocr_enabled`, `ocr_remote_url`, `ocr_remote_api_key`, `llm_vision_provider`, `llm_vision_model`, `llm_vision_ollama_url`, `google_vision_key`
+**OCR (legacy flat fields, kept for the auto-migration path):** `ocr_engine`, `ocr_language`, `ocr_confidence_threshold`, `cloud_ocr_enabled`, `ocr_remote_url`, `ocr_remote_api_key`, `llm_vision_provider`, `llm_vision_model`, `llm_vision_ollama_url`, `google_vision_key`
 
 **Vision-LLM (legacy flat fields):** `vision_extraction_timeout`, `vision_max_concurrent_requests`, `vision_max_retries`, `vision_retry_backoff_seconds`. New deployments should leave these at defaults and rely on the per-credential values.
 
@@ -322,7 +322,7 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 
 **OIDC:** `oidc_enabled`, `oidc_provider_url`, `oidc_client_id`, `oidc_client_secret`, `oidc_scopes`, `oidc_auto_create_user`, `oidc_username_claim`, `oidc_display_name_claim`
 
-For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`) and the shared credential list (`credentials[]`), use the dedicated `PUT /api/settings/{llm|ocr|vision}-providers` and `PUT /api/settings/credentials` endpoints — each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
+For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`) and the shared credential list (`credentials[]`), use the dedicated `PUT /api/settings/{llm|ocr|vision}-providers` and `PUT /api/settings/credentials` endpoints, each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
 
 ## Prompts
 

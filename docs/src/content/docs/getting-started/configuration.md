@@ -37,7 +37,7 @@ oidc:
 
 # Shared connections referenced by provider entries via `credential_id`.
 # Concurrency limits and retry policies live here so models on the same
-# endpoint share a queue — see admin-guide/llm-configuration.md.
+# endpoint share a queue, see admin-guide/llm-configuration.md.
 credentials:
   - id: "cred-ollama-main"
     name: "Ollama (GPU box)"
@@ -51,8 +51,8 @@ ocr:
   # Global defaults (used when no provider-level override is set)
   language: "eng"              # Tesseract language codes, + separated
   confidence_threshold: 0.7    # Below this, document marked as needs_review
-  max_concurrent_vision_requests: 1  # Legacy — preferred knob is credential.max_concurrent
-  # Ordered provider list — tried in priority order for the OCR+LLM flow.
+  max_concurrent_vision_requests: 1  # Legacy, preferred knob is credential.max_concurrent
+  # Ordered provider list, tried in priority order for the OCR+LLM flow.
   providers:
     - id: "tesseract-1"
       type: "tesseract"        # tesseract | tesseract_remote | llm_vision | google_vision
@@ -72,13 +72,13 @@ ocr:
 
 llm:
   extraction_timeout: 120          # Per-provider timeout (seconds)
-  max_concurrent_requests: 2       # Legacy flat cap — new setups rely on credential.max_concurrent
-  max_retries: 3                   # Legacy — replaced by per-credential retry policy
+  max_concurrent_requests: 2       # Legacy flat cap, new setups rely on credential.max_concurrent
+  max_retries: 3                   # Legacy, replaced by per-credential retry policy
   retry_backoff_seconds: [30, 60, 120]
   extraction_max_output_tokens: 16384   # Raise if the LLM keeps hitting the output-token cap
   classification_max_output_tokens: 4096
   canonical_language: "English"    # Language for LLM-authored free-form text
-  # Ordered provider list — tried in priority order.
+  # Ordered provider list, tried in priority order.
   providers:
     - id: "ollama-1"
       type: "ollama"           # ollama | vllm | claude | openai
@@ -88,7 +88,7 @@ llm:
       credential_id: "cred-ollama-main"
       model: "qwen2.5"
       timeout: 120
-  # General-purpose LLM — used for chat, auto-merge, auto-rename, link
+  # General-purpose LLM, used for chat, auto-merge, auto-rename, link
   # suggestion, event extraction, and AI document edits. When empty, those
   # endpoints return 503.
   general:
@@ -116,7 +116,7 @@ pipeline:
   poll_interval_seconds: 5           # How often to check for new files
   retry_interval_seconds: 300        # Wait before retrying failed extractions
   max_retries: 3                     # Max retry attempts for failed documents
-  default_flow: "ocr_llm"            # "ocr_llm" or "vision_llm" — which path new uploads use
+  default_flow: "ocr_llm"            # "ocr_llm" or "vision_llm", which path new uploads use
 ```
 
 ## Providers and processing flows
@@ -143,14 +143,14 @@ See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full deta
 
 ### Concurrency caps
 
-Each **credential** carries a `max_concurrent` value — the process-wide cap for everything that uses that endpoint. Every LLM/Vision/OCR provider referencing the credential shares a queue, split per kind (`llm` / `ocr` / `vision`). A single Ollama server with `max_concurrent: 1` will never run more than one LLM request *and* one OCR request *and* one vision request at the same time, matching how the physical GPU actually behaves.
+Each **credential** carries a `max_concurrent` value, the process-wide cap for everything that uses that endpoint. Every LLM/Vision/OCR provider referencing the credential shares a queue, split per kind (`llm` / `ocr` / `vision`). A single Ollama server with `max_concurrent: 1` will never run more than one LLM request *and* one OCR request *and* one vision request at the same time, matching how the physical GPU actually behaves.
 
 When a provider still uses inline URL + API key (no `credential_id`), the process falls back to the legacy flat caps:
 
 | Legacy setting | Purpose | Default |
 |--|--|--|
-| `ocr.max_concurrent_vision_requests` | OCR+LLM flow — vision-OCR page calls | `1` |
-| `vision.max_concurrent_requests` | Vision-LLM flow — end-to-end page calls | `2` |
+| `ocr.max_concurrent_vision_requests` | OCR+LLM flow, vision-OCR page calls | `1` |
+| `vision.max_concurrent_requests` | Vision-LLM flow, end-to-end page calls | `2` |
 | `llm.max_concurrent_requests` | Text-LLM pipeline calls | `2` |
 
 New deployments should leave these alone and adjust `credentials[].max_concurrent` instead.

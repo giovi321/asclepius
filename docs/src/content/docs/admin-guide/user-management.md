@@ -57,7 +57,7 @@ Each user must be explicitly granted access to each patient:
 1. Go to **Settings → Users**
 2. Click the user's row to open the **Access** modal
 3. Pick a role (`owner` or `viewer`) from the role dropdown
-4. Tick the patients you want the user to access — the list is **multi-select**, so you can add or revoke multiple patients at once
+4. Tick the patients you want the user to access, the list is **multi-select**, so you can add or revoke multiple patients at once
 5. Click **Save**
 
 :::note[Setup wizard grants owner access]

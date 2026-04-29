@@ -8,34 +8,34 @@ Asclepius supports two extraction flows and uses a **multi-provider priority sys
 
 The two flows are:
 
-- **OCR + LLM** — extract text with an OCR engine, then send the text to a language model for classification and structured extraction. Uses `ocr.providers` + `llm.providers`.
-- **Vision-LLM** — send page images straight to a vision-capable LLM that returns both the transcribed text and the structured extraction in a single call. Uses `vision.providers`.
+- **OCR + LLM**, extract text with an OCR engine, then send the text to a language model for classification and structured extraction. Uses `ocr.providers` + `llm.providers`.
+- **Vision-LLM**, send page images straight to a vision-capable LLM that returns both the transcribed text and the structured extraction in a single call. Uses `vision.providers`.
 
 Which flow runs for a **new upload** is controlled by `pipeline.default_flow` (Settings → Pipeline). On an **existing document** you can pick any flow on a per-document basis from the Reprocess menu (OCR+LLM, OCR only, LLM only, or Vision-LLM).
 
 All provider configuration is done from **Settings** > **Document Analysis** in the web UI. That page has four sub-tabs:
 
-- **Providers** — add/edit/reorder LLM, OCR, and Vision-LLM providers, and manage the **Credentials** they share.
-- **Priority** — drag-to-reorder priority across the providers you've defined.
-- **Prompts** — edit classification / extraction / vision / chat / page-classification prompts.
-- **Normalization** — canonical mappings for doctors, facilities, lab tests, specialties, diagnoses, medications.
+- **Providers**, add/edit/reorder LLM, OCR, and Vision-LLM providers, and manage the **Credentials** they share.
+- **Priority**, drag-to-reorder priority across the providers you've defined.
+- **Prompts**, edit classification / extraction / vision / chat / page-classification prompts.
+- **Normalization**, canonical mappings for doctors, facilities, lab tests, specialties, diagnoses, medications.
 
 ## Credentials
 
-A **credential** is a shared connection (URL + API key) that multiple providers can reference by `credential_id`. One credential per physical endpoint — a single Ollama server, a single Anthropic account, a single OpenAI project. Any number of LLM / Vision-LLM / OCR entries can point at the same credential and pick up changes to the URL, API key, retry policy, or concurrency cap automatically.
+A **credential** is a shared connection (URL + API key) that multiple providers can reference by `credential_id`. One credential per physical endpoint, a single Ollama server, a single Anthropic account, a single OpenAI project. Any number of LLM / Vision-LLM / OCR entries can point at the same credential and pick up changes to the URL, API key, retry policy, or concurrency cap automatically.
 
 Key fields (per credential):
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | `type` | `ollama` | One of `ollama`, `vllm`, `claude`, `openai`, `google_vision`, `tesseract_remote` |
-| `base_url` | — | Only for self-hosted types (Ollama/vLLM/Tesseract-remote) |
-| `api_key` | — | Only for cloud types (Claude / OpenAI / Google Vision) |
-| `max_concurrent` | `2` | Process-wide concurrency cap for this credential. Every provider referencing this credential shares the same queue, split per **kind** (`llm` / `ocr` / `vision`). This matches how a single Ollama or Claude account actually behaves — one physical endpoint, one real concurrency limit. |
+| `base_url` | | Only for self-hosted types (Ollama/vLLM/Tesseract-remote) |
+| `api_key` | | Only for cloud types (Claude / OpenAI / Google Vision) |
+| `max_concurrent` | `2` | Process-wide concurrency cap for this credential. Every provider referencing this credential shares the same queue, split per **kind** (`llm` / `ocr` / `vision`). This matches how a single Ollama or Claude account actually behaves, one physical endpoint, one real concurrency limit. |
 | `max_retries` | `3` | Retries on transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) |
 | `retry_backoff_seconds` | `[30, 60, 120]` | Sleep between successive attempts; last value reused if list is shorter than `max_retries` |
 
-Concurrency is enforced by a process-wide semaphore keyed by `credential_id`, **not** by `(credential, kind)`. `max_concurrent` is the absolute number of inflight calls allowed against a credential — `max_concurrent: 1` means at most one call total across LLM, Vision, and OCR purposes that share the credential, *not* "one extra per kind". The Dashboard renders a separate chip per `(credential, kind)` for visibility, so when both an LLM and an OCR call are pending against the same Ollama server you see two chips, but only one is actually inflight at any moment — the other is queued (annotated `(queued)` in the chip label since 0.9.12).
+Concurrency is enforced by a process-wide semaphore keyed by `credential_id`, **not** by `(credential, kind)`. `max_concurrent` is the absolute number of inflight calls allowed against a credential, `max_concurrent: 1` means at most one call total across LLM, Vision, and OCR purposes that share the credential, *not* "one extra per kind". The Dashboard renders a separate chip per `(credential, kind)` for visibility, so when both an LLM and an OCR call are pending against the same Ollama server you see two chips, but only one is actually inflight at any moment, the other is queued (annotated `(queued)` in the chip label since 0.9.12).
 
 :::tip[Why per-credential instead of per-provider?]
 Two Ollama models on the same server compete for the same GPU. Setting a concurrency cap on each provider entry would let the physical server get overrun as soon as you enabled a second provider on it. A credential-scoped cap means adding a new model to an existing endpoint doesn't silently multiply load.
@@ -153,7 +153,7 @@ llm:
     timeout: 120
 ```
 
-Legacy inline form (`base_url` + `api_key` directly on the provider, no `credential_id`) is still honoured for backwards compatibility — on startup, Asclepius synthesises a credential per unique (type, base_url, api_key) triple and rewrites `settings.yaml` to reference it.
+Legacy inline form (`base_url` + `api_key` directly on the provider, no `credential_id`) is still honoured for backwards compatibility, on startup, Asclepius synthesises a credential per unique (type, base_url, api_key) triple and rewrites `settings.yaml` to reference it.
 
 ### Recommended models
 
@@ -182,7 +182,7 @@ OCR providers extract text from scanned documents and images.
 |----------|------|-------------|
 | **Tesseract (Local)** | `tesseract` | Local Tesseract OCR. Free, no network needed. |
 | **Tesseract (Remote)** | `tesseract_remote` | Remote Tesseract server via HTTP API. |
-| **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR only — the text then flows into the normal LLM extraction step. |
+| **LLM Vision** | `llm_vision` | Send page images to an LLM for OCR only, the text then flows into the normal LLM extraction step. |
 | **Google Cloud Vision** | `google_vision` | Google Cloud Vision API. |
 
 :::note[Single-step vision extraction moved]
@@ -194,13 +194,13 @@ The old `vision_extraction` OCR provider type has been promoted to its own flow.
 
 The LLM Vision OCR engine sends page images directly to an LLM for text extraction. It produces the best results on handwritten documents, poorly scanned pages, and complex mixed text/image layouts.
 
-Vision OCR can use a different LLM provider and model than the extraction LLM — for example, Chandra for OCR plus llama3.1 for extraction.
+Vision OCR can use a different LLM provider and model than the extraction LLM, for example, Chandra for OCR plus llama3.1 for extraction.
 
 #### Supported vision backends
 
-- **Ollama** — use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
-- **Claude** — uses Claude's native vision capability
-- **OpenAI** — uses GPT-4o vision
+- **Ollama**, use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
+- **Claude**, uses Claude's native vision capability
+- **OpenAI**, uses GPT-4o vision
 
 #### Chandra OCR
 
@@ -223,7 +223,7 @@ ocr:
       priority: 1
       language: "eng+ita+deu"
       confidence_threshold: 0.7
-      # Local Tesseract has no credential — leave credential_id empty.
+      # Local Tesseract has no credential, leave credential_id empty.
     - id: "llm-vision-1"
       type: "llm_vision"
       name: "Chandra Vision OCR"
@@ -260,7 +260,7 @@ This is useful when:
 2. Go to **Settings** > **Document Analysis** > **Providers** and scroll to the **Vision-LLM** section.
 3. Click **Add Provider**, pick the type, either select an existing credential or create a new one inline.
 4. Fill in the model name (the credential already supplies URL + API key).
-5. Click **Test Connection** — a trivial image round-trip confirms the wiring.
+5. Click **Test Connection**, a trivial image round-trip confirms the wiring.
 6. Drag to reorder priority in the **Priority** sub-tab and **Save Changes**.
 
 Asclepius also runs Phase 2 type-specific extraction after the vision call, reusing the same provider you selected for vision. That way Haiku-for-vision stays Haiku-for-extraction instead of silently falling back to the default text-LLM.
@@ -276,7 +276,7 @@ Per-document override stays available in the document detail page's Reprocess me
 
 ### Custom prompt
 
-The vision prompt is editable under **Settings** > **Document Analysis** > **Prompts** with key `vision_extraction`. Keep the JSON schema intact — the pipeline parses the response into `ocr_text` plus classification fields.
+The vision prompt is editable under **Settings** > **Document Analysis** > **Prompts** with key `vision_extraction`. Keep the JSON schema intact, the pipeline parses the response into `ocr_text` plus classification fields.
 
 ### YAML configuration
 
@@ -302,7 +302,7 @@ vision:
       timeout: 600
 ```
 
-Retries and concurrency aren't configured on `vision.*` itself — they live on the credential each vision provider references.
+Retries and concurrency aren't configured on `vision.*` itself, they live on the credential each vision provider references.
 
 ### Recommended local models
 
@@ -310,10 +310,10 @@ Retries and concurrency aren't configured on `vision.*` itself — they live on 
 |------------|---------------------|----------------------------------------|
 | ≥ 48 GB    | `qwen2.5vl:72b`     | Best quality, slow on consumer hardware |
 | 24 GB      | `qwen2.5vl:32b`     | Best quality / VRAM trade-off          |
-| 12–16 GB   | `qwen2.5vl:7b`      | Recommended default                    |
+| 12, 16 GB   | `qwen2.5vl:7b`      | Recommended default                    |
 | 8 GB       | `qwen2.5vl:3b`      | Only for clean typed documents         |
 
-`qwen2.5:14b` is **text-only** — there is no 14B vision variant. `minicpm-v` (8B) is a solid alternative to `qwen2.5vl:7b` when OCR on noisy scans matters more than strict JSON adherence. Avoid `llama3.2-vision` for dense tables and strict JSON output.
+`qwen2.5:14b` is **text-only**, there is no 14B vision variant. `minicpm-v` (8B) is a solid alternative to `qwen2.5vl:7b` when OCR on noisy scans matters more than strict JSON adherence. Avoid `llama3.2-vision` for dense tables and strict JSON output.
 
 ## General LLM
 
@@ -343,9 +343,9 @@ Increase the provider timeout for very large documents, slow inference servers, 
 
 ### Wall-clock budget on Ollama
 
-`timeout` is the httpx **read** timeout — the idle interval between bytes. On a genuinely wedged connection where the server accepts the POST but never replies (seen with stuck Ollama generate workers), the read timer can fail to fire and the request hangs indefinitely, holding the credential's gate slot with it.
+`timeout` is the httpx **read** timeout, the idle interval between bytes. On a genuinely wedged connection where the server accepts the POST but never replies (seen with stuck Ollama generate workers), the read timer can fail to fire and the request hangs indefinitely, holding the credential's gate slot with it.
 
-Ollama POSTs are therefore also wrapped in `asyncio.wait_for` with a wall-clock budget of `timeout + 30s`. A hung socket raises `TimeoutError` at the wall-clock boundary regardless of what httpx sees. The error is treated the same as any other transient failure and feeds the credential's normal retry/backoff loop. Claude and OpenAI don't need this — their client libraries enforce wall-clock timeouts internally.
+Ollama POSTs are therefore also wrapped in `asyncio.wait_for` with a wall-clock budget of `timeout + 30s`. A hung socket raises `TimeoutError` at the wall-clock boundary regardless of what httpx sees. The error is treated the same as any other transient failure and feeds the credential's normal retry/backoff loop. Claude and OpenAI don't need this, their client libraries enforce wall-clock timeouts internally.
 
 ## Custom prompts
 
@@ -370,11 +370,11 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
-**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_bloodtest`, `extraction_prescription`, …) only receive `{ocr_text}` — canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat — the SQL-generation prompt is the tool-call.
+**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_bloodtest`, `extraction_prescription`, …) only receive `{ocr_text}`, canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat, the SQL-generation prompt is the tool-call.
 
 ### Available variables
 
-Prompts are Python `str.format()` templates. Each prompt supports a specific set of `{placeholder}` variables that are substituted when the prompt is executed. **Using a placeholder not listed for a given prompt will raise a `KeyError` at runtime and break that extraction path** — stick to the variables below for each prompt.
+Prompts are Python `str.format()` templates. Each prompt supports a specific set of `{placeholder}` variables that are substituted when the prompt is executed. **Using a placeholder not listed for a given prompt will raise a `KeyError` at runtime and break that extraction path**, stick to the variables below for each prompt.
 
 The Prompts settings page shows the exact variables available for each prompt as clickable chips: click a chip to copy the placeholder into your clipboard.
 
@@ -387,7 +387,7 @@ The Prompts settings page shows the exact variables available for each prompt as
 | `{patient_list}` | JSON list of known patients (id, slug, name, DOB, sex) |
 | `{facility_list}` | JSON list of known facilities (id, slug, name) |
 | `{doctor_list}` | JSON list of known doctors (id, slug, name) |
-| `{few_shot_examples}` | 1–2 similar prior documents with their extractions, used as in-context examples |
+| `{few_shot_examples}` | 1, 2 similar prior documents with their extractions, used as in-context examples |
 | `{lab_test_mappings}` | JSON list of canonical lab-test aliases (optional) |
 | `{specialty_mappings}` | JSON list of canonical specialty aliases (optional) |
 | `{diagnosis_mappings}` | JSON list of canonical diagnosis/ICD-10 aliases (optional) |
@@ -407,14 +407,14 @@ The Prompts settings page shows the exact variables available for each prompt as
 | `{user_instruction}` | User's correction/edit instruction (document_edit) |
 | `{json_schema}` | Expected JSON-schema response shape (document_edit) |
 
-Variables labelled **optional** are substituted only if their placeholder actually appears in the (custom) template — they can be safely added to extend a prompt, but are not required.
+Variables labelled **optional** are substituted only if their placeholder actually appears in the (custom) template, they can be safely added to extend a prompt, but are not required.
 
 #### Variables by prompt
 
 | Prompt key | Variables |
 |------------|-----------|
 | `classification` | `{patient_list}`, `{facility_list}`, `{doctor_list}`, `{ocr_text}`, `{few_shot_examples}` |
-| `vision_extraction` | *(none — self-contained)* |
+| `vision_extraction` | *(none, self-contained)* |
 | `extraction_bloodtest` | `{ocr_text}`, `{lab_test_mappings}`? |
 | `extraction_specialist_report` | `{ocr_text}`, `{specialty_mappings}`?, `{diagnosis_mappings}`?, `{medication_mappings}`? |
 | `extraction_prescription` | `{ocr_text}`, `{medication_mappings}`? |
@@ -438,7 +438,7 @@ Variables suffixed with `?` are optional.
 4. Click **Reset to Default** to revert to the hardcoded default
 
 **Tips:**
-- Keep JSON output format instructions intact — the pipeline depends on specific field names
+- Keep JSON output format instructions intact, the pipeline depends on specific field names
 - Test changes on a single document before bulk reprocessing
 
 ## Normalization
@@ -449,11 +449,11 @@ See [Normalization](../user-guide/normalization.md) for details.
 
 ## Correction-driven learning
 
-When you manually edit document metadata (doc_type, dates, doctor name, etc.) from the document detail page or via AI Edit, Asclepius captures the correction — what the LLM originally extracted vs. what you set. These corrections accumulate over time and are used to improve future extractions:
+When you manually edit document metadata (doc_type, dates, doctor name, etc.) from the document detail page or via AI Edit, Asclepius captures the correction, what the LLM originally extracted vs. what you set. These corrections accumulate over time and are used to improve future extractions:
 
 - Documents with user corrections are preferred as few-shot examples when processing new documents
 - Corrections from the same facility are especially valuable, since documents from the same source tend to share formatting
-- The system automatically injects 1–2 relevant examples into the classification prompt based on similarity
+- The system automatically injects 1, 2 relevant examples into the classification prompt based on similarity
 
 Extraction quality improves as you correct more documents. No fine-tuning or model retraining needed.
 
@@ -463,7 +463,7 @@ Asclepius auto-migrates older layouts on startup:
 
 - **Flat `llm.*` fields** (`provider`, `ollama_base_url`, `ollama_model`, `claude_api_key`, `claude_model`) are folded into `llm.providers[]`.
 - **Flat `ocr.*` fields** (`engine`, `remote_url`, `llm_vision_*`, `google_vision_key`) are folded into `ocr.providers[]`.
-- **OCR entries of type `vision_extraction`** are moved into `vision.providers[]` and dropped from the OCR list — the single-step flow is now a first-class sibling of OCR.
+- **OCR entries of type `vision_extraction`** are moved into `vision.providers[]` and dropped from the OCR list, the single-step flow is now a first-class sibling of OCR.
 - **Inline `base_url` + `api_key`** on LLM/Vision/OCR provider entries are promoted to shared `credentials[]` entries and replaced with `credential_id`. Per-provider retry / concurrency knobs (`llm.max_retries`, `vision.max_concurrent_requests`, etc.) are preserved as a fallback when a credential isn't set, but new deployments should rely on the credential's values.
 
 All migrations are transparent and the settings file is rewritten on first run so subsequent starts are clean.

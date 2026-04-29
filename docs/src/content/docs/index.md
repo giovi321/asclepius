@@ -10,8 +10,10 @@ title: "Asclepius"
 
 Asclepius ingests, OCRs, extracts, organizes, and searches your personal medical records. Drop documents into the inbox (or upload them through the web UI), and the server runs OCR plus an LLM extraction pass, files everything under `patients/{slug}/{year}/`, and makes the whole archive browsable and searchable in a single web app.
 
-:::danger[Not safe to expose to the public internet]
-Asclepius is designed to run on a **trusted LAN, a single-user workstation, or behind a VPN / authenticating reverse proxy** — never bound directly to a public IP. The bundled username/password authentication is intentionally minimal: no rate limiting, no MFA, no account lockout, and no brute-force protection.
+:::danger[Personal-use software, not safe to expose to the public internet]
+Asclepius is built for one person managing their own family's records, not a hardened service for the open internet. It is designed to run on a **trusted LAN, a single-user workstation, or behind a VPN / authenticating reverse proxy**, never bound directly to a public IP.
+
+The bundled username/password authentication is intentionally minimal: no rate limiting, no MFA, no account lockout, and no brute-force protection. The chat feature lets the LLM author SQLite `SELECT` queries against your medical database, which makes it a prompt-injection target and exposes a SQL injection surface if untrusted users can reach the chat endpoint. Documents in the inbox flow into LLM prompts as well, so files from untrusted sources can carry injection payloads.
 
 **For any multi-user or remote-access deployment, configure an OIDC provider such as [Authentik](https://goauthentik.io/), Keycloak, or Auth0** and treat the local-password flow as a single-user convenience only. See [Installation](getting-started/installation.md) and [User Management](admin-guide/user-management.md).
 :::
@@ -120,7 +122,7 @@ docker compose up -d
 Then open [http://localhost:8070](http://localhost:8070). On first launch, a **setup wizard** will guide you through creating your admin account and first patient profile.
 
 :::tip[Setup Wizard]
-The wizard only appears once — when no users exist in the database. It creates your admin account and a first patient profile pre-filled with your name.
+The wizard only appears once, when no users exist in the database. It creates your admin account and a first patient profile pre-filled with your name.
 
 :::
 
@@ -139,7 +141,7 @@ The wizard only appears once — when no users exist in the database. It creates
 
 ## Architecture at a Glance
 
-Asclepius runs as a **single Docker container**. The FastAPI backend serves the REST API and the pre-built React frontend out of the same process. LLM inference is always external — point Asclepius at your own Ollama, vLLM, Claude, or OpenAI endpoint.
+Asclepius runs as a **single Docker container**. The FastAPI backend serves the REST API and the pre-built React frontend out of the same process. LLM inference is always external, point Asclepius at your own Ollama, vLLM, Claude, or OpenAI endpoint.
 
 The ingestion pipeline runs as a background asyncio task, so processing never blocks HTTP requests. Files live on disk inside a vault directory; all metadata sits in SQLite.
 

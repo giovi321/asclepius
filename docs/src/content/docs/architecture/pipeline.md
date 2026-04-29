@@ -163,7 +163,7 @@ bookkeeping files. The upload route extracts the zip server-side
    uncompressed-size budget caps zip-bomb expansion.
 3. **Sanitise** every member name through ``safe_filename`` /
    ``safe_vault_join`` (Zip Slip rejected).
-4. **Peek** byte 128–131 of every member from the zip stream. If those
+4. **Peek** byte 128, 131 of every member from the zip stream. If those
    four bytes equal ``DICM``, the member is treated as a DICOM frame
    and written to disk under its **final** filename
    (``<stem>.dcm``); otherwise it is written as ``<original-name>.bin``
@@ -433,8 +433,8 @@ For documents that are not large enough for sectioning, chunking is triggered wh
 
 Chunked extraction runs the same two phases as the non-chunked path, but with Phase 2 repeated per chunk and merged:
 
-1. **Phase 1 — classify on chunk 1.** A short-schema call that captures universal fields (doc_type, patient, doctor, facility, dates, summary, language). Keeping it separate means small models only have to fit one concern in working memory at a time — the reason qwen2.5:14b reliably returns these fields now instead of zooming in on the loudest section (lab table) and dropping everything else.
-2. **Phase 2 — type-specific extraction per chunk.** Runs the prompt for the doc_type picked in Phase 1 (e.g. `bloodtest` → lab-results-only schema). Each chunk produces its own extraction; `merge_extractions` dedupes overlap.
+1. **Phase 1, classify on chunk 1.** A short-schema call that captures universal fields (doc_type, patient, doctor, facility, dates, summary, language). Keeping it separate means small models only have to fit one concern in working memory at a time, the reason qwen2.5:14b reliably returns these fields now instead of zooming in on the loudest section (lab table) and dropping everything else.
+2. **Phase 2, type-specific extraction per chunk.** Runs the prompt for the doc_type picked in Phase 1 (e.g. `bloodtest` → lab-results-only schema). Each chunk produces its own extraction; `merge_extractions` dedupes overlap.
 
 ### Page-aligned chunks
 
@@ -447,7 +447,7 @@ Chunked extraction runs the same two phases as the non-chunked path, but with Ph
 
 Each chunk is extracted **in-memory**; the merged result is stored exactly once at the end. If a chunk response is flagged `_truncated` or `_truncation_suspected` and contains more than one page, the chunk is bisected into two halves and each half is retried (depth-capped at 2). The bisection path keeps writes idempotent because nothing hits the DB until all chunks have succeeded.
 
-Small models can also self-truncate mid-JSON well before the token cap is reached — the JSON parser detects an unclosed structure and flags the response as truncated, which feeds the same bisection loop. So "one chunk" on the first attempt often becomes "two single-page halves" on retry, and both finish cleanly.
+Small models can also self-truncate mid-JSON well before the token cap is reached, the JSON parser detects an unclosed structure and flags the response as truncated, which feeds the same bisection loop. So "one chunk" on the first attempt often becomes "two single-page halves" on retry, and both finish cleanly.
 
 ### Merging & logging
 
@@ -465,14 +465,14 @@ After merging, a **page coverage** line is logged: `pages covered=N/total`, numb
 
 Document processing can be cancelled at any time from the web UI. The Cancel button triggers two mechanisms at once (belt-and-braces):
 
-1. **Hard cancel** — the pipeline keeps a registry of in-flight asyncio tasks keyed by `doc_id`. On cancel, the API calls `asyncio.Task.cancel()` on the registered task. This propagates `CancelledError` into whichever `await` the pipeline is parked on (typically the httpx POST to the LLM), aborts the HTTP connection, releases the credential gate slot via `async with` finalizers, and marks the document `cancelled`. The UI chip disappears within a second.
-2. **Cooperative flag** — the API also adds the doc_id to an in-memory `cancelled_docs` set. Every phase boundary (before OCR, between OCR and LLM, after LLM) checks the set and exits early. This is the fallback for the rare case where the hard cancel can't interrupt the current await (e.g. C-level blocking syscall).
+1. **Hard cancel**, the pipeline keeps a registry of in-flight asyncio tasks keyed by `doc_id`. On cancel, the API calls `asyncio.Task.cancel()` on the registered task. This propagates `CancelledError` into whichever `await` the pipeline is parked on (typically the httpx POST to the LLM), aborts the HTTP connection, releases the credential gate slot via `async with` finalizers, and marks the document `cancelled`. The UI chip disappears within a second.
+2. **Cooperative flag**, the API also adds the doc_id to an in-memory `cancelled_docs` set. Every phase boundary (before OCR, between OCR and LLM, after LLM) checks the set and exits early. This is the fallback for the rare case where the hard cancel can't interrupt the current await (e.g. C-level blocking syscall).
 
 Before this was belt-and-braces, cancel was cooperative only: a mid-extraction click had to wait for the LLM to finish its current call before the pipeline would notice. Reprocess also didn't honour the flag at all. Both are fixed.
 
 ## Name Normalization
 
-Everything that references a canonical table — lab tests, medications, diagnoses, specialties, doctors, facilities — is matched in Python after extraction, not inside the LLM prompt. The LLM emits the document's original wording; `asclepius.normalization.resolver` does the rest:
+Everything that references a canonical table, lab tests, medications, diagnoses, specialties, doctors, facilities, is matched in Python after extraction, not inside the LLM prompt. The LLM emits the document's original wording; `asclepius.normalization.resolver` does the rest:
 
 1. Exact case-insensitive match against the alias table.
 2. Fuzzy match via `rapidfuzz.process.extractOne` (WRatio ≥ 85). Catches OCR drift and minor language variants.
@@ -485,7 +485,7 @@ Before this refactor the prompt carried every `(canonical_code, alias)` pair inl
 
 ### Chat context
 
-The chat system prompt uses the same philosophy: no full entity tables in the prompt. `build_patient_context` (`backend/asclepius/chat/message_builder.py`) assembles a bounded per-patient rollup — identity plus the last 10 documents, 20 lab results, and 10 medications — and substitutes it into `{patient_context}`. Anything outside that window is reachable through the LLM-generated SQL path, not through more prompt stuffing. There is no MCP server and no vector retrieval; the SQL-generation prompt is the tool-call. Only `classification`, `document_edit`, and the legacy `extraction_legacy` prompt still ship the full `patient_list` / `facility_list` / `doctor_list` JSON — every other path is either deterministic (normalization) or bounded (chat rollup).
+The chat system prompt uses the same philosophy: no full entity tables in the prompt. `build_patient_context` (`backend/asclepius/chat/message_builder.py`) assembles a bounded per-patient rollup, identity plus the last 10 documents, 20 lab results, and 10 medications, and substitutes it into `{patient_context}`. Anything outside that window is reachable through the LLM-generated SQL path, not through more prompt stuffing. There is no MCP server and no vector retrieval; the SQL-generation prompt is the tool-call. Only `classification`, `document_edit`, and the legacy `extraction_legacy` prompt still ship the full `patient_list` / `facility_list` / `doctor_list` JSON, every other path is either deterministic (normalization) or bounded (chat rollup).
 
 ## Progress Tracking
 

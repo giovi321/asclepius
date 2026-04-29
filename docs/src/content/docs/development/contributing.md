@@ -7,7 +7,7 @@ title: "Contributing"
 ### Backend (Python)
 
 - Python 3.12+ with type hints
-- No ORM — raw SQL with `aiosqlite`
+- No ORM, raw SQL with `aiosqlite`
 - Async everywhere (`async def`, `await`)
 - Pydantic models for request/response validation
 - Logging via `logging.getLogger(__name__)`

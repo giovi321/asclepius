@@ -14,24 +14,24 @@ If any lab result references a document that has been deleted, a yellow banner a
 
 ### Filter row
 
-- **Search by test name** — matches both the original extracted name and the canonical display.
-- **Group by test date** — collapsible groups keyed by `(test_date, source document)` so all the results of a single blood-test event stay together. On by default.
+- **Search by test name**, matches both the original extracted name and the canonical display.
+- **Group by test date**, collapsible groups keyed by `(test_date, source document)` so all the results of a single blood-test event stay together. On by default.
 
 ### Trend chart
 
 Above the table sits a collapsible **test picker** listing every canonical test present in the current result set with its row count. Expand it and type to **fuzzy-search** a test by canonical display or original name. Click one or more tests to reveal a line chart plotting the values over time, one series per selected test. A reference band is drawn from the mode of the first series' reference ranges. The picker stays collapsed by default so the table isn't pushed down until you need the chart.
 
-Each point on the chart is dated by the lab result's `test_date` when present — if a row has no extracted test date, the chart **falls back to the source document's `doc_date`** so a row with only a document-level date still appears in the trend instead of being dropped.
+Each point on the chart is dated by the lab result's `test_date` when present, if a row has no extracted test date, the chart **falls back to the source document's `doc_date`** so a row with only a document-level date still appears in the trend instead of being dropped.
 
 ### Results table
 
 Columns:
 
-- **Document** — file icon + filename, linked to the source document page. Shows *"no document"* if the row is orphaned.
-- **Test** — canonical display name (falling back to the original).
-- **Value** — numeric or text; abnormal rows are tinted red.
-- **Unit** / **Reference** / **Date** — as extracted.
-- **Actions** — inline **Edit** turns the row into input fields (test name, value, unit, reference low/high, test date). **Delete** removes the row after a confirmation; the source document is untouched.
+- **Document**, file icon + filename, linked to the source document page. Shows *"no document"* if the row is orphaned.
+- **Test**, canonical display name (falling back to the original).
+- **Value**, numeric or text; abnormal rows are tinted red.
+- **Unit** / **Reference** / **Date**, as extracted.
+- **Actions**, inline **Edit** turns the row into input fields (test name, value, unit, reference low/high, test date). **Delete** removes the row after a confirmation; the source document is untouched.
 
 ### OGTT curve
 
@@ -58,7 +58,7 @@ Each lab result record contains:
 
 | Field | Description |
 |-------|-------------|
-| `document_id` | FK to the source document (NULL if that document has since been deleted — listed as "orphan") |
+| `document_id` | FK to the source document (NULL if that document has since been deleted, listed as "orphan") |
 | `patient_id` | Denormalized patient ownership |
 | `test_name_original` | Test name as written in the document |
 | `norm_lab_test_id` | Link to the canonical lab test |
@@ -78,7 +78,7 @@ Each lab result record contains:
 |--------|------|-------------|
 | `GET` | `/api/lab-results` | List lab results. Enriches each row with `document_filename`, `document_doc_type`, `document_doc_date`, `document_missing`, and `canonical_code`. Scoped to accessible patients; default limit 500, max 2000. |
 | `GET` | `/api/lab-results/orphans` | Lab results whose `document_id` no longer points to an existing document. |
-| `GET` | `/api/lab-results/timeline` | Time-series for a single test — historical endpoint used by the old trend view. |
+| `GET` | `/api/lab-results/timeline` | Time-series for a single test, historical endpoint used by the old trend view. |
 | `POST` | `/api/lab-results` | Add a row by hand. Requires `document_id` and `test_name_original`; other fields optional. |
 | `PATCH` | `/api/lab-results/{id}` | Update editable fields. Viewers are blocked. |
 | `DELETE` | `/api/lab-results/{id}` | Delete a single row. |

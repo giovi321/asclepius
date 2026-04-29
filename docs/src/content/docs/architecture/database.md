@@ -139,7 +139,7 @@ The diagram above is the core hub-and-spoke shape: `documents` in the middle, `p
 | `encounters` | Clinical encounters with diagnoses, findings, and follow-up instructions |
 | `medications` | Prescribed medications with dosage, frequency, and duration |
 | `vaccinations` | Vaccination records with manufacturer, lot number, and dose |
-| `imaging_studies` | Imaging study metadata (modality, body part, accession, study UID, ``report_status``). Doctor + facility are foreign keys kept in lockstep with the parent ``documents`` row via the ``imaging_studies_doctor_sync`` / ``_facility_sync`` AFTER UPDATE triggers — do not write them here directly. ``institution_name``, ``referring_physician`` and ``is_dicom`` were dropped in v0.9.7. |
+| `imaging_studies` | Imaging study metadata (modality, body part, accession, study UID, ``report_status``). Doctor + facility are foreign keys kept in lockstep with the parent ``documents`` row via the ``imaging_studies_doctor_sync`` / ``_facility_sync`` AFTER UPDATE triggers, do not write them here directly. ``institution_name``, ``referring_physician`` and ``is_dicom`` were dropped in v0.9.7. |
 | `imaging_series` | Individual series within an imaging study (series_number, series_instance_uid, num_images, folder_path) |
 | `invoice_items` | Line items from medical invoices with amounts and tariff codes |
 
@@ -190,7 +190,7 @@ Shared credentials (URL + API key + concurrency + retry policy) and LLM/OCR/Visi
 
 - **Deduplication.** Documents have a unique `file_hash` (SHA-256) to prevent duplicate imports.
 - **Names live in one place.** Doctor and facility names are stored only on `doctors` / `facilities`. `documents` just keeps `doctor_id` / `facility_id`, and readers JOIN to get the display name. Renaming a doctor once updates every document that references them.
-- **Dates.** Each document carries `event_date` (the canonical timeline anchor — when the medical event actually happened) and `issued_date` (when the document was produced administratively). The timeline, chart, and search views all key off `event_date`.
+- **Dates.** Each document carries `event_date` (the canonical timeline anchor, when the medical event actually happened) and `issued_date` (when the document was produced administratively). The timeline, chart, and search views all key off `event_date`.
 - **Child rows stay in sync.** `encounters.doctor_id` / `encounters.facility_id` and `imaging_studies.doctor_id` / `imaging_studies.facility_id` are kept in lockstep with the parent document through AFTER UPDATE triggers, so moving a document to a different doctor updates its child rows in the same transaction.
 - **One imaging study, one document.** From v0.9.6 onward, a 35-frame DICOM bundle creates ONE `documents` row and ONE `imaging_studies` row, not 35 of each. The parent document is the radiology report PDF: either a real PDF the user attached (`doc_type='imaging_report'`, `file_path` points at the PDF) or a placeholder (`file_path=''`) waiting to be populated. `imaging_studies.report_status` is the denormalised flag (`placeholder` | `attached`) the imaging list sorts and filters on. The DICOM frames live on disk under `imaging_studies.folder_path`; only the report has a `documents.file_path`.
 - **Cascading deletes.** Deleting a document cascades to all child records (lab results, encounters, medications, etc.).

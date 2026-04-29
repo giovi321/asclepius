@@ -12,7 +12,7 @@ Asclepius stores every login as a row in the `sessions` table. The cookie delive
 | --- | --- |
 | **User** | The account that owns the session |
 | **Client** | Browser + OS parsed from the `User-Agent` header (hover for the full UA string) |
-| **IP** | Remote address recorded at login — respects `X-Forwarded-For` when behind a reverse proxy |
+| **IP** | Remote address recorded at login, respects `X-Forwarded-For` when behind a reverse proxy |
 | **Last active** | The most recent time a request was authenticated by this session (throttled to one update per minute) |
 | **Created** | When the user logged in |
 | **Expires** | When the signed cookie stops being accepted, set from `auth.session_ttl_hours` |
@@ -24,7 +24,7 @@ Use the filter input to narrow by username, IP, or client string. Toggle **Inclu
 
 Click **Revoke** on any active row. The server marks the row `revoked_at = now`; the next request that presents that cookie returns `401 Session revoked` and the frontend redirects to login.
 
-- Revocation is **immediate** from the server's perspective — no waiting for the cookie TTL.
+- Revocation is **immediate** from the server's perspective, no waiting for the cookie TTL.
 - Revoking **your own** session logs you out right away and sends you to the login screen. The UI prompts before doing this.
 - Revocations are written to the audit log under the action `session.revoke` with the target user id and a `self` flag.
 
@@ -32,7 +32,7 @@ Click **Revoke** on any active row. The server marks the row `revoked_at = now`;
 
 - A user lost a device that still has a valid cookie
 - A suspicious IP or User-Agent appears for a privileged account
-- A password change — consider revoking all other sessions for that user so the old cookie stops working
+- A password change, consider revoking all other sessions for that user so the old cookie stops working
 - Before retiring an account
 
 ## How it works under the hood
@@ -44,6 +44,6 @@ Click **Revoke** on any active row. The server marks the row `revoked_at = now`;
 
 ## Related settings
 
-- `auth.session_ttl_hours` in `config/settings.yaml` — controls `expires_at`
-- `auth.secret_key` — signs the cookie; rotating it invalidates every session in one step
-- `auth.login_max_attempts` / `auth.login_window_seconds` — per-IP, per-username rate limit on password login
+- `auth.session_ttl_hours` in `config/settings.yaml`, controls `expires_at`
+- `auth.secret_key`, signs the cookie; rotating it invalidates every session in one step
+- `auth.login_max_attempts` / `auth.login_window_seconds`, per-IP, per-username rate limit on password login

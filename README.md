@@ -31,13 +31,13 @@ It runs in one Docker container on your own machine. Your records stay there unl
 git clone https://github.com/giovi321/asclepius.git
 cd asclepius
 cp config/settings.example.yaml config/settings.yaml
-# edit config/settings.yaml — at minimum point it at one LLM provider
+# edit config/settings.yaml, at minimum point it at one LLM provider
 docker compose up -d
 ```
 
 Open <http://localhost:8070>. A first-launch wizard creates your admin account and your first patient profile, and you're ready to drop files into the inbox.
 
-You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Claude or OpenAI API key. The container is small on purpose; the model lives elsewhere.
+You'll need an LLM somewhere, a local Ollama instance, a vLLM server, or a Claude or OpenAI API key. The container is small on purpose; the model lives elsewhere.
 
 ## What it does
 
@@ -46,10 +46,10 @@ You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Cl
 </p>
 
 - Drops PDFs, images, DICOM files, and DICOM zip bundles (the format every imaging CD ships in) into the pipeline. OCR can be Tesseract, Google Vision, or any LLM with vision; extraction can be Ollama, vLLM, Claude, or OpenAI.
-- Long documents (over 5 pages) get split into logical sections — lab block, clinical notes, discharge summary — and each section is extracted on its own.
+- Long documents (over 5 pages) get split into logical sections, lab block, clinical notes, discharge summary, and each section is extracted on its own.
 - Lab results are normalized across visits and languages. A "ferritin" in Italian, a typo'd "Ferrytin" in a German report, and "ferritin (s)" with weird units all end up on the same trend chart.
 - A built-in DICOM viewer handles MRI and CT studies with windowing, zoom, and pan, and can attach the radiology PDF report next to the frames so you read the doctor's narrative and the images in the same place.
-- The timeline view groups documents into medical events — a diagnosis, a course of treatment, a surgery and the follow-ups around it.
+- The timeline view groups documents into medical events, a diagnosis, a course of treatment, a surgery and the follow-ups around it.
 - Full-text search (SQLite FTS5) and a small RAG chat layer let you ask things like *when did I last get a tetanus shot?*
 - Multi-patient with role-based access, so you can keep records for a partner or your kids in the same install with separate access.
 - When you correct an extracted field, the change is captured and used as a few-shot example for similar documents later.
@@ -70,7 +70,15 @@ You'll need an LLM somewhere — a local Ollama instance, a vLLM server, or a Cl
 
 ## Before you self-host
 
-Asclepius is built for a trusted home network or a single-user laptop. The bundled username/password login is intentionally minimal — no rate limiting, no MFA, no account lockout. For anything reachable from outside your LAN, front it with an OIDC provider like [Authentik](https://goauthentik.io/), Keycloak, or Auth0, or put the whole thing behind a VPN. [`SECURITY.md`](SECURITY.md) has the full picture.
+Asclepius is personal-use software. It is built for one person managing their own family's records on a trusted home network or a single laptop, not a hardened service for the open internet.
+
+A few things stop being safe the moment strangers can reach it:
+
+- The bundled username/password login has no rate limiting, no MFA, and no account lockout. Anyone who can reach port `8070` can hammer it.
+- The chat feature lets the LLM author SQLite `SELECT` queries against your medical database. That makes it a prompt-injection target. Hostile content in a document, OCR result, or chat message can coerce the model into reading rows it should not, and SQL injection through the chat tool-call is a real concern if untrusted users can reach the endpoint.
+- Files in the inbox flow into LLM prompts, so any document from an untrusted source is a potential injection vector.
+
+For anything beyond a single user on a trusted LAN, front it with an OIDC provider like [Authentik](https://goauthentik.io/), Keycloak, or Auth0, or keep the whole thing behind a VPN. [`SECURITY.md`](SECURITY.md) has the full picture.
 
 ## Development
 
@@ -96,8 +104,8 @@ npm run dev
 
 Contributions are welcome. Two files worth reading first:
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, coding style, PR checklist
-- [`SECURITY.md`](SECURITY.md) — how to report a vulnerability privately
+- [`CONTRIBUTING.md`](CONTRIBUTING.md), dev setup, coding style, PR checklist
+- [`SECURITY.md`](SECURITY.md), how to report a vulnerability privately
 
 Quick starts:
 
@@ -119,4 +127,4 @@ npm run build
 
 Released under the [MIT License](LICENSE).
 
-Bundled medical reference data (LOINC, ATC, ICD-10) is covered by separate third-party licenses — see [`NOTICE`](NOTICE) for required attributions, including the LOINC short notice required by Section 10 of the LOINC license.
+Bundled medical reference data (LOINC, ATC, ICD-10) is covered by separate third-party licenses, see [`NOTICE`](NOTICE) for required attributions, including the LOINC short notice required by Section 10 of the LOINC license.

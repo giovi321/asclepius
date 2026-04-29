@@ -6,8 +6,8 @@ title: "Backup and restore"
 
 Two things make up the entire Asclepius state:
 
-1. **`vault/` directory** — all documents, organized files, imaging studies, and the SQLite database
-2. **`config/settings.yaml`** — your configuration file
+1. **`vault/` directory**, all documents, organized files, imaging studies, and the SQLite database
+2. **`config/settings.yaml`**, your configuration file
 
 Back up both regularly.
 
@@ -50,10 +50,10 @@ The vault archive walks `vault/` and skips three things automatically: the backu
 
 The same Settings page lets you:
 
-- **Run now** — triggers the configured job immediately, no waiting for the next tick
-- **List existing backups** — newest first, with size and timestamp
+- **Run now**, triggers the configured job immediately, no waiting for the next tick
+- **List existing backups**, newest first, with size and timestamp
 - **Download** any backup file
-- **Delete** any backup file (admin only — emits a `backup.delete` audit-log entry)
+- **Delete** any backup file (admin only, emits a `backup.delete` audit-log entry)
 
 You can also drive the same actions via the API:
 
@@ -68,13 +68,13 @@ DELETE /api/settings/backup/files/{name} # admin · delete one file
 
 Retention runs after every successful backup. Two modes:
 
-- **count** (default `7`) — keep the N most recent files across all kinds, delete the rest
-- **days** (e.g. `30`) — keep everything newer than N days, delete the rest
+- **count** (default `7`), keep the N most recent files across all kinds, delete the rest
+- **days** (e.g. `30`), keep everything newer than N days, delete the rest
 
 Both modes operate across the whole backup directory, so mixing scopes (e.g. switching from `db` to `full`) still results in a clean directory. Pruning a file logs a single `Pruned backup ...` line.
 
 :::caution[The schedule fires once per interval since the last backup]
-"Daily" means *24 hours since the most recent file in the backup directory*, not "at midnight". If you enable a daily job for the first time, the next run happens immediately; subsequent runs space themselves out by 24 hours. Restarting the container does not reset the clock — the scheduler reads the most recent file's mtime on startup.
+"Daily" means *24 hours since the most recent file in the backup directory*, not "at midnight". If you enable a daily job for the first time, the next run happens immediately; subsequent runs space themselves out by 24 hours. Restarting the container does not reset the clock, the scheduler reads the most recent file's mtime on startup.
 :::
 
 #### Settings file equivalent
@@ -92,7 +92,7 @@ backup:
   retention_value: 7
 ```
 
-Settings are live — changes are written back to YAML and the in-memory scheduler is cancelled and restarted with the new config. No container restart needed.
+Settings are live, changes are written back to YAML and the in-memory scheduler is cancelled and restarted with the new config. No container restart needed.
 
 ### Full backup (recommended)
 

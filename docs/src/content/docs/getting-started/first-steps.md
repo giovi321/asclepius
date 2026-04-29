@@ -10,14 +10,14 @@ three things matter before you can ingest documents.
 
 Open **Settings → Document Analysis → Providers** and add:
 
-- **Credentials** — one per physical endpoint (Ollama server, Claude /
+- **Credentials**, one per physical endpoint (Ollama server, Claude /
   OpenAI account). Each credential carries its URL, API key, concurrency
   cap, and retry policy.
-- **LLM provider** — pointing at a credential and a model (e.g.
+- **LLM provider**, pointing at a credential and a model (e.g.
   `qwen2.5`, `claude-haiku-4-5-20251001`).
-- **OCR provider(s)** — Tesseract (built-in, no credential), LLM Vision
+- **OCR provider(s)**, Tesseract (built-in, no credential), LLM Vision
   (vision model), Google Cloud Vision, or Tesseract Remote.
-- **Vision-LLM provider** (optional) — for the single-step vision flow.
+- **Vision-LLM provider** (optional), for the single-step vision flow.
 
 The **Priority** sub-tab reorders providers for fallback.
 

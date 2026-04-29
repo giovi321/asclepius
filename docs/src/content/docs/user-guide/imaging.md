@@ -4,16 +4,16 @@ title: "Medical Imaging"
 
 ## Supported formats
 
-- **DICOM** (.dcm, .dicom) — native medical imaging format from CT, MRI,
+- **DICOM** (.dcm, .dicom), native medical imaging format from CT, MRI,
   X-ray, ultrasound, and other modalities
-- **DICOM zip bundles** (.zip) — the format every imaging CD / hospital
+- **DICOM zip bundles** (.zip), the format every imaging CD / hospital
   export ships in: extension-less DICOM frames (e.g. ``I1000000``), a
   ``DICOMDIR`` manifest, JPEG previews, and bookkeeping files. The
   extractor inspects byte 128 of every member for the ``DICM`` preamble
   and auto-renames true DICOM files to ``.dcm``; everything else is
   filed under ``imaging-bundles/`` and surfaced from the imaging detail
   page.
-- **Radiology reports** (.pdf) — the doctor's narrative for a study.
+- **Radiology reports** (.pdf), the doctor's narrative for a study.
   Uploaded separately or auto-attached to a study via the imaging detail
   page (see *Radiology reports* below).
 
@@ -23,12 +23,12 @@ mimes are accepted.
 
 ## Pages and routing
 
-- ``/imaging`` — list page modelled on ``/documents``: search across
+- ``/imaging``, list page modelled on ``/documents``: search across
   body part / facility / doctor / study description,
   modality filter, date range filter, *report status* filter
   (``placeholder`` vs ``attached``), sortable columns, paginated 20
   rows / page. Clicking anywhere on a row opens the detail page.
-- ``/imaging/:studyId`` — detail page for one study. Layout:
+- ``/imaging/:studyId``, detail page for one study. Layout:
   - **Header** with the modality + body part + study date, plus a
     *Document view* button (jumps to the parent document) and a
     *Delete* button.
@@ -40,7 +40,7 @@ mimes are accepted.
     (PDF viewer when a report is attached, *Upload PDF* / *Pick
     existing PDF* buttons when it isn't) and the document
     **MetadataEditor + EventSelector + NotesEditor + LinksSection**
-    on the right — identical to ``/documents/:id``.
+    on the right, identical to ``/documents/:id``.
 
 ## DICOM viewer
 
@@ -50,17 +50,17 @@ on-demand from the source DICOM). Interactions:
 - **Frame navigation**: arrow keys, mouse wheel, prev/next buttons,
   slider.
 - **Zoom**: ``Ctrl+wheel``, ``+`` / ``-`` keys, toolbar buttons. Range
-  25%–800%. Double-click resets zoom + pan.
+  25%, 800%. Double-click resets zoom + pan.
 - **Pan**: middle-mouse-button or ``shift``+drag. ``0`` resets the view.
 - **Contrast (MR only)**: when the modality is ``MR`` two paired
   controls appear for *Window center* and *Window width*. Each axis
   has a number input (precise typed value) plus a slider whose thumb
-  reflects the *real* current value — the file's own
+  reflects the *real* current value, the file's own
   ``WindowCenter`` / ``WindowWidth`` when on auto, or the user's
   override when manual. The slider range adapts around the auto
   value so dragging stays useful regardless of modality. Either
-  axis can be moved independently — the missing axis falls back to
-  the file's tag — and *Reset* clears both back to auto. The viewer
+  axis can be moved independently, the missing axis falls back to
+  the file's tag, and *Reset* clears both back to auto. The viewer
   also has an **Invert colours** toggle (sends ``?invert=1`` so the
   PNG comes back inverted post-windowing) and a **Metadata** button
   that opens a panel listing every DICOM header tag for the current
@@ -79,14 +79,14 @@ waiting to be populated.
 
 Two ways to attach a report from the empty-state slot:
 
-- **Upload PDF** — multipart upload to ``POST /api/imaging/{id}/report``.
+- **Upload PDF**, multipart upload to ``POST /api/imaging/{id}/report``.
   PDF-only is enforced via libmagic. The PDF lands in the user's inbox,
   the standard pipeline (OCR + LLM extraction) processes it, and on
   completion the imaging study is repointed at the new document and
   the placeholder row is deleted. The same flow works from
-  ``/documents/:id`` for an imaging document — the page renders the
+  ``/documents/:id`` for an imaging document, the page renders the
   same shared *ReportSlot* component.
-- **Pick existing PDF** — a slim search dialog over the patient's
+- **Pick existing PDF**, a slim search dialog over the patient's
   already-uploaded PDFs. Selecting calls
   ``POST /api/imaging/{id}/report`` with ``{"document_id": <id>}``.
   The placeholder is deleted; the chosen PDF document is repointed at
@@ -99,12 +99,12 @@ PdfViewer used on the documents page.
 The attached state is no longer one-shot. The PDF viewer panel now
 exposes:
 
-- **Replace with PDF** — upload a different PDF; the imaging study
+- **Replace with PDF**, upload a different PDF; the imaging study
   is repointed at the new one once processing finishes. The previous
   PDF document stays alive (it's just no longer this study's parent).
-- **Pick different PDF** — same shape as the empty-state picker but
+- **Pick different PDF**, same shape as the empty-state picker but
   excludes the currently-attached document.
-- **Detach** — calls ``DELETE /api/imaging/{id}/report``, which
+- **Detach**, calls ``DELETE /api/imaging/{id}/report``, which
   creates a fresh placeholder and repoints the study at it. The
   previously-attached PDF document is left in the documents list so
   the user can re-attach it (or anything else) later.
@@ -130,8 +130,7 @@ When a DICOM file (or zip bundle) lands in the inbox:
    from extension-less zip members) skip OCR and go straight to
    ``process_dicom`` in ``backend/asclepius/pipeline/dicom_ingest.py``.
 3. **Metadata extraction** via pydicom: PatientName,
-   ReferringPhysicianName (both parsed from DICOM PN syntax —
-   ``Family^Given^Middle^Prefix^Suffix`` becomes ``Given Family``
+   ReferringPhysicianName (both parsed from DICOM PN syntax, ``Family^Given^Middle^Prefix^Suffix`` becomes ``Given Family``
    with the title prefix dropped), StudyDate, Modality, BodyPart,
    StudyDescription, InstitutionName, AccessionNumber,
    StudyInstanceUID, SeriesInstanceUID, SeriesNumber.
@@ -143,7 +142,7 @@ When a DICOM file (or zip bundle) lands in the inbox:
    ``.facility_id`` are linked to those FKs.
 6. **Study folder**: frames are written to
    ``patients/{slug}/{year}/{study-folder}/series-N/`` (peer of regular
-   document files — there is no ``imaging/`` middle segment in v0.9.6+).
+   document files, there is no ``imaging/`` middle segment in v0.9.6+).
 7. **Document row**: the first frame creates a placeholder
    ``imaging_report`` row with ``file_path=''``; every subsequent frame
    finds it via the deterministic study hash and just bumps counters.
@@ -153,7 +152,7 @@ When a DICOM file (or zip bundle) lands in the inbox:
 
 ### Multi-file studies
 
-Drop the whole exam at once — usually as a single ``.zip``. Frames
+Drop the whole exam at once, usually as a single ``.zip``. Frames
 sharing a ``StudyInstanceUID`` are grouped into one study;
 ``SeriesInstanceUID`` (or ``SeriesNumber`` as fallback) groups frames
 into series. Re-uploading the same study is idempotent: a frame that
@@ -172,7 +171,7 @@ already exists at its destination with the same byte size doesn't bump
 | `doctor_id` | FK → ``doctors.id``. Mirrors the parent document via the ``imaging_studies_doctor_sync`` AFTER UPDATE trigger; never edited here directly. |
 | `facility_id` | FK → ``facilities.id``. Mirrors the parent document via ``imaging_studies_facility_sync``. |
 | `report_status` | ``placeholder`` (no PDF attached yet) \| ``attached`` (parent document is a real PDF) |
-| `modality` | DICOM Modality tag — CT, MR, US, XR, MG, PT, … (editable from the imaging detail page; corrections are recorded in ``extraction_corrections``) |
+| `modality` | DICOM Modality tag, CT, MR, US, XR, MG, PT, … (editable from the imaging detail page; corrections are recorded in ``extraction_corrections``) |
 | `body_part` | Anatomical region (editable) |
 | `study_description` | Description from DICOM metadata (editable) |
 | `accession_number` | Hospital / RIS accession number (editable) |
@@ -194,14 +193,14 @@ already exists at its destination with the same byte size doesn't bump
 
 Modality, body part, study description and accession number are all
 editable inline on the imaging detail page using the same UX as the
-documents-side ``MetadataEditor`` — click the value, type the
+documents-side ``MetadataEditor``, click the value, type the
 correction, press Enter. The PATCH lands on
 ``/api/imaging/{id}/metadata`` and every accepted field is recorded
 against the parent document in ``extraction_corrections`` (with
 ``doc_type='imaging_report'``) so the same correction-driven LLM
 learning loop that documents use applies to imaging metadata too.
 
-Date, doctor and facility are NOT shown on the imaging block — they
+Date, doctor and facility are NOT shown on the imaging block, they
 live on the parent document and are edited via that document's
 ``MetadataEditor`` (single source of truth; AFTER UPDATE triggers
 keep ``imaging_studies.doctor_id`` / ``.facility_id`` in lockstep).

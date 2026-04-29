@@ -4,7 +4,7 @@ title: "Chat"
 
 ## Overview
 
-Chat lets you ask questions about a patient's medical history in plain language. Answers are grounded in your actual records rather than whatever the model decides to invent: each turn prepends a bounded summary of the active patient's recent history to the system prompt, and the LLM can author a scoped SQLite `SELECT` to pull anything else it needs. There is no vector retrieval and no MCP server — the SQL path is the tool-call.
+Chat lets you ask questions about a patient's medical history in plain language. Answers are grounded in your actual records rather than whatever the model decides to invent: each turn prepends a bounded summary of the active patient's recent history to the system prompt, and the LLM can author a scoped SQLite `SELECT` to pull anything else it needs. There is no vector retrieval and no MCP server, the SQL path is the tool-call.
 
 ## How it works
 

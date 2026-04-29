@@ -5,7 +5,7 @@ title: "Medical Events"
 ## Overview
 
 Medical events group related documents under a single medical story: a
-diagnosis, a treatment course, a surgery, a hospitalization — anything
+diagnosis, a treatment course, a surgery, a hospitalization, anything
 that spans more than one document.
 
 For example, a *Sleep Apnea Diagnosis & Treatment* event might link
@@ -40,13 +40,12 @@ free-text **diagnosis**, **ICD-10 code**, **specialty**, **description**,
 
 Documents can be linked to events with a relevance level:
 
-- **Primary** — directly related to this event
-- **Secondary** — tangentially related
-- **Background** — provides context
+- **Primary**, directly related to this event
+- **Secondary**, tangentially related
+- **Background**, provides context
 
 Links can be created from either the event detail page (search and add)
-or the document detail page (select an event or create a new one —
-setting the document's `event_id` to the primary event).
+or the document detail page (select an event or create a new one, setting the document's `event_id` to the primary event).
 
 ## Event detail page
 

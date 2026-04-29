@@ -6,8 +6,8 @@ title: "Search"
 
 Asclepius uses SQLite FTS5 for ranked full-text search across:
 
-- **OCR text** — the raw text extracted from documents
-- **Raw extraction data** — the JSON output from LLM extraction
+- **OCR text**, the raw text extracted from documents
+- **Raw extraction data**, the JSON output from LLM extraction
 
 ## Usage
 

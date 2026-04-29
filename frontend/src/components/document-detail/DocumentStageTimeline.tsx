@@ -51,9 +51,9 @@ function stageLabel(stage: string): string {
 type StatusVisual = {
   label: string;
   Icon: any;
-  iconClass: string;       // for the marker dot
-  rowAccentClass: string;  // left border accent on the card
-  pillClass: string;       // small status pill
+  iconClass: string; // for the marker dot
+  rowAccentClass: string; // left border accent on the card
+  pillClass: string; // small status pill
   spin?: boolean;
 };
 
@@ -65,7 +65,8 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
         Icon: Check,
         iconClass: "bg-emerald-500 text-white",
         rowAccentClass: "border-l-emerald-500",
-        pillClass: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+        pillClass:
+          "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
       };
     case "failed":
       return {
@@ -73,7 +74,8 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
         Icon: X,
         iconClass: "bg-red-500 text-white",
         rowAccentClass: "border-l-red-500",
-        pillClass: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+        pillClass:
+          "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
       };
     case "started":
       return {
@@ -81,7 +83,8 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
         Icon: Loader2,
         iconClass: "bg-blue-500 text-white",
         rowAccentClass: "border-l-blue-500",
-        pillClass: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+        pillClass:
+          "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
         spin: true,
       };
     case "cancelled":
@@ -90,7 +93,8 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
         Icon: Ban,
         iconClass: "bg-amber-500 text-white",
         rowAccentClass: "border-l-amber-500",
-        pillClass: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+        pillClass:
+          "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
       };
     case "skipped":
     default:
@@ -192,17 +196,46 @@ function groupRuns(events: DocumentStageEvent[]): RunGroup[] {
 function runDuration(events: DocumentStageEvent[]): number | null {
   if (!events.length) return null;
   const first = events[0].started_at || events[0].finished_at;
-  const last = events[events.length - 1].finished_at || events[events.length - 1].started_at;
+  const last =
+    events[events.length - 1].finished_at ||
+    events[events.length - 1].started_at;
   return durationMs(first, last);
 }
 
-function runOutcome(events: DocumentStageEvent[]): DocumentStageEvent["status"] {
+function runOutcome(
+  events: DocumentStageEvent[],
+): DocumentStageEvent["status"] {
   // Worst outcome wins so a run with one failed stage reads as failed.
-  const order: DocumentStageEvent["status"][] = ["failed", "cancelled", "started", "skipped", "completed"];
+  const order: DocumentStageEvent["status"][] = [
+    "failed",
+    "cancelled",
+    "started",
+    "skipped",
+    "completed",
+  ];
   for (const o of order) {
     if (events.some((e) => e.status === o)) return o;
   }
   return "completed";
+}
+
+function runFlowBadge(
+  events: DocumentStageEvent[],
+): { label: string; pill: string } | null {
+  const stages = new Set(events.map((e) => e.stage));
+  if (stages.has("vision_extraction")) {
+    return {
+      label: "Vision-LLM",
+      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+    };
+  }
+  if (stages.has("ocr")) {
+    return {
+      label: "OCR + LLM",
+      pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700",
+    };
+  }
+  return null;
 }
 
 interface Props {
@@ -224,7 +257,9 @@ export default function DocumentStageTimeline({ documentId }: Props) {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await api.get<DocumentStagesResponse>(`/documents/${documentId}/stages`);
+        const res = await api.get<DocumentStagesResponse>(
+          `/documents/${documentId}/stages`,
+        );
         if (!cancelled) setData(res.data);
       } catch {
         // 404 etc — leave data null, render nothing.
@@ -233,7 +268,10 @@ export default function DocumentStageTimeline({ documentId }: Props) {
       }
     };
     load();
-    if (!isLive) return () => { cancelled = true; };
+    if (!isLive)
+      return () => {
+        cancelled = true;
+      };
     const interval = setInterval(load, 2500);
     return () => {
       cancelled = true;
@@ -256,7 +294,8 @@ export default function DocumentStageTimeline({ documentId }: Props) {
           <h2 className="text-base font-semibold">Pipeline stages</h2>
           <p className="text-xs text-muted-foreground">
             {groups.length} run{groups.length === 1 ? "" : "s"}
-            {data.events.length > 0 && ` · ${data.events.length} event${data.events.length === 1 ? "" : "s"}`}
+            {data.events.length > 0 &&
+              ` · ${data.events.length} event${data.events.length === 1 ? "" : "s"}`}
           </p>
         </div>
         {isLive && (
@@ -286,6 +325,7 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
   const totalMs = runDuration(group.events);
   const outcome = runOutcome(group.events);
   const outcomeVis = statusVisuals(outcome);
+  const flow = runFlowBadge(group.events);
 
   const headerColor = isReprocess
     ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
@@ -297,8 +337,12 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
   return (
     <div className="overflow-hidden rounded-lg border">
       {/* Run header */}
-      <div className={`flex items-center gap-3 border-b px-3 py-2 ${headerColor}`}>
-        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${kindIconColor}`}>
+      <div
+        className={`flex items-center gap-3 border-b px-3 py-2 ${headerColor}`}
+      >
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${kindIconColor}`}
+        >
           <KindIcon className="h-3.5 w-3.5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -312,9 +356,19 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
                 In progress
               </span>
             )}
-            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${outcomeVis.pillClass}`}>
+            <span
+              className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${outcomeVis.pillClass}`}
+            >
               {outcomeVis.label}
             </span>
+            {flow && (
+              <span
+                className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${flow.pill}`}
+                title={`Flow: ${flow.label}`}
+              >
+                {flow.label}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
             <span className="inline-flex items-center gap-1">
@@ -340,14 +394,24 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
         <div className="absolute left-[1.4375rem] top-5 bottom-5 w-0.5 bg-muted" />
 
         {group.events.map((ev, i) => (
-          <StageRow key={ev.id} event={ev} isLast={i === group.events.length - 1} />
+          <StageRow
+            key={ev.id}
+            event={ev}
+            isLast={i === group.events.length - 1}
+          />
         ))}
       </ol>
     </div>
   );
 }
 
-function StageRow({ event, isLast }: { event: DocumentStageEvent; isLast: boolean }) {
+function StageRow({
+  event,
+  isLast,
+}: {
+  event: DocumentStageEvent;
+  isLast: boolean;
+}) {
   const v = statusVisuals(event.status);
   const StageIcon = STAGE_ICONS[event.stage] ?? FileSearch;
   const dur = durationMs(event.started_at, event.finished_at);
@@ -359,15 +423,22 @@ function StageRow({ event, isLast }: { event: DocumentStageEvent; isLast: boolea
         className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-4 ring-card ${v.iconClass}`}
         title={v.label}
       >
-        <v.Icon className={`h-3.5 w-3.5 ${v.spin ? "animate-spin" : ""}`} strokeWidth={2.5} />
+        <v.Icon
+          className={`h-3.5 w-3.5 ${v.spin ? "animate-spin" : ""}`}
+          strokeWidth={2.5}
+        />
       </span>
 
       {/* Stage card */}
-      <div className={`flex-1 min-w-0 rounded-md border border-l-2 bg-card px-3 py-2 ${v.rowAccentClass}`}>
+      <div
+        className={`flex-1 min-w-0 rounded-md border border-l-2 bg-card px-3 py-2 ${v.rowAccentClass}`}
+      >
         <div className="flex items-center gap-2 flex-wrap">
           <StageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <span className="text-sm font-medium">{stageLabel(event.stage)}</span>
-          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.pillClass}`}>
+          <span
+            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${v.pillClass}`}
+          >
             {v.label}
           </span>
           {dur != null && (
@@ -382,8 +453,12 @@ function StageRow({ event, isLast }: { event: DocumentStageEvent; isLast: boolea
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-[11px] text-muted-foreground" title={formatTimestamp(event.finished_at)}>
-          {formatTimestamp(event.started_at) || formatTimestamp(event.finished_at)}
+        <div
+          className="mt-0.5 text-[11px] text-muted-foreground"
+          title={formatTimestamp(event.finished_at)}
+        >
+          {formatTimestamp(event.started_at) ||
+            formatTimestamp(event.finished_at)}
         </div>
         {event.message && (
           <p className="mt-1 text-xs text-red-600 dark:text-red-400 break-words whitespace-pre-wrap">

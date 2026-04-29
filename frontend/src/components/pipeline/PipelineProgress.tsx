@@ -64,6 +64,30 @@ function kindBadge(kind: PipelineJobKind | null): {
   };
 }
 
+/** Infer the flow architecture from the planned stages.
+ *
+ * Backend doesn't expose ``flow`` directly on ``current_job``; the stage list
+ * carries the same information unambiguously: ``vision_extraction`` only
+ * appears in the Vision-LLM flow (single-step image → text + extraction),
+ * everything else uses the OCR-then-LLM flow. We surface this so the user
+ * can A/B-compare flows on the dashboard without having to read the stages.
+ */
+function flowBadge(stages: string[]): { label: string; pill: string } | null {
+  if (stages.includes("vision_extraction")) {
+    return {
+      label: "Vision-LLM",
+      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+    };
+  }
+  if (stages.includes("ocr")) {
+    return {
+      label: "OCR + LLM",
+      pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700",
+    };
+  }
+  return null;
+}
+
 function formatElapsed(ms: number): string {
   if (ms < 1000) return "0s";
   const s = Math.floor(ms / 1000);
@@ -136,11 +160,13 @@ function IdleCard({ status }: { status: PipelineStatus }) {
     <div className="relative overflow-hidden rounded-xl border bg-card p-5">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-muted/40 to-transparent" />
       <div className="relative flex items-center gap-4">
-        <div className={`flex h-11 w-11 items-center justify-center rounded-full ${
-          stopped
-            ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300"
-            : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300"
-        }`}>
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-full ${
+            stopped
+              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300"
+              : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300"
+          }`}
+        >
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -156,18 +182,34 @@ function IdleCard({ status }: { status: PipelineStatus }) {
         <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
           <Stat label="Processed" value={status.total_processed} />
           <span className="opacity-30">|</span>
-          <Stat label="Errors" value={status.total_errors} tone={status.total_errors > 0 ? "red" : undefined} />
+          <Stat
+            label="Errors"
+            value={status.total_errors}
+            tone={status.total_errors > 0 ? "red" : undefined}
+          />
         </div>
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number | string; tone?: "red" }) {
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "red";
+}) {
   return (
     <div className="text-center">
-      <div className="text-[10px] uppercase tracking-wide opacity-70">{label}</div>
-      <div className={`text-sm font-semibold tabular-nums ${tone === "red" ? "text-red-600 dark:text-red-400" : ""}`}>
+      <div className="text-[10px] uppercase tracking-wide opacity-70">
+        {label}
+      </div>
+      <div
+        className={`text-sm font-semibold tabular-nums ${tone === "red" ? "text-red-600 dark:text-red-400" : ""}`}
+      >
         {value}
       </div>
     </div>
@@ -183,34 +225,56 @@ function RunningCard({
 }) {
   const badge = kindBadge(job.kind);
   const planned = job.stages_planned ?? [];
+  const flow = flowBadge(planned);
   const done = new Set(job.stages_done ?? []);
   const currentIndex = planned.findIndex((s) => s === job.stage);
   const progressIndex = currentIndex >= 0 ? currentIndex : done.size;
-  const overallPct = planned.length > 0
-    ? Math.min(100, Math.round(((done.size + (currentIndex >= 0 ? 0.5 : 0)) / planned.length) * 100))
-    : 0;
+  const overallPct =
+    planned.length > 0
+      ? Math.min(
+          100,
+          Math.round(
+            ((done.size + (currentIndex >= 0 ? 0.5 : 0)) / planned.length) *
+              100,
+          ),
+        )
+      : 0;
 
   const now = useNow(true);
   const startedAt = job.started_at ? new Date(job.started_at).getTime() : null;
   const elapsed = startedAt ? Math.max(0, now - startedAt) : null;
 
   return (
-    <div className={`relative overflow-hidden rounded-xl border bg-card p-5 ring-1 ${badge.ring}`}>
+    <div
+      className={`relative overflow-hidden rounded-xl border bg-card p-5 ring-1 ${badge.ring}`}
+    >
       {/* Ambient kind-tinted glow */}
-      <div className={`pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br ${badge.glow} blur-2xl`} />
+      <div
+        className={`pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br ${badge.glow} blur-2xl`}
+      />
 
       <div className="relative space-y-4">
         {/* Header: kind badge, filename, elapsed time */}
         <div className="flex items-start justify-between gap-3 min-w-0">
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.pill}`}>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.pill}`}
+              >
                 <span className="relative inline-flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-50 animate-ping" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
                 </span>
                 {badge.label}
               </span>
+              {flow && (
+                <span
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${flow.pill}`}
+                  title={`Flow: ${flow.label}`}
+                >
+                  {flow.label}
+                </span>
+              )}
               {elapsed != null && (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <Hourglass className="h-3 w-3" />
@@ -227,14 +291,21 @@ function RunningCard({
                 {job.filename || `Document #${job.doc_id}`}
               </Link>
             ) : (
-              <span className="block text-base font-semibold truncate" title={job.filename || ""}>
+              <span
+                className="block text-base font-semibold truncate"
+                title={job.filename || ""}
+              >
                 {job.filename || "(unknown)"}
               </span>
             )}
           </div>
           <div className="hidden sm:flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
             <Stat label="Processed" value={status.total_processed} />
-            <Stat label="Errors" value={status.total_errors} tone={status.total_errors > 0 ? "red" : undefined} />
+            <Stat
+              label="Errors"
+              value={status.total_errors}
+              tone={status.total_errors > 0 ? "red" : undefined}
+            />
           </div>
         </div>
 
@@ -279,9 +350,12 @@ function Stepper({
     <div>
       <div className="flex items-end justify-between mb-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Pipeline · stage {Math.min(planned.length, progressIndex + 1)} of {planned.length}
+          Pipeline · stage {Math.min(planned.length, progressIndex + 1)} of{" "}
+          {planned.length}
         </span>
-        <span className="text-xs font-semibold tabular-nums">{overallPct}%</span>
+        <span className="text-xs font-semibold tabular-nums">
+          {overallPct}%
+        </span>
       </div>
 
       {/* Steps with connector. The connector line sits behind the icons; the
@@ -293,27 +367,37 @@ function Stepper({
         <div
           className="absolute left-5 top-5 h-0.5 -translate-y-1/2 bg-gradient-to-r from-emerald-400 to-emerald-500 transition-[width] duration-500"
           style={{
-            width: planned.length > 1
-              ? `calc((100% - 2.5rem) * ${Math.max(0, Math.min(progressIndex, planned.length - 1)) / (planned.length - 1)})`
-              : "0px",
+            width:
+              planned.length > 1
+                ? `calc((100% - 2.5rem) * ${Math.max(0, Math.min(progressIndex, planned.length - 1)) / (planned.length - 1)})`
+                : "0px",
           }}
         />
 
-        <ol className="relative grid gap-1" style={{ gridTemplateColumns: `repeat(${planned.length}, minmax(0, 1fr))` }}>
+        <ol
+          className="relative grid gap-1"
+          style={{
+            gridTemplateColumns: `repeat(${planned.length}, minmax(0, 1fr))`,
+          }}
+        >
           {planned.map((s, i) => {
             const isDone = done.has(s);
-            const isCurrent = !isDone && (i === progressIndex || s === currentStage);
+            const isCurrent =
+              !isDone && (i === progressIndex || s === currentStage);
             const Icon = STAGE_ICONS[s] ?? FileSearch;
             return (
-              <li key={`${s}-${i}`} className="flex flex-col items-center text-center">
+              <li
+                key={`${s}-${i}`}
+                className="flex flex-col items-center text-center"
+              >
                 <span
                   className={[
                     "relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors",
                     isDone
                       ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
                       : isCurrent
-                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
-                      : "border-muted bg-card text-muted-foreground",
+                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                        : "border-muted bg-card text-muted-foreground",
                   ].join(" ")}
                 >
                   {/* Pulsing ring around current stage */}
@@ -334,8 +418,8 @@ function Stepper({
                     isDone
                       ? "text-emerald-700 dark:text-emerald-300 font-medium"
                       : isCurrent
-                      ? "text-blue-700 dark:text-blue-300 font-semibold"
-                      : "text-muted-foreground",
+                        ? "text-blue-700 dark:text-blue-300 font-semibold"
+                        : "text-muted-foreground",
                   ].join(" ")}
                   title={stageLabel(s)}
                 >
@@ -373,7 +457,8 @@ function PageProgress({
           className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 bg-[length:200%_100%] transition-[width] duration-700"
           style={{
             width: `${pct}%`,
-            animation: pct > 0 && pct < 100 ? "shimmer 2s linear infinite" : undefined,
+            animation:
+              pct > 0 && pct < 100 ? "shimmer 2s linear infinite" : undefined,
           }}
         />
       </div>
@@ -381,7 +466,11 @@ function PageProgress({
   );
 }
 
-function QueueCard({ queued }: { queued: NonNullable<PipelineStatus["queued_jobs"]> }) {
+function QueueCard({
+  queued,
+}: {
+  queued: NonNullable<PipelineStatus["queued_jobs"]>;
+}) {
   return (
     <div className="rounded-xl border bg-card/50 p-4">
       <div className="flex items-center justify-between mb-2">
@@ -397,7 +486,9 @@ function QueueCard({ queued }: { queued: NonNullable<PipelineStatus["queued_jobs
           const badge = kindBadge(q.kind);
           const inner = (
             <>
-              <span className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.pill}`}>
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.pill}`}
+              >
                 {badge.label}
               </span>
               <span className="truncate text-sm">{q.label}</span>
@@ -408,7 +499,9 @@ function QueueCard({ queued }: { queued: NonNullable<PipelineStatus["queued_jobs
           return (
             <li key={`${q.kind}-${q.doc_id ?? "u"}-${i}`}>
               {q.doc_id ? (
-                <Link to={`/documents/${q.doc_id}`} className={cls}>{inner}</Link>
+                <Link to={`/documents/${q.doc_id}`} className={cls}>
+                  {inner}
+                </Link>
               ) : (
                 <div className={cls}>{inner}</div>
               )}

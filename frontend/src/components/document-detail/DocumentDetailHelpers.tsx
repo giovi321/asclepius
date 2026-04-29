@@ -1058,7 +1058,7 @@ export function TranslatedTextSection({
   model: string | null;
   translatedAt: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   if (!text) return null;
   return (
     <div className="rounded-lg border">

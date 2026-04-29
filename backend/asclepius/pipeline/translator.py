@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
 
 import aiosqlite
 
@@ -20,7 +19,7 @@ from asclepius.pipeline.provider_factory import _build_llm_provider, get_llm_pro
 from asclepius.pipeline.stage_events import (
     STAGE_TRANSLATION,
     begin_job,
-    record_stage,
+    stage,
 )
 from asclepius.pipeline.state import PIPELINE_STATE
 from asclepius.pipeline.text_utils import strip_chandra_markup
@@ -121,61 +120,52 @@ async def translate_document(
         cleaned_pages = [strip_chandra_markup(p) for p in raw_pages]
         cleaned_pages = [p for p in cleaned_pages if p.strip()] or [cleaned]
         chunks = _build_page_chunks(cleaned_pages, _TRANSLATION_CHUNK_CHARS)
-
-        stage_started = datetime.utcnow().isoformat(timespec="seconds")
         total_chunks = len(chunks)
-        translated_parts: list[str] = []
 
         try:
-            for index, chunk in enumerate(chunks, start=1):
-                if _is_cancelled(doc_id):
-                    raise asyncio.CancelledError()
-
-                PIPELINE_STATE.pipeline_status["processing_pages"] = total_chunks
-                PIPELINE_STATE.pipeline_status["processing_page_current"] = index
-                job = PIPELINE_STATE.pipeline_status.get("current_job") or {}
-                job["page_total"] = total_chunks
-                job["page_current"] = index
-                PIPELINE_STATE.pipeline_status["current_job"] = job
-
-                user_message = prompt_template.format(ocr_text=chunk["text"])
-                response = await llm.chat(
-                    messages=[{"role": "user", "content": user_message}],
-                    system_prompt="You translate medical documents to English following the user's rules precisely.",
-                )
-                translated_parts.append(response.strip())
-
-            translated = "\n\n".join(p for p in translated_parts if p).strip()
-            if not translated:
-                raise RuntimeError("LLM returned empty translation")
-
-            model_label = getattr(llm, "provider_label", None) or llm_provider_id or "default"
-            await db.execute(
-                """UPDATE documents SET
-                       ocr_text_en = ?,
-                       ocr_text_en_model = ?,
-                       ocr_text_en_translated_at = CURRENT_TIMESTAMP,
-                       updated_at = CURRENT_TIMESTAMP
-                   WHERE id = ?""",
-                (translated, model_label, doc_id),
-            )
-            await db.commit()
-            await record_stage(
+            async with stage(
                 db,
                 doc_id,
                 STAGE_TRANSLATION,
-                "completed",
-                "translate",
-                started_at=stage_started,
-                page_current=total_chunks,
+                job_kind="translate",
                 page_total=total_chunks,
-            )
-            logger.info(
-                "Translation complete for doc %d (%d chunk(s), model=%s)",
-                doc_id,
-                total_chunks,
-                model_label,
-            )
+            ) as progress:
+                translated_parts: list[str] = []
+                for index, chunk in enumerate(chunks, start=1):
+                    if _is_cancelled(doc_id):
+                        raise asyncio.CancelledError()
+
+                    progress.set_page(index, total=total_chunks)
+
+                    user_message = prompt_template.format(ocr_text=chunk["text"])
+                    response = await llm.chat(
+                        messages=[{"role": "user", "content": user_message}],
+                        system_prompt="You translate medical documents to English following the user's rules precisely.",
+                    )
+                    translated_parts.append(response.strip())
+
+                translated = "\n\n".join(p for p in translated_parts if p).strip()
+                if not translated:
+                    raise RuntimeError("LLM returned empty translation")
+
+                model_label = getattr(llm, "provider_label", None) or llm_provider_id or "default"
+                await db.execute(
+                    """UPDATE documents SET
+                           ocr_text_en = ?,
+                           ocr_text_en_model = ?,
+                           ocr_text_en_translated_at = CURRENT_TIMESTAMP,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (translated, model_label, doc_id),
+                )
+                await db.commit()
+                logger.info(
+                    "Translation complete for doc %d (%d chunk(s), model=%s)",
+                    doc_id,
+                    total_chunks,
+                    model_label,
+                )
+
             return {"status": "done", "document_id": doc_id}
 
         except asyncio.CancelledError:
@@ -184,27 +174,10 @@ async def translate_document(
                 await _mark_cancelled(db, doc_id)
             except Exception:
                 pass
-            await record_stage(
-                db,
-                doc_id,
-                STAGE_TRANSLATION,
-                "cancelled",
-                "translate",
-                started_at=stage_started,
-            )
             raise
         except Exception as e:
             logger.exception("Translation failed for doc %d", doc_id)
             error_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
-            await record_stage(
-                db,
-                doc_id,
-                STAGE_TRANSLATION,
-                "failed",
-                "translate",
-                started_at=stage_started,
-                message=error_msg[:1000],
-            )
             return {"error": error_msg}
         finally:
             unregister_running_task(doc_id, _current_task)

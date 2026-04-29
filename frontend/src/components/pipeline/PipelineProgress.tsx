@@ -65,6 +65,14 @@ function kindBadge(kind: PipelineJobKind | null): {
       glow: "from-purple-500/10 via-purple-500/5 to-transparent",
     };
   }
+  if (kind === "translate") {
+    return {
+      label: "Translate",
+      pill: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
+      ring: "ring-emerald-300/60 dark:ring-emerald-600/40",
+      glow: "from-emerald-500/10 via-emerald-500/5 to-transparent",
+    };
+  }
   return {
     label: "Upload",
     pill: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
@@ -533,7 +541,9 @@ function QueueCard({
           // Upload jobs in queue have no stable doc_id and the cancel
           // endpoint is keyed by doc_id, so we can't cancel them from here
           // yet — disable the button with a tooltip rather than hide it.
-          const cancellable = q.kind === "reprocess" && q.doc_id != null;
+          const cancellable =
+            (q.kind === "reprocess" || q.kind === "translate") &&
+            q.doc_id != null;
           const inner = (
             <>
               <span

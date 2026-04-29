@@ -237,6 +237,13 @@ export default function DocumentDetailPage() {
               onReloaded={() => loadDoc(false)}
             />
           )}
+          {!isImagingPlaceholder(doc) && (
+            <TranslatedTextSection
+              text={doc.ocr_text_en}
+              model={doc.ocr_text_en_model}
+              translatedAt={doc.ocr_text_en_translated_at}
+            />
+          )}
         </div>
 
         <div className="space-y-4 min-w-0">
@@ -290,13 +297,6 @@ export default function DocumentDetailPage() {
       {/* OCR section: hide for placeholder imaging reports (no PDF, no
           OCR text). Real PDF reports go through OCR like any document. */}
       {!isImagingPlaceholder(doc) && <OcrSection text={doc.ocr_text} />}
-      {!isImagingPlaceholder(doc) && (
-        <TranslatedTextSection
-          text={doc.ocr_text_en}
-          model={doc.ocr_text_en_model}
-          translatedAt={doc.ocr_text_en_translated_at}
-        />
-      )}
     </div>
   );
 }

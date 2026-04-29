@@ -995,6 +995,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Frame Metadata
+         * @description Return the DICOM tags of a single frame as a JSON dict.
+         *
+         *     Used by the viewer's "Metadata" panel — gives the user the full DICOM
+         *     header without leaving the page. Pixel data and other large binary
+         *     blobs are filtered out so the payload stays small (typically a few
+         *     hundred tags). Tags whose value can't be represented as plain JSON
+         *     are coerced to ``str(value)``.
+         */
+        get: operations["get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/imaging/{study_id}/bundle-files": {
         parameters: {
             query?: never;
@@ -4634,8 +4660,42 @@ export interface operations {
                 format?: string;
                 wc?: number | null;
                 ww?: number | null;
+                invert?: boolean;
                 upscale?: number;
             };
+            header?: never;
+            path: {
+                study_id: number;
+                series_id: number;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 study_id: number;

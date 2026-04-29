@@ -313,13 +313,22 @@ async def _migration_0_9_5_collapse_imaging_docs(db: aiosqlite.Connection) -> No
 
 async def _migration_0_9_5_imaging_series_dedup(db: aiosqlite.Connection) -> None:
     """Merge duplicate imaging_series rows (NULL series_instance_uid bug)
-    and recompute parent counters. Idempotent."""
+    and recompute parent counters. Idempotent.
+
+    For NULL-UID rows the merge key now includes ``folder_path``: two
+    rows that share a study + series_number but came from different
+    source folders are kept separate. The earlier formulation grouped on
+    (study_id, series_number) only, which collapsed legitimately
+    distinct series into one (e.g. an MRI study with 7 series where
+    several shared SeriesNumber=1 ended up showing 3).
+    """
     cursor = await db.execute(
         """SELECT study_id, COALESCE(series_number, -1) AS sn,
+                  COALESCE(folder_path, '') AS fp,
                   GROUP_CONCAT(id) AS ids, SUM(num_images) AS total
            FROM imaging_series
            WHERE series_instance_uid IS NULL
-           GROUP BY study_id, COALESCE(series_number, -1)
+           GROUP BY study_id, COALESCE(series_number, -1), COALESCE(folder_path, '')
            HAVING COUNT(*) > 1"""
     )
     null_uid_groups = await cursor.fetchall()
@@ -334,9 +343,12 @@ async def _migration_0_9_5_imaging_series_dedup(db: aiosqlite.Connection) -> Non
     uid_groups = await cursor.fetchall()
 
     _merged = 0
+    # NULL-UID groups carry an extra folder_path column at index 2, so
+    # the ids/total columns sit at -2/-1. UID-keyed groups still have
+    # them at 2/3. Index from the end so both shapes work.
     for grp in (*null_uid_groups, *uid_groups):
-        ids_str = grp[2]
-        total = grp[3] or 0
+        ids_str = grp[-2]
+        total = grp[-1] or 0
         ids = sorted(int(s) for s in str(ids_str).split(",") if s)
         if len(ids) < 2:
             continue

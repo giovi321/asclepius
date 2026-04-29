@@ -9,6 +9,9 @@ import {
   Move,
   Sun,
   Maximize,
+  Contrast,
+  Info,
+  X,
 } from "lucide-react";
 
 interface DicomViewerProps {
@@ -51,10 +54,17 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
 
   // Window center / width (contrast). Only applied for MR. Defaults align
   // with the backend's "no overrides → use DICOM's own VOI LUT" behaviour
-  // when both are null.
+  // when both are null. Either slider can move independently — the
+  // backend now falls back to the file's other tag for the missing
+  // axis, so a single slider move applies immediately.
   const isMR = (modality || "").toUpperCase() === "MR";
   const [wc, setWc] = useState<number | null>(null);
   const [ww, setWw] = useState<number | null>(null);
+  const [invert, setInvert] = useState(false);
+  const [metaOpen, setMetaOpen] = useState(false);
+  const [metaItems, setMetaItems] = useState<any[] | null>(null);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaQuery, setMetaQuery] = useState("");
 
   // Load frame list
   useEffect(() => {
@@ -79,7 +89,42 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
     setPan({ x: 0, y: 0 });
     setWc(null);
     setWw(null);
+    setInvert(false);
+    setMetaItems(null);
+    setMetaQuery("");
   }, [studyId, seriesId]);
+
+  // Lazy-load DICOM metadata for the current frame on demand.
+  const openMetadata = useCallback(async () => {
+    setMetaOpen(true);
+    if (metaItems !== null) return;
+    setMetaLoading(true);
+    try {
+      const res = await api.get(
+        `/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}/metadata`,
+      );
+      setMetaItems(Array.isArray(res.data?.items) ? res.data.items : []);
+    } catch {
+      setMetaItems([]);
+    } finally {
+      setMetaLoading(false);
+    }
+  }, [studyId, seriesId, currentFrame, metaItems]);
+
+  // Refetch metadata if frame changes while panel is open.
+  useEffect(() => {
+    if (!metaOpen) return;
+    setMetaItems(null);
+    setMetaLoading(true);
+    api
+      .get(`/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}/metadata`)
+      .then((res) => setMetaItems(Array.isArray(res.data?.items) ? res.data.items : []))
+      .catch(() => setMetaItems([]))
+      .finally(() => setMetaLoading(false));
+    // metaOpen intentionally excluded so toggling the panel itself
+    // doesn't re-trigger this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studyId, seriesId, currentFrame]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -153,6 +198,7 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
   const resetContrast = () => {
     setWc(null);
     setWw(null);
+    setInvert(false);
   };
 
   if (loading) {
@@ -184,15 +230,22 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
   const params = new URLSearchParams();
   if (isMR && wc != null) params.set("wc", String(wc));
   if (isMR && ww != null) params.set("ww", String(ww));
-  // Ask the backend to bicubic-upscale the PNG once the user zooms past
-  // ~1.5x — without this the CSS scale path produces a blurry/pixelated
-  // image because the PNG is delivered at the DICOM's native resolution
-  // (often 256x256 or 512x512). Capped at 4x because PIL bicubic gets
-  // expensive past that and there's no further sharpness gain.
-  const upscale = zoom >= 3 ? 4 : zoom >= 1.5 ? 2 : 1;
+  if (invert) params.set("invert", "1");
+  // Ask the backend to bicubic-upscale the PNG so the CSS-zoomed image
+  // stays sharp. Schedule keeps the effective on-screen pixel ratio
+  // close to 1: pick a backend upscale that's at least the visible zoom.
+  const upscale =
+    zoom >= 5 ? 8 : zoom >= 3 ? 4 : zoom >= 1.5 ? 2 : 1;
   if (upscale > 1) params.set("upscale", String(upscale));
   const qs = params.toString();
   const frameUrl = `/api/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}${qs ? `?${qs}` : ""}`;
+
+  const filteredMetaItems = (metaItems || []).filter((it: any) => {
+    const q = metaQuery.trim().toLowerCase();
+    if (!q) return true;
+    const hay = `${it.keyword || ""} ${it.name || ""} ${it.tag || ""} ${it.value ?? ""}`.toLowerCase();
+    return hay.includes(q);
+  });
 
   return (
     <div className="flex flex-col h-full">
@@ -251,45 +304,63 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
           >
             <RotateCcw className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => setInvert((v) => !v)}
+            className={`rounded p-1 hover:bg-accent ${invert ? "bg-accent text-primary" : ""}`}
+            title="Invert colours"
+            aria-pressed={invert}
+          >
+            <Contrast className="h-4 w-4" />
+          </button>
+          <button
+            onClick={openMetadata}
+            className="rounded p-1 hover:bg-accent"
+            title="View DICOM metadata"
+          >
+            <Info className="h-4 w-4" />
+          </button>
         </div>
         <span className="text-[10px] text-muted-foreground hidden md:block">
           <Move className="inline h-3 w-3" /> shift-drag · Ctrl+wheel zoom · arrows scroll
         </span>
       </div>
 
-      {/* MRI contrast controls */}
+      {/* MRI contrast controls. Wider sliders + step=10 so a small mouse
+          movement maps to a small window-level change. The previous
+          step=1 over a 4096-value range made every pixel of slider
+          travel jump the image by ~32 intensity units. */}
       {isMR && (
-        <div className="flex items-center gap-3 border-b px-3 py-2 bg-muted/20 text-xs">
-          <Sun className="h-3.5 w-3.5 text-muted-foreground" />
-          <label className="flex items-center gap-1">
-            <span className="text-muted-foreground">Center</span>
+        <div className="flex items-center gap-3 border-b px-3 py-2 bg-muted/20 text-xs flex-wrap">
+          <Sun className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+          <label className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <span className="text-muted-foreground w-12 flex-shrink-0">Center</span>
             <input
               type="range"
               min={-1024}
               max={3072}
-              step={1}
+              step={10}
               value={wc ?? 1024}
               onChange={(e) => setWc(Number(e.target.value))}
-              className="w-32 accent-primary"
+              className="flex-1 accent-primary"
             />
-            <span className="tabular-nums w-12 text-right">{wc ?? "auto"}</span>
+            <span className="tabular-nums w-14 text-right flex-shrink-0">{wc ?? "auto"}</span>
           </label>
-          <label className="flex items-center gap-1">
-            <span className="text-muted-foreground">Width</span>
+          <label className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <span className="text-muted-foreground w-12 flex-shrink-0">Width</span>
             <input
               type="range"
               min={1}
               max={4096}
-              step={1}
+              step={10}
               value={ww ?? 2048}
               onChange={(e) => setWw(Number(e.target.value))}
-              className="w-32 accent-primary"
+              className="flex-1 accent-primary"
             />
-            <span className="tabular-nums w-12 text-right">{ww ?? "auto"}</span>
+            <span className="tabular-nums w-14 text-right flex-shrink-0">{ww ?? "auto"}</span>
           </label>
           <button
             onClick={resetContrast}
-            className="ml-auto rounded border px-2 py-0.5 hover:bg-accent"
+            className="rounded border px-2 py-0.5 hover:bg-accent flex-shrink-0"
           >
             Auto
           </button>
@@ -332,6 +403,84 @@ export default function DicomViewer({ studyId, seriesId, modality }: DicomViewer
             onChange={(e) => setCurrentFrame(Number(e.target.value))}
             className="block w-full accent-primary"
           />
+        </div>
+      )}
+
+      {/* DICOM metadata viewer — modal listing every header tag for the
+          current frame. Search filters by keyword / name / value so the
+          user can pin a tag without scrolling through hundreds of rows. */}
+      {metaOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50"
+          onClick={() => setMetaOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-[80vh] w-[min(800px,90vw)] flex-col rounded-lg border bg-background shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b px-4 py-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Info className="h-4 w-4" />
+                DICOM metadata
+                <span className="text-xs font-normal text-muted-foreground">
+                  Frame {currentFrame + 1} / {totalFrames}
+                </span>
+              </div>
+              <button
+                onClick={() => setMetaOpen(false)}
+                className="rounded p-1 hover:bg-accent"
+                aria-label="Close metadata panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="border-b px-4 py-2">
+              <input
+                type="text"
+                value={metaQuery}
+                onChange={(e) => setMetaQuery(e.target.value)}
+                placeholder="Filter by tag, keyword or value..."
+                className="w-full rounded border bg-background px-2 py-1 text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {metaLoading ? (
+                <div className="px-4 py-6 text-sm text-muted-foreground">Loading metadata...</div>
+              ) : !metaItems || metaItems.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-muted-foreground">No metadata available.</div>
+              ) : filteredMetaItems.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-muted-foreground">No tags match the filter.</div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 border-b bg-muted/50">
+                    <tr>
+                      <th className="px-3 py-1.5 text-left font-medium w-20">Tag</th>
+                      <th className="px-3 py-1.5 text-left font-medium w-12">VR</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Name</th>
+                      <th className="px-3 py-1.5 text-left font-medium">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredMetaItems.map((it: any, i: number) => (
+                      <tr key={`${it.tag}-${i}`}>
+                        <td className="px-3 py-1 font-mono text-[11px] text-muted-foreground">{it.tag}</td>
+                        <td className="px-3 py-1 font-mono text-[11px] text-muted-foreground">{it.vr}</td>
+                        <td className="px-3 py-1">{it.name}</td>
+                        <td className="px-3 py-1 break-all">
+                          {it.value === null || it.value === undefined ? (
+                            <span className="text-muted-foreground italic">none</span>
+                          ) : (
+                            String(it.value)
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

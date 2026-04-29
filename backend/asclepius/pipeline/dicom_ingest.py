@@ -191,12 +191,28 @@ async def process_dicom(
     # Real-world DICOM exports almost always put each series in its own
     # subfolder. When SeriesInstanceUID is missing (raw IVR LE streams,
     # legacy media), the upstream zip-extracted folder name is the
-    # strongest signal that two frames belong to the same series — without
-    # it, we fall back to series_number and collide files from different
-    # source folders into one series row. Capture the parent folder for
-    # use further down as a tiebreaker.
+    # strongest signal that two frames belong to the same series.
+    #
+    # We use that folder name as the on-disk series folder so two source
+    # series with the same SeriesNumber don't write into the same disk
+    # path: previously both would land in ``series-1/`` and the second
+    # series' frames would either silently overwrite the first's (when
+    # filenames collided) or pile up alongside but be matched as one
+    # series row, so the user only saw 3 of their 7 series.
     source_folder_hint = path.parent.name if path.parent else ""
-    series_folder = f"series-{series_number or '001'}"
+    if series_uid:
+        # With a real SeriesInstanceUID the row lookup is unambiguous, so
+        # a numeric folder is fine and keeps the disk layout tidy.
+        series_folder = f"series-{series_number or '001'}"
+    elif source_folder_hint:
+        # No UID — anchor the disk folder to the source folder name so
+        # different source series stay separated even with overlapping
+        # SeriesNumbers. Sanitise to avoid path traversal.
+        from asclepius.patients.service import slugify
+        slug = slugify(source_folder_hint) or f"series-{series_number or '001'}"
+        series_folder = slug
+    else:
+        series_folder = f"series-{series_number or '001'}"
     relative_path = f"{base_path}/{series_folder}/{path.name}"
 
     vault_root = Path(config.vault.root_path)
@@ -305,12 +321,12 @@ async def process_dicom(
         study_id = cursor.lastrowid
         study_is_new = True
 
-    # Create or find imaging series. Match on series_instance_uid when
-    # present; fall back to (study_id, series_number, source_folder) when
-    # the DICOM lacks a SeriesInstanceUID. The folder name is the tiebreaker
-    # because different vendor ZIPs ship multiple series with overlapping
-    # SeriesNumber=1 entries — without it, all of them collapse into one
-    # series row and the user only sees the first one.
+    # Create or find imaging series. With a SeriesInstanceUID the lookup
+    # is unambiguous. Without one we use the on-disk ``folder_path`` as
+    # the unique key, since the path is now derived from the source
+    # folder hint above (so two distinct source series never share a
+    # folder, even when their SeriesNumber collides).
+    series_folder_path = f"{base_path}/{series_folder}"
     if series_uid:
         cursor = await db.execute(
             "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid = ?",
@@ -319,9 +335,8 @@ async def process_dicom(
     else:
         cursor = await db.execute(
             "SELECT id FROM imaging_series WHERE study_id = ? AND series_instance_uid IS NULL "
-            "AND COALESCE(series_number, -1) = COALESCE(?, -1) "
-            "AND COALESCE(series_description, '') = COALESCE(?, '')",
-            (study_id, series_number, series_desc or source_folder_hint),
+            "AND folder_path = ?",
+            (study_id, series_folder_path),
         )
     row = await cursor.fetchone()
     if row:
@@ -333,9 +348,9 @@ async def process_dicom(
             )
     else:
         # When there's no SeriesInstanceUID, fall back to the source folder
-        # name as a synthesized description so the distinct-series check on
-        # the next frame matches consistently. Real description still wins
-        # if the DICOM tag carried one.
+        # name as a synthesized description so the user can still tell
+        # series apart in the picker. Real description still wins if the
+        # DICOM tag carried one.
         effective_desc = series_desc or (source_folder_hint if not series_uid else None)
         await db.execute(
             """INSERT INTO imaging_series
@@ -343,7 +358,7 @@ async def process_dicom(
                 num_images, series_instance_uid, folder_path)
                VALUES (?, ?, ?, ?, 1, ?, ?)""",
             (study_id, series_number, effective_desc, modality,
-             series_uid, f"{base_path}/{series_folder}"),
+             series_uid, series_folder_path),
         )
         # First frame of a brand-new series under an EXISTING study — bump
         # the parent's series counter. For a brand-new study the counter

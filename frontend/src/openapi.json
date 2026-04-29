@@ -2989,15 +2989,84 @@
             }
           },
           {
+            "name": "invert",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Invert"
+            }
+          },
+          {
             "name": "upscale",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 4,
+              "maximum": 8,
               "minimum": 1,
               "default": 1,
               "title": "Upscale"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/imaging/{study_id}/series/{series_id}/frame/{index}/metadata": {
+      "get": {
+        "tags": [
+          "imaging"
+        ],
+        "summary": "Get Frame Metadata",
+        "description": "Return the DICOM tags of a single frame as a JSON dict.\n\nUsed by the viewer's \"Metadata\" panel — gives the user the full DICOM\nheader without leaving the page. Pixel data and other large binary\nblobs are filtered out so the payload stays small (typically a few\nhundred tags). Tags whose value can't be represented as plain JSON\nare coerced to ``str(value)``.",
+        "operationId": "get_frame_metadata_api_imaging__study_id__series__series_id__frame__index__metadata_get",
+        "parameters": [
+          {
+            "name": "study_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Study Id"
+            }
+          },
+          {
+            "name": "series_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Series Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
             }
           }
         ],

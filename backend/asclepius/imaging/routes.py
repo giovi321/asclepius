@@ -250,7 +250,8 @@ async def get_frame(
     format: str = Query(default="png", pattern="^(png|dicom)$"),
     wc: float | None = Query(default=None),
     ww: float | None = Query(default=None),
-    upscale: int = Query(default=1, ge=1, le=4),
+    invert: bool = Query(default=False),
+    upscale: int = Query(default=1, ge=1, le=8),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -303,17 +304,18 @@ async def get_frame(
         if slope != 1 or intercept != 0:
             pixel_array = pixel_array * slope + intercept
 
-        # Decide window-level. Caller-supplied wc+ww win; otherwise fall
-        # back to the file's WindowCenter/WindowWidth tags.
-        if wc is not None and ww is not None and ww > 0:
-            wc_val: float | None = wc
-            ww_val: float | None = ww
-        elif hasattr(ds, "WindowCenter") and hasattr(ds, "WindowWidth"):
-            wc_val = float(ds.WindowCenter) if not isinstance(ds.WindowCenter, pydicom.multival.MultiValue) else float(ds.WindowCenter[0])
-            ww_val = float(ds.WindowWidth) if not isinstance(ds.WindowWidth, pydicom.multival.MultiValue) else float(ds.WindowWidth[0])
-        else:
-            wc_val = None
-            ww_val = None
+        # Decide window-level. Caller can supply ``wc`` and/or ``ww``; the
+        # missing axis falls back to the DICOM file's own VOI tag, so a
+        # single slider move still applies (previously both had to be sent
+        # together for the override to win).
+        file_wc: float | None = None
+        file_ww: float | None = None
+        if hasattr(ds, "WindowCenter") and hasattr(ds, "WindowWidth"):
+            file_wc = float(ds.WindowCenter) if not isinstance(ds.WindowCenter, pydicom.multival.MultiValue) else float(ds.WindowCenter[0])
+            file_ww = float(ds.WindowWidth) if not isinstance(ds.WindowWidth, pydicom.multival.MultiValue) else float(ds.WindowWidth[0])
+
+        wc_val = wc if wc is not None else file_wc
+        ww_val = ww if ww is not None else file_ww
 
         if wc_val is not None and ww_val is not None and ww_val > 0:
             # Map the user-chosen [wc-ww/2, wc+ww/2] window to [0, 255] —
@@ -335,6 +337,10 @@ async def get_frame(
                 pixel_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min()) * 255
 
         pixel_array = pixel_array.astype(np.uint8)
+        if invert:
+            # Invert intensity post-windowing — mirrors the standard DICOM
+            # viewer "invert" toggle. Cheap on a uint8 array.
+            pixel_array = 255 - pixel_array
 
         img = PILImage.fromarray(pixel_array)
         if upscale > 1:
@@ -353,6 +359,81 @@ async def get_frame(
             path=str(frames[index]),
             media_type="application/dicom",
         )
+
+
+@router.get("/{study_id}/series/{series_id}/frame/{index}/metadata")
+async def get_frame_metadata(
+    study_id: int,
+    series_id: int,
+    index: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Return the DICOM tags of a single frame as a JSON dict.
+
+    Used by the viewer's "Metadata" panel — gives the user the full DICOM
+    header without leaving the page. Pixel data and other large binary
+    blobs are filtered out so the payload stays small (typically a few
+    hundred tags). Tags whose value can't be represented as plain JSON
+    are coerced to ``str(value)``.
+    """
+    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
+    config = get_config()
+    series_path = Path(config.vault.root_path) / folder
+    if not series_path.exists():
+        raise HTTPException(status_code=404, detail="Frame not found")
+    frames = sorted(
+        [f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
+    )
+    if index < 0 or index >= len(frames):
+        raise HTTPException(status_code=404, detail="Frame not found")
+
+    try:
+        import pydicom
+    except ImportError:
+        raise HTTPException(status_code=500, detail="pydicom not installed")
+
+    try:
+        ds = pydicom.dcmread(str(frames[index]), stop_before_pixels=True)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Could not read DICOM header")
+
+    # Skip tags that aren't useful in a UI — pixel data, very large
+    # blobs, file-meta separators. Everything else is converted to its
+    # string repr (DICOM PN, dates, sequences all stringify cleanly).
+    SKIP_KEYWORDS = {"PixelData", "FloatPixelData", "DoubleFloatPixelData"}
+    items: list[dict] = []
+    for elem in ds:
+        kw = elem.keyword or ""
+        if kw in SKIP_KEYWORDS:
+            continue
+        # Sequences (SQ): summarise as item count rather than dumping the
+        # nested dataset, which would inflate the payload.
+        if elem.VR == "SQ":
+            try:
+                count = len(elem.value)  # type: ignore[arg-type]
+            except Exception:
+                count = 0
+            value: str | int | float | None = f"<sequence: {count} item(s)>"
+        else:
+            try:
+                raw = elem.value
+                if isinstance(raw, (bytes, bytearray, memoryview)):
+                    value = f"<{len(bytes(raw))} bytes>"
+                elif isinstance(raw, (int, float, str)):
+                    value = raw
+                else:
+                    value = str(raw)
+            except Exception:
+                value = None
+        items.append({
+            "tag": str(elem.tag),
+            "keyword": kw or None,
+            "vr": elem.VR,
+            "name": elem.name,
+            "value": value,
+        })
+    return {"items": items, "count": len(items)}
 
 
 # ── Bundle files (DICOMDIR, JPEG previews, etc.) ───────────────────

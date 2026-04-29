@@ -143,8 +143,8 @@ default: |-
         "date_administered": "YYYY-MM-DD or null"
       }}
     ],
-    "summary_en": "1-3 sentence English summary of the document",
-    "summary_original": "1-3 sentence summary in the document's source language"
+    "summary_en": "1-3 sentence English summary focused on what the document is and its core clinical content (type of exam/procedure, key findings, medications, diagnoses). DO NOT repeat patient name, date of birth, facility/hospital, doctor name, or dates - those are already captured in their own fields.",
+    "summary_original": "Same content as summary_en but in the document's source language. DO NOT repeat patient identifiers, facility, doctor, or dates."
   }}
 
   OCR text:

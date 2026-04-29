@@ -13,6 +13,6 @@ default: |-
     "language_detected": "ISO 639-1 code",
     "doctor": { "name": "string or null", "title": "string or null", "specialty_original": "string or null" },
     "facility": { "name": "string or null", "type": "hospital|clinic|lab|pharmacy|other|null", "address": "string or null", "city": "string or null" },
-    "summary_en": "1-3 sentence English summary",
-    "summary_original": "1-3 sentence summary in source language"
+    "summary_en": "1-3 sentence English summary focused on what the document is and its core clinical content (type of exam/procedure, key findings, medications, diagnoses). DO NOT repeat patient name, date of birth, facility/hospital, doctor name, or dates - those are already captured in their own fields.",
+    "summary_original": "Same content as summary_en but in the document's source language. DO NOT repeat patient identifiers, facility, doctor, or dates."
   }

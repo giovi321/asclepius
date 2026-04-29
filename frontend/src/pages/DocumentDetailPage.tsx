@@ -329,6 +329,11 @@ export default function DocumentDetailPage() {
               translatedAt={doc.ocr_text_en_translated_at}
             />
           )}
+          <RegionTranslationsSection
+            docId={Number(id)}
+            items={doc.region_translations || []}
+            onChanged={() => loadDoc(false)}
+          />
         </div>
 
         <div className="space-y-4 min-w-0">
@@ -371,12 +376,6 @@ export default function DocumentDetailPage() {
             patientId={doc.patient_id}
             links={linkedDocs}
             onLinksChange={setLinkedDocs}
-          />
-
-          <RegionTranslationsSection
-            docId={Number(id)}
-            items={doc.region_translations || []}
-            onChanged={() => loadDoc(false)}
           />
         </div>
       </div>

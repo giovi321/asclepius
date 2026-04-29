@@ -5065,7 +5065,7 @@
           "settings"
         ],
         "summary": "Test Llm Provider",
-        "description": "Test connectivity to an LLM provider by sending a tiny prompt.",
+        "description": "Test connectivity to an LLM provider via its metadata endpoint.\n\nHits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),\nor ``client.models.list()`` (Anthropic). Free, instant, validates auth\nand that the configured model is available \u2014 without acquiring an\ninference slot or burning tokens.",
         "operationId": "test_llm_provider_api_settings_test_llm_provider_post",
         "requestBody": {
           "content": {
@@ -5145,7 +5145,7 @@
           "settings"
         ],
         "summary": "Test Vision Provider",
-        "description": "Test connectivity to a Vision-LLM provider with a trivial prompt.",
+        "description": "Test connectivity to a Vision-LLM provider via its metadata endpoint.\n\nSame probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),\n``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).\nNo image is uploaded, no inference is run.",
         "operationId": "test_vision_provider_api_settings_test_vision_provider_post",
         "requestBody": {
           "content": {

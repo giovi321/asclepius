@@ -1792,7 +1792,12 @@ export interface paths {
         put?: never;
         /**
          * Test Llm Provider
-         * @description Test connectivity to an LLM provider by sending a tiny prompt.
+         * @description Test connectivity to an LLM provider via its metadata endpoint.
+         *
+         *     Hits ``GET /api/tags`` (Ollama), ``GET /v1/models`` (OpenAI-compatible),
+         *     or ``client.models.list()`` (Anthropic). Free, instant, validates auth
+         *     and that the configured model is available — without acquiring an
+         *     inference slot or burning tokens.
          */
         post: operations["test_llm_provider_api_settings_test_llm_provider_post"];
         delete?: never;
@@ -1832,7 +1837,11 @@ export interface paths {
         put?: never;
         /**
          * Test Vision Provider
-         * @description Test connectivity to a Vision-LLM provider with a trivial prompt.
+         * @description Test connectivity to a Vision-LLM provider via its metadata endpoint.
+         *
+         *     Same probe as ``test-llm-provider``: ``GET /api/tags`` (Ollama),
+         *     ``GET /v1/models`` (OpenAI), or ``client.models.list()`` (Anthropic).
+         *     No image is uploaded, no inference is run.
          */
         post: operations["test_vision_provider_api_settings_test_vision_provider_post"];
         delete?: never;

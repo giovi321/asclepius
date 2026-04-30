@@ -725,11 +725,24 @@ async def extract_and_store(
     ocr_text: str,
     config: AppConfig,
     extraction_override: dict | None = None,
+    scope: set[str] | None = None,
 ) -> dict:
     """Run LLM extraction and write results to DB tables.
 
-    If extraction_override is provided, skip the LLM call and use that data directly.
+    If ``extraction_override`` is provided, skip the LLM call and use that
+    data directly.
+
+    ``scope`` (when set) restricts the write side to a subset of the
+    child tables — valid entries are ``lab_results``, ``encounters``,
+    ``medications``, ``vaccinations``, ``invoice_items``. Document-level
+    metadata (doc_type, dates, summary, doctor, facility, etc.) is left
+    untouched in scoped mode. Used by the AI editor to "only overwrite
+    lab tests" (or any subset) without disturbing the rest of the
+    document. ``None`` keeps the original whole-document behaviour.
     """
+    _all_children = {"lab_results", "encounters", "medications", "vaccinations", "invoice_items"}
+    _scope = scope if scope is not None else _all_children
+    _scoped_run = scope is not None
     context = await build_extraction_context(db)
     if extraction_override:
         extraction = extraction_override
@@ -795,12 +808,13 @@ async def extract_and_store(
             len(extraction.get("diagnoses") or []),
         )
 
-    # Clear any prior child rows for this document so re-extraction overwrites
-    # old data instead of appending duplicates. Both the full pipeline and the
-    # reprocess path funnel through extract_and_store, so doing the cleanup
-    # here makes every extraction idempotent.
-    for _child in ("lab_results", "encounters", "medications", "vaccinations", "invoice_items"):
-        await db.execute(f"DELETE FROM {_child} WHERE document_id = ?", (doc_id,))
+    # Clear prior child rows so re-extraction overwrites old data instead
+    # of appending duplicates. In ``scope``-restricted runs (e.g. AI edit
+    # for "labs only"), only the in-scope tables get cleared so the rest
+    # of the document's data survives.
+    for _child in _all_children:
+        if _child in _scope:
+            await db.execute(f"DELETE FROM {_child} WHERE document_id = ?", (doc_id,))
 
     # Store raw extraction — use the provider label if available
     llm_label = getattr(llm, "provider_label", "") or "unknown"
@@ -809,105 +823,132 @@ async def extract_and_store(
         (json.dumps(extraction), llm_label, doc_id),
     )
 
-    # Get the document's patient_id
+    # Get the document's patient_id (always — needed for child inserts).
     cursor = await db.execute("SELECT patient_id FROM documents WHERE id = ?", (doc_id,))
     row = await cursor.fetchone()
     patient_id = row[0] if row else None
 
-    if not patient_id:
-        # Try to match patient from extraction — auto-assign
+    if not patient_id and not _scoped_run:
+        # Try to match patient from extraction — auto-assign. Skipped on
+        # scoped runs because a partial extraction may not even include
+        # patient_name, and we don't want a scoped re-extract to
+        # accidentally re-assign the patient.
         patient_id = await _match_patient(db, extraction.get("patient_name"))
         if patient_id:
             await db.execute(
                 "UPDATE documents SET patient_id = ? WHERE id = ?", (patient_id, doc_id)
             )
 
-    # Update document metadata
-    updates = {}
-    if extraction.get("doc_type"):
-        updates["doc_type"] = extraction["doc_type"]
-    # Collapse the historic three-date LLM schema (date_visit > date_issued >
-    # doc_date) into the canonical event_date. Prefer an explicit event_date
-    # if the LLM already emitted one.
-    event_date_val = (
-        extraction.get("event_date")
-        or extraction.get("date_visit")
-        or extraction.get("date_issued")
-        or extraction.get("doc_date")
-    )
-    if event_date_val:
-        updates["event_date"] = event_date_val
-    issued_date_val = extraction.get("issued_date") or extraction.get("date_issued")
-    if issued_date_val:
-        updates["issued_date"] = issued_date_val
-    if lang := _clean(extraction.get("language_detected")):
-        updates["language_source"] = lang
-    if sum_en := _clean(extraction.get("summary_en")):
-        updates["summary_en"] = sum_en
-    if sum_orig := _clean(extraction.get("summary_original")):
-        updates["summary_original"] = sum_orig
-    cost_data = extraction.get("cost", {})
-    if cost_data.get("total_amount"):
-        updates["cost_amount"] = cost_data["total_amount"]
-        updates["cost_currency"] = cost_data.get("currency")
-    elif cost_data.get("amount"):
-        updates["cost_amount"] = cost_data["amount"]
-        updates["cost_currency"] = cost_data.get("currency")
-
-    # Insurance info from extraction
-    insurance = extraction.get("insurance", {})
-    if ins_co := _clean(insurance.get("company")):
-        updates["insurance_company"] = ins_co
-    if ins_pol := _clean(insurance.get("policy_number")):
-        updates["insurance_policy"] = ins_pol
-
-    # Specialty info on the document itself
-    specialty_data = extraction.get("specialty", {})
-    if spec_orig := _clean(specialty_data.get("original")):
-        updates["specialty_original"] = spec_orig
-    # resolve_extraction() populates specialty["norm_specialty_id"] from the
-    # original text; fall back to the legacy canonical-based resolver when
-    # that wasn't run (error / override path).
-    if specialty_data.get("norm_specialty_id"):
-        updates["norm_specialty_id"] = specialty_data["norm_specialty_id"]
-    elif specialty_data.get("canonical"):
-        norm_spec_id = await _resolve_specialty_from_data(db, specialty_data)
-        if norm_spec_id:
-            updates["norm_specialty_id"] = norm_spec_id
-
-    if updates:
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [doc_id]
-        await db.execute(f"UPDATE documents SET {set_clause} WHERE id = ?", values)
-        logger.info("Doc %d metadata updated: %s", doc_id, list(updates.keys()))
-    else:
-        logger.warning("Doc %d: no metadata fields to update from extraction", doc_id)
-
-    # Upsert facility
+    # Document-level metadata + facility/doctor/insurance/cost. Skipped
+    # entirely in ``scope``-restricted runs so AI edit "overwrite labs"
+    # doesn't wipe the document's doc_type / summary / doctor etc. when
+    # the partial OCR text doesn't carry those fields.
     facility_id = None
-    facility_data = extraction.get("facility", {})
-    if facility_data.get("name"):
-        facility_id = await _upsert_facility(db, facility_data)
-        await db.execute(
-            "UPDATE documents SET facility_id = ? WHERE id = ?",
-            (facility_id, doc_id),
-        )
-
-    # Upsert doctor
     doctor_id = None
-    doctor_data = extraction.get("doctor", {})
-    if doctor_data.get("name"):
-        doctor_id = await _upsert_doctor(db, doctor_data, facility_id)
-        await db.execute(
-            "UPDATE documents SET doctor_id = ? WHERE id = ?",
-            (doctor_id, doc_id),
-        )
+    doctor_data: dict = {}
+    event_date_val = None
 
-    # Insert lab results
+    if _scoped_run:
+        # Read back the existing facility / doctor ids so child inserts
+        # below can populate FK columns consistently with the rest of the
+        # document. Same query the legacy path effectively does via the
+        # upserts.
+        cursor = await db.execute(
+            "SELECT facility_id, doctor_id, event_date FROM documents WHERE id = ?",
+            (doc_id,),
+        )
+        row = await cursor.fetchone()
+        if row:
+            facility_id = row[0]
+            doctor_id = row[1]
+            event_date_val = row[2]
+    else:
+        # Update document metadata (full-run path).
+        updates: dict = {}
+        if extraction.get("doc_type"):
+            updates["doc_type"] = extraction["doc_type"]
+        # Collapse the historic three-date LLM schema (date_visit >
+        # date_issued > doc_date) into the canonical event_date. Prefer an
+        # explicit event_date if the LLM already emitted one.
+        event_date_val = (
+            extraction.get("event_date")
+            or extraction.get("date_visit")
+            or extraction.get("date_issued")
+            or extraction.get("doc_date")
+        )
+        if event_date_val:
+            updates["event_date"] = event_date_val
+        issued_date_val = extraction.get("issued_date") or extraction.get("date_issued")
+        if issued_date_val:
+            updates["issued_date"] = issued_date_val
+        if lang := _clean(extraction.get("language_detected")):
+            updates["language_source"] = lang
+        if sum_en := _clean(extraction.get("summary_en")):
+            updates["summary_en"] = sum_en
+        if sum_orig := _clean(extraction.get("summary_original")):
+            updates["summary_original"] = sum_orig
+        cost_data = extraction.get("cost", {})
+        if cost_data.get("total_amount"):
+            updates["cost_amount"] = cost_data["total_amount"]
+            updates["cost_currency"] = cost_data.get("currency")
+        elif cost_data.get("amount"):
+            updates["cost_amount"] = cost_data["amount"]
+            updates["cost_currency"] = cost_data.get("currency")
+
+        # Insurance info from extraction
+        insurance = extraction.get("insurance", {})
+        if ins_co := _clean(insurance.get("company")):
+            updates["insurance_company"] = ins_co
+        if ins_pol := _clean(insurance.get("policy_number")):
+            updates["insurance_policy"] = ins_pol
+
+        # Specialty info on the document itself
+        specialty_data = extraction.get("specialty", {})
+        if spec_orig := _clean(specialty_data.get("original")):
+            updates["specialty_original"] = spec_orig
+        # resolve_extraction() populates specialty["norm_specialty_id"] from
+        # the original text; fall back to the legacy canonical-based
+        # resolver when that wasn't run (error / override path).
+        if specialty_data.get("norm_specialty_id"):
+            updates["norm_specialty_id"] = specialty_data["norm_specialty_id"]
+        elif specialty_data.get("canonical"):
+            norm_spec_id = await _resolve_specialty_from_data(db, specialty_data)
+            if norm_spec_id:
+                updates["norm_specialty_id"] = norm_spec_id
+
+        if updates:
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            values = list(updates.values()) + [doc_id]
+            await db.execute(f"UPDATE documents SET {set_clause} WHERE id = ?", values)
+            logger.info("Doc %d metadata updated: %s", doc_id, list(updates.keys()))
+        else:
+            logger.warning("Doc %d: no metadata fields to update from extraction", doc_id)
+
+        # Upsert facility
+        facility_data = extraction.get("facility", {})
+        if facility_data.get("name"):
+            facility_id = await _upsert_facility(db, facility_data)
+            await db.execute(
+                "UPDATE documents SET facility_id = ? WHERE id = ?",
+                (facility_id, doc_id),
+            )
+
+        # Upsert doctor
+        doctor_data = extraction.get("doctor", {})
+        if doctor_data.get("name"):
+            doctor_id = await _upsert_doctor(db, doctor_data, facility_id)
+            await db.execute(
+                "UPDATE documents SET doctor_id = ? WHERE id = ?",
+                (doctor_id, doc_id),
+            )
+
+    # Insert child rows. Each block is gated on ``scope`` so a focused AI
+    # edit (e.g. "labs only") only touches the matching table.
+    doc_best_date = None
     if patient_id:
-        # Default test_date for every lab row that doesn't carry its own.
-        # Read back from the DB rather than the extraction dict so any dates
-        # the user manually set pre-extraction are respected.
+        # Default test_date for every lab/medication/encounter row that
+        # doesn't carry its own. Read back from the DB so any dates the
+        # user manually set pre-extraction are respected.
         cursor = await db.execute(
             "SELECT event_date FROM documents WHERE id = ?",
             (doc_id,),
@@ -915,6 +956,7 @@ async def extract_and_store(
         drow = await cursor.fetchone()
         doc_best_date = drow[0] if drow else None
 
+    if patient_id and "lab_results" in _scope:
         for lab in extraction.get("lab_results", []):
             if not isinstance(lab, dict):
                 continue
@@ -970,6 +1012,7 @@ async def extract_and_store(
             (doc_id, doc_id, doc_id),
         )
 
+    if patient_id and "encounters" in _scope:
         # Insert encounters/diagnoses
         encounter = extraction.get("encounter", {})
         if not isinstance(encounter, dict):
@@ -1035,6 +1078,7 @@ async def extract_and_store(
                 ),
             )
 
+    if patient_id and "medications" in _scope:
         # Insert medications
         for med in extraction.get("medications", []):
             if not isinstance(med, dict):
@@ -1063,6 +1107,7 @@ async def extract_and_store(
                 ),
             )
 
+    if patient_id and "vaccinations" in _scope:
         # Insert vaccinations
         for vax in extraction.get("vaccinations", []):
             if not isinstance(vax, dict):
@@ -1083,9 +1128,12 @@ async def extract_and_store(
                 ),
             )
 
-    # Insert invoice line items (not gated on patient_id — invoices may not have a patient)
+    # Insert invoice line items (not gated on patient_id — invoices may not
+    # have a patient). Skipped when ``invoice_items`` is outside the scope.
     cost_data = extraction.get("cost", {})
     if not isinstance(cost_data, dict):
+        cost_data = {}
+    if "invoice_items" not in _scope:
         cost_data = {}
     for item in cost_data.get("line_items", []):
         if not isinstance(item, dict) or not item.get("description"):

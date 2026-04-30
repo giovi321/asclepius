@@ -126,6 +126,7 @@ async def edit_document_with_ai(
             body.re_run_ocr,
             config,
             request,
+            instruction=body.instruction,
         )
 
     from asclepius.pipeline.provider_factory import _build_general_llm_provider
@@ -283,6 +284,8 @@ async def _scoped_page_reprocess(
     re_run_ocr: bool,
     config,
     request: Request,
+    *,
+    instruction: str = "",
 ) -> dict:
     """Two-phase scoped page reprocess.
 
@@ -422,6 +425,11 @@ async def _scoped_page_reprocess(
             "ocr_provider_id": ocr_provider_id,
             "llm_provider_id": llm_provider_id,
             "re_run_ocr": re_run_ocr,
+            # Pass the user's natural-language instruction so the worker
+            # can detect intent ("lab tests" / "medications" / …) and
+            # route to the matching ``extraction_<doc_type>.yaml``
+            # focused prompt.
+            "instruction": instruction,
         },
         priority=0,  # user-initiated, jump the inbox queue
         queued_doc_id=doc_id,

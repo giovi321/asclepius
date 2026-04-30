@@ -22,7 +22,11 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig, get_active_llm_provider_config
-from asclepius.pipeline.extractor import extract_and_store
+from asclepius.pipeline.extractor import (
+    _extract_type_specific,
+    build_extraction_context,
+    extract_and_store,
+)
 from asclepius.pipeline.ocr import extract_text_for_pages
 from asclepius.pipeline.provider_factory import (
     ProviderUnreachableError,
@@ -52,6 +56,110 @@ def _resolve_llm(config: AppConfig, llm_provider_id: str | None):
     return get_llm_provider(config, priority=1)
 
 
+# Map intent keywords (extracted from the user's instruction) to the
+# canonical doc_type whose ``extraction_<key>.yaml`` prompt we should
+# run. Longest match wins so "lab tests" beats a stray "labs" elsewhere
+# in the instruction. ``scope`` lists the child tables the extraction
+# is allowed to wipe + re-insert, so a "labs" edit doesn't clobber the
+# document's medications / encounters / vaccinations.
+_INTENTS: list[tuple[str, set[str], tuple[str, ...]]] = [
+    (
+        "lab_test",
+        {"lab_results"},
+        (
+            "lab tests",
+            "blood tests",
+            "blood test",
+            "lab test",
+            "labtest",
+            "labs",
+            "lab",
+            "analisi",
+            "blutbild",
+            "bloodtest",
+        ),
+    ),
+    (
+        "prescription",
+        {"medications"},
+        (
+            "medications",
+            "medication",
+            "prescriptions",
+            "prescription",
+            "drugs",
+            "drug",
+            "ricetta",
+            "rezept",
+            "meds",
+        ),
+    ),
+    (
+        "specialist_report",
+        {"encounters"},
+        (
+            "diagnoses",
+            "diagnosis",
+            "encounter",
+            "encounters",
+            "findings",
+        ),
+    ),
+    (
+        "vaccination",
+        {"vaccinations"},
+        ("vaccination", "vaccine", "immunization", "impfung"),
+    ),
+    (
+        "imaging_report",
+        # Imaging report extraction populates encounters (findings live in
+        # the encounter row), so scope it to encounters.
+        {"encounters"},
+        (
+            "imaging report",
+            "radiology",
+            "imaging",
+            "x-ray",
+            "xray",
+            "ct scan",
+            "mri",
+        ),
+    ),
+    (
+        "invoice",
+        {"invoice_items"},
+        ("invoice", "bill", "billing", "fattura", "rechnung"),
+    ),
+    (
+        "surgical_report",
+        {"encounters"},
+        ("surgical", "surgery", "operative", "intervento"),
+    ),
+]
+
+
+def _detect_intent(instruction: str) -> tuple[str, set[str]] | None:
+    """Return ``(doc_type, scope)`` matched in the user's instruction.
+
+    Returns ``None`` when no clear intent can be detected, in which case
+    the worker falls back to the legacy whole-document extraction path.
+    """
+    if not instruction:
+        return None
+    text = instruction.lower()
+    best: tuple[int, str | None, set[str] | None] = (0, None, None)
+    for doc_type, scope, keywords in _INTENTS:
+        for kw in keywords:
+            if kw in text:
+                # Length-based scoring so "lab tests" beats "lab".
+                if len(kw) > best[0]:
+                    best = (len(kw), doc_type, scope)
+                    break
+    if best[1] is None or best[2] is None:
+        return None
+    return best[1], best[2]
+
+
 async def ai_edit_document(
     doc_id: int,
     config: AppConfig,
@@ -61,12 +169,20 @@ async def ai_edit_document(
     ocr_provider_id: str | None,
     llm_provider_id: str | None,
     re_run_ocr: bool,
+    instruction: str = "",
 ) -> dict:
     """Run the AI editor's scoped page reprocess on the worker.
 
     Caller validates the request (pages in range, file_path resolves,
     provider ids exist) before enqueuing — this function only performs
     the work and persists results.
+
+    ``instruction`` is the user's original natural-language prompt,
+    used to detect intent (labs vs medications vs imaging…). When a
+    clear intent is matched the worker runs the dedicated
+    ``extraction_<doc_type>.yaml`` prompt and writes only the matching
+    child table. When no intent is detected the worker falls back to
+    the legacy whole-document extraction.
     """
     from asclepius.pipeline.processor import (
         register_running_task,
@@ -224,19 +340,73 @@ async def ai_edit_document(
                 await _persist_doc_warning(db, doc_id, str(e))
                 return {"error": str(e)}
 
+            # Detect intent so we can run the focused per-type prompt
+            # (extraction_lab_test.yaml etc.) instead of the legacy
+            # whole-document prompt. The whole-document prompt has a huge
+            # JSON schema and qwen2.5:14b in particular tends to skip
+            # lab_results when given partial OCR — the focused prompt
+            # asks for just lab_results and is far more reliable.
+            intent = _detect_intent(instruction)
+            intent_type: str | None = intent[0] if intent else None
+            scope: set[str] | None = intent[1] if intent else None
+
             # Run extract_and_store inside the LLM stage; let exceptions
             # escape the ``stage()`` so it records "failed" with the
             # message, then catch outside and persist on the document.
             extraction_error: str | None = None
+            inserted_counts: dict[str, int] = {}
             try:
                 async with stage(db, doc_id, STAGE_LLM_EXTRACTION, job_kind="ai_edit"):
-                    result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
+                    if intent_type:
+                        # Focused per-type extraction.
+                        logger.info(
+                            "AI-edit doc=%d using extraction_%s prompt (scope=%s)",
+                            doc_id,
+                            intent_type,
+                            sorted(scope or []),
+                        )
+                        ctx = await build_extraction_context(db)
+                        type_extraction = await _extract_type_specific(
+                            llm,
+                            scoped_ocr,
+                            intent_type,
+                            ctx,
+                            db_path=config.database.path,
+                        )
+                        if isinstance(type_extraction, dict) and type_extraction.get("error"):
+                            raise RuntimeError(str(type_extraction["error"]))
+                        if not isinstance(type_extraction, dict) or not type_extraction:
+                            raise RuntimeError(
+                                f"extraction_{intent_type} prompt returned no usable JSON"
+                            )
+                        result = await extract_and_store(
+                            db,
+                            llm,
+                            doc_id,
+                            scoped_ocr,
+                            config,
+                            extraction_override=type_extraction,
+                            scope=scope,
+                        )
+                    else:
+                        # Fallback: legacy whole-document extraction.
+                        result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
                     if isinstance(result, dict) and result.get("error"):
                         # extract_and_store handled the failure path
-                        # internally (it sets status='failed' on the
-                        # documents row when extraction has an error
-                        # key). Re-raise so the stage records as failed.
+                        # internally; re-raise so the stage records as
+                        # failed.
                         raise RuntimeError(str(result["error"]))
+                    # Surface insert counts so the toast / log can tell
+                    # the user something actually landed (or didn't).
+                    for key in (
+                        "lab_results",
+                        "medications",
+                        "diagnoses",
+                        "vaccinations",
+                    ):
+                        v = result.get(key) if isinstance(result, dict) else None
+                        if isinstance(v, list):
+                            inserted_counts[key] = len(v)
             except Exception as exc:  # noqa: BLE001
                 extraction_error = f"{type(exc).__name__}: {exc}".strip()
                 logger.exception(
@@ -246,6 +416,14 @@ async def ai_edit_document(
                     db, doc_id, f"AI edit extraction failed: {extraction_error}"
                 )
                 return {"error": extraction_error}
+
+            logger.info(
+                "AI-edit doc=%d done: intent=%s scope=%s counts=%s",
+                doc_id,
+                intent_type,
+                sorted(scope or []),
+                inserted_counts,
+            )
 
             # Surface partial-OCR result on the document so the user knows
             # which pages came back blank and might want to re-OCR them.

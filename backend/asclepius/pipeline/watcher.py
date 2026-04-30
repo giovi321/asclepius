@@ -343,6 +343,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                         ocr_provider_id=payload.get("ocr_provider_id"),
                         llm_provider_id=payload.get("llm_provider_id"),
                         re_run_ocr=payload.get("re_run_ocr", False),
+                        instruction=payload.get("instruction", ""),
                     )
                 else:
                     logger.info("Pipeline worker processing: %s", Path(file_path).name)

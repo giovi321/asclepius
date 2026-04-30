@@ -374,10 +374,41 @@ async def ai_edit_document(
                             db_path=config.database.path,
                         )
                         if isinstance(type_extraction, dict) and type_extraction.get("error"):
-                            raise RuntimeError(str(type_extraction["error"]))
+                            # parse_llm_json returns
+                            # ``{"error": "Failed to parse extraction",
+                            #    "raw_response": "<first 500 chars>"}``
+                            # when the model emitted non-JSON. Surface the
+                            # raw response so the user can see what the
+                            # model said and pick a more capable provider.
+                            raw = type_extraction.get("raw_response", "")
+                            err = str(type_extraction["error"])
+                            if raw:
+                                err = f"{err}. LLM returned: {raw[:300]!r}"
+                            raise RuntimeError(err)
                         if not isinstance(type_extraction, dict) or not type_extraction:
                             raise RuntimeError(
-                                f"extraction_{intent_type} prompt returned no usable JSON"
+                                f"extraction_{intent_type} prompt returned no usable JSON. "
+                                f"Try selecting a more capable LLM provider in the picker."
+                            )
+                        # If the focused prompt returned NO rows for the
+                        # requested table, that's a strong signal the
+                        # model didn't follow the schema (or there's
+                        # genuinely nothing to extract). Surface the
+                        # response shape so the user can decide.
+                        scope_keys = list(scope or [])
+                        if scope_keys and not any(
+                            isinstance(type_extraction.get(k), list)
+                            and len(type_extraction.get(k) or [])
+                            for k in scope_keys
+                        ):
+                            keys_seen = sorted(type_extraction.keys())
+                            raise RuntimeError(
+                                f"extraction_{intent_type} returned 0 rows for "
+                                f"{scope_keys}. Response keys: {keys_seen}. "
+                                f"Either the OCR text on those pages didn't "
+                                f"contain extractable {intent_type} data, or "
+                                f"the LLM didn't follow the schema. Try a "
+                                f"more capable LLM provider."
                             )
                         result = await extract_and_store(
                             db,

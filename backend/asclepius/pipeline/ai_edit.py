@@ -142,27 +142,30 @@ async def ai_edit_document(
             )
 
             ocr_for_pages: dict[int, str] = {}
+            empty_pages: list[int] = []
 
             # Phase 1 — re-OCR the chosen pages, OR pull cached OCR.
+            # Exceptions inside the ``stage()`` block intentionally
+            # propagate so the stage_event row is recorded as "failed"
+            # with the exception message; the outer try/except below
+            # then turns that into the worker's error result + persists
+            # the message onto the document so the user sees it in the UI.
             if re_run_ocr:
                 async with stage(
                     db, doc_id, STAGE_OCR, job_kind="ai_edit", page_total=len(in_range)
                 ) as p:
-                    try:
-                        fresh = await extract_text_for_pages(
-                            file_path,
-                            config,
-                            in_range,
-                            ocr_provider_id=ocr_provider_id,
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        logger.exception("Re-OCR failed for doc %d", doc_id)
-                        return {"error": f"Re-OCR failed: {exc}"}
+                    fresh = await extract_text_for_pages(
+                        file_path,
+                        config,
+                        in_range,
+                        ocr_provider_id=ocr_provider_id,
+                    )
 
                     for i, page_num in enumerate(in_range, start=1):
                         p.set_page(i)
                         page_text = (fresh.get(page_num) or "").strip()
                         if not page_text:
+                            empty_pages.append(page_num)
                             logger.warning(
                                 "AI-edit: OCR returned empty text for doc=%d page=%d",
                                 doc_id,
@@ -199,6 +202,7 @@ async def ai_edit_document(
                     txt = (r["ocr_text"] or "").strip()
                     if txt:
                         ocr_for_pages[int(r["page_number"])] = txt
+                empty_pages = [p for p in in_range if p not in ocr_for_pages]
 
             used_pages = sorted(ocr_for_pages)
             if not used_pages:
@@ -208,6 +212,7 @@ async def ai_edit_document(
                     else "None of the requested pages have cached OCR text."
                 )
                 logger.warning("AI-edit doc=%d: %s", doc_id, msg)
+                await _persist_doc_warning(db, doc_id, msg)
                 return {"error": msg}
 
             scoped_ocr = "\n\n".join(ocr_for_pages[n] for n in used_pages)
@@ -216,22 +221,47 @@ async def ai_edit_document(
             try:
                 llm = _resolve_llm(config, llm_provider_id)
             except (ProviderUnreachableError, RuntimeError) as e:
+                await _persist_doc_warning(db, doc_id, str(e))
                 return {"error": str(e)}
 
-            async with stage(db, doc_id, STAGE_LLM_EXTRACTION, job_kind="ai_edit"):
-                try:
+            # Run extract_and_store inside the LLM stage; let exceptions
+            # escape the ``stage()`` so it records "failed" with the
+            # message, then catch outside and persist on the document.
+            extraction_error: str | None = None
+            try:
+                async with stage(db, doc_id, STAGE_LLM_EXTRACTION, job_kind="ai_edit"):
                     result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
-                except Exception as exc:  # noqa: BLE001
-                    logger.exception("AI-edit extraction failed for doc %d", doc_id)
-                    return {"error": f"Extraction failed: {exc}"}
+                    if isinstance(result, dict) and result.get("error"):
+                        # extract_and_store handled the failure path
+                        # internally (it sets status='failed' on the
+                        # documents row when extraction has an error
+                        # key). Re-raise so the stage records as failed.
+                        raise RuntimeError(str(result["error"]))
+            except Exception as exc:  # noqa: BLE001
+                extraction_error = f"{type(exc).__name__}: {exc}".strip()
+                logger.exception(
+                    "AI-edit extraction failed for doc %d: %s", doc_id, extraction_error
+                )
+                await _persist_doc_warning(
+                    db, doc_id, f"AI edit extraction failed: {extraction_error}"
+                )
+                return {"error": extraction_error}
 
-                if isinstance(result, dict) and result.get("error"):
-                    return {"error": str(result["error"])}
+            # Surface partial-OCR result on the document so the user knows
+            # which pages came back blank and might want to re-OCR them.
+            if empty_pages:
+                note = (
+                    f"AI edit: OCR returned empty text for page(s) "
+                    f"{empty_pages}; extraction used pages {used_pages}."
+                )
+                logger.info("Doc %d: %s", doc_id, note)
+                await _persist_doc_warning(db, doc_id, note, status="needs_review")
 
             return {
                 "status": "reprocessed",
                 "document_id": doc_id,
                 "pages": used_pages,
+                "empty_pages": empty_pages,
                 "page_count": page_count,
                 "re_run_ocr": re_run_ocr,
                 "ocr_provider_id": ocr_provider_id,
@@ -240,3 +270,38 @@ async def ai_edit_document(
         finally:
             end_job()
             unregister_running_task(doc_id, _current_task)
+
+
+async def _persist_doc_warning(
+    db: aiosqlite.Connection,
+    doc_id: int,
+    message: str,
+    *,
+    status: str | None = None,
+) -> None:
+    """Surface a worker-side issue on the document so the user sees it.
+
+    Writes ``error_message`` (capped at 1000 chars) and optionally
+    flips ``status``. The document detail page renders ``error_message``
+    inside the status block when status is ``failed`` or
+    ``needs_review``, which is exactly the visibility we want here.
+    """
+    try:
+        if status:
+            await db.execute(
+                """UPDATE documents SET error_message = ?, status = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (message[:1000], status, doc_id),
+            )
+        else:
+            await db.execute(
+                """UPDATE documents SET error_message = ?,
+                       updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+                (message[:1000], doc_id),
+            )
+        await db.commit()
+    except Exception:
+        # Best-effort — never let the message-persist itself crash the worker.
+        logger.warning(
+            "Failed to persist AI-edit warning on doc %d (non-fatal)", doc_id, exc_info=True
+        )

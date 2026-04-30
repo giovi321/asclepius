@@ -248,7 +248,11 @@ function synthesizeLiveGroup(
 function groupRuns(events: DocumentStageEvent[]): RunGroup[] {
   const groups: RunGroup[] = [];
   let current: RunGroup | null = null;
-  const startStages = new Set(["ocr", "vision_extraction"]);
+  // Stages that mark the start of a new run within the same job_kind.
+  // Seeing one of these after we've already passed one in the current
+  // group means the user kicked off a fresh attempt (e.g. clicked AI Edit
+  // again on the same doc) — split into a new run group.
+  const startStages = new Set(["ocr", "vision_extraction", "ai_edit"]);
   let seenStart = false;
   for (const ev of events) {
     const isStart = startStages.has(ev.stage);
@@ -434,34 +438,43 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
   const isTranslate =
     group.job_kind === "translate" || group.job_kind === "translate_region";
   const isRegionTranslate = group.job_kind === "translate_region";
-  const KindIcon = isTranslate
-    ? Languages
-    : isReprocess
-      ? RefreshCw
-      : UploadIcon;
-  const runLabel = isRegionTranslate
-    ? "Region translate"
+  const isAiEdit = group.job_kind === "ai_edit";
+  const KindIcon = isAiEdit
+    ? Brain
     : isTranslate
-      ? "Translate"
+      ? Languages
       : isReprocess
-        ? "Reprocess"
-        : "Upload";
+        ? RefreshCw
+        : UploadIcon;
+  const runLabel = isAiEdit
+    ? "AI edit"
+    : isRegionTranslate
+      ? "Region translate"
+      : isTranslate
+        ? "Translate"
+        : isReprocess
+          ? "Reprocess"
+          : "Upload";
   const startTs = group.events[0]?.started_at || group.events[0]?.finished_at;
   const totalMs = runDuration(group.events);
   const outcome = runOutcome(group.events);
   const outcomeVis = statusVisuals(outcome);
   const flow = runFlowBadge(group.events);
 
-  const headerColor = isTranslate
-    ? "bg-emerald-50/60 dark:bg-emerald-900/15 border-emerald-200/60 dark:border-emerald-900"
-    : isReprocess
-      ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
-      : "bg-blue-50/60 dark:bg-blue-900/15 border-blue-200/60 dark:border-blue-900";
-  const kindIconColor = isTranslate
-    ? "bg-emerald-500 text-white"
-    : isReprocess
-      ? "bg-purple-500 text-white"
-      : "bg-blue-500 text-white";
+  const headerColor = isAiEdit
+    ? "bg-amber-50/60 dark:bg-amber-900/15 border-amber-200/60 dark:border-amber-900"
+    : isTranslate
+      ? "bg-emerald-50/60 dark:bg-emerald-900/15 border-emerald-200/60 dark:border-emerald-900"
+      : isReprocess
+        ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
+        : "bg-blue-50/60 dark:bg-blue-900/15 border-blue-200/60 dark:border-blue-900";
+  const kindIconColor = isAiEdit
+    ? "bg-amber-500 text-white"
+    : isTranslate
+      ? "bg-emerald-500 text-white"
+      : isReprocess
+        ? "bg-purple-500 text-white"
+        : "bg-blue-500 text-white";
 
   return (
     <div className="overflow-hidden rounded-lg border">

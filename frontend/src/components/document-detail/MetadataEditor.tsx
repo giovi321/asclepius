@@ -51,10 +51,10 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
     setMarkingReviewed(true);
     try {
       await api.post(`/documents/${doc.id}/mark-reviewed`);
-      // Signal the parent to re-fetch the document so it picks up the
-      // new status + cleared error_message. ``onSave`` without a payload
-      // is the parent's "refresh" hook (used elsewhere in the editor).
-      onSave();
+      // The parent's ``onSave`` is a merge — pass the fields the
+      // backend just changed so the local state updates immediately
+      // and the red banner disappears without a page refresh.
+      onSave({ status: "done", error_message: null });
       toast({
         title: "Marked as reviewed",
         description: "Status set to done, review banner cleared.",

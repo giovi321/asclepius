@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from asclepius.auth.session import get_current_user
@@ -82,6 +82,7 @@ def _parse_pages_from_instruction(text: str, max_pages: int) -> list[int]:
 async def edit_document_with_ai(
     doc_id: int,
     body: DocumentEditRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
@@ -124,6 +125,7 @@ async def edit_document_with_ai(
             body.llm_provider_id,
             body.re_run_ocr,
             config,
+            request,
         )
 
     from asclepius.pipeline.provider_factory import _build_general_llm_provider
@@ -280,6 +282,7 @@ async def _scoped_page_reprocess(
     llm_provider_id: str | None,
     re_run_ocr: bool,
     config,
+    request: Request,
 ) -> dict:
     """Two-phase scoped page reprocess.
 
@@ -289,38 +292,21 @@ async def _scoped_page_reprocess(
     knows whether a re-OCR is required, and return
     ``status='needs_ocr_choice'`` with the available OCR + LLM providers.
 
-    Phase B — second submit: either re-OCR the chosen pages with the
-    selected OCR provider (``re_run_ocr=True``) and update the cache, or
-    pull the existing cached OCR text. Either way the LLM extraction
-    runs against ``llm_provider_id`` (or the highest-priority enabled
-    LLM if not specified). Wipes every child row (lab_results,
-    encounters, medications, vaccinations, invoice_items) before
-    re-inserting — when the user says "reprocess page 41 for labs",
-    they expect labs to come from page 41 and nothing else.
-
-    The whole work block is wrapped in ``stage_events.stage()`` so the
-    document timeline reflects the AI-edit re-OCR + re-extract just like
-    a regular reprocess.
+    Phase B — second submit: enqueue an ``ai_edit`` job for the pipeline
+    worker and return ``status='queued'`` immediately. The worker calls
+    ``ai_edit_document`` which either re-OCRs the chosen pages with the
+    selected OCR provider (``re_run_ocr=True``) and refreshes the cache,
+    or pulls the cached OCR. Either way the LLM extraction runs against
+    ``llm_provider_id`` (or the highest-priority enabled LLM if not
+    specified). Child rows (lab_results, encounters, medications,
+    vaccinations, invoice_items) get wiped and re-inserted, so the
+    user's "reprocess page 41 for labs" yields labs from page 41 and
+    nothing else. Running on the worker keeps the HTTP request short
+    (otherwise a 5-page Chandra OCR run would hold the request open
+    long enough for any reverse proxy to return 502).
     """
-    from asclepius.config import get_active_llm_provider_config
-    from asclepius.pipeline.extractor import extract_and_store
-    from asclepius.pipeline.ocr import (
-        extract_text_for_pages,
-        list_llm_providers,
-        list_ocr_providers,
-    )
-    from asclepius.pipeline.provider_factory import (
-        ProviderUnreachableError,
-        _build_llm_provider,
-        get_llm_provider,
-    )
-    from asclepius.pipeline.stage_events import (
-        STAGE_LLM_EXTRACTION,
-        STAGE_OCR,
-        begin_job,
-        end_job,
-        stage,
-    )
+    from asclepius.pipeline.ocr import list_llm_providers, list_ocr_providers
+    from asclepius.pipeline.watcher import enqueue_job
 
     total_pages = page_count if page_count and page_count > 0 else 0
     if total_pages <= 0:
@@ -382,179 +368,80 @@ async def _scoped_page_reprocess(
             detail="re_run_ocr=true requires ocr_provider_id.",
         )
 
-    # Resolve the LLM provider for the extraction step. Default to the
-    # highest-priority enabled provider when the user didn't pick one.
-    def _resolve_llm():
-        if llm_provider_id:
-            for entry in config.llm.providers:
-                if entry.id == llm_provider_id and entry.enabled:
-                    return _build_llm_provider(entry)
-            raise HTTPException(
-                status_code=400,
-                detail=f"LLM provider '{llm_provider_id}' is not configured or disabled.",
-            )
-        try:
-            return get_llm_provider(config, priority=1)
-        except ProviderUnreachableError as e:
-            raise HTTPException(status_code=503, detail=str(e))
+    # Validate provider ids against the live config so the user gets a
+    # crisp error here instead of a generic worker failure later.
+    if llm_provider_id and not any(
+        p.id == llm_provider_id and p.enabled for p in config.llm.providers
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"LLM provider '{llm_provider_id}' is not configured or disabled.",
+        )
+    if ocr_provider_id and not any(
+        p.id == ocr_provider_id and p.enabled for p in config.ocr.providers
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"OCR provider '{ocr_provider_id}' is not configured or disabled.",
+        )
 
-    # ``documents.file_path`` is vault-relative (e.g.
-    # ``patients/alex-smith/2024/20240315_lab-test.pdf``); resolve against
-    # ``config.vault.root_path`` to get the absolute path the OCR helpers
-    # expect. Mirrors what reprocessor.py does at every OCR call site.
+    # ``documents.file_path`` is vault-relative; verify the file exists
+    # before queuing so the user gets a sync error rather than a silent
+    # worker failure.
     rel_path = doc.get("file_path") or ""
     if re_run_ocr and not rel_path:
         raise HTTPException(
             status_code=400,
             detail="Document has no file on disk to re-OCR.",
         )
-    file_path = str(Path(config.vault.root_path) / rel_path) if rel_path else ""
-    if re_run_ocr and not Path(file_path).exists():
+    if re_run_ocr and not (Path(config.vault.root_path) / rel_path).exists():
         raise HTTPException(
             status_code=400,
             detail=f"File not found on disk: {rel_path}",
         )
 
-    # Phase B: do the work. Surface it as a tracked job (job_kind="ai_edit")
-    # so the dashboard's pipeline timeline labels the whole run "AI edit"
-    # via its kind badge. The stages inside are the real work units (OCR
-    # if re-running, then LLM extraction); we deliberately do NOT emit a
-    # standalone STAGE_AI_EDIT marker stage because it would complete in
-    # 0ms before any real work began and read as "AI edit done, OCR still
-    # going" — the framing belongs at the run level, not as a fake stage.
-    planned: list[str] = []
-    if re_run_ocr:
-        planned.append(STAGE_OCR)
-    planned.append(STAGE_LLM_EXTRACTION)
-
-    # Surface the chosen LLM credential id (when known) so the dashboard
-    # can show the model badge for this job.
+    # Surface the LLM credential id for the queued-jobs preview.
     llm_cred_id: str | None = None
     if llm_provider_id:
         for entry in config.llm.providers:
             if entry.id == llm_provider_id:
                 llm_cred_id = entry.credential_id or entry.id or None
                 break
-    else:
-        active = get_active_llm_provider_config(config, 1)
-        if active:
-            llm_cred_id = active.credential_id or active.id or None
 
-    begin_job(
-        doc_id=doc_id,
-        filename=doc.get("original_filename") or doc.get("file_path"),
-        kind="ai_edit",
-        stages_planned=planned,
-        providers={"ocr": ocr_provider_id or None, "llm": llm_cred_id},
-    )
-    try:
-        logger.info(
-            "AI-edit scoped reprocess doc=%d pages=%s (of %d) re_run_ocr=%s ocr=%s llm=%s",
-            doc_id,
-            in_range,
-            total_pages,
-            re_run_ocr,
-            ocr_provider_id,
-            llm_provider_id or "default",
-        )
+    queue = getattr(request.app.state, "pipeline_queue", None)
+    if queue is None:
+        raise HTTPException(status_code=503, detail="Pipeline worker not running")
 
-        # Phase B.1 — re-OCR the chosen pages with the user's selected engine,
-        # OR fall through to the existing cache. Re-OCR upserts into
-        # ``ocr_page_cache`` keyed by real PDF page numbers so the cache
-        # gets corrected on every AI edit.
-        ocr_for_pages: dict[int, str] = {}
-        if re_run_ocr:
-            async with stage(
-                db,
-                doc_id,
-                STAGE_OCR,
-                job_kind="ai_edit",
-                page_total=len(in_range),
-            ) as p:
-                try:
-                    fresh = await extract_text_for_pages(
-                        file_path, config, in_range, ocr_provider_id=ocr_provider_id
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    logger.exception("Re-OCR failed for doc %d", doc_id)
-                    raise HTTPException(status_code=500, detail=f"Re-OCR failed: {exc}")
-
-                for i, page_num in enumerate(in_range, start=1):
-                    p.set_page(i)
-                    page_text = (fresh.get(page_num) or "").strip()
-                    if not page_text:
-                        continue
-                    await db.execute(
-                        """INSERT INTO ocr_page_cache
-                              (document_id, page_number, ocr_text, ocr_engine, confidence)
-                           VALUES (?, ?, ?, ?, ?)
-                           ON CONFLICT(document_id, page_number) DO UPDATE SET
-                              ocr_text = excluded.ocr_text,
-                              ocr_engine = excluded.ocr_engine,
-                              confidence = excluded.confidence""",
-                        (doc_id, page_num, page_text, f"ai_edit:{ocr_provider_id}", 0.0),
-                    )
-                    ocr_for_pages[page_num] = page_text
-                await db.commit()
-        else:
-            # Use cached OCR text, indexed by real PDF page numbers.
-            cursor = await db.execute(
-                "SELECT page_number, ocr_text FROM ocr_page_cache "
-                "WHERE document_id = ? AND page_number IN ("
-                + ",".join(["?"] * len(in_range))
-                + ")",
-                (doc_id, *in_range),
-            )
-            for r in await cursor.fetchall():
-                txt = (r[1] or "").strip()
-                if txt:
-                    ocr_for_pages[int(r[0])] = txt
-
-        used_pages = sorted(ocr_for_pages)
-        if not used_pages:
-            if re_run_ocr:
-                raise HTTPException(
-                    status_code=502,
-                    detail="OCR returned no text for the requested pages.",
-                )
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"None of the requested pages have cached OCR text. "
-                    f"Pick an OCR engine and re-run OCR — pages "
-                    f"{missing_from_cache or in_range} are missing from the cache."
-                ),
-            )
-
-        scoped_ocr = "\n\n".join(ocr_for_pages[n] for n in used_pages)
-
-        # Phase B.2 — extract from the OCR text (fresh or cached).
-        llm = _resolve_llm()
-        async with stage(db, doc_id, STAGE_LLM_EXTRACTION, job_kind="ai_edit"):
-            try:
-                result = await extract_and_store(db, llm, doc_id, scoped_ocr, config)
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Scoped reprocess failed for doc %d", doc_id)
-                raise HTTPException(status_code=500, detail=f"Extraction failed: {exc}")
-
-            if isinstance(result, dict) and result.get("error"):
-                raise HTTPException(status_code=500, detail=str(result.get("error")))
-
-        return {
-            "status": "reprocessed",
-            "mode": "pages",
-            "document_id": doc_id,
-            "pages": used_pages,
-            "skipped_pages": sorted(out_of_range),
-            "out_of_range_pages": out_of_range,
-            "not_in_cache_pages": [p for p in in_range if p not in used_pages],
+    enqueue_job(
+        queue,
+        "ai_edit",
+        {
+            "doc_id": doc_id,
+            "requested_pages": in_range,
             "page_count": total_pages,
-            "re_run_ocr": re_run_ocr,
             "ocr_provider_id": ocr_provider_id,
             "llm_provider_id": llm_provider_id,
-        }
-    finally:
-        end_job()
+            "re_run_ocr": re_run_ocr,
+        },
+        priority=0,  # user-initiated, jump the inbox queue
+        queued_doc_id=doc_id,
+        queued_label=doc.get("original_filename") or f"doc#{doc_id}",
+        queued_providers={
+            "ocr": ocr_provider_id or None,
+            "llm": llm_cred_id,
+        },
+    )
+    return {
+        "status": "queued",
+        "mode": "pages",
+        "document_id": doc_id,
+        "pages": in_range,
+        "out_of_range_pages": out_of_range,
+        "page_count": total_pages,
+        "re_run_ocr": re_run_ocr,
+        "ocr_provider_id": ocr_provider_id,
+        "llm_provider_id": llm_provider_id,
+    }
 
 
 @router.post("/{doc_id}/generate-filename")

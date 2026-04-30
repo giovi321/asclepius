@@ -246,7 +246,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
 
             file_path = payload.get("file_path") if kind == "upload" else None
             label = file_path or f"doc#{payload.get('doc_id')}"
-            doc_kind = kind in ("reprocess", "translate", "translate_region")
+            doc_kind = kind in ("reprocess", "translate", "translate_region", "ai_edit")
 
             # Pop the matching entry off pipeline_status.queued_jobs so the
             # frontend's queued list reflects the worker actually picking
@@ -326,6 +326,23 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                         ocr_provider_id=payload.get("ocr_provider_id"),
                         llm_provider_id=payload.get("llm_provider_id"),
                         resolved_providers=payload.get("resolved_providers"),
+                    )
+                elif kind == "ai_edit":
+                    logger.info(
+                        "Pipeline worker processing ai_edit: doc=%d pages=%s",
+                        payload["doc_id"],
+                        payload.get("requested_pages"),
+                    )
+                    from asclepius.pipeline.ai_edit import ai_edit_document
+
+                    await ai_edit_document(
+                        payload["doc_id"],
+                        config,
+                        requested_pages=payload["requested_pages"],
+                        page_count=payload["page_count"],
+                        ocr_provider_id=payload.get("ocr_provider_id"),
+                        llm_provider_id=payload.get("llm_provider_id"),
+                        re_run_ocr=payload.get("re_run_ocr", False),
                     )
                 else:
                     logger.info("Pipeline worker processing: %s", Path(file_path).name)

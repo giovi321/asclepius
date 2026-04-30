@@ -101,17 +101,18 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
         const oor: number[] = Array.isArray(data.out_of_range_pages)
           ? data.out_of_range_pages
           : [];
-        const notCached: number[] = Array.isArray(data.not_in_cache_pages)
-          ? data.not_in_cache_pages
-          : [];
-        let description = `Re-extracted from page${pages.length === 1 ? "" : "s"} ${pages.join(", ")}`;
+        const queued = data.status === "queued";
+        let description = queued
+          ? `Queued page${pages.length === 1 ? "" : "s"} ${pages.join(", ")} — watch the pipeline timeline below for progress.`
+          : `Re-extracted from page${pages.length === 1 ? "" : "s"} ${pages.join(", ")}`;
         if (oor.length) {
           description += ` (skipped out-of-range: ${oor.join(", ")})`;
         }
-        if (notCached.length) {
-          description += ` (skipped not in OCR cache: ${notCached.join(", ")})`;
-        }
-        toast({ title: "Pages reprocessed", description, variant: "success" });
+        toast({
+          title: queued ? "AI edit queued" : "Pages reprocessed",
+          description,
+          variant: "success",
+        });
       }
     } catch (e: any) {
       toast({

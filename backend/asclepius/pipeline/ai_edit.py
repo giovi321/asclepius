@@ -456,15 +456,36 @@ async def ai_edit_document(
                 inserted_counts,
             )
 
-            # Surface partial-OCR result on the document so the user knows
-            # which pages came back blank and might want to re-OCR them.
+            # Note empty OCR pages in the worker log only. We deliberately
+            # don't flip the document to ``needs_review`` here: when the
+            # scoped extraction succeeded (e.g. 42 lab rows landed from
+            # the non-empty pages), the document is in fine shape and a
+            # red-banner status change is misleading. Empty pages are
+            # surfaced via the API result instead so the frontend toast
+            # can hint at them without changing the doc state.
             if empty_pages:
-                note = (
-                    f"AI edit: OCR returned empty text for page(s) "
-                    f"{empty_pages}; extraction used pages {used_pages}."
+                logger.info(
+                    "Doc %d: AI edit completed; OCR returned empty text on "
+                    "page(s) %s, extraction used %s",
+                    doc_id,
+                    empty_pages,
+                    used_pages,
                 )
-                logger.info("Doc %d: %s", doc_id, note)
-                await _persist_doc_warning(db, doc_id, note, status="needs_review")
+
+            # Clear any prior AI-edit / extraction error and mark the
+            # document done — same shape as reprocess_document. Without
+            # this, a successful AI edit run leaves a previous failure's
+            # red banner sitting on the document.
+            await db.execute(
+                """UPDATE documents
+                      SET status = 'done',
+                          error_message = NULL,
+                          updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                      AND status IN ('failed', 'needs_review', 'processing')""",
+                (doc_id,),
+            )
+            await db.commit()
 
             return {
                 "status": "reprocessed",

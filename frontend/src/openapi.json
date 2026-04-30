@@ -1503,6 +1503,45 @@
         }
       }
     },
+    "/api/documents/{doc_id}/mark-reviewed": {
+      "post": {
+        "tags": ["documents"],
+        "summary": "Mark Reviewed",
+        "description": "Confirm that the user has reviewed a flagged document.\n\nFlips ``status`` from ``needs_review`` (or ``failed``) to ``done`` and\nclears ``error_message`` so the red banner disappears. No-op when the\ndocument is already in any other state. Requires write access.",
+        "operationId": "mark_reviewed_api_documents__doc_id__mark_reviewed_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/documents/{doc_id}/cancel": {
       "post": {
         "tags": ["documents"],

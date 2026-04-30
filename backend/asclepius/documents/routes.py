@@ -378,6 +378,41 @@ async def update_doc(
     return await get_document(db, doc_id)
 
 
+@router.post("/{doc_id}/mark-reviewed")
+async def mark_reviewed(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Confirm that the user has reviewed a flagged document.
+
+    Flips ``status`` from ``needs_review`` (or ``failed``) to ``done`` and
+    clears ``error_message`` so the red banner disappears. No-op when the
+    document is already in any other state. Requires write access.
+    """
+    from asclepius.documents.file_routes import _require_write_access
+
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await _require_write_access(db, current_user, doc)
+
+    if doc.get("status") not in ("needs_review", "failed"):
+        return {
+            "status": doc.get("status"),
+            "document_id": doc_id,
+            "changed": False,
+        }
+
+    await db.execute(
+        """UPDATE documents SET status = 'done', error_message = NULL,
+               updated_at = CURRENT_TIMESTAMP WHERE id = ?""",
+        (doc_id,),
+    )
+    await db.commit()
+    return {"status": "done", "document_id": doc_id, "changed": True}
+
+
 @router.post("/{doc_id}/cancel")
 async def cancel_processing(
     doc_id: int,

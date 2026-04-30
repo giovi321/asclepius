@@ -617,6 +617,30 @@ export interface paths {
     patch: operations["update_doc_api_documents__doc_id__patch"];
     trace?: never;
   };
+  "/api/documents/{doc_id}/mark-reviewed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mark Reviewed
+     * @description Confirm that the user has reviewed a flagged document.
+     *
+     *     Flips ``status`` from ``needs_review`` (or ``failed``) to ``done`` and
+     *     clears ``error_message`` so the red banner disappears. No-op when the
+     *     document is already in any other state. Requires write access.
+     */
+    post: operations["mark_reviewed_api_documents__doc_id__mark_reviewed_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/documents/{doc_id}/cancel": {
     parameters: {
       query?: never;
@@ -4050,6 +4074,37 @@ export interface operations {
         "application/json": components["schemas"]["DocumentUpdate"];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  mark_reviewed_api_documents__doc_id__mark_reviewed_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {

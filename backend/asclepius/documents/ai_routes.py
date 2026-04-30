@@ -315,7 +315,6 @@ async def _scoped_page_reprocess(
         get_llm_provider,
     )
     from asclepius.pipeline.stage_events import (
-        STAGE_AI_EDIT,
         STAGE_LLM_EXTRACTION,
         STAGE_OCR,
         begin_job,
@@ -416,10 +415,14 @@ async def _scoped_page_reprocess(
             detail=f"File not found on disk: {rel_path}",
         )
 
-    # Phase B: do the work. Surface it as a tracked job so the dashboard's
-    # pipeline timeline shows "AI Edit → (OCR) → LLM extraction" for this
-    # document in the same shape as a regular upload/reprocess.
-    planned = [STAGE_AI_EDIT]
+    # Phase B: do the work. Surface it as a tracked job (job_kind="ai_edit")
+    # so the dashboard's pipeline timeline labels the whole run "AI edit"
+    # via its kind badge. The stages inside are the real work units (OCR
+    # if re-running, then LLM extraction); we deliberately do NOT emit a
+    # standalone STAGE_AI_EDIT marker stage because it would complete in
+    # 0ms before any real work began and read as "AI edit done, OCR still
+    # going" — the framing belongs at the run level, not as a fake stage.
+    planned: list[str] = []
     if re_run_ocr:
         planned.append(STAGE_OCR)
     planned.append(STAGE_LLM_EXTRACTION)
@@ -445,16 +448,15 @@ async def _scoped_page_reprocess(
         providers={"ocr": ocr_provider_id or None, "llm": llm_cred_id},
     )
     try:
-        async with stage(db, doc_id, STAGE_AI_EDIT, job_kind="ai_edit"):
-            logger.info(
-                "AI-edit scoped reprocess doc=%d pages=%s (of %d) re_run_ocr=%s ocr=%s llm=%s",
-                doc_id,
-                in_range,
-                total_pages,
-                re_run_ocr,
-                ocr_provider_id,
-                llm_provider_id or "default",
-            )
+        logger.info(
+            "AI-edit scoped reprocess doc=%d pages=%s (of %d) re_run_ocr=%s ocr=%s llm=%s",
+            doc_id,
+            in_range,
+            total_pages,
+            re_run_ocr,
+            ocr_provider_id,
+            llm_provider_id or "default",
+        )
 
         # Phase B.1 — re-OCR the chosen pages with the user's selected engine,
         # OR fall through to the existing cache. Re-OCR upserts into

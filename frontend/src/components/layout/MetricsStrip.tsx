@@ -41,7 +41,11 @@ export default function MetricsStrip() {
         ? "Reprocess"
         : kind === "translate"
           ? "Translate"
-          : "Upload";
+          : kind === "translate_region"
+            ? "Region translate"
+            : kind === "ai_edit"
+              ? "AI edit"
+              : "Upload";
     const pageCurrent = job?.page_current ?? status.processing_page_current;
     const pageTotal = job?.page_total ?? status.processing_pages;
     const pageInfo =
@@ -66,9 +70,11 @@ export default function MetricsStrip() {
       colorClass:
         kind === "reprocess"
           ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-          : kind === "translate"
+          : kind === "translate" || kind === "translate_region"
             ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-            : "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+            : kind === "ai_edit"
+              ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+              : "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800",
     });
   }
 

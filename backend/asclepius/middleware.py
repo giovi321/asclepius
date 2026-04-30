@@ -15,6 +15,7 @@ from starlette.types import ASGIApp
 
 from asclepius.auth.session import COOKIE_NAME
 from asclepius.config import AppConfig
+from asclepius.share.dependencies import SHARE_COOKIE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ _CSRF_HEADER_VALUE = "XMLHttpRequest"
 # cookie instead (see ``auth/oidc.py``).
 _CSRF_EXEMPT_PREFIXES = (
     "/api/auth/oidc/",  # OIDC redirect/callback
-    "/api/setup/",      # pre-auth first-run wizard
+    "/api/setup/",  # pre-auth first-run wizard
 )
 
 
@@ -99,7 +100,9 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             # endpoints that bootstrap a session (login, setup) set the
             # cookie on their response and therefore have no cookie on the
             # request.
-            has_session_cookie = COOKIE_NAME in request.cookies
+            has_session_cookie = (
+                COOKIE_NAME in request.cookies or SHARE_COOKIE_NAME in request.cookies
+            )
             exempt = any(path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES) or path in (
                 "/api/auth/login",
             )
@@ -108,7 +111,9 @@ class CsrfMiddleware(BaseHTTPMiddleware):
                 if header_val.lower() != _CSRF_HEADER_VALUE.lower():
                     logger.warning(
                         "CSRF block: %s %s (missing %s header)",
-                        request.method, path, _CSRF_HEADER,
+                        request.method,
+                        path,
+                        _CSRF_HEADER,
                     )
                     return JSONResponse(
                         {"detail": "CSRF protection: missing X-Requested-With header"},

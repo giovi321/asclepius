@@ -5860,6 +5860,539 @@
           }
         }
       }
+    },
+    "/api/shares": {
+      "post": {
+        "tags": ["shares"],
+        "summary": "Create Share",
+        "description": "Create a curated share. Returns the raw share URL \u2014 shown once.",
+        "operationId": "create_share_api_shares_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["shares"],
+        "summary": "List Shares",
+        "operationId": "list_shares_api_shares_get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Patient Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}": {
+      "delete": {
+        "tags": ["shares"],
+        "summary": "Revoke Share",
+        "operationId": "revoke_share_api_shares__share_id__delete",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}/audit": {
+      "get": {
+        "tags": ["shares"],
+        "summary": "Share Audit",
+        "description": "Return the audit trail for a share. When ``include_active_otp`` is\nset, also surface the live OTP code so the admin can convey it to the\ndoctor over a separate channel (phone, in-person).",
+        "operationId": "share_audit_api_shares__share_id__audit_get",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "include_active_otp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Active Otp"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}/documents": {
+      "get": {
+        "tags": ["shares"],
+        "summary": "Share Document List",
+        "description": "Lightweight admin view of the share's document membership.\n\nReturns the same JOIN shape the doctor sees so the admin can preview\nexactly what was shared without opening a doctor session.",
+        "operationId": "share_document_list_api_shares__share_id__documents_get",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{token}/request-otp": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Request Otp",
+        "description": "Generate and store a fresh OTP for this share.\n\nThe doctor sees only ``204 No Content`` \u2014 they receive the actual\ncode from the admin out-of-band. This intentionally does not leak\nwhether the token resolves to a real share: an invalid token returns\nthe same shape, but no audit/OTP rows are created.",
+        "operationId": "request_otp_api_share__token__request_otp_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{token}/verify-otp": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Verify Otp",
+        "description": "Exchange a valid OTP for a session cookie.\n\nOn success a row is written to ``document_share_sessions`` and the\n``asclepius_share`` cookie is set with ``max_age = session TTL``.",
+        "operationId": "verify_otp_api_share__token__verify_otp_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/logout": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Logout",
+        "description": "Revoke the current share session and clear its cookie.\n\nIdempotent: if no cookie is set we still clear and return 200 so the\nUI can call this on hard navigation away.",
+        "operationId": "logout_api_share_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/me": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Me",
+        "description": "Doctor dashboard payload: patient label, share metadata, doc list,\nand current translate-rate-limit headroom.",
+        "operationId": "share_me_api_share_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Document Detail",
+        "description": "Full document view \u2014 labs, encounters, medications, vaccinations,\nsections, region translations, and links scoped to the share's docs.",
+        "operationId": "share_document_detail_api_share_documents__doc_id__get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/file": {
+      "head": {
+        "tags": ["share-doctor"],
+        "summary": "Share Head File",
+        "operationId": "share_head_file_api_share_documents__doc_id__file_head",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Serve File",
+        "description": "Stream a watermarked copy of the document file.\n\nThe original vault bytes are never streamed unmodified \u2014 every\nresponse is a fresh in-memory render with the doctor's identity\nburned onto every page (PDF) or composited onto the image (PNG/JPG).",
+        "operationId": "share_serve_file_api_share_documents__doc_id__file_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/translate": {
+      "post": {
+        "tags": ["share-doctor"],
+        "summary": "Share Translate",
+        "description": "Queue a whole-document translation onto the existing pipeline.\n\nThe doctor uses the same worker as admin users; the only difference\nis that this entry point enforces share-scope, rate limits, and audit\nlogging. Falls through to the same ``translate`` job kind so the\npipeline does not need to know about shares.",
+        "operationId": "share_translate_api_share_documents__doc_id__translate_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareTranslateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/translate-region": {
+      "post": {
+        "tags": ["share-doctor"],
+        "summary": "Share Translate Region",
+        "description": "Region translate \u2014 same behaviour as the admin endpoint, scoped\nto the share and rate-limited like ``share_translate``.",
+        "operationId": "share_translate_region_api_share_documents__doc_id__translate_region_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareTranslateRegionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8709,6 +9242,123 @@
         "required": ["username", "password", "display_name", "patient_name"],
         "title": "SetupRequest"
       },
+      "ShareCreateRequest": {
+        "properties": {
+          "patient_id": {
+            "type": "integer",
+            "title": "Patient Id"
+          },
+          "document_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Document Ids"
+          },
+          "recipient_label": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Recipient Label"
+          },
+          "recipient_contact": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Recipient Contact"
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "required": [
+          "patient_id",
+          "document_ids",
+          "recipient_label",
+          "recipient_contact"
+        ],
+        "title": "ShareCreateRequest"
+      },
+      "ShareCreateResponse": {
+        "properties": {
+          "share_id": {
+            "type": "integer",
+            "title": "Share Id"
+          },
+          "share_url": {
+            "type": "string",
+            "title": "Share Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": ["share_id", "share_url", "expires_at"],
+        "title": "ShareCreateResponse"
+      },
+      "ShareTranslateRegionRequest": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Page"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/RegionBbox"
+          },
+          "ocr_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Provider Id"
+          },
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id"
+          }
+        },
+        "type": "object",
+        "required": ["page", "bbox"],
+        "title": "ShareTranslateRegionRequest"
+      },
+      "ShareTranslateRequest": {
+        "properties": {
+          "llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider Id"
+          }
+        },
+        "type": "object",
+        "title": "ShareTranslateRequest"
+      },
       "TestProviderRequest": {
         "properties": {
           "provider_id": {
@@ -8899,6 +9549,19 @@
         "type": "object",
         "required": ["loc", "msg", "type"],
         "title": "ValidationError"
+      },
+      "VerifyOtpRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": ["code"],
+        "title": "VerifyOtpRequest"
       },
       "ViewPrefsBody": {
         "properties": {

@@ -28,6 +28,7 @@ import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
 import DocumentStageTimeline from "@/components/document-detail/DocumentStageTimeline";
 import RegionTranslationsSection from "@/components/document-detail/RegionTranslationsSection";
+import ShareWithDoctorButton from "@/components/document-detail/ShareWithDoctorButton";
 import type { NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -277,6 +278,12 @@ export default function DocumentDetailPage() {
               />
             </>
           )}
+          <ShareWithDoctorButton
+            patientId={doc.patient_id}
+            documentId={doc.id}
+            patientName={doc.patient_name}
+            documentLabel={doc.original_filename || doc.doc_type}
+          />
           <button
             onClick={handleDelete}
             className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"

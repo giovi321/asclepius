@@ -2236,6 +2236,273 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/shares": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Shares */
+    get: operations["list_shares_api_shares_get"];
+    put?: never;
+    /**
+     * Create Share
+     * @description Create a curated share. Returns the raw share URL — shown once.
+     */
+    post: operations["create_share_api_shares_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Share */
+    delete: operations["revoke_share_api_shares__share_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}/audit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Audit
+     * @description Return the audit trail for a share. When ``include_active_otp`` is
+     *     set, also surface the live OTP code so the admin can convey it to the
+     *     doctor over a separate channel (phone, in-person).
+     */
+    get: operations["share_audit_api_shares__share_id__audit_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Document List
+     * @description Lightweight admin view of the share's document membership.
+     *
+     *     Returns the same JOIN shape the doctor sees so the admin can preview
+     *     exactly what was shared without opening a doctor session.
+     */
+    get: operations["share_document_list_api_shares__share_id__documents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/{token}/request-otp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Request Otp
+     * @description Generate and store a fresh OTP for this share.
+     *
+     *     The doctor sees only ``204 No Content`` — they receive the actual
+     *     code from the admin out-of-band. This intentionally does not leak
+     *     whether the token resolves to a real share: an invalid token returns
+     *     the same shape, but no audit/OTP rows are created.
+     */
+    post: operations["request_otp_api_share__token__request_otp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/{token}/verify-otp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify Otp
+     * @description Exchange a valid OTP for a session cookie.
+     *
+     *     On success a row is written to ``document_share_sessions`` and the
+     *     ``asclepius_share`` cookie is set with ``max_age = session TTL``.
+     */
+    post: operations["verify_otp_api_share__token__verify_otp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout
+     * @description Revoke the current share session and clear its cookie.
+     *
+     *     Idempotent: if no cookie is set we still clear and return 200 so the
+     *     UI can call this on hard navigation away.
+     */
+    post: operations["logout_api_share_logout_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Me
+     * @description Doctor dashboard payload: patient label, share metadata, doc list,
+     *     and current translate-rate-limit headroom.
+     */
+    get: operations["share_me_api_share_me_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Document Detail
+     * @description Full document view — labs, encounters, medications, vaccinations,
+     *     sections, region translations, and links scoped to the share's docs.
+     */
+    get: operations["share_document_detail_api_share_documents__doc_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Serve File
+     * @description Stream a watermarked copy of the document file.
+     *
+     *     The original vault bytes are never streamed unmodified — every
+     *     response is a fresh in-memory render with the doctor's identity
+     *     burned onto every page (PDF) or composited onto the image (PNG/JPG).
+     */
+    get: operations["share_serve_file_api_share_documents__doc_id__file_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    /** Share Head File */
+    head: operations["share_head_file_api_share_documents__doc_id__file_head"];
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/translate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Share Translate
+     * @description Queue a whole-document translation onto the existing pipeline.
+     *
+     *     The doctor uses the same worker as admin users; the only difference
+     *     is that this entry point enforces share-scope, rate limits, and audit
+     *     logging. Falls through to the same ``translate`` job kind so the
+     *     pipeline does not need to know about shares.
+     */
+    post: operations["share_translate_api_share_documents__doc_id__translate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/translate-region": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Share Translate Region
+     * @description Region translate — same behaviour as the admin endpoint, scoped
+     *     to the share and rate-limited like ``share_translate``.
+     */
+    post: operations["share_translate_region_api_share_documents__doc_id__translate_region_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2982,6 +3249,46 @@ export interface components {
       /** Patient Sex */
       patient_sex?: string | null;
     };
+    /** ShareCreateRequest */
+    ShareCreateRequest: {
+      /** Patient Id */
+      patient_id: number;
+      /** Document Ids */
+      document_ids: number[];
+      /** Recipient Label */
+      recipient_label: string;
+      /** Recipient Contact */
+      recipient_contact: string;
+      /**
+       * Expires In Days
+       * @default 7
+       */
+      expires_in_days: number;
+    };
+    /** ShareCreateResponse */
+    ShareCreateResponse: {
+      /** Share Id */
+      share_id: number;
+      /** Share Url */
+      share_url: string;
+      /** Expires At */
+      expires_at: string;
+    };
+    /** ShareTranslateRegionRequest */
+    ShareTranslateRegionRequest: {
+      /** Page */
+      page: number;
+      bbox: components["schemas"]["RegionBbox"];
+      /** Ocr Provider Id */
+      ocr_provider_id?: string | null;
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+    };
+    /** ShareTranslateRequest */
+    ShareTranslateRequest: {
+      /** Llm Provider Id */
+      llm_provider_id?: string | null;
+    };
     /**
      * TestProviderRequest
      * @description Test-connection request.
@@ -3052,6 +3359,11 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /** VerifyOtpRequest */
+    VerifyOtpRequest: {
+      /** Code */
+      code: string;
     };
     /** ViewPrefsBody */
     ViewPrefsBody: {
@@ -7151,6 +7463,432 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["SetupRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_shares_api_shares_get: {
+    parameters: {
+      query: {
+        patient_id: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_share_api_shares_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShareCreateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ShareCreateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_share_api_shares__share_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_audit_api_shares__share_id__audit_get: {
+    parameters: {
+      query?: {
+        include_active_otp?: boolean;
+      };
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_document_list_api_shares__share_id__documents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  request_otp_api_share__token__request_otp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  verify_otp_api_share__token__verify_otp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VerifyOtpRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  logout_api_share_logout_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  share_me_api_share_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  share_document_detail_api_share_documents__doc_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_serve_file_api_share_documents__doc_id__file_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_head_file_api_share_documents__doc_id__file_head: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_translate_api_share_documents__doc_id__translate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShareTranslateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_translate_region_api_share_documents__doc_id__translate_region_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShareTranslateRegionRequest"];
       };
     };
     responses: {

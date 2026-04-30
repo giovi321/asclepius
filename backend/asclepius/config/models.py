@@ -115,6 +115,7 @@ class CredentialEntry(BaseModel):
     physical resource actually behaves (one Ollama server has a fixed
     parallelism limit regardless of which model is loaded).
     """
+
     id: str = ""
     name: str = ""
     # ollama | vllm | claude | openai | google_vision | tesseract_remote
@@ -132,6 +133,7 @@ class CredentialEntry(BaseModel):
 
 class OcrProviderEntry(BaseModel):
     """A single OCR provider configuration."""
+
     id: str = ""
     type: str = "tesseract"  # tesseract, tesseract_remote, llm_vision, google_vision
     name: str = ""
@@ -159,6 +161,7 @@ class OcrProviderEntry(BaseModel):
 
 class LlmProviderEntry(BaseModel):
     """A single LLM provider configuration."""
+
     id: str = ""
     type: str = "ollama"  # ollama, vllm, claude, openai
     name: str = ""
@@ -180,6 +183,7 @@ class VisionLlmProviderEntry(BaseModel):
     OCR'd text AND the structured classification/extraction in a single call,
     as an alternative to the OCR + text-LLM pipeline.
     """
+
     id: str = ""
     type: str = "claude"  # claude, openai, ollama
     name: str = ""
@@ -199,6 +203,7 @@ class GeneralLlmConfig(BaseModel):
     and document-edit AI. When ``credential_id`` is empty, those endpoints
     return 503. The concurrency cap comes from the credential.
     """
+
     credential_id: str = ""
     type: str = "ollama"  # same vocabulary as LlmProviderEntry.type
     model: str = ""
@@ -261,6 +266,7 @@ class LlmConfig(BaseModel):
 
 class VisionConfig(BaseModel):
     """Vision-LLM flow configuration — alternative to OCR + text-LLM."""
+
     extraction_timeout: int = 600
     max_concurrent_requests: int = 2
     max_retries: int = 3
@@ -280,6 +286,30 @@ class PipelineConfig(BaseModel):
     default_flow: str = "ocr_llm"
 
 
+class ShareConfig(BaseModel):
+    """Settings for the doctor-share access flow.
+
+    Shares grant a curated, read-only window onto selected documents to an
+    outside doctor without giving them a real account. Sessions are absolute
+    (no sliding refresh) so a stolen cookie cannot stay alive indefinitely.
+    """
+
+    # How long a verified doctor session lives before re-OTP is required.
+    # Absolute, not sliding; activity does not extend it.
+    session_ttl_minutes: int = 120
+    # OTP code lifetime from the moment the doctor calls request-otp.
+    otp_ttl_minutes: int = 10
+    # Max OTP verify attempts per code before it locks (single-use anyway).
+    otp_max_attempts: int = 5
+    # Default share expiry when admin doesn't pass one explicitly.
+    default_share_days: int = 7
+    # Translate-endpoint rate limits (per-doctor-session).
+    translate_per_session_seconds: int = 30  # debounce: 1 request per N seconds
+    translate_per_share_per_hour: int = 20  # cost cap: max requests / share / rolling hour
+    # Watermark intensity (0.0–1.0) for the diagonal stamp burned into PDFs.
+    watermark_opacity: float = 0.20
+
+
 class BackupConfig(BaseModel):
     """One scheduled backup job.
 
@@ -287,12 +317,13 @@ class BackupConfig(BaseModel):
     boolean flags. Retention is a single policy: keep the last N files OR
     everything newer than N days, not both.
     """
+
     directory: str = "/vault/backups"
     enabled: bool = False
     include_database: bool = True
     include_vault: bool = False
-    schedule: str = "daily"           # "hourly" | "daily" | "weekly"
-    retention_mode: str = "count"     # "count" | "days"
+    schedule: str = "daily"  # "hourly" | "daily" | "weekly"
+    retention_mode: str = "count"  # "count" | "days"
     retention_value: int = 7
 
 
@@ -307,5 +338,6 @@ class AppConfig(BaseModel):
     vision: VisionConfig = VisionConfig()
     pipeline: PipelineConfig = PipelineConfig()
     backup: BackupConfig = BackupConfig()
+    share: ShareConfig = ShareConfig()
     # Shared credentials referenced by LLM / Vision / OCR provider entries.
     credentials: list[CredentialEntry] = []

@@ -18,6 +18,11 @@ import PatientsPage from "@/pages/PatientsPage";
 import TimelinePage from "@/pages/TimelinePage";
 import EventsPage from "@/pages/EventsPage";
 import FileBrowserPage from "@/pages/FileBrowserPage";
+import ShareLandingPage from "@/pages/share/ShareLandingPage";
+import ShareVerifyPage from "@/pages/share/ShareVerifyPage";
+import ShareDashboardPage from "@/pages/share/ShareDashboardPage";
+import ShareDocumentPage from "@/pages/share/ShareDocumentPage";
+import { ShareSessionProvider } from "@/contexts/ShareSessionContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, needsSetup } = useAuth();
@@ -43,6 +48,29 @@ export default function App() {
     <Routes>
       <Route path="/setup" element={<SetupWizardPage />} />
       <Route path="/login" element={<LoginPage />} />
+      {/* Doctor share surface — lives outside ProtectedRoute and outside
+          the regular AuthContext-bound AppLayout so account auth and
+          share auth are entirely isolated. */}
+      <Route
+        path="/share/*"
+        element={
+          <ShareSessionProvider>
+            <Routes>
+              <Route index element={<ShareLandingPage />} />
+              <Route
+                path="dashboard"
+                element={page("Share dashboard", <ShareDashboardPage />)}
+              />
+              <Route
+                path="documents/:id"
+                element={page("Share document", <ShareDocumentPage />)}
+              />
+              <Route path=":token/verify" element={<ShareVerifyPage />} />
+              <Route path=":token" element={<ShareLandingPage />} />
+            </Routes>
+          </ShareSessionProvider>
+        }
+      />
       <Route
         path="/"
         element={
@@ -53,14 +81,29 @@ export default function App() {
       >
         <Route index element={page("Dashboard", <DashboardPage />)} />
         <Route path="patients" element={page("Patients", <PatientsPage />)} />
-        <Route path="documents" element={page("Documents", <DocumentsPage />)} />
+        <Route
+          path="documents"
+          element={page("Documents", <DocumentsPage />)}
+        />
         <Route path="timeline" element={page("Timeline", <TimelinePage />)} />
         <Route path="events" element={page("Events", <EventsPage />)} />
-        <Route path="documents/:id" element={page("Document Detail", <DocumentDetailPage />)} />
-        <Route path="unclassified" element={page("Unclassified", <UnclassifiedPage />)} />
-        <Route path="lab-results" element={page("Lab Results", <LabResultsPage />)} />
+        <Route
+          path="documents/:id"
+          element={page("Document Detail", <DocumentDetailPage />)}
+        />
+        <Route
+          path="unclassified"
+          element={page("Unclassified", <UnclassifiedPage />)}
+        />
+        <Route
+          path="lab-results"
+          element={page("Lab Results", <LabResultsPage />)}
+        />
         <Route path="imaging" element={page("Imaging", <ImagingPage />)} />
-        <Route path="imaging/:studyId" element={page("Imaging Detail", <ImagingDetailPage />)} />
+        <Route
+          path="imaging/:studyId"
+          element={page("Imaging Detail", <ImagingDetailPage />)}
+        />
         <Route path="chat" element={page("Chat", <ChatPage />)} />
         <Route path="search" element={page("Search", <SearchPage />)} />
         <Route path="settings/*" element={page("Settings", <SettingsPage />)} />

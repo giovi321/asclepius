@@ -424,29 +424,43 @@ async def list_audit(db: aiosqlite.Connection, share_id: int, limit: int = 200) 
 
 # ── Admin listing ────────────────────────────────────────────────
 
-
+# Listing columns + JOINs kept in one place because the patient-scoped and
+# user-scoped variants share the same shape. We aggregate audit access
+# counts via a LEFT JOIN against a pre-grouped subquery rather than three
+# correlated SELECTs per row: the subquery touches the audit table once
+# and the JOIN is keyed on the same indexed share_id, so cost is O(N)
+# rather than O(N * audit_rows_per_share). On a busy install this is the
+# difference between a snappy dashboard and a multi-second wait.
 _SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.recipient_label, sh.recipient_contact,
                           sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
                           u.username AS created_by_username,
                           p.display_name AS patient_name,
-                          (SELECT COUNT(*) FROM document_share_documents dsd
-                            WHERE dsd.share_id = sh.id) AS document_count,
-                          (SELECT COUNT(*) FROM document_share_audit a
-                            WHERE a.share_id = sh.id
-                              AND a.action IN ('view_doc', 'view_file', 'translate'))
-                              AS access_count,
-                          (SELECT MAX(a.created_at) FROM document_share_audit a
-                            WHERE a.share_id = sh.id
-                              AND a.action IN ('view_doc', 'view_file', 'translate'))
-                              AS last_accessed_at"""
+                          COALESCE(dc.cnt, 0) AS document_count,
+                          COALESCE(ac.cnt, 0) AS access_count,
+                          ac.last_at AS last_accessed_at"""
+
+_SHARE_LIST_JOINS = """JOIN users u ON u.id = sh.created_by_user_id
+                        JOIN patients p ON p.id = sh.patient_id
+                        LEFT JOIN (
+                          SELECT share_id, COUNT(*) AS cnt
+                          FROM document_share_documents
+                          GROUP BY share_id
+                        ) dc ON dc.share_id = sh.id
+                        LEFT JOIN (
+                          SELECT share_id,
+                                 COUNT(*) AS cnt,
+                                 MAX(created_at) AS last_at
+                          FROM document_share_audit
+                          WHERE action IN ('view_doc', 'view_file', 'translate')
+                          GROUP BY share_id
+                        ) ac ON ac.share_id = sh.id"""
 
 
 async def list_shares_for_patient(db: aiosqlite.Connection, patient_id: int) -> list[dict]:
     cursor = await db.execute(
         f"""SELECT {_SHARE_LIST_COLUMNS}
              FROM document_shares sh
-             JOIN users u ON u.id = sh.created_by_user_id
-             JOIN patients p ON p.id = sh.patient_id
+             {_SHARE_LIST_JOINS}
             WHERE sh.patient_id = ?
             ORDER BY sh.id DESC""",
         (patient_id,),
@@ -465,16 +479,14 @@ async def list_shares_for_user(db: aiosqlite.Connection, current_user: dict) -> 
         cursor = await db.execute(
             f"""SELECT {_SHARE_LIST_COLUMNS}
                  FROM document_shares sh
-                 JOIN users u ON u.id = sh.created_by_user_id
-                 JOIN patients p ON p.id = sh.patient_id
+                 {_SHARE_LIST_JOINS}
                 ORDER BY sh.id DESC"""
         )
     else:
         cursor = await db.execute(
             f"""SELECT {_SHARE_LIST_COLUMNS}
                  FROM document_shares sh
-                 JOIN users u ON u.id = sh.created_by_user_id
-                 JOIN patients p ON p.id = sh.patient_id
+                 {_SHARE_LIST_JOINS}
                  JOIN user_patient_access upa
                    ON upa.patient_id = sh.patient_id
                   AND upa.user_id = ?

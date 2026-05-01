@@ -146,9 +146,8 @@ export default function ShareDialog({
     setLoadingOtp((s) => ({ ...s, [shareId]: true }));
     setRevealOtp((s) => ({ ...s, [shareId]: true }));
     try {
-      const res = await api.get(`/shares/${shareId}/audit`, {
-        params: { include_active_otp: true },
-      });
+      // Lightweight endpoint — see SharesPage.onShowOtp comment.
+      const res = await api.get(`/shares/${shareId}/active-otp`);
       setActiveOtps((s) => ({ ...s, [shareId]: res.data?.active_otp || null }));
     } catch (err: any) {
       toast({

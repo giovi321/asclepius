@@ -6032,6 +6032,45 @@
         }
       }
     },
+    "/api/shares/{share_id}/active-otp": {
+      "get": {
+        "tags": ["shares"],
+        "summary": "Share Active Otp",
+        "description": "Return only the live OTP code for a share, if any.\n\nFaster than ``/{id}/audit?include_active_otp=true`` because it\nskips the audit-event listing \u2014 the dashboard hits this every time\nthe admin clicks \"Show active code\", so it must be cheap.\n\nResponse shape: ``{\"active_otp\": null}`` when no code is live, or\n``{\"active_otp\": {\"code\": ..., \"expires_at\": ..., \"attempts\": ...}}``.",
+        "operationId": "share_active_otp_api_shares__share_id__active_otp_get",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{share_id}/documents": {
       "get": {
         "tags": ["shares"],

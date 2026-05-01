@@ -2305,6 +2305,33 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/shares/{share_id}/active-otp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Active Otp
+     * @description Return only the live OTP code for a share, if any.
+     *
+     *     Faster than ``/{id}/audit?include_active_otp=true`` because it
+     *     skips the audit-event listing — the dashboard hits this every time
+     *     the admin clicks "Show active code", so it must be cheap.
+     *
+     *     Response shape: ``{"active_otp": null}`` when no code is live, or
+     *     ``{"active_otp": {"code": ..., "expires_at": ..., "attempts": ...}}``.
+     */
+    get: operations["share_active_otp_api_shares__share_id__active_otp_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/shares/{share_id}/documents": {
     parameters: {
       query?: never;
@@ -7595,6 +7622,37 @@ export interface operations {
       query?: {
         include_active_otp?: boolean;
       };
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_active_otp_api_shares__share_id__active_otp_get: {
+    parameters: {
+      query?: never;
       header?: never;
       path: {
         share_id: number;

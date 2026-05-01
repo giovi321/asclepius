@@ -228,6 +228,28 @@ async def share_audit(
     return payload
 
 
+@router.get("/{share_id}/active-otp")
+async def share_active_otp(
+    share_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Return only the live OTP code for a share, if any.
+
+    Faster than ``/{id}/audit?include_active_otp=true`` because it
+    skips the audit-event listing — the dashboard hits this every time
+    the admin clicks "Show active code", so it must be cheap.
+
+    Response shape: ``{"active_otp": null}`` when no code is live, or
+    ``{"active_otp": {"code": ..., "expires_at": ..., "attempts": ...}}``.
+    """
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+    return {"active_otp": await share_service.get_active_otp_clear(db, share_id)}
+
+
 @router.get("/{share_id}/documents")
 async def share_document_list(
     share_id: int,

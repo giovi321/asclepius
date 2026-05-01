@@ -140,9 +140,11 @@ export default function SharesPage() {
     setOtpVisible((s) => ({ ...s, [id]: true }));
     setOtpLoading((s) => ({ ...s, [id]: true }));
     try {
-      const res = await api.get(`/shares/${id}/audit`, {
-        params: { include_active_otp: true },
-      });
+      // Lightweight endpoint that skips the audit-event listing — the
+      // /audit response can be 200 rows of user-agent strings, which
+      // made every "Show active code" click feel sluggish on a busy
+      // install.
+      const res = await api.get(`/shares/${id}/active-otp`);
       setActiveOtp((s) => ({ ...s, [id]: res.data?.active_otp || null }));
     } catch (err: any) {
       toast({
@@ -331,8 +333,8 @@ export default function SharesPage() {
                             onRefresh={() => onShowOtp(s.id)}
                           />
                         ) : (
-                          <span className="text-xs text-muted-foreground">
-                            —
+                          <span className="text-xs text-muted-foreground italic">
+                            n/a
                           </span>
                         )}
                       </td>
@@ -421,9 +423,18 @@ function OtpCell({
   }
   return (
     <div className="flex items-center gap-1">
-      <span className="font-mono text-base tracking-widest text-primary">
-        {otp?.code || "—"}
-      </span>
+      {otp?.code ? (
+        <span className="font-mono text-base tracking-widest text-primary">
+          {otp.code}
+        </span>
+      ) : (
+        <span
+          className="text-xs italic text-muted-foreground max-w-[200px]"
+          title="A code is created when the doctor opens the share link and clicks 'Request access code'. Hit refresh after they do."
+        >
+          No code yet. Doctor needs to click "Request access code" first.
+        </span>
+      )}
       <button
         onClick={onRefresh}
         className="rounded p-0.5 hover:bg-accent"

@@ -43,6 +43,12 @@ def share_app(tmp_path, monkeypatch):
     # Force the resolver to ignore any settings.yaml file on disk.
     monkeypatch.setenv("ASCLEPIUS_CONFIG_PATH", str(tmp_path / "no_such_config.yaml"))
 
+    # ``get_config`` is ``@lru_cache``-d, so a prior test's cached config
+    # would otherwise win and the lifespan would init a stale db_path.
+    from asclepius.config import get_config
+
+    get_config.cache_clear()
+
     from asclepius.db.connection import set_db_path
 
     set_db_path(str(db_path))

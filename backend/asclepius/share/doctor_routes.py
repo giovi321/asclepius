@@ -325,8 +325,8 @@ async def share_serve_file(
 @router.post("/documents/{doc_id}/translate")
 async def share_translate(
     doc_id: int,
-    body: ShareTranslateRequest,
     request: Request,
+    body: ShareTranslateRequest = ShareTranslateRequest(),
     session: dict = Depends(get_share_session),
     db: aiosqlite.Connection = Depends(get_db),
 ):

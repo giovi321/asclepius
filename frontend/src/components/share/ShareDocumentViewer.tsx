@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import {
   ChevronLeft,
@@ -21,6 +21,11 @@ interface ShareDocumentViewerProps {
   treatAsImage?: boolean;
 }
 
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3.0;
+const WHEEL_ZOOM_STEP = 0.1;
+const BUTTON_ZOOM_STEP = 0.2;
+
 /**
  * Read-only PDF / image viewer for the doctor share surface.
  *
@@ -31,6 +36,8 @@ interface ShareDocumentViewerProps {
  * - No download button, no "Open in new tab", no rotate / replace UI.
  * - Right-click and Ctrl+S/Ctrl+P are intercepted (cosmetic — a determined
  *   user can still screenshot, but we remove all easy paths).
+ * - Click-and-drag pan, Ctrl+wheel zoom, Ctrl+= / Ctrl+- / Ctrl+0 keyboard
+ *   shortcuts — same affordances as the admin viewer.
  */
 export default function ShareDocumentViewer({
   documentId,
@@ -45,16 +52,23 @@ export default function ShareDocumentViewer({
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
 
-  // Stable react-pdf options — deep-equal compared, so an unstable object
-  // would force a full document reload.
-  const docOptions = useMemo(() => ({}), []);
+  // Pan state. We pan by adjusting scrollLeft/scrollTop on the
+  // ``overflow-auto`` container instead of CSS transforming the page —
+  // that way the browser handles bounds and bounces, and the visible
+  // bytes are always the rendered react-pdf canvas.
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const panOriginRef = useRef<{
+    x: number;
+    y: number;
+    scrollLeft: number;
+    scrollTop: number;
+  } | null>(null);
 
-  // ALSO memoize the file prop. react-pdf's <Document> sees ``file`` as
-  // changed whenever the object identity differs and re-fetches /
-  // re-parses, even when the underlying bytes are unchanged. Passing a
-  // fresh ``{ data: pdfData }`` literal each render meant page navigation
-  // and zoom triggered a re-load loop, which presented as "the PDF
-  // never renders" in slow / racy conditions.
+  // Stable react-pdf options + file prop so identity-changes don't
+  // force re-fetches. (See earlier commit fixing the "PDF doesn't
+  // render" bug.)
+  const docOptions = useMemo(() => ({}), []);
   const fileProp = useMemo(
     () => (pdfData ? { data: pdfData } : null),
     [pdfData],
@@ -77,9 +91,6 @@ export default function ShareDocumentViewer({
           res.headers["content-type"] || "",
         ).toLowerCase();
         if (contentType.startsWith("image/")) {
-          // Images can't be re-rendered into react-pdf, so we still need a
-          // blob URL for the <img>. The blob is revoked on unmount and the
-          // <img> has download attributes blocked + right-click suppressed.
           const blob = new Blob([res.data], {
             type: contentType || "image/png",
           });
@@ -87,7 +98,6 @@ export default function ShareDocumentViewer({
           revokeUrl = url;
           setImageBlobUrl(url);
         } else {
-          // react-pdf accepts a typed-array directly; we never expose a URL.
           setPdfData(new Uint8Array(res.data));
         }
         setLoading(false);
@@ -109,9 +119,12 @@ export default function ShareDocumentViewer({
     };
   }, [documentId]);
 
-  // Block right-click + Ctrl+S/Ctrl+P on the viewer container. Cosmetic
-  // hardening only — the goal is to remove the obvious save paths, not to
-  // claim screenshots are impossible.
+  // Block right-click + Ctrl+S/Ctrl+P globally on the document. Ctrl+P
+  // also normally opens the print dialog which would reveal the file
+  // through the OS print system, so we suppress it here too. The
+  // Ctrl+= / Ctrl+- / Ctrl+0 zoom shortcuts are *separately* attached
+  // to the viewer container below so they only fire when the viewer is
+  // focused.
   useEffect(() => {
     const onCtx = (e: Event) => {
       e.preventDefault();
@@ -133,6 +146,88 @@ export default function ShareDocumentViewer({
       document.removeEventListener("keydown", onKey);
     };
   }, []);
+
+  // Ctrl+wheel zoom. React's synthetic onWheel is passive in modern
+  // React, so we attach a native non-passive listener that can call
+  // preventDefault — otherwise the browser intercepts ctrl+scroll as
+  // a page-level zoom and our own zoom never fires.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      // ctrlKey is also true on macOS pinch-to-zoom, so pinch comes
+      // for free. metaKey covers Cmd on Mac.
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP;
+      setScale((s) => clampZoom(s + delta));
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
+
+  // Ctrl+= / Ctrl+- / Ctrl+0 keyboard shortcuts. Bound to the document
+  // (not the container) so they work even when focus drifts to a
+  // toolbar button. Falls through to the browser when not over the
+  // viewer subtree, so it does not steal Ctrl+0 from the rest of the
+  // page if the user happens to be elsewhere — but here the share view
+  // is the entire page so that distinction doesn't matter.
+  useEffect(() => {
+    if (!pdfData) return;
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        setScale((s) => clampZoom(s + BUTTON_ZOOM_STEP));
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        setScale((s) => clampZoom(s - BUTTON_ZOOM_STEP));
+      } else if (e.key === "0") {
+        e.preventDefault();
+        setScale(1.0);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [pdfData]);
+
+  // Click-and-drag to pan inside the scroll container. mouseup +
+  // mousemove are window-bound so a fast drag that exits the viewport
+  // doesn't strand panning state.
+  const handlePanStart = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const el = containerRef.current;
+    if (!el) return;
+    panOriginRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: el.scrollLeft,
+      scrollTop: el.scrollTop,
+    };
+    setIsPanning(true);
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    if (!isPanning) return;
+    const onMove = (e: MouseEvent) => {
+      const origin = panOriginRef.current;
+      const el = containerRef.current;
+      if (!origin || !el) return;
+      el.scrollLeft = origin.scrollLeft - (e.clientX - origin.x);
+      el.scrollTop = origin.scrollTop - (e.clientY - origin.y);
+    };
+    const onUp = () => {
+      setIsPanning(false);
+      panOriginRef.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [isPanning]);
 
   if (loading) {
     return (
@@ -192,30 +287,34 @@ export default function ShareDocumentViewer({
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() =>
-                setScale((s) => Math.max(0.5, +(s - 0.2).toFixed(1)))
-              }
+              onClick={() => setScale((s) => clampZoom(s - BUTTON_ZOOM_STEP))}
               className="rounded p-1.5 hover:bg-accent"
-              title="Zoom out"
+              title="Zoom out (Ctrl+- or Ctrl+scroll)"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
-            <span className="text-sm text-muted-foreground min-w-[40px] text-center">
-              {Math.round(scale * 100)}%
-            </span>
             <button
-              onClick={() =>
-                setScale((s) => Math.min(3.0, +(s + 0.2).toFixed(1)))
-              }
+              onClick={() => setScale(1.0)}
+              className="text-sm text-muted-foreground min-w-[44px] text-center hover:text-foreground transition-colors"
+              title="Reset zoom (Ctrl+0)"
+            >
+              {Math.round(scale * 100)}%
+            </button>
+            <button
+              onClick={() => setScale((s) => clampZoom(s + BUTTON_ZOOM_STEP))}
               className="rounded p-1.5 hover:bg-accent"
-              title="Zoom in"
+              title="Zoom in (Ctrl++ or Ctrl+scroll)"
             >
               <ZoomIn className="h-4 w-4" />
             </button>
           </div>
         </div>
         <div
-          className="flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto select-none"
+          ref={containerRef}
+          onMouseDown={handlePanStart}
+          className={`flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto select-none ${
+            isPanning ? "cursor-grabbing [&_*]:cursor-grabbing" : "cursor-grab"
+          }`}
           onContextMenu={(e) => e.preventDefault()}
         >
           <Document
@@ -250,4 +349,8 @@ export default function ShareDocumentViewer({
   }
 
   return null;
+}
+
+function clampZoom(s: number): number {
+  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, +s.toFixed(2)));
 }

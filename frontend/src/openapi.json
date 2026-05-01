@@ -6361,11 +6361,11 @@
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ShareTranslateRequest"
+                "$ref": "#/components/schemas/ShareTranslateRequest",
+                "default": {}
               }
             }
           }

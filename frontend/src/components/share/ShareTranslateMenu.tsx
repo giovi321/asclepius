@@ -32,7 +32,12 @@ export default function ShareTranslateMenu({
     setError(null);
     setMessage(null);
     try {
-      await shareApi.post(`/documents/${documentId}/translate`);
+      // Send an empty JSON object so FastAPI's body-validation step sees
+      // a present-but-empty body. Without this, axios sends no body at
+      // all and the (defaulted-but-still-required) Pydantic model fails
+      // validation with "Field required" — which used to surface as a
+      // confusing JSON blob in the UI.
+      await shareApi.post(`/documents/${documentId}/translate`, {});
       setMessage("Translation queued. Refresh in a moment to see the result.");
       onQueued?.();
     } catch (err: any) {

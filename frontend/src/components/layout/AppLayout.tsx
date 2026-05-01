@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   FolderTree,
+  Share2,
 } from "lucide-react";
 
 const navItems = [
@@ -35,6 +36,7 @@ const navItems = [
   { path: "/imaging", label: "Imaging", icon: Image },
   { path: "/chat", label: "Chat", icon: MessageCircle },
   { path: "/search", label: "Search", icon: Search },
+  { path: "/shares", label: "Doctor Shares", icon: Share2 },
 ];
 
 // Titles for every top-level route, including the ones that were moved
@@ -50,6 +52,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/imaging": "Imaging",
   "/chat": "Chat",
   "/search": "Search",
+  "/shares": "Doctor Shares",
   "/settings": "Settings",
   "/files": "Files",
 };
@@ -61,7 +64,9 @@ function pageTitleFor(pathname: string): string {
   const sorted = Object.keys(PAGE_TITLES)
     .filter((p) => p !== "/")
     .sort((a, b) => b.length - a.length);
-  const match = sorted.find((p) => pathname === p || pathname.startsWith(p + "/"));
+  const match = sorted.find(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
   return match ? PAGE_TITLES[match] : "";
 }
 
@@ -86,7 +91,11 @@ export default function AppLayout() {
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-3">
-          <img src="/logo.svg" alt="Asclepius" className="h-14 w-14 rounded-lg flex-shrink-0" />
+          <img
+            src="/logo.svg"
+            alt="Asclepius"
+            className="h-14 w-14 rounded-lg flex-shrink-0"
+          />
           {sidebarOpen && (
             <span className="text-lg font-semibold">Asclepius</span>
           )}
@@ -123,7 +132,9 @@ export default function AppLayout() {
 
           {/* Icon row + version link pair — tight vertical gap. */}
           <div>
-            <div className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "flex-col"}`}>
+            <div
+              className={`flex items-center gap-1 ${sidebarOpen ? "justify-between" : "flex-col"}`}
+            >
               <Link
                 to="/settings"
                 title="Settings"
@@ -150,11 +161,19 @@ export default function AppLayout() {
               </Link>
               <button
                 onClick={toggleTheme}
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                title={
+                  theme === "dark"
+                    ? "Switch to light mode"
+                    : "Switch to dark mode"
+                }
                 aria-label="Toggle theme"
                 className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
-                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
               </button>
               <button
                 onClick={logout}

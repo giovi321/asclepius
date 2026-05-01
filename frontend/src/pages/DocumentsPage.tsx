@@ -7,15 +7,19 @@ import type { PipelineStatus } from "@/types";
 import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
 import {
-  COLUMNS, DOCUMENTS_DEFAULTS,
+  COLUMNS,
+  DOCUMENTS_DEFAULTS,
   type ColumnKey,
 } from "@/components/documents/columns";
 import { useColumnPrefs } from "@/lib/columnPrefs";
 import DocumentFilters from "@/components/documents/DocumentFilters";
-import BulkActionsBar, { type ReprocessMode } from "@/components/documents/BulkActionsBar";
+import BulkActionsBar, {
+  type ReprocessMode,
+} from "@/components/documents/BulkActionsBar";
 import DocumentTable from "@/components/documents/DocumentTable";
 import { useDocumentList } from "@/hooks/data/useDocumentList";
 import { useLlmProviders, useOcrProviders } from "@/hooks/data";
+import ShareDialog from "@/components/share/ShareDialog";
 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
@@ -24,10 +28,16 @@ export default function DocumentsPage() {
   const limit = 20;
 
   const {
-    items: documents, total, loading,
-    filters, setFilters, clearFilters,
-    sort, toggleSort,
-    page, setPage,
+    items: documents,
+    total,
+    loading,
+    filters,
+    setFilters,
+    clearFilters,
+    sort,
+    toggleSort,
+    page,
+    setPage,
     reload: reloadDocuments,
     setItems: setDocuments,
   } = useDocumentList({ patientId: selectedPatient?.id, limit });
@@ -39,12 +49,45 @@ export default function DocumentsPage() {
   // follows them across devices. The hook migrates the legacy localStorage
   // entry (asclepius_documents_columns) up to the server on first run.
   const colPrefs = useColumnPrefs("documents", DOCUMENTS_DEFAULTS);
-  const visibleCols = useMemo(() => new Set(colPrefs.visible as ColumnKey[]), [colPrefs.visible]);
-  const setVisibleCols = (next: Set<ColumnKey>) => colPrefs.setVisible(Array.from(next));
+  const visibleCols = useMemo(
+    () => new Set(colPrefs.visible as ColumnKey[]),
+    [colPrefs.visible],
+  );
+  const setVisibleCols = (next: Set<ColumnKey>) =>
+    colPrefs.setVisible(Array.from(next));
 
   // Selection + bulk state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [bulkShareOpen, setBulkShareOpen] = useState(false);
+
+  // A share covers exactly one patient, so the bulk-share button is only
+  // valid when the entire selection sits inside the same patient_id. We
+  // also derive the patient name for the dialog header so the user can
+  // sanity-check before clicking Create.
+  const sharePatient = useMemo(() => {
+    const selected = documents.filter((d: any) => selectedIds.has(d.id));
+    if (selected.length === 0)
+      return {
+        id: null as number | null,
+        name: null as string | null,
+        conflict: false,
+      };
+    const ids = new Set(selected.map((d: any) => d.patient_id));
+    if (ids.size > 1) return { id: null, name: null, conflict: true };
+    const first = selected[0];
+    return {
+      id: first.patient_id ?? null,
+      name: first.patient_name ?? null,
+      conflict: false,
+    };
+  }, [documents, selectedIds]);
+
+  const shareTooltip = sharePatient.conflict
+    ? "Selection spans multiple patients. A share covers one patient at a time."
+    : !sharePatient.id
+      ? "Selected documents are not assigned to a patient."
+      : null;
   const { data: llmData } = useLlmProviders();
   const { data: ocrData } = useOcrProviders();
   const llmProviders = useMemo(
@@ -63,9 +106,15 @@ export default function DocumentsPage() {
 
   // Poll pipeline status for live page progress
   useEffect(() => {
-    api.get("/pipeline/status").then((res: any) => setPipeline(res.data)).catch(() => {});
+    api
+      .get("/pipeline/status")
+      .then((res: any) => setPipeline(res.data))
+      .catch(() => {});
     const interval = setInterval(() => {
-      api.get("/pipeline/status").then((res: any) => setPipeline(res.data)).catch(() => {});
+      api
+        .get("/pipeline/status")
+        .then((res: any) => setPipeline(res.data))
+        .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -93,7 +142,10 @@ export default function DocumentsPage() {
     }
   };
 
-  const runBulk = async (label: string, perDoc: (id: number) => Promise<void>) => {
+  const runBulk = async (
+    label: string,
+    perDoc: (id: number) => Promise<void>,
+  ) => {
     if (selectedIds.size === 0 || bulkBusy) return;
     setBulkBusy(label);
     const ids = Array.from(selectedIds);
@@ -105,7 +157,9 @@ export default function DocumentsPage() {
         ok += 1;
       } catch (err: any) {
         const d = err?.response?.data?.detail || err?.message || "failed";
-        failures.push(`#${id}: ${typeof d === "string" ? d : JSON.stringify(d)}`);
+        failures.push(
+          `#${id}: ${typeof d === "string" ? d : JSON.stringify(d)}`,
+        );
       }
     }
     setBulkBusy(null);
@@ -116,7 +170,9 @@ export default function DocumentsPage() {
     } else {
       toast({
         title: `${label}: ${ok}/${ids.length} done, ${failures.length} failed`,
-        description: failures.slice(0, 3).join(" • ") + (failures.length > 3 ? ` (+${failures.length - 3} more)` : ""),
+        description:
+          failures.slice(0, 3).join(" • ") +
+          (failures.length > 3 ? ` (+${failures.length - 3} more)` : ""),
         variant: "error",
       });
     }
@@ -126,23 +182,32 @@ export default function DocumentsPage() {
     const n = selectedIds.size;
     const ok = await confirm({
       title: `Delete ${n} document${n === 1 ? "" : "s"}?`,
-      description: "Files will be removed from disk and every related record (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
+      description:
+        "Files will be removed from disk and every related record (lab results, encounters, medications, etc.) will be cascaded. This cannot be undone.",
       variant: "destructive",
     });
     if (!ok) return;
-    await runBulk("Delete", (id) => api.delete(`/documents/${id}`).then(() => {}));
+    await runBulk("Delete", (id) =>
+      api.delete(`/documents/${id}`).then(() => {}),
+    );
   };
 
-  const bulkReprocess = async (mode: ReprocessMode, llmProviderId: string, ocrProviderId: string) => {
+  const bulkReprocess = async (
+    mode: ReprocessMode,
+    llmProviderId: string,
+    ocrProviderId: string,
+  ) => {
     if (shouldConfirmBulk(selectedIds.size)) {
       const modeLabel = mode === "both" ? "OCR and LLM" : mode.toUpperCase();
-      const ok = await confirm(buildBulkConfirm({
-        count: selectedIds.size,
-        verb: "Reprocess",
-        noun: "document",
-        description: `This will re-run ${modeLabel} on every selected document. It can take a while and may consume paid-provider tokens.`,
-        confirmText: "Reprocess",
-      }));
+      const ok = await confirm(
+        buildBulkConfirm({
+          count: selectedIds.size,
+          verb: "Reprocess",
+          noun: "document",
+          description: `This will re-run ${modeLabel} on every selected document. It can take a while and may consume paid-provider tokens.`,
+          confirmText: "Reprocess",
+        }),
+      );
       if (!ok) return;
     }
 
@@ -154,12 +219,14 @@ export default function DocumentsPage() {
     if (longDocs.length > 0) {
       const totalPages = longDocs.reduce((n, d) => n + (d.page_count || 0), 0);
       const ok = await confirm({
-        title: longDocs.length === 1
-          ? `Reprocess ${longDocs[0].page_count}-page document?`
-          : `Reprocess ${longDocs.length} long documents?`,
-        description: longDocs.length === 1
-          ? `"${longDocs[0].original_filename}" has ${longDocs[0].page_count} pages. Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`
-          : `${longDocs.length} of the selected documents have more than 5 pages (${totalPages} pages total). Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`,
+        title:
+          longDocs.length === 1
+            ? `Reprocess ${longDocs[0].page_count}-page document?`
+            : `Reprocess ${longDocs.length} long documents?`,
+        description:
+          longDocs.length === 1
+            ? `"${longDocs[0].original_filename}" has ${longDocs[0].page_count} pages. Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`
+            : `${longDocs.length} of the selected documents have more than 5 pages (${totalPages} pages total). Reprocessing runs OCR and the LLM on every page, which can take a while and cost tokens on a paid provider.`,
         confirmText: "Reprocess",
         cancelText: "Cancel",
       });
@@ -177,13 +244,16 @@ export default function DocumentsPage() {
 
   const bulkRegenerateFilename = async () => {
     if (shouldConfirmBulk(selectedIds.size)) {
-      const ok = await confirm(buildBulkConfirm({
-        count: selectedIds.size,
-        verb: "Regenerate filename on",
-        noun: "document",
-        description: "Each file is re-analyzed by the LLM and renamed on disk. This can take a while and may consume paid-provider tokens.",
-        confirmText: "Regenerate",
-      }));
+      const ok = await confirm(
+        buildBulkConfirm({
+          count: selectedIds.size,
+          verb: "Regenerate filename on",
+          noun: "document",
+          description:
+            "Each file is re-analyzed by the LLM and renamed on disk. This can take a while and may consume paid-provider tokens.",
+          confirmText: "Regenerate",
+        }),
+      );
       if (!ok) return;
     }
     await runBulk("Regenerate filename", async (id) => {
@@ -197,10 +267,12 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-4">
       {showUpload && (
-        <FileUpload onUploadComplete={() => {
-          setPage(0);
-          reloadDocuments();
-        }} />
+        <FileUpload
+          onUploadComplete={() => {
+            setPage(0);
+            reloadDocuments();
+          }}
+        />
       )}
 
       <DocumentFilters
@@ -217,9 +289,11 @@ export default function DocumentsPage() {
           if ("search" in patch) next.search = patch.search!;
           if ("typeFilter" in patch) next.typeFilter = patch.typeFilter!;
           if ("statusFilter" in patch) next.statusFilter = patch.statusFilter!;
-          if ("specialtyFilter" in patch) next.specialtyFilter = patch.specialtyFilter!;
+          if ("specialtyFilter" in patch)
+            next.specialtyFilter = patch.specialtyFilter!;
           if ("doctorFilter" in patch) next.doctorFilter = patch.doctorFilter!;
-          if ("facilityFilter" in patch) next.facilityFilter = patch.facilityFilter!;
+          if ("facilityFilter" in patch)
+            next.facilityFilter = patch.facilityFilter!;
           if ("dateFrom" in patch) next.dateFrom = patch.dateFrom!;
           if ("dateTo" in patch) next.dateTo = patch.dateTo!;
           setFilters(next);
@@ -239,6 +313,17 @@ export default function DocumentsPage() {
         onReprocess={bulkReprocess}
         onRegenerateFilename={bulkRegenerateFilename}
         onClear={() => setSelectedIds(new Set())}
+        onShare={() => setBulkShareOpen(true)}
+        shareTooltip={shareTooltip}
+      />
+
+      <ShareDialog
+        open={bulkShareOpen}
+        onClose={() => setBulkShareOpen(false)}
+        patientId={sharePatient.id}
+        documentIds={Array.from(selectedIds)}
+        patientName={sharePatient.name}
+        selectionLabel={`${selectedIds.size} document${selectedIds.size === 1 ? "" : "s"}`}
       />
 
       <DocumentTable
@@ -249,9 +334,11 @@ export default function DocumentsPage() {
         onToggleSelect={toggleSelect}
         onToggleSelectAll={toggleSelectAllOnPage}
         onRenamed={(updated) => {
-          setDocuments((prev) => prev.map((d: any) =>
-            d.id === updated.id ? { ...d, ...updated } : d,
-          ));
+          setDocuments((prev) =>
+            prev.map((d: any) =>
+              d.id === updated.id ? { ...d, ...updated } : d,
+            ),
+          );
         }}
         sortBy={sort.sortBy}
         sortOrder={sort.sortOrder}
@@ -262,19 +349,24 @@ export default function DocumentsPage() {
       {total > limit && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            Showing {page * limit + 1}-{Math.min((page + 1) * limit, total)} of {total}
+            Showing {page * limit + 1}-{Math.min((page + 1) * limit, total)} of{" "}
+            {total}
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage(Math.max(0, page - 1))}
               disabled={page === 0}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            >Previous</button>
+            >
+              Previous
+            </button>
             <button
               onClick={() => setPage(page + 1)}
               disabled={(page + 1) * limit >= total}
               className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-            >Next</button>
+            >
+              Next
+            </button>
           </div>
         </div>
       )}

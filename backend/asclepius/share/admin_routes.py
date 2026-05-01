@@ -155,12 +155,22 @@ async def create_share(
 
 @router.get("")
 async def list_shares(
-    patient_id: int = Query(...),
+    patient_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    await _require_admin_or_owner(db, current_user, patient_id)
-    return await share_service.list_shares_for_patient(db, patient_id)
+    """List shares.
+
+    With ``patient_id``: scoped to that patient (admin/owner only — same
+    permission gate as creation).
+
+    Without ``patient_id``: all shares the caller can manage. Admins see
+    everything; non-admins see only shares for patients they own.
+    """
+    if patient_id is not None:
+        await _require_admin_or_owner(db, current_user, patient_id)
+        return await share_service.list_shares_for_patient(db, patient_id)
+    return await share_service.list_shares_for_user(db, current_user)
 
 
 @router.delete("/{share_id}")

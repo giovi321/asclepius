@@ -5903,14 +5903,22 @@
       "get": {
         "tags": ["shares"],
         "summary": "List Shares",
+        "description": "List shares.\n\nWith ``patient_id``: scoped to that patient (admin/owner only \u2014 same\npermission gate as creation).\n\nWithout ``patient_id``: all shares the caller can manage. Admins see\neverything; non-admins see only shares for patients they own.",
         "operationId": "list_shares_api_shares_get",
         "parameters": [
           {
             "name": "patient_id",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "integer",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Patient Id"
             }
           }

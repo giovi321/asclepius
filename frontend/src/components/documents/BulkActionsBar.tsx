@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Share2 } from "lucide-react";
 
 export type ReprocessMode = "both" | "ocr" | "llm";
 
@@ -15,9 +15,18 @@ export interface BulkActionsBarProps {
   llmProviders: Provider[];
   ocrProviders: Provider[];
   onDelete: () => void;
-  onReprocess: (mode: ReprocessMode, llmProviderId: string, ocrProviderId: string) => void;
+  onReprocess: (
+    mode: ReprocessMode,
+    llmProviderId: string,
+    ocrProviderId: string,
+  ) => void;
   onRegenerateFilename: () => void;
   onClear: () => void;
+  /** Optional: render a "Share with doctor" action when defined. Hidden
+   * when the current selection spans multiple patients (parent passes
+   * undefined ``shareTooltip``). */
+  onShare?: () => void;
+  shareTooltip?: string | null;
 }
 
 /**
@@ -35,6 +44,8 @@ export default function BulkActionsBar({
   onReprocess,
   onRegenerateFilename,
   onClear,
+  onShare,
+  shareTooltip,
 }: BulkActionsBarProps) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<ReprocessMode>("both");
@@ -45,7 +56,8 @@ export default function BulkActionsBar({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -81,7 +93,9 @@ export default function BulkActionsBar({
         </button>
         {open && (
           <div className="absolute left-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3 text-foreground">
-            <p className="text-xs font-medium text-muted-foreground">What to reprocess</p>
+            <p className="text-xs font-medium text-muted-foreground">
+              What to reprocess
+            </p>
             <div className="flex gap-1">
               {[
                 { value: "both", label: "OCR + LLM" },
@@ -104,7 +118,9 @@ export default function BulkActionsBar({
 
             {mode !== "llm" && ocrProviders.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">OCR Provider</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  OCR Provider
+                </p>
                 <select
                   value={ocrId}
                   onChange={(e) => setOcrId(e.target.value)}
@@ -112,7 +128,9 @@ export default function BulkActionsBar({
                 >
                   <option value="">Default (highest priority)</option>
                   {ocrProviders.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name || p.id}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name || p.id}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -120,7 +138,9 @@ export default function BulkActionsBar({
 
             {mode !== "ocr" && llmProviders.length > 0 && (
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">LLM Provider</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  LLM Provider
+                </p>
                 <select
                   value={llmId}
                   onChange={(e) => setLlmId(e.target.value)}
@@ -128,14 +148,19 @@ export default function BulkActionsBar({
                 >
                   <option value="">Default (highest priority)</option>
                   {llmProviders.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name || p.id}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name || p.id}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
 
             <button
-              onClick={() => { onReprocess(mode, llmId, ocrId); setOpen(false); }}
+              onClick={() => {
+                onReprocess(mode, llmId, ocrId);
+                setOpen(false);
+              }}
               disabled={!!bulkBusy}
               className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
@@ -149,8 +174,23 @@ export default function BulkActionsBar({
         disabled={!!bulkBusy}
         className="hover:text-foreground disabled:opacity-50"
       >
-        {bulkBusy === "Regenerate filename" ? "Renaming..." : "Regenerate filename"}
+        {bulkBusy === "Regenerate filename"
+          ? "Renaming..."
+          : "Regenerate filename"}
       </button>
+      {onShare && (
+        <button
+          onClick={onShare}
+          disabled={!!bulkBusy || !!shareTooltip}
+          title={
+            shareTooltip ||
+            "Create one share link covering all selected documents"
+          }
+          className="inline-flex items-center gap-1 hover:text-foreground disabled:opacity-50"
+        >
+          <Share2 className="h-3 w-3" /> Share with doctor
+        </button>
+      )}
       <button
         onClick={onClear}
         disabled={!!bulkBusy}

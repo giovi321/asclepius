@@ -18,6 +18,7 @@ import PatientsPage from "@/pages/PatientsPage";
 import TimelinePage from "@/pages/TimelinePage";
 import EventsPage from "@/pages/EventsPage";
 import FileBrowserPage from "@/pages/FileBrowserPage";
+import SharesPage from "@/pages/SharesPage";
 import ShareLandingPage from "@/pages/share/ShareLandingPage";
 import ShareVerifyPage from "@/pages/share/ShareVerifyPage";
 import ShareDashboardPage from "@/pages/share/ShareDashboardPage";
@@ -106,6 +107,7 @@ export default function App() {
         />
         <Route path="chat" element={page("Chat", <ChatPage />)} />
         <Route path="search" element={page("Search", <SearchPage />)} />
+        <Route path="shares" element={page("Doctor Shares", <SharesPage />)} />
         <Route path="settings/*" element={page("Settings", <SettingsPage />)} />
         <Route path="files" element={page("Files", <FileBrowserPage />)} />
       </Route>

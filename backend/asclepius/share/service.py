@@ -425,17 +425,61 @@ async def list_audit(db: aiosqlite.Connection, share_id: int, limit: int = 200) 
 # ── Admin listing ────────────────────────────────────────────────
 
 
+_SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.recipient_label, sh.recipient_contact,
+                          sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
+                          u.username AS created_by_username,
+                          p.display_name AS patient_name,
+                          (SELECT COUNT(*) FROM document_share_documents dsd
+                            WHERE dsd.share_id = sh.id) AS document_count,
+                          (SELECT COUNT(*) FROM document_share_audit a
+                            WHERE a.share_id = sh.id
+                              AND a.action IN ('view_doc', 'view_file', 'translate'))
+                              AS access_count,
+                          (SELECT MAX(a.created_at) FROM document_share_audit a
+                            WHERE a.share_id = sh.id
+                              AND a.action IN ('view_doc', 'view_file', 'translate'))
+                              AS last_accessed_at"""
+
+
 async def list_shares_for_patient(db: aiosqlite.Connection, patient_id: int) -> list[dict]:
     cursor = await db.execute(
-        """SELECT sh.id, sh.patient_id, sh.recipient_label, sh.recipient_contact,
-                  sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
-                  u.username AS created_by_username,
-                  (SELECT COUNT(*) FROM document_share_documents dsd
-                    WHERE dsd.share_id = sh.id) AS document_count
+        f"""SELECT {_SHARE_LIST_COLUMNS}
              FROM document_shares sh
              JOIN users u ON u.id = sh.created_by_user_id
+             JOIN patients p ON p.id = sh.patient_id
             WHERE sh.patient_id = ?
             ORDER BY sh.id DESC""",
         (patient_id,),
     )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def list_shares_for_user(db: aiosqlite.Connection, current_user: dict) -> list[dict]:
+    """Every share the caller may manage.
+
+    Admins see all shares regardless of patient. Non-admins see shares
+    for the patients they own (mirrors the permission gate used at share
+    creation time).
+    """
+    if current_user.get("role") == "admin":
+        cursor = await db.execute(
+            f"""SELECT {_SHARE_LIST_COLUMNS}
+                 FROM document_shares sh
+                 JOIN users u ON u.id = sh.created_by_user_id
+                 JOIN patients p ON p.id = sh.patient_id
+                ORDER BY sh.id DESC"""
+        )
+    else:
+        cursor = await db.execute(
+            f"""SELECT {_SHARE_LIST_COLUMNS}
+                 FROM document_shares sh
+                 JOIN users u ON u.id = sh.created_by_user_id
+                 JOIN patients p ON p.id = sh.patient_id
+                 JOIN user_patient_access upa
+                   ON upa.patient_id = sh.patient_id
+                  AND upa.user_id = ?
+                  AND upa.role = 'owner'
+                ORDER BY sh.id DESC""",
+            (current_user["id"],),
+        )
     return [dict(r) for r in await cursor.fetchall()]

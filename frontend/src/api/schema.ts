@@ -2243,7 +2243,16 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Shares */
+    /**
+     * List Shares
+     * @description List shares.
+     *
+     *     With ``patient_id``: scoped to that patient (admin/owner only — same
+     *     permission gate as creation).
+     *
+     *     Without ``patient_id``: all shares the caller can manage. Admins see
+     *     everything; non-admins see only shares for patients they own.
+     */
     get: operations["list_shares_api_shares_get"];
     put?: never;
     /**
@@ -7488,8 +7497,8 @@ export interface operations {
   };
   list_shares_api_shares_get: {
     parameters: {
-      query: {
-        patient_id: number;
+      query?: {
+        patient_id?: number | null;
       };
       header?: never;
       path?: never;

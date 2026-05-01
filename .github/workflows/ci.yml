@@ -127,6 +127,13 @@ jobs:
         run: |
           python backend/scripts/export_openapi.py
           npm --prefix frontend run gen:api
+          # Mirror the local pre-commit hook: prettier reformats the
+          # generated artefacts (compact required-arrays etc.). Without
+          # this step CI's freshly-exported files differ from the
+          # prettier'd copies the contributor committed, causing a
+          # drift failure on every PR.
+          npx --prefix frontend prettier --write \
+            frontend/src/openapi.json frontend/src/api/schema.ts
       - name: Fail on drift
         run: |
           git diff --exit-code -- frontend/src/openapi.json frontend/src/api/schema.ts || {

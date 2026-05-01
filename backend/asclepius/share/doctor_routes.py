@@ -151,8 +151,12 @@ async def share_document_detail(
     sections, region translations, and links scoped to the share's docs."""
     doc = await _ensure_doc_in_share(db, session["share_id"], doc_id)
 
+    # Encounters are intentionally NOT exposed on the doctor surface —
+    # they often contain free-text clinical notes / diagnoses written by
+    # the original physician for internal use. The structured lab,
+    # medication, and vaccination tables, plus the watermarked PDF +
+    # summary, are sufficient for an outside doctor's review.
     lab_results = await get_related_records(db, "lab_results", doc_id)
-    encounters = await get_related_records(db, "encounters", doc_id)
     medications = await get_related_records(db, "medications", doc_id)
     vaccinations = await get_related_records(db, "vaccinations", doc_id)
     sections = await get_document_sections(db, doc_id)
@@ -213,7 +217,6 @@ async def share_document_detail(
     return {
         **public_doc,
         "lab_results": lab_results,
-        "encounters": encounters,
         "medications": medications,
         "vaccinations": vaccinations,
         "sections": sections,
@@ -339,7 +342,7 @@ async def share_translate(
     if not (doc.get("ocr_text") or "").strip():
         raise HTTPException(
             status_code=400,
-            detail="Document has not been OCR'd yet — translation unavailable.",
+            detail="Document has not been OCR'd yet, so translation is unavailable.",
         )
 
     allowed, retry_after = translate_allowed(

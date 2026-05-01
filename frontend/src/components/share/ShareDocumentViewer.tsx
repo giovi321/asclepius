@@ -49,6 +49,17 @@ export default function ShareDocumentViewer({
   // would force a full document reload.
   const docOptions = useMemo(() => ({}), []);
 
+  // ALSO memoize the file prop. react-pdf's <Document> sees ``file`` as
+  // changed whenever the object identity differs and re-fetches /
+  // re-parses, even when the underlying bytes are unchanged. Passing a
+  // fresh ``{ data: pdfData }`` literal each render meant page navigation
+  // and zoom triggered a re-load loop, which presented as "the PDF
+  // never renders" in slow / racy conditions.
+  const fileProp = useMemo(
+    () => (pdfData ? { data: pdfData } : null),
+    [pdfData],
+  );
+
   useEffect(() => {
     let alive = true;
     let revokeUrl: string | null = null;
@@ -208,7 +219,7 @@ export default function ShareDocumentViewer({
           onContextMenu={(e) => e.preventDefault()}
         >
           <Document
-            file={{ data: pdfData }}
+            file={fileProp}
             options={docOptions}
             onLoadSuccess={({ numPages }) => {
               setNumPages(numPages);

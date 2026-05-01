@@ -38,12 +38,22 @@ export default function ShareTranslateMenu({
     } catch (err: any) {
       const status = err?.response?.status;
       const retryAfter = err?.response?.headers?.["retry-after"];
+      const detail = err?.response?.data?.detail;
       if (status === 429 && retryAfter) {
         setError(`Try again in ${retryAfter}s.`);
-      } else if (status === 400) {
-        setError(err?.response?.data?.detail || "Translation unavailable.");
+      } else if (status === 503) {
+        setError(
+          detail ||
+            "Translation temporarily unavailable; ask the sender to retry later.",
+        );
+      } else if (detail) {
+        // 400 / 404 / etc. — surface the backend's reason verbatim so
+        // the admin gets enough info to diagnose without a console dive.
+        setError(typeof detail === "string" ? detail : JSON.stringify(detail));
       } else {
-        setError("Translation request failed.");
+        setError(
+          `Translation request failed${status ? ` (HTTP ${status})` : ""}.`,
+        );
       }
     } finally {
       setSubmitting(false);

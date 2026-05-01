@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, FileText, Calendar, Clock } from "lucide-react";
+import { LogOut, FileText, Calendar } from "lucide-react";
 
 import { useShareSession } from "@/contexts/ShareSessionContext";
 
@@ -19,8 +20,6 @@ export default function ShareDashboardPage() {
   }
   if (!me) return null;
 
-  const sessionExpiresLocal = formatLocal(me.session_expires_at);
-
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
@@ -28,8 +27,8 @@ export default function ShareDashboardPage() {
           <div>
             <h1 className="text-lg font-semibold">{me.patient_name}</h1>
             <p className="text-xs text-muted-foreground">
-              Shared with {me.recipient_label} · session expires{" "}
-              {sessionExpiresLocal}
+              Shared with {me.recipient_label} · you will be logged out
+              automatically in <SessionCountdown iso={me.session_expires_at} />
             </p>
           </div>
           <button
@@ -82,22 +81,37 @@ export default function ShareDashboardPage() {
             ))}
           </ul>
         )}
-
-        <p className="mt-8 inline-flex items-center gap-1 text-xs text-muted-foreground border-t pt-4">
-          <Clock className="h-3 w-3" /> Translate is rate-limited to keep costs
-          predictable. After the session expires you will need a new access
-          code.
-        </p>
       </main>
     </div>
   );
 }
 
-function formatLocal(iso: string): string {
-  try {
-    const dt = new Date(iso + "Z"); // backend writes UTC ISO without Z
-    return dt.toLocaleString();
-  } catch {
-    return iso;
-  }
+/**
+ * Live countdown until a UTC ISO timestamp. Updates every second.
+ *
+ * The backend writes session expiry as a naive UTC ISO ("2026-05-02T..."
+ * with no trailing Z), so we append the Z explicitly before constructing
+ * a Date — otherwise the browser interprets it in local time and the
+ * countdown is off by the local UTC offset.
+ */
+function SessionCountdown({ iso }: { iso: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const target = new Date(iso.endsWith("Z") ? iso : iso + "Z").getTime();
+  const remaining = Math.max(0, Math.floor((target - now) / 1000));
+  return <span className="font-mono">{formatDuration(remaining)}</span>;
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (totalSeconds <= 0) return "0s";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0)
+    return `${h}h ${String(m).padStart(2, "0")}m ${String(s).padStart(2, "0")}s`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${s}s`;
 }

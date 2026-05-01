@@ -9,6 +9,8 @@ import {
   ChevronRight,
   ScrollText,
   Activity,
+  Copy,
+  Check,
 } from "lucide-react";
 
 import api from "@/api/client";
@@ -267,7 +269,7 @@ export default function SharesPage() {
                 <th className="text-left px-3 py-2">Expires</th>
                 <th className="text-left px-3 py-2">Accesses</th>
                 <th className="text-left px-3 py-2">Last access</th>
-                <th className="text-left px-3 py-2">Active code</th>
+                <th className="text-left px-3 py-2 w-[230px]">Active code</th>
                 <th className="text-left px-3 py-2">Actions</th>
               </tr>
             </thead>
@@ -422,34 +424,62 @@ function OtpCell({
     );
   }
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-start gap-1">
       {otp?.code ? (
-        <span className="font-mono text-base tracking-widest text-primary">
-          {otp.code}
-        </span>
+        <>
+          <span className="font-mono text-base tracking-widest text-primary">
+            {otp.code}
+          </span>
+          <CopyCodeButton code={otp.code} />
+        </>
       ) : (
-        <span
-          className="text-xs italic text-muted-foreground max-w-[200px]"
-          title="A code is created when the doctor opens the share link and clicks 'Request access code'. Hit refresh after they do."
-        >
+        // Fixed width + whitespace-normal forces the help text to wrap
+        // inside the column instead of pushing every other column out.
+        <p className="text-[11px] italic text-muted-foreground leading-tight w-[170px] whitespace-normal">
           No code yet. Doctor needs to click "Request access code" first.
-        </span>
+        </p>
       )}
       <button
         onClick={onRefresh}
-        className="rounded p-0.5 hover:bg-accent"
+        className="rounded p-0.5 hover:bg-accent flex-shrink-0"
         title="Refetch"
       >
         <RefreshCw className="h-3 w-3" />
       </button>
       <button
         onClick={onHide}
-        className="rounded p-0.5 hover:bg-accent"
+        className="rounded p-0.5 hover:bg-accent flex-shrink-0"
         title="Hide"
       >
         <EyeOff className="h-3 w-3" />
       </button>
     </div>
+  );
+}
+
+function CopyCodeButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // older browsers may block navigator.clipboard outside HTTPS
+    }
+  };
+  return (
+    <button
+      onClick={onCopy}
+      className="rounded p-0.5 hover:bg-accent flex-shrink-0"
+      title={copied ? "Copied" : "Copy code"}
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
   );
 }
 

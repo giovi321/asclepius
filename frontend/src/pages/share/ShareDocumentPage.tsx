@@ -24,7 +24,6 @@ interface ShareDocumentDetail {
   page_count: number | null;
   original_filename: string | null;
   lab_results: any[];
-  encounters: any[];
   medications: any[];
   vaccinations: any[];
   region_translations: any[];
@@ -200,37 +199,6 @@ export default function ShareDocumentPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
-
-          {doc.encounters && doc.encounters.length > 0 && (
-            <div>
-              <h2 className="text-sm font-semibold mb-2">Encounters</h2>
-              <ul className="space-y-2">
-                {doc.encounters.map((e: any) => (
-                  <li
-                    key={e.id}
-                    className="rounded-md border bg-card p-3 text-sm"
-                  >
-                    <div className="font-medium">
-                      {e.diagnosis_canonical_display ||
-                        e.diagnosis_original ||
-                        "Encounter"}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {e.encounter_date} · {e.specialty_canonical_display || ""}
-                    </div>
-                    {e.findings && (
-                      <p className="mt-2 whitespace-pre-wrap">{e.findings}</p>
-                    )}
-                    {e.notes && (
-                      <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">
-                        {e.notes}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 

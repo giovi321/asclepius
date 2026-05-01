@@ -22,24 +22,19 @@ const shareApi = axios.create({
   },
 });
 
+// We deliberately do NOT do a window.location redirect on 401 here.
+// An earlier version did `window.location.href = "/share/{firstSegment}"`
+// which on the landing page (/share/{token}) redirects to the same URL
+// we're already on, producing an infinite refresh loop. On /share/dashboard
+// it does the same.
+//
+// The ShareSessionProvider's React effect handles the "session missing"
+// case correctly: it sets ``me = null`` (so the page can render an
+// inline state) and uses react-router's ``navigate("/share")`` for the
+// deep-link fallback, which is a soft route change with no reload.
 shareApi.interceptors.response.use(
   (response: any) => response,
-  (error: any) => {
-    if (
-      error.response?.status === 401 &&
-      window.location.pathname.startsWith("/share/") &&
-      // Don't redirect on the OTP verify call itself — the page renders
-      // its own error message.
-      !error.config?.url?.endsWith("/verify-otp") &&
-      !error.config?.url?.endsWith("/request-otp")
-    ) {
-      // Strip any deep `/share/documents/...` path back to the landing
-      // page; the doctor will need to re-enter the OTP.
-      const m = window.location.pathname.match(/^\/share\/[^/]+/);
-      window.location.href = m ? m[0] : "/share";
-    }
-    return Promise.reject(error);
-  },
+  (error: any) => Promise.reject(error),
 );
 
 export default shareApi;

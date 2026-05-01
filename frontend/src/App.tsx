@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -51,27 +51,29 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       {/* Doctor share surface — lives outside ProtectedRoute and outside
           the regular AuthContext-bound AppLayout so account auth and
-          share auth are entirely isolated. */}
+          share auth are entirely isolated. We use the Outlet pattern
+          (not a nested <Routes>) so useParams() correctly picks up
+          ``:token`` in the leaf components. */}
       <Route
-        path="/share/*"
+        path="/share"
         element={
           <ShareSessionProvider>
-            <Routes>
-              <Route index element={<ShareLandingPage />} />
-              <Route
-                path="dashboard"
-                element={page("Share dashboard", <ShareDashboardPage />)}
-              />
-              <Route
-                path="documents/:id"
-                element={page("Share document", <ShareDocumentPage />)}
-              />
-              <Route path=":token/verify" element={<ShareVerifyPage />} />
-              <Route path=":token" element={<ShareLandingPage />} />
-            </Routes>
+            <Outlet />
           </ShareSessionProvider>
         }
-      />
+      >
+        <Route index element={<ShareLandingPage />} />
+        <Route
+          path="dashboard"
+          element={page("Share dashboard", <ShareDashboardPage />)}
+        />
+        <Route
+          path="documents/:id"
+          element={page("Share document", <ShareDocumentPage />)}
+        />
+        <Route path=":token/verify" element={<ShareVerifyPage />} />
+        <Route path=":token" element={<ShareLandingPage />} />
+      </Route>
       <Route
         path="/"
         element={

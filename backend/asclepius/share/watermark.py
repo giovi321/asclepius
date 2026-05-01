@@ -83,17 +83,22 @@ def _stamp_diagonal(
     diagonal_offset: float,
     opacity: float,
 ) -> None:
-    """Insert a single rotated text line as a redaction-free overlay.
+    """Stamp ``text`` along the page diagonal at low opacity.
 
-    ``diagonal_offset`` shifts the line along the page diagonal: 0.0 is
-    centre, ±0.25 produce two flanking copies. Using ``insert_textbox``
-    with ``rotate=45`` keeps the overlay vector (no rasterisation) and
-    survives copy/paste of screenshots as visible text.
+    PyMuPDF's ``insert_textbox`` rejects rotations that aren't a multiple
+    of 90, so we compose the 45-degree turn with a Shape + ``commit(morph=...)``
+    instead. The Shape draws the text horizontally; the Matrix rotates it
+    around the box centre, giving us a real diagonal text object — vector,
+    selectable, and copy/paste-able from any PDF viewer.
+
+    ``diagonal_offset`` shifts the stamp along the page diagonal: 0.0 is
+    the centre, ±0.25 produce two flanking copies. We render three offsets
+    so a screenshot of any quadrant carries at least one full copy of the
+    label.
     """
     cx, cy = rect.width / 2, rect.height / 2
     dx = rect.width * diagonal_offset
     dy = rect.height * diagonal_offset
-    # A 60% × 16% box centred on (cx + dx, cy + dy), rotated 45°.
     box_w = rect.width * 0.6
     box_h = rect.height * 0.16
     box = fitz.Rect(
@@ -103,20 +108,24 @@ def _stamp_diagonal(
         cy + dy + box_h / 2,
     )
     try:
-        page.insert_textbox(
+        pivot = fitz.Point(cx + dx, cy + dy)
+        rotation = fitz.Matrix(45)  # 45-degree rotation
+        shape = page.new_shape()
+        shape.insert_textbox(
             box,
             text,
             fontsize=20,
             fontname="helv",
             color=(0.5, 0.5, 0.5),
             fill_opacity=opacity,
-            rotate=45,
             align=fitz.TEXT_ALIGN_CENTER,
+            morph=(pivot, rotation),
         )
+        shape.commit(overlay=True)
     except Exception:
         # PyMuPDF raises on a few odd page geometries; swallow so a single
         # bad page doesn't blank the whole document.
-        logger.debug("insert_textbox failed for page", exc_info=True)
+        logger.debug("diagonal stamp failed for page", exc_info=True)
 
 
 def watermark_image_bytes(

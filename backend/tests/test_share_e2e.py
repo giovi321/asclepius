@@ -225,13 +225,25 @@ def _run_share_flow(client, seed):
     res = client.get("/api/share/documents/9999", headers=csrf)
     assert res.status_code == 404
 
-    # 9. File serve returns PDF content with no-store headers.
+    # 9. File serve returns a watermarked PDF with no-store headers.
     res = client.get(f"/api/share/documents/{seed['doc_id']}/file", headers=csrf)
     assert res.status_code == 200
     assert res.headers["content-type"] == "application/pdf"
     assert "no-store" in res.headers.get("cache-control", "").lower()
-    # Watermarked or pass-through; either way we got bytes.
     assert res.content[:5] == b"%PDF-"
+    # The watermark must actually be present — earlier we shipped a version
+    # where ``insert_textbox(rotate=45)`` raised silently and the served
+    # bytes were the un-stamped original. Re-open the served bytes with
+    # PyMuPDF and confirm the recipient label is now searchable on page 1.
+    import io as _io
+    import fitz as _fitz
+
+    served = _fitz.open(stream=_io.BytesIO(res.content), filetype="pdf")
+    try:
+        hits = served[0].search_for("Dr. Test")
+        assert hits, "Watermark missing from served PDF"
+    finally:
+        served.close()
 
     # 10. Logout clears the cookie.
     res = client.post("/api/share/logout", headers=csrf)

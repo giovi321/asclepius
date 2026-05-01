@@ -217,7 +217,7 @@ export default function ShareWithDoctorButton({
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1">
-                      Contact (free-text — for your records only)
+                      Contact (free-text, for your records only)
                     </label>
                     <input
                       type="text"
@@ -260,7 +260,7 @@ export default function ShareWithDoctorButton({
               {createResult && (
                 <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2">
                   <p className="text-xs font-medium text-primary">
-                    Share created. Copy the link below — it is shown only once.
+                    Share created. Copy the link below; it is shown only once.
                   </p>
                   <div className="flex items-stretch gap-1.5">
                     <input
@@ -330,7 +330,7 @@ export default function ShareWithDoctorButton({
                                     <div className="font-mono text-base tracking-widest text-primary">
                                       {activeOtps[s.id]?.code || (
                                         <span className="text-xs text-muted-foreground italic">
-                                          No active code — ask the doctor to
+                                          No active code; ask the doctor to
                                           request one
                                         </span>
                                       )}

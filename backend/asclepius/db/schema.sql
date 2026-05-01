@@ -576,10 +576,15 @@ CREATE INDEX IF NOT EXISTS idx_invoice_items_document ON invoice_items(document_
 -- be promoted into a normal account session.
 CREATE TABLE IF NOT EXISTS document_shares (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    -- sha256 of the URL token. The raw token is shown to the admin once at
-    -- creation time and never persisted; the doctor presents the raw token
-    -- in the share URL and we hash on lookup.
+    -- sha256 of the URL token. Authoritative for lookup; the raw token
+    -- in token_clear is only kept so the admin can re-copy the share URL
+    -- from the dashboard without having to issue a fresh share.
     token_hash TEXT NOT NULL UNIQUE,
+    -- Plaintext URL token. Same trust level as the rest of the DB — a
+    -- DB read already exposes everything (PHI, audit, sessions), so
+    -- adding the token does not change the threat model materially. Kept
+    -- nullable for legacy rows created before this column existed.
+    token_clear TEXT,
     patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
     created_by_user_id INTEGER NOT NULL REFERENCES users(id),
     recipient_label TEXT NOT NULL,         -- "Dr. Rossi" — shown in audit log + watermark

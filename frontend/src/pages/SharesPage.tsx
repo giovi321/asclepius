@@ -11,6 +11,7 @@ import {
   Activity,
   Copy,
   Check,
+  Link as LinkIcon,
 } from "lucide-react";
 
 import api from "@/api/client";
@@ -20,6 +21,10 @@ interface ShareSummary {
   id: number;
   patient_id: number;
   patient_name: string;
+  /** Raw URL token. Null for shares created before the
+   * token_clear column existed — those rows can't show a copy-link
+   * button (admin must reissue if they need a new link). */
+  token_clear: string | null;
   recipient_label: string;
   recipient_contact: string;
   contact_kind: string;
@@ -49,7 +54,9 @@ interface ActiveOtp {
   attempts: number;
 }
 
-type StatusFilter = "all" | "active" | "expired" | "revoked";
+type ShareStatus = "active" | "expired" | "revoked";
+
+const ALL_STATUSES: ShareStatus[] = ["active", "expired", "revoked"];
 
 /**
  * Admin dashboard listing every doctor share the caller can manage.
@@ -64,7 +71,12 @@ export default function SharesPage() {
   const { toast } = useToast();
   const [shares, setShares] = useState<ShareSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<StatusFilter>("all");
+  // Multi-select status filter — admins want to see e.g. active +
+  // expired without revoked. Default includes everything so first
+  // page load looks identical to the "all" view we used to ship.
+  const [statusFilter, setStatusFilter] = useState<Set<ShareStatus>>(
+    () => new Set(ALL_STATUSES),
+  );
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [auditByShare, setAuditByShare] = useState<
@@ -102,8 +114,12 @@ export default function SharesPage() {
     return shares.filter((s) => {
       const isRevoked = !!s.revoked_at;
       const isExpired = !isRevoked && s.expires_at < now;
-      const status = isRevoked ? "revoked" : isExpired ? "expired" : "active";
-      if (filter !== "all" && status !== filter) return false;
+      const status: ShareStatus = isRevoked
+        ? "revoked"
+        : isExpired
+          ? "expired"
+          : "active";
+      if (!statusFilter.has(status)) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -116,7 +132,16 @@ export default function SharesPage() {
       }
       return true;
     });
-  }, [shares, filter, search]);
+  }, [shares, statusFilter, search]);
+
+  const toggleStatus = (status: ShareStatus) => {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  };
 
   const onRevoke = async (id: number) => {
     if (
@@ -198,25 +223,46 @@ export default function SharesPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
+        {/* Multi-select status filter. Each chip is a checkbox-style
+            toggle; the selection set is the union of statuses to show.
+            Click "All" to flip every status on, "None" to show nothing
+            (handy for hiding the table during a search). */}
         <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-sm">
-          {(["all", "active", "expired", "revoked"] as StatusFilter[]).map(
-            (f) => (
+          {ALL_STATUSES.map((s) => {
+            const on = statusFilter.has(s);
+            return (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
+                key={s}
+                onClick={() => toggleStatus(s)}
                 className={`rounded px-3 py-1 capitalize transition-colors ${
-                  filter === f
+                  on
                     ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
+                    : "hover:bg-accent text-muted-foreground"
                 }`}
+                title={on ? `Hide ${s} shares` : `Show ${s} shares`}
               >
-                {f}
-                {f !== "all" && (
-                  <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-                )}
+                {s}
+                <span className="ml-1.5 text-xs opacity-70">{counts[s]}</span>
               </button>
-            ),
-          )}
+            );
+          })}
+          <span className="mx-1 h-4 w-px bg-border" />
+          <button
+            onClick={() => setStatusFilter(new Set(ALL_STATUSES))}
+            disabled={statusFilter.size === ALL_STATUSES.length}
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default"
+            title="Show all statuses"
+          >
+            All
+          </button>
+          <button
+            onClick={() => setStatusFilter(new Set())}
+            disabled={statusFilter.size === 0}
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default"
+            title="Hide all statuses"
+          >
+            None
+          </button>
         </div>
         <input
           type="text"
@@ -341,15 +387,24 @@ export default function SharesPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 align-top whitespace-nowrap">
-                        {!isRevoked && (
-                          <button
-                            onClick={() => onRevoke(s.id)}
-                            className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                            title="Revoke share"
-                          >
-                            <Trash2 className="h-3 w-3" /> Revoke
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {/* Copy-link is hidden for legacy rows that
+                              predate the token_clear column — those have
+                              token_clear=null and we can't recover the
+                              raw URL from the hash. Admin must reissue. */}
+                          {!isRevoked && !isExpired && s.token_clear && (
+                            <CopyLinkButton token={s.token_clear} />
+                          )}
+                          {!isRevoked && (
+                            <button
+                              onClick={() => onRevoke(s.id)}
+                              className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                              title="Revoke share"
+                            >
+                              <Trash2 className="h-3 w-3" /> Revoke
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     {isOpen && (
@@ -424,7 +479,11 @@ function OtpCell({
     );
   }
   return (
-    <div className="flex items-start gap-1">
+    // ``items-center`` aligns the refresh / hide / copy buttons with the
+    // 6-digit code on the same horizontal axis. For the no-code branch
+    // the buttons sit centred against the wrapped help text, which is
+    // a smaller asymmetry than the previous top-aligned look.
+    <div className="flex items-center gap-1">
       {otp?.code ? (
         <>
           <span className="font-mono text-base tracking-widest text-primary">
@@ -454,6 +513,39 @@ function OtpCell({
         <EyeOff className="h-3 w-3" />
       </button>
     </div>
+  );
+}
+
+function CopyLinkButton({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    // Reconstruct the same URL the admin saw in the create dialog —
+    // origin + /share/{token}. We do not store the full URL because
+    // origin can vary across deployments (reverse proxy, direct), and
+    // computing it client-side guarantees the link the admin copies
+    // matches the page they're on.
+    const url = `${window.location.origin}/share/${token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // older browsers may block navigator.clipboard outside HTTPS
+    }
+  };
+  return (
+    <button
+      onClick={onCopy}
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent"
+      title={copied ? "Copied" : "Copy share link"}
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <LinkIcon className="h-3 w-3" />
+      )}
+      {copied ? "Copied" : "Link"}
+    </button>
   );
 }
 

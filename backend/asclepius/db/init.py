@@ -100,6 +100,15 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     """)
     await db.commit()
 
+    # ── document_shares.token_clear column (idempotent). Older installs
+    # only had token_hash; we now also store the raw URL token so admins
+    # can copy a share link from the dashboard without re-issuing.
+    cursor = await db.execute("PRAGMA table_info(document_shares)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    if cols and "token_clear" not in cols:
+        await db.execute("ALTER TABLE document_shares ADD COLUMN token_clear TEXT")
+        await db.commit()
+
     # Skip the rest entirely on a fresh install (no documents yet).
     cursor = await db.execute("SELECT COUNT(*) FROM documents")
     n_docs = (await cursor.fetchone())[0]

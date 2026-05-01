@@ -183,11 +183,12 @@ async def create_share(
     raw_token = generate_share_token()
     cursor = await db.execute(
         """INSERT INTO document_shares
-              (token_hash, patient_id, created_by_user_id,
+              (token_hash, token_clear, patient_id, created_by_user_id,
                recipient_label, recipient_contact, contact_kind, expires_at)
-           VALUES (?, ?, ?, ?, ?, 'manual', ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, 'manual', ?)""",
         (
             hash_token(raw_token),
+            raw_token,
             patient_id,
             created_by_user_id,
             recipient_label,
@@ -431,7 +432,8 @@ async def list_audit(db: aiosqlite.Connection, share_id: int, limit: int = 200) 
 # and the JOIN is keyed on the same indexed share_id, so cost is O(N)
 # rather than O(N * audit_rows_per_share). On a busy install this is the
 # difference between a snappy dashboard and a multi-second wait.
-_SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.recipient_label, sh.recipient_contact,
+_SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.token_clear,
+                          sh.recipient_label, sh.recipient_contact,
                           sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
                           u.username AS created_by_username,
                           p.display_name AS patient_name,

@@ -91,6 +91,21 @@ export default function ShareDocumentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId]);
 
+  // Auto-poll while any region translation is still pending
+  // (translated_text == null). We stop the moment everything's filled
+  // in so we're not spamming the server during idle viewing. The poll
+  // runs every 4s; the worker typically finishes a full-page region
+  // translate in well under that.
+  const hasPendingTranslation = !!doc?.region_translations?.some(
+    (rt) => !rt.translated_text,
+  );
+  useEffect(() => {
+    if (!docId || !hasPendingTranslation) return;
+    const t = setInterval(refresh, 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docId, hasPendingTranslation]);
+
   const onSelectionConfirm = async (page: number, bbox: NormalizedBbox) => {
     setSelectionMode(false);
     try {
@@ -223,6 +238,7 @@ export default function ShareDocumentPage() {
               documentId={doc.id}
               hasFile={doc.has_file}
               currentPage={currentPage}
+              translationPending={hasPendingTranslation}
               onStartRegionSelection={() => setSelectionMode(true)}
               onQueued={refresh}
             />

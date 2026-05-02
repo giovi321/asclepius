@@ -30,6 +30,7 @@ from asclepius.documents.service import (
     get_document_sections,
     get_related_records,
 )
+from asclepius.pipeline.text_utils import strip_chandra_markup
 from asclepius.share import service as share_service
 from asclepius.share.dependencies import get_share_session
 from asclepius.share.rate_limit import translate_allowed, translate_headroom
@@ -161,7 +162,12 @@ async def share_document_detail(
     vaccinations = await get_related_records(db, "vaccinations", doc_id)
     sections = await get_document_sections(db, doc_id)
 
-    # Region translations.
+    # Region translations. We strip Chandra/Vision-LLM HTML markup
+    # before serving — the raw ocr_text can be a wall of <div data-bbox=...>
+    # tags that would render unreadably in the doctor's "view original
+    # text" panel. The pipeline's translator stage strips internally
+    # before sending to the LLM but the row itself stores the raw
+    # markup, so we clean on read instead of changing the storage shape.
     rt_cursor = await db.execute(
         """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
                   ocr_text, translated_text, llm_model, created_at
@@ -170,7 +176,14 @@ async def share_document_detail(
             ORDER BY id DESC""",
         (doc_id,),
     )
-    region_translations = [dict(r) for r in await rt_cursor.fetchall()]
+    region_translations = []
+    for r in await rt_cursor.fetchall():
+        item = dict(r)
+        if item.get("ocr_text"):
+            item["ocr_text"] = strip_chandra_markup(item["ocr_text"])
+        if item.get("translated_text"):
+            item["translated_text"] = strip_chandra_markup(item["translated_text"])
+        region_translations.append(item)
 
     # Links — but filter to only docs that are also part of this share so
     # the doctor cannot pivot to documents outside the curated set.
@@ -467,14 +480,20 @@ async def share_translate_region(
             return min(enabled, key=lambda p: getattr(p, "priority", 0))
         return items[0] if items else None
 
+    # Provider resolution ladder:
+    #   1. body override (the doctor's UI does not expose this; reserved
+    #      for the admin-side region translate)
+    #   2. per-share default the admin set when creating the share
+    #   3. system-wide translation default (settings page)
+    #   4. first-enabled provider in the system
     queued_providers: dict[str, str | None] = {}
-    ocr_id = body.ocr_provider_id or share_default_ocr
+    ocr_id = body.ocr_provider_id or share_default_ocr or (cfg.ocr.translation_provider_id or None)
     if not ocr_id:
         p = _first_enabled(cfg.ocr.providers)
         ocr_id = p.id if p else None
     if ocr_id:
         queued_providers["ocr"] = ocr_id
-    llm_id = body.llm_provider_id or share_default_llm
+    llm_id = body.llm_provider_id or share_default_llm or (cfg.llm.translation_provider_id or None)
     if not llm_id:
         p = _first_enabled(cfg.llm.providers)
         llm_id = p.id if p else None

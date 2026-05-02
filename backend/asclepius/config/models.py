@@ -230,6 +230,12 @@ class OcrConfig(BaseModel):
     max_concurrent_vision_requests: int = 1
     # New: ordered provider list
     providers: list[OcrProviderEntry] = []
+    # Default OCR provider id used by translation flows (admin-side
+    # region-translate AND doctor-side share translates). Empty string
+    # falls back to the first-enabled provider. Distinct from the
+    # general default so users can dedicate a cheaper / faster engine
+    # to translation work without touching the main extraction queue.
+    translation_provider_id: str = ""
 
 
 class LlmConfig(BaseModel):
@@ -262,6 +268,11 @@ class LlmConfig(BaseModel):
     canonical_language: str = "English"
     # General-purpose LLM (non-pipeline). See GeneralLlmConfig.
     general: GeneralLlmConfig = GeneralLlmConfig()
+    # Default LLM provider id used by translation flows. Same fallback
+    # ladder as ``ocr.translation_provider_id``: empty -> first-enabled
+    # ``providers`` entry. Lets the user pin translation to e.g. a
+    # cheap remote model while extraction keeps using a local one.
+    translation_provider_id: str = ""
 
 
 class VisionConfig(BaseModel):

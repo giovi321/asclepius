@@ -5080,6 +5080,60 @@
         }
       }
     },
+    "/api/settings/translation-defaults": {
+      "get": {
+        "tags": ["settings"],
+        "summary": "Get Translation Defaults",
+        "description": "Return the system-wide default OCR + LLM provider IDs used by\ntranslation flows. Empty string means \"fall through to first\nenabled\"; the doctor's translate-region endpoint applies these\nafter per-share overrides.",
+        "operationId": "get_translation_defaults_api_settings_translation_defaults_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["settings"],
+        "summary": "Update Translation Defaults",
+        "description": "Persist the system translation provider defaults to settings.yaml.\n\nValidates that any non-empty IDs reference real provider entries so\nthe dashboard can't write a stale ID that nothing resolves later.",
+        "operationId": "update_translation_defaults_api_settings_translation_defaults_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslationDefaultsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/test-llm-provider": {
       "post": {
         "tags": ["settings"],
@@ -9513,6 +9567,22 @@
         },
         "type": "object",
         "title": "TranslateRequest"
+      },
+      "TranslationDefaultsUpdate": {
+        "properties": {
+          "ocr_provider_id": {
+            "type": "string",
+            "title": "Ocr Provider Id",
+            "default": ""
+          },
+          "llm_provider_id": {
+            "type": "string",
+            "title": "Llm Provider Id",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "TranslationDefaultsUpdate"
       },
       "UserCreate": {
         "properties": {

@@ -1901,6 +1901,36 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/settings/translation-defaults": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Translation Defaults
+     * @description Return the system-wide default OCR + LLM provider IDs used by
+     *     translation flows. Empty string means "fall through to first
+     *     enabled"; the doctor's translate-region endpoint applies these
+     *     after per-share overrides.
+     */
+    get: operations["get_translation_defaults_api_settings_translation_defaults_get"];
+    /**
+     * Update Translation Defaults
+     * @description Persist the system translation provider defaults to settings.yaml.
+     *
+     *     Validates that any non-empty IDs reference real provider entries so
+     *     the dashboard can't write a stale ID that nothing resolves later.
+     */
+    put: operations["update_translation_defaults_api_settings_translation_defaults_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/test-llm-provider": {
     parameters: {
       query?: never;
@@ -3370,6 +3400,19 @@ export interface components {
     TranslateRequest: {
       /** Llm Provider Id */
       llm_provider_id?: string | null;
+    };
+    /** TranslationDefaultsUpdate */
+    TranslationDefaultsUpdate: {
+      /**
+       * Ocr Provider Id
+       * @default
+       */
+      ocr_provider_id: string;
+      /**
+       * Llm Provider Id
+       * @default
+       */
+      llm_provider_id: string;
     };
     /** UserCreate */
     UserCreate: {
@@ -6863,6 +6906,59 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["GeneralLlmUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_translation_defaults_api_settings_translation_defaults_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  update_translation_defaults_api_settings_translation_defaults_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["TranslationDefaultsUpdate"];
       };
     };
     responses: {

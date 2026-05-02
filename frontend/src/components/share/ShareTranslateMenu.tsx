@@ -9,6 +9,12 @@ interface ShareTranslateMenuProps {
   /** Page the doctor is currently viewing in the PDF. Used by the
    * "Translate current page" option. */
   currentPage: number;
+  /** True iff at least one region_translation row on this document
+   * is still waiting on the worker (translated_text == null). The
+   * parent computes this; we use it to keep the trigger disabled
+   * past the POST so the doctor can't queue a second job while one
+   * is still processing. */
+  translationPending?: boolean;
   /** Called when the doctor picks "Translate selected region" — the
    * parent flips the viewer into selection mode and waits for a bbox
    * (it then calls /translate-region itself). */
@@ -35,6 +41,7 @@ export default function ShareTranslateMenu({
   documentId,
   hasFile,
   currentPage,
+  translationPending = false,
   onStartRegionSelection,
   onQueued,
 }: ShareTranslateMenuProps) {
@@ -107,18 +114,28 @@ export default function ShareTranslateMenu({
     onStartRegionSelection();
   };
 
+  // The button stays disabled past the request-roundtrip — i.e. while
+  // any region translation row on this doc is still missing its
+  // translated_text. That covers the worker time after our POST has
+  // already returned 200, which would otherwise let the doctor queue
+  // a second translate while the first is still in flight.
+  const isBusy = submitting || translationPending;
+  const disabledReason = !hasFile
+    ? "This document has no file to translate."
+    : translationPending
+      ? "A translation is in progress; please wait."
+      : undefined;
+
   return (
     <div className="space-y-2">
       <div className="relative inline-block" ref={popoverRef}>
         <button
           onClick={() => setOpen((o) => !o)}
-          disabled={submitting || !hasFile}
-          title={
-            hasFile ? undefined : "This document has no file to translate."
-          }
+          disabled={isBusy || !hasFile}
+          title={disabledReason}
           className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? (
+          {isBusy ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Translating...
@@ -131,7 +148,7 @@ export default function ShareTranslateMenu({
             </>
           )}
         </button>
-        {open && !submitting && (
+        {open && !isBusy && (
           <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-lg border bg-background shadow-xl p-1.5 text-foreground">
             <button
               onClick={onTranslateCurrentPage}

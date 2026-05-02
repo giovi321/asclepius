@@ -2504,12 +2504,14 @@ export interface paths {
     put?: never;
     /**
      * Share Translate
-     * @description Queue a whole-document translation onto the existing pipeline.
+     * @deprecated
+     * @description DEPRECATED: whole-document translation via the doctor surface.
      *
-     *     The doctor uses the same worker as admin users; the only difference
-     *     is that this entry point enforces share-scope, rate limits, and audit
-     *     logging. Falls through to the same ``translate`` job kind so the
-     *     pipeline does not need to know about shares.
+     *     Kept for backward compatibility (the e2e test still exercises it)
+     *     but the doctor UI no longer exposes a button. Use
+     *     ``/documents/{doc_id}/translate-region`` with a full-page bbox
+     *     (x=0, y=0, w=1, h=1) instead — that path is rate-limited the same
+     *     way and lets the doctor pick which page to translate.
      */
     post: operations["share_translate_api_share_documents__doc_id__translate_post"];
     delete?: never;
@@ -2531,6 +2533,11 @@ export interface paths {
      * Share Translate Region
      * @description Region translate — same behaviour as the admin endpoint, scoped
      *     to the share and rate-limited like ``share_translate``.
+     *
+     *     Provider resolution order (each falls through if missing):
+     *     1. The body override sent by the doctor's UI.
+     *     2. The per-share defaults the admin saved at share-creation time.
+     *     3. The system's first-enabled provider.
      */
     post: operations["share_translate_region_api_share_documents__doc_id__translate_region_post"];
     delete?: never;
@@ -3300,6 +3307,10 @@ export interface components {
        * @default 7
        */
       expires_in_days: number;
+      /** Default Ocr Provider Id */
+      default_ocr_provider_id?: string | null;
+      /** Default Llm Provider Id */
+      default_llm_provider_id?: string | null;
     };
     /** ShareCreateResponse */
     ShareCreateResponse: {

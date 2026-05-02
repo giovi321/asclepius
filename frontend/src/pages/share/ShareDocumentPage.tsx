@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Languages, Moon, Sun } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
-import ShareDocumentViewer from "@/components/share/ShareDocumentViewer";
+import ShareDocumentViewer, {
+  type NormalizedBbox,
+} from "@/components/share/ShareDocumentViewer";
 import ShareTranslateMenu from "@/components/share/ShareTranslateMenu";
+import { useToast } from "@/contexts/ToastContext";
+import { useShareSession } from "@/contexts/ShareSessionContext";
+
+interface RegionTranslation {
+  id: number;
+  page: number;
+  ocr_text: string | null;
+  translated_text: string | null;
+  llm_model: string | null;
+  created_at: string;
+}
 
 interface ShareDocumentDetail {
   id: number;
@@ -23,26 +36,35 @@ interface ShareDocumentDetail {
   ocr_text_en: string | null;
   page_count: number | null;
   original_filename: string | null;
+  has_file: boolean;
   lab_results: any[];
   medications: any[];
   vaccinations: any[];
-  region_translations: any[];
+  region_translations: RegionTranslation[];
 }
 
 /**
  * Read-only document detail for the doctor share view.
  *
- * Reuses the backend's normal record shape so the same fields drive both
- * the admin and doctor sides — but the JSX deliberately renders no edit
- * affordances. The PDF/image is fetched via shareApi (cookie-bound) by
- * the ShareDocumentViewer, which never exposes a downloadable URL.
+ * Owns the PDF viewer's page + selection-mode state so the translate
+ * menu (sibling) can drive the viewer: "translate current page" reads
+ * the current page; "translate selected region" flips the viewer into
+ * draw-rectangle mode and waits for the bbox to come back.
+ *
+ * No edit / delete / upload affordances. The PDF/image is fetched via
+ * shareApi (cookie-bound) by the ShareDocumentViewer, which never
+ * exposes a downloadable URL.
  */
 export default function ShareDocumentPage() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const { theme, toggleTheme } = useShareSession();
   const docId = id ? parseInt(id, 10) : 0;
   const [doc, setDoc] = useState<ShareDocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectionMode, setSelectionMode] = useState(false);
 
   const refresh = async () => {
     try {
@@ -68,6 +90,32 @@ export default function ShareDocumentPage() {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId]);
+
+  const onSelectionConfirm = async (page: number, bbox: NormalizedBbox) => {
+    setSelectionMode(false);
+    try {
+      await shareApi.post(`/documents/${docId}/translate-region`, {
+        page,
+        bbox,
+      });
+      toast({
+        title: "Region translation queued",
+        description: `Will appear under "Region translations" in a moment.`,
+        variant: "success",
+      });
+      refresh();
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      toast({
+        title: "Translation request failed",
+        description:
+          (typeof detail === "string" ? detail : null) ||
+          `HTTP ${status ?? "?"}`,
+        variant: "error",
+      });
+    }
+  };
 
   if (loading)
     return <div className="p-8 text-muted-foreground">Loading...</div>;
@@ -97,13 +145,39 @@ export default function ShareDocumentPage() {
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
-          <div className="text-xs text-muted-foreground">Read-only view</div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">
+              Read-only view
+            </span>
+            <button
+              onClick={toggleTheme}
+              title={
+                theme === "dark"
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
+              aria-label="Toggle theme"
+              className="rounded-md border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section>
-          <ShareDocumentViewer documentId={doc.id} />
+          <ShareDocumentViewer
+            documentId={doc.id}
+            selectionMode={selectionMode}
+            onPageChange={setCurrentPage}
+            onSelectionConfirm={onSelectionConfirm}
+            onSelectionCancel={() => setSelectionMode(false)}
+          />
         </section>
 
         <section className="space-y-6">
@@ -147,20 +221,56 @@ export default function ShareDocumentPage() {
             <h2 className="text-sm font-semibold mb-2">Translation</h2>
             <ShareTranslateMenu
               documentId={doc.id}
-              hasOcrText={!!doc.ocr_text}
+              hasFile={doc.has_file}
+              currentPage={currentPage}
+              onStartRegionSelection={() => setSelectionMode(true)}
               onQueued={refresh}
             />
-            {doc.ocr_text_en && (
-              <details className="mt-3 rounded-md border bg-card">
-                <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
-                  English translation
-                </summary>
-                <div className="border-t p-3 text-sm whitespace-pre-wrap">
-                  {doc.ocr_text_en}
-                </div>
-              </details>
-            )}
           </div>
+
+          {doc.region_translations && doc.region_translations.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold mb-2">
+                Region translations
+              </h2>
+              <ul className="space-y-2">
+                {doc.region_translations.map((rt) => (
+                  <li
+                    key={rt.id}
+                    className="rounded-md border bg-card p-3 text-sm"
+                  >
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>Page {rt.page}</span>
+                      {rt.llm_model && (
+                        <span className="inline-flex items-center gap-1">
+                          <Languages className="h-3 w-3" /> {rt.llm_model}
+                        </span>
+                      )}
+                    </div>
+                    {rt.translated_text ? (
+                      <p className="whitespace-pre-wrap">
+                        {rt.translated_text}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        Translating...
+                      </p>
+                    )}
+                    {rt.ocr_text && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs text-muted-foreground">
+                          Original text
+                        </summary>
+                        <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
+                          {rt.ocr_text}
+                        </p>
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {doc.lab_results && doc.lab_results.length > 0 && (
             <div>
@@ -179,7 +289,11 @@ export default function ShareDocumentPage() {
                     {doc.lab_results.map((lr: any) => (
                       <tr
                         key={lr.id}
-                        className={lr.is_abnormal ? "bg-amber-50/40" : ""}
+                        className={
+                          lr.is_abnormal
+                            ? "bg-amber-50/40 dark:bg-amber-900/10"
+                            : ""
+                        }
                       >
                         <td className="px-3 py-1.5">
                           {lr.test_name_canonical || lr.test_name_original}

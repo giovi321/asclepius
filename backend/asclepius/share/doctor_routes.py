@@ -198,7 +198,10 @@ async def share_document_detail(
         user_agent=request.headers.get("user-agent"),
     )
 
-    # Strip storage-internal fields before returning.
+    # Strip storage-internal fields before returning. We expose a
+    # boolean ``has_file`` in their place so the doctor UI can decide
+    # whether to enable translate / fetch the file without ever seeing
+    # the vault path.
     public_doc = {
         k: v
         for k, v in doc.items()
@@ -213,6 +216,7 @@ async def share_document_detail(
             "error_message",
         }
     }
+    public_doc["has_file"] = bool(doc.get("file_path"))
 
     return {
         **public_doc,
@@ -322,7 +326,7 @@ async def share_serve_file(
     )
 
 
-@router.post("/documents/{doc_id}/translate")
+@router.post("/documents/{doc_id}/translate", deprecated=True)
 async def share_translate(
     doc_id: int,
     request: Request,
@@ -330,12 +334,13 @@ async def share_translate(
     session: dict = Depends(get_share_session),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Queue a whole-document translation onto the existing pipeline.
+    """DEPRECATED: whole-document translation via the doctor surface.
 
-    The doctor uses the same worker as admin users; the only difference
-    is that this entry point enforces share-scope, rate limits, and audit
-    logging. Falls through to the same ``translate`` job kind so the
-    pipeline does not need to know about shares.
+    Kept for backward compatibility (the e2e test still exercises it)
+    but the doctor UI no longer exposes a button. Use
+    ``/documents/{doc_id}/translate-region`` with a full-page bbox
+    (x=0, y=0, w=1, h=1) instead — that path is rate-limited the same
+    way and lets the doctor pick which page to translate.
     """
     cfg = get_config()
     doc = await _ensure_doc_in_share(db, session["share_id"], doc_id)
@@ -416,7 +421,13 @@ async def share_translate_region(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Region translate — same behaviour as the admin endpoint, scoped
-    to the share and rate-limited like ``share_translate``."""
+    to the share and rate-limited like ``share_translate``.
+
+    Provider resolution order (each falls through if missing):
+    1. The body override sent by the doctor's UI.
+    2. The per-share defaults the admin saved at share-creation time.
+    3. The system's first-enabled provider.
+    """
     cfg = get_config()
     doc = await _ensure_doc_in_share(db, session["share_id"], doc_id)
     if not doc.get("file_path"):
@@ -424,6 +435,11 @@ async def share_translate_region(
             status_code=400,
             detail="Document has no file to crop.",
         )
+
+    # Pull the share row so we can read the per-share provider defaults.
+    share_row = await share_service.get_share_by_id(db, session["share_id"])
+    share_default_ocr = (share_row or {}).get("default_ocr_provider_id") or None
+    share_default_llm = (share_row or {}).get("default_llm_provider_id") or None
 
     allowed, retry_after = translate_allowed(
         session_id=session["id"],
@@ -452,13 +468,13 @@ async def share_translate_region(
         return items[0] if items else None
 
     queued_providers: dict[str, str | None] = {}
-    ocr_id = body.ocr_provider_id
+    ocr_id = body.ocr_provider_id or share_default_ocr
     if not ocr_id:
         p = _first_enabled(cfg.ocr.providers)
         ocr_id = p.id if p else None
     if ocr_id:
         queued_providers["ocr"] = ocr_id
-    llm_id = body.llm_provider_id
+    llm_id = body.llm_provider_id or share_default_llm
     if not llm_id:
         p = _first_enabled(cfg.llm.providers)
         llm_id = p.id if p else None
@@ -492,8 +508,12 @@ async def share_translate_region(
             "region_row_id": region_row_id,
             "page": body.page,
             "bbox": body.bbox.model_dump(),
-            "ocr_provider_id": body.ocr_provider_id,
-            "llm_provider_id": body.llm_provider_id,
+            # Pass the resolved IDs (including share defaults) to the
+            # worker, not the raw body — otherwise the per-share defaults
+            # would be silently dropped and the worker would re-resolve
+            # to the system default.
+            "ocr_provider_id": ocr_id,
+            "llm_provider_id": llm_id,
             "resolved_providers": queued_providers,
         },
         priority=0,

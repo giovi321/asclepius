@@ -100,13 +100,17 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
     """)
     await db.commit()
 
-    # ── document_shares.token_clear column (idempotent). Older installs
-    # only had token_hash; we now also store the raw URL token so admins
-    # can copy a share link from the dashboard without re-issuing.
+    # ── document_shares additive columns (idempotent). Older installs
+    # only had token_hash; later iterations added the raw URL token (so
+    # admins can recopy a link) and per-share OCR / LLM defaults (so a
+    # doctor's translation request can fall back to the admin's choice
+    # of providers without exposing the picker on the doctor surface).
     cursor = await db.execute("PRAGMA table_info(document_shares)")
     cols = {row[1] for row in await cursor.fetchall()}
-    if cols and "token_clear" not in cols:
-        await db.execute("ALTER TABLE document_shares ADD COLUMN token_clear TEXT")
+    if cols:
+        for col in ("token_clear", "default_ocr_provider_id", "default_llm_provider_id"):
+            if col not in cols:
+                await db.execute(f"ALTER TABLE document_shares ADD COLUMN {col} TEXT")
         await db.commit()
 
     # Skip the rest entirely on a fresh install (no documents yet).

@@ -11,6 +11,7 @@ import {
 
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
+import { useLlmProviders, useOcrProviders } from "@/hooks/data";
 
 interface ShareSummary {
   id: number;
@@ -67,6 +68,16 @@ export default function ShareDialog({
   const [recipientLabel, setRecipientLabel] = useState("");
   const [recipientContact, setRecipientContact] = useState("");
   const [days, setDays] = useState(7);
+  const [ocrProviderId, setOcrProviderId] = useState("");
+  const [llmProviderId, setLlmProviderId] = useState("");
+  const { data: llmData } = useLlmProviders();
+  const { data: ocrData } = useOcrProviders();
+  const llmOptions = (Array.isArray(llmData) ? llmData : []).filter(
+    (p: any) => p.enabled,
+  );
+  const ocrOptions = (Array.isArray(ocrData) ? ocrData : []).filter(
+    (p: any) => p.enabled,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [createResult, setCreateResult] = useState<CreateResult | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
@@ -101,6 +112,8 @@ export default function ShareDialog({
       setRecipientLabel("");
       setRecipientContact("");
       setTokenCopied(false);
+      setOcrProviderId("");
+      setLlmProviderId("");
     }
   }, [open]);
 
@@ -114,6 +127,11 @@ export default function ShareDialog({
         recipient_label: recipientLabel.trim() || "Outside doctor",
         recipient_contact: recipientContact.trim() || "manual",
         expires_in_days: days,
+        // Empty string from the <select>'s "Default" option becomes
+        // null on the wire; the backend then falls through to the
+        // first-enabled provider at translate time.
+        default_ocr_provider_id: ocrProviderId || null,
+        default_llm_provider_id: llmProviderId || null,
       });
       setCreateResult(res.data);
       refresh();
@@ -238,6 +256,47 @@ export default function ShareDialog({
                   onChange={(e) => setDays(parseInt(e.target.value, 10) || 7)}
                   className="w-32 rounded-md border bg-background px-3 py-1.5 text-sm"
                 />
+              </div>
+              {/* Provider defaults — when the doctor clicks Translate
+                  the backend uses these unless the request overrides
+                  them. The doctor surface intentionally has no provider
+                  picker, so the admin's choice here is final from the
+                  doctor's point of view. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    OCR provider for translation
+                  </label>
+                  <select
+                    value={ocrProviderId}
+                    onChange={(e) => setOcrProviderId(e.target.value)}
+                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Default (highest priority)</option>
+                    {ocrOptions.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name || p.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">
+                    LLM provider for translation
+                  </label>
+                  <select
+                    value={llmProviderId}
+                    onChange={(e) => setLlmProviderId(e.target.value)}
+                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Default (highest priority)</option>
+                    {llmOptions.map((p: any) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name || p.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="flex justify-end">
                 <button

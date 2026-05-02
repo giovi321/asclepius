@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import shareApi from "@/api/shareClient";
+import { useTheme } from "@/hooks/useTheme";
 
 interface ShareDocument {
   id: number;
@@ -44,6 +45,11 @@ interface ShareSessionContextType {
   loading: boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Theme controls re-exported from useTheme so share pages can read
+   * + flip the theme without separately invoking the hook (which would
+   * race with the provider's instance and lose state). */
+  theme: "light" | "dark";
+  toggleTheme: () => void;
 }
 
 const ShareSessionContext = createContext<ShareSessionContextType | null>(null);
@@ -66,6 +72,11 @@ export function ShareSessionProvider({
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  // Mounted here so the doctor surface honours light/dark on first load
+  // (defaults to ``prefers-color-scheme`` since the doctor never visits
+  // the admin app to set the theme manually). The hook writes the
+  // ``.dark`` class on <html>; tailwind picks it up everywhere.
+  const { theme, toggleTheme } = useTheme();
 
   const refresh = useCallback(async () => {
     try {
@@ -111,7 +122,9 @@ export function ShareSessionProvider({
   }, [navigate]);
 
   return (
-    <ShareSessionContext.Provider value={{ me, loading, refresh, logout }}>
+    <ShareSessionContext.Provider
+      value={{ me, loading, refresh, logout, theme, toggleTheme }}
+    >
       {children}
     </ShareSessionContext.Provider>
   );

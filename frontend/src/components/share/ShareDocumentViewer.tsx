@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
   FileText,
+  X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -13,12 +15,30 @@ import shareApi from "@/api/shareClient";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
+/** Bbox in normalised [0,1] page coordinates. Mirrors the admin
+ * PdfViewer's NormalizedBbox so backend payloads match. */
+export interface NormalizedBbox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface ShareDocumentViewerProps {
   documentId: number;
-  /** Mime type hint from the server-side response (image/* vs PDF). The
-   * backend always serves PDFs untouched and rasterises images to PNG, so
-   * we only need to differentiate at this granularity. */
   treatAsImage?: boolean;
+  /** When true, click-and-drag draws a selection rectangle on the
+   * current page instead of panning. */
+  selectionMode?: boolean;
+  /** Called with the current page number whenever the doctor changes
+   * page. The parent uses this to know which page to translate when
+   * the doctor picks "Translate current page". */
+  onPageChange?: (page: number) => void;
+  /** Fired when the doctor confirms a region selection. Bbox is in
+   * normalised [0,1] page coords. */
+  onSelectionConfirm?: (page: number, bbox: NormalizedBbox) => void;
+  /** Fired when the doctor cancels selection mode (Esc or X button). */
+  onSelectionCancel?: () => void;
 }
 
 const ZOOM_MIN = 0.5;
@@ -29,19 +49,22 @@ const BUTTON_ZOOM_STEP = 0.2;
 /**
  * Read-only PDF / image viewer for the doctor share surface.
  *
- * Differences vs. the admin DocumentViewer:
- * - Fetches bytes via shareApi (cookie-bound, scoped path) into a Uint8Array
- *   that's handed straight to react-pdf — no Object URL, no `<a href>`,
- *   nothing the browser will treat as a downloadable resource.
- * - No download button, no "Open in new tab", no rotate / replace UI.
- * - Right-click and Ctrl+S/Ctrl+P are intercepted (cosmetic — a determined
- *   user can still screenshot, but we remove all easy paths).
- * - Click-and-drag pan, Ctrl+wheel zoom, Ctrl+= / Ctrl+- / Ctrl+0 keyboard
- *   shortcuts — same affordances as the admin viewer.
+ * vs. the admin DocumentViewer:
+ * - Bytes fetched via shareApi (cookie-bound) into a Uint8Array; never
+ *   exposed as a URL the browser would treat as downloadable.
+ * - No download button, no rotate / replace UI.
+ * - Right-click + Ctrl+S/Ctrl+P intercepted (cosmetic).
+ * - Click-and-drag pan, Ctrl+wheel zoom, Ctrl+= / Ctrl+- / Ctrl+0.
+ * - Optional selection mode (drag a rectangle for region-translate),
+ *   driven by the parent so the translate menu can flip it on / off.
  */
 export default function ShareDocumentViewer({
   documentId,
   treatAsImage = false,
+  selectionMode = false,
+  onPageChange,
+  onSelectionConfirm,
+  onSelectionCancel,
 }: ShareDocumentViewerProps) {
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
@@ -52,11 +75,9 @@ export default function ShareDocumentViewer({
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
 
-  // Pan state. We pan by adjusting scrollLeft/scrollTop on the
-  // ``overflow-auto`` container instead of CSS transforming the page —
-  // that way the browser handles bounds and bounces, and the visible
-  // bytes are always the rendered react-pdf canvas.
   const containerRef = useRef<HTMLDivElement>(null);
+  const pageWrapperRef = useRef<HTMLDivElement>(null);
+
   const [isPanning, setIsPanning] = useState(false);
   const panOriginRef = useRef<{
     x: number;
@@ -65,14 +86,25 @@ export default function ShareDocumentViewer({
     scrollTop: number;
   } | null>(null);
 
-  // Stable react-pdf options + file prop so identity-changes don't
-  // force re-fetches. (See earlier commit fixing the "PDF doesn't
-  // render" bug.)
+  // Selection rectangle in page-local pixels. ``drawingRect`` is the
+  // in-flight drag; ``lockedRect`` is what stays after mouseup so the
+  // confirm/cancel toolbar can render without flicker.
+  type SelectionRect = { x: number; y: number; w: number; h: number };
+  const [drawingRect, setDrawingRect] = useState<SelectionRect | null>(null);
+  const [lockedRect, setLockedRect] = useState<SelectionRect | null>(null);
+  const drawOriginRef = useRef<{ x: number; y: number } | null>(null);
+
   const docOptions = useMemo(() => ({}), []);
   const fileProp = useMemo(
     () => (pdfData ? { data: pdfData } : null),
     [pdfData],
   );
+
+  // Tell the parent which page the doctor is currently looking at, so
+  // the translate menu's "current page" option knows what to send.
+  useEffect(() => {
+    onPageChange?.(pageNumber);
+  }, [pageNumber, onPageChange]);
 
   useEffect(() => {
     let alive = true;
@@ -119,12 +151,6 @@ export default function ShareDocumentViewer({
     };
   }, [documentId]);
 
-  // Block right-click + Ctrl+S/Ctrl+P globally on the document. Ctrl+P
-  // also normally opens the print dialog which would reveal the file
-  // through the OS print system, so we suppress it here too. The
-  // Ctrl+= / Ctrl+- / Ctrl+0 zoom shortcuts are *separately* attached
-  // to the viewer container below so they only fire when the viewer is
-  // focused.
   useEffect(() => {
     const onCtx = (e: Event) => {
       e.preventDefault();
@@ -147,16 +173,12 @@ export default function ShareDocumentViewer({
     };
   }, []);
 
-  // Ctrl+wheel zoom. React's synthetic onWheel is passive in modern
-  // React, so we attach a native non-passive listener that can call
-  // preventDefault — otherwise the browser intercepts ctrl+scroll as
-  // a page-level zoom and our own zoom never fires.
+  // Ctrl+wheel zoom. Native non-passive listener so preventDefault
+  // works (React's synthetic onWheel is passive).
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
-      // ctrlKey is also true on macOS pinch-to-zoom, so pinch comes
-      // for free. metaKey covers Cmd on Mac.
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       const delta = e.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP;
@@ -166,12 +188,7 @@ export default function ShareDocumentViewer({
     return () => el.removeEventListener("wheel", handler);
   }, []);
 
-  // Ctrl+= / Ctrl+- / Ctrl+0 keyboard shortcuts. Bound to the document
-  // (not the container) so they work even when focus drifts to a
-  // toolbar button. Falls through to the browser when not over the
-  // viewer subtree, so it does not steal Ctrl+0 from the rest of the
-  // page if the user happens to be elsewhere — but here the share view
-  // is the entire page so that distinction doesn't matter.
+  // Ctrl++ / Ctrl+- / Ctrl+0 keyboard shortcuts.
   useEffect(() => {
     if (!pdfData) return;
     const handler = (e: KeyboardEvent) => {
@@ -191,22 +208,123 @@ export default function ShareDocumentViewer({
     return () => document.removeEventListener("keydown", handler);
   }, [pdfData]);
 
-  // Click-and-drag to pan inside the scroll container. mouseup +
-  // mousemove are window-bound so a fast drag that exits the viewport
-  // doesn't strand panning state.
-  const handlePanStart = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    const el = containerRef.current;
-    if (!el) return;
-    panOriginRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      scrollLeft: el.scrollLeft,
-      scrollTop: el.scrollTop,
+  // Reset selection state when the user changes pages or exits mode.
+  useEffect(() => {
+    setDrawingRect(null);
+    setLockedRect(null);
+    drawOriginRef.current = null;
+  }, [pageNumber, selectionMode]);
+
+  // Esc cancels selection mode.
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawingRect(null);
+        setLockedRect(null);
+        drawOriginRef.current = null;
+        onSelectionCancel?.();
+      }
     };
-    setIsPanning(true);
-    e.preventDefault();
-  }, []);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selectionMode, onSelectionCancel]);
+
+  const handleSelectionStart = useCallback(
+    (e: React.MouseEvent) => {
+      if (!selectionMode) return;
+      if (e.button !== 0) return;
+      const wrapper = pageWrapperRef.current;
+      if (!wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      drawOriginRef.current = { x, y };
+      setDrawingRect({ x, y, w: 0, h: 0 });
+      setLockedRect(null);
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    [selectionMode],
+  );
+
+  useEffect(() => {
+    if (!drawingRect) return;
+    const onMove = (e: MouseEvent) => {
+      const origin = drawOriginRef.current;
+      const wrapper = pageWrapperRef.current;
+      if (!origin || !wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
+      const cx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const cy = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+      const x = Math.min(origin.x, cx);
+      const y = Math.min(origin.y, cy);
+      const w = Math.abs(cx - origin.x);
+      const h = Math.abs(cy - origin.y);
+      setDrawingRect({ x, y, w, h });
+    };
+    const onUp = () => {
+      const final = drawingRect;
+      drawOriginRef.current = null;
+      setDrawingRect(null);
+      // Ignore tiny click-without-drag rectangles.
+      if (final && final.w >= 6 && final.h >= 6) {
+        setLockedRect(final);
+      } else {
+        setLockedRect(null);
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [drawingRect]);
+
+  const confirmSelection = () => {
+    const wrapper = pageWrapperRef.current;
+    const rect = lockedRect;
+    if (!wrapper || !rect) return;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    if (wrapperRect.width <= 0 || wrapperRect.height <= 0) return;
+    const bbox: NormalizedBbox = {
+      x: rect.x / wrapperRect.width,
+      y: rect.y / wrapperRect.height,
+      w: rect.w / wrapperRect.width,
+      h: rect.h / wrapperRect.height,
+    };
+    setLockedRect(null);
+    onSelectionConfirm?.(pageNumber, bbox);
+  };
+
+  const cancelSelection = () => {
+    setLockedRect(null);
+    setDrawingRect(null);
+    drawOriginRef.current = null;
+    onSelectionCancel?.();
+  };
+
+  const activeRect = lockedRect ?? drawingRect;
+
+  const handlePanStart = useCallback(
+    (e: React.MouseEvent) => {
+      // Don't pan while drawing a selection rectangle.
+      if (selectionMode) return;
+      if (e.button !== 0) return;
+      const el = containerRef.current;
+      if (!el) return;
+      panOriginRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: el.scrollLeft,
+        scrollTop: el.scrollTop,
+      };
+      setIsPanning(true);
+      e.preventDefault();
+    },
+    [selectionMode],
+  );
 
   useEffect(() => {
     if (!isPanning) return;
@@ -309,11 +427,32 @@ export default function ShareDocumentViewer({
             </button>
           </div>
         </div>
+
+        {selectionMode && (
+          <div className="flex items-center justify-between gap-2 border-b bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200">
+            <span>
+              Click and drag on page {pageNumber} to select a region. Press Esc
+              to cancel.
+            </span>
+            <button
+              onClick={cancelSelection}
+              className="rounded p-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+              title="Cancel selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <div
           ref={containerRef}
           onMouseDown={handlePanStart}
           className={`flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto select-none ${
-            isPanning ? "cursor-grabbing [&_*]:cursor-grabbing" : "cursor-grab"
+            selectionMode
+              ? "cursor-crosshair"
+              : isPanning
+                ? "cursor-grabbing [&_*]:cursor-grabbing"
+                : "cursor-grab"
           }`}
           onContextMenu={(e) => e.preventDefault()}
         >
@@ -331,17 +470,64 @@ export default function ShareDocumentViewer({
               </div>
             }
           >
-            <Page
-              pageNumber={pageNumber}
-              scale={scale}
-              renderTextLayer={false}
-              renderAnnotationLayer={false}
-              loading={
-                <div className="text-muted-foreground text-sm py-8">
-                  Rendering page...
+            <div
+              ref={pageWrapperRef}
+              onMouseDown={handleSelectionStart}
+              className="relative inline-block"
+            >
+              <Page
+                pageNumber={pageNumber}
+                scale={scale}
+                renderTextLayer={!selectionMode}
+                renderAnnotationLayer={!selectionMode}
+                loading={
+                  <div className="text-muted-foreground text-sm py-8">
+                    Rendering page...
+                  </div>
+                }
+              />
+              {selectionMode && activeRect && (
+                <div
+                  className="pointer-events-none absolute border-2 border-amber-500 bg-amber-400/20"
+                  style={{
+                    left: activeRect.x,
+                    top: activeRect.y,
+                    width: activeRect.w,
+                    height: activeRect.h,
+                  }}
+                />
+              )}
+              {selectionMode && lockedRect && (
+                <div
+                  className="absolute z-10 flex gap-1"
+                  style={{
+                    left: lockedRect.x,
+                    top: lockedRect.y + lockedRect.h + 4,
+                  }}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmSelection();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground shadow-lg hover:bg-primary/90"
+                  >
+                    <Check className="h-3 w-3" /> Translate this region
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      cancelSelection();
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs shadow-lg hover:bg-accent"
+                  >
+                    <X className="h-3 w-3" /> Cancel
+                  </button>
                 </div>
-              }
-            />
+              )}
+            </div>
           </Document>
         </div>
       </div>

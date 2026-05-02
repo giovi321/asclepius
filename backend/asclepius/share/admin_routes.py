@@ -37,6 +37,11 @@ class ShareCreateRequest(BaseModel):
     recipient_label: str = Field(min_length=1, max_length=200)
     recipient_contact: str = Field(min_length=1, max_length=200)
     expires_in_days: int = Field(default=7, ge=1, le=90)
+    # Provider preferences. Both optional — null falls back to the
+    # system's first-enabled provider at translate time, which keeps
+    # parity with the admin-side translate flow.
+    default_ocr_provider_id: str | None = None
+    default_llm_provider_id: str | None = None
 
 
 class ShareCreateResponse(BaseModel):
@@ -125,6 +130,8 @@ async def create_share(
         recipient_contact=body.recipient_contact.strip(),
         expires_at_iso=expires_at,
         created_by_user_id=current_user["id"],
+        default_ocr_provider_id=body.default_ocr_provider_id,
+        default_llm_provider_id=body.default_llm_provider_id,
     )
 
     await audit_log(

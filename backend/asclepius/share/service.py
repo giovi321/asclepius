@@ -174,18 +174,22 @@ async def create_share(
     recipient_contact: str,
     expires_at_iso: str,
     created_by_user_id: int,
+    default_ocr_provider_id: str | None = None,
+    default_llm_provider_id: str | None = None,
 ) -> tuple[int, str]:
     """Insert a share + its document membership rows. Returns (share_id, raw_token).
 
-    The raw token is returned to the caller exactly once and never stored
-    in plaintext — only its sha256 lives in ``token_hash``.
+    The raw token is returned to the caller exactly once. Provider
+    defaults are stored on the share row so doctor-side translate calls
+    can use them without the doctor seeing a provider picker.
     """
     raw_token = generate_share_token()
     cursor = await db.execute(
         """INSERT INTO document_shares
               (token_hash, token_clear, patient_id, created_by_user_id,
-               recipient_label, recipient_contact, contact_kind, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'manual', ?)""",
+               recipient_label, recipient_contact, contact_kind, expires_at,
+               default_ocr_provider_id, default_llm_provider_id)
+           VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)""",
         (
             hash_token(raw_token),
             raw_token,
@@ -194,6 +198,8 @@ async def create_share(
             recipient_label,
             recipient_contact,
             expires_at_iso,
+            default_ocr_provider_id or None,
+            default_llm_provider_id or None,
         ),
     )
     share_id = cursor.lastrowid
@@ -435,6 +441,7 @@ async def list_audit(db: aiosqlite.Connection, share_id: int, limit: int = 200) 
 _SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.token_clear,
                           sh.recipient_label, sh.recipient_contact,
                           sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
+                          sh.default_ocr_provider_id, sh.default_llm_provider_id,
                           u.username AS created_by_username,
                           p.display_name AS patient_name,
                           COALESCE(dc.cnt, 0) AS document_count,

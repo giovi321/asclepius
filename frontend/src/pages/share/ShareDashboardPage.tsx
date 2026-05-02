@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, FileText, Calendar } from "lucide-react";
+import { LogOut, FileText, Calendar, Moon, Sun } from "lucide-react";
 
 import { useShareSession } from "@/contexts/ShareSessionContext";
 
@@ -13,7 +13,7 @@ import { useShareSession } from "@/contexts/ShareSessionContext";
  * doctor sees this share's documents and nothing else.
  */
 export default function ShareDashboardPage() {
-  const { me, loading, logout } = useShareSession();
+  const { me, loading, logout, theme, toggleTheme } = useShareSession();
 
   if (loading) {
     return <div className="p-8 text-muted-foreground">Loading...</div>;
@@ -31,12 +31,30 @@ export default function ShareDashboardPage() {
               automatically in <SessionCountdown iso={me.session_expires_at} />
             </p>
           </div>
-          <button
-            onClick={logout}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
-            <LogOut className="h-4 w-4" /> Log out
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              title={
+                theme === "dark"
+                  ? "Switch to light mode"
+                  : "Switch to dark mode"
+              }
+              aria-label="Toggle theme"
+              className="rounded-md border p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              <LogOut className="h-4 w-4" /> Log out
+            </button>
+          </div>
         </div>
       </header>
 

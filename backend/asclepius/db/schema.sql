@@ -592,6 +592,13 @@ CREATE TABLE IF NOT EXISTS document_shares (
     contact_kind TEXT NOT NULL DEFAULT 'manual',  -- v1: only 'manual'; reserved: 'email','sms'
     expires_at DATETIME NOT NULL,          -- absolute share expiry (defaults to +7d at create)
     revoked_at DATETIME,
+    -- Per-share provider preferences. The doctor's translate-region call
+    -- uses these as fallbacks when the request doesn't override; admins
+    -- pick them in the share dialog so a doctor never has to think about
+    -- which OCR engine / LLM is configured. Both nullable; null falls
+    -- back to the system's first-enabled provider at translate time.
+    default_ocr_provider_id TEXT,
+    default_llm_provider_id TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_document_shares_patient ON document_shares(patient_id);

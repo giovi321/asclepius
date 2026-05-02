@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Languages, Moon, Sun } from "lucide-react";
+import { ArrowLeft, Moon, Sun } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareDocumentViewer, {
@@ -15,7 +15,6 @@ interface RegionTranslation {
   page: number;
   ocr_text: string | null;
   translated_text: string | null;
-  llm_model: string | null;
   created_at: string;
 }
 
@@ -255,13 +254,8 @@ export default function ShareDocumentPage() {
                     key={rt.id}
                     className="rounded-md border bg-card p-3 text-sm"
                   >
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                      <span>Page {rt.page}</span>
-                      {rt.llm_model && (
-                        <span className="inline-flex items-center gap-1">
-                          <Languages className="h-3 w-3" /> {rt.llm_model}
-                        </span>
-                      )}
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Page {rt.page}
                     </div>
                     {rt.translated_text ? (
                       <p className="whitespace-pre-wrap">

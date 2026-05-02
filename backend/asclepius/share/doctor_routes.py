@@ -170,12 +170,17 @@ async def share_document_detail(
     # markup, so we clean on read instead of changing the storage shape.
     rt_cursor = await db.execute(
         """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
-                  ocr_text, translated_text, llm_model, created_at
+                  ocr_text, translated_text, created_at
              FROM region_translations
             WHERE document_id = ?
             ORDER BY id DESC""",
         (doc_id,),
     )
+    # Don't include llm_model in the doctor surface — the doctor doesn't
+    # need to know which provider the admin configured, and surfacing it
+    # would require revealing internal model identifiers (sometimes
+    # tied to specific deployments). Storage isn't touched; we just
+    # don't SELECT it.
     region_translations = []
     for r in await rt_cursor.fetchall():
         item = dict(r)

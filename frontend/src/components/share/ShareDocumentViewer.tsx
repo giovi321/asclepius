@@ -175,7 +175,13 @@ export default function ShareDocumentViewer({
 
   // Ctrl+wheel zoom. Native non-passive listener so preventDefault
   // works (React's synthetic onWheel is passive).
+  //
+  // The dep on ``pdfData`` matters: this effect ran on mount when the
+  // container hadn't been rendered yet (we show a Loading div first).
+  // Without re-running after the PDF arrives we never bound to the
+  // real container and ctrl+scroll silently did nothing.
   useEffect(() => {
+    if (!pdfData) return;
     const el = containerRef.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
@@ -186,7 +192,7 @@ export default function ShareDocumentViewer({
     };
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-  }, []);
+  }, [pdfData]);
 
   // Ctrl++ / Ctrl+- / Ctrl+0 keyboard shortcuts.
   useEffect(() => {

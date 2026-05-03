@@ -17,7 +17,7 @@ If you've ever spent twenty minutes hunting for a blood test from three years ag
 
 Asclepius takes the pile of PDFs, scans, discharge letters, and phone photos of paper reports that builds up over a lifetime and turns it into something you can actually search. Drop a file into the inbox folder. The app runs OCR, asks an LLM to pull out the dates, diagnoses, lab values, and medications, and files everything under the right person and year.
 
-After that, you can plot a hemoglobin trend across a decade, scroll a timeline of every appointment, or just ask plain-language questions about your history.
+After that, you can plot a hemoglobin trend across a decade, scroll a timeline of every appointment, or just ask plain-language questions about your history. When a specialist needs to look at part of your file, you can hand them a one-time link plus a 6-digit code instead of emailing PDFs around.
 
 It runs in one Docker container on your own machine. Your records stay there unless you tell them otherwise.
 
@@ -54,7 +54,18 @@ You'll need an LLM somewhere, a local Ollama instance, a vLLM server, or a Claud
 - Multi-patient with role-based access, so you can keep records for a partner or your kids in the same install with separate access.
 - When you correct an extracted field, the change is captured and used as a few-shot example for similar documents later.
 - Every provider list (OCR, LLM, Vision-LLM) supports priority fallback, so a flaky endpoint hands off to the next one without you noticing.
-- **Doctor share links.** Hand a curated subset of one patient's records to an outside doctor for consultation: one-time URL + 6-digit OTP you read out by phone, watermarked PDFs, no download path, translate-current-page or translate-region only, 2-hour session, full audit trail. See [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.md).
+
+## Sharing records with an outside doctor
+
+When you need a second opinion, you don't want to attach a stack of scans to an email or hand over your whole archive. Asclepius has a dedicated share surface for outside clinicians: pick the documents that matter, give them a link, read out a code by phone, done.
+
+- **Curated, not all-or-nothing.** Tick one document or many from the list, as long as they belong to the same patient. The doctor sees only what you ticked, never the rest of the file, and free-text encounter notes are hidden by default.
+- **One-time link + out-of-band OTP.** The URL alone does nothing. The doctor has to request a 6-digit code on the landing page, and you read it back to them on a separate channel (typically a phone call). Five wrong attempts and the code burns; codes expire after 10 minutes; sessions are an absolute 2 hours with no refresh.
+- **Watermarked, no-download viewer.** PDFs are rendered server-side with a faint vector watermark on every page carrying the recipient's name and UTC timestamp. The viewer fetches bytes into memory, so right-click, Ctrl+S, and Ctrl+P are intercepted.
+- **Targeted translation, not a free LLM tunnel.** The doctor can translate the current page or drag a rectangle to translate a region. Whole-document translation isn't exposed. Rate-limited per session and per share. You pick which OCR and LLM provider runs the translation, per share or globally.
+- **Full audit trail.** Every OTP request, view, file fetch, translate, and logout is logged with timestamp, IP, and user-agent. Revoke kills active sessions instantly.
+
+Full reference: [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.md).
 
 ## Tech stack
 

@@ -40,7 +40,9 @@ router = APIRouter()
 
 
 def _resolve_test_connection(
-    entry, *, kind: str,
+    entry,
+    *,
+    kind: str,
 ) -> tuple[str, str, str, str, str]:
     """Resolve the effective ``(type, base_url, api_key, model, label)`` for
     a test request, mirroring how the real provider builders treat the
@@ -57,13 +59,19 @@ def _resolve_test_connection(
 
     if kind == "llm_vision":
         eff_type = (cred.type if cred else None) or entry.llm_provider
-        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (entry.llm_base_url or "")
+        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (
+            entry.llm_base_url or ""
+        )
         eff_api_key = (cred.api_key if cred and cred.api_key else None) or (entry.llm_api_key or "")
         eff_model = entry.llm_model or ""
     else:
         eff_type = (cred.type if cred else None) or getattr(entry, "type", "")
-        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (getattr(entry, "base_url", "") or "")
-        eff_api_key = (cred.api_key if cred and cred.api_key else None) or (getattr(entry, "api_key", "") or "")
+        eff_base_url = (cred.base_url if cred and cred.base_url else None) or (
+            getattr(entry, "base_url", "") or ""
+        )
+        eff_api_key = (cred.api_key if cred and cred.api_key else None) or (
+            getattr(entry, "api_key", "") or ""
+        )
         eff_model = getattr(entry, "model", "") or ""
 
     label = (cred.name if cred else "") or getattr(entry, "name", "") or eff_type
@@ -71,7 +79,12 @@ def _resolve_test_connection(
 
 
 async def _probe_metadata(
-    eff_type: str, base_url: str, api_key: str, model: str, *, timeout: float = 10.0,
+    eff_type: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    *,
+    timeout: float = 10.0,
 ) -> dict:
     """Hit the provider's free metadata endpoint to verify connectivity, auth
     and model availability — without consuming any inference tokens.
@@ -121,12 +134,16 @@ async def _probe_metadata(
                         f"Available: {', '.join(available[:10]) or '(none)'}"
                     ),
                 }
-            return {"ok": True, "detail": f"{eff_type.upper()} reachable · {len(available)} model(s) accessible"}
+            return {
+                "ok": True,
+                "detail": f"{eff_type.upper()} reachable · {len(available)} model(s) accessible",
+            }
 
         if eff_type == "claude":
             # Anthropic SDK exposes ``client.models.list()`` — free, validates
             # the API key. Catches the most common test failure (bad key).
             from anthropic import AsyncAnthropic
+
             client = AsyncAnthropic(api_key=api_key)
             try:
                 listing = await client.models.list()
@@ -147,7 +164,10 @@ async def _probe_metadata(
                         f"Available: {', '.join(ids[:8]) or '(none)'}"
                     ),
                 }
-            return {"ok": True, "detail": f"Anthropic API key valid · {len(ids)} model(s) accessible"}
+            return {
+                "ok": True,
+                "detail": f"Anthropic API key valid · {len(ids)} model(s) accessible",
+            }
 
         return {"ok": False, "error": f"Unknown provider type: {eff_type}"}
 
@@ -193,6 +213,7 @@ def _model_in_list(model: str, available: list[str]) -> bool:
 
 
 # --- LLM Providers ---
+
 
 @router.get("/llm-providers")
 async def get_llm_providers(current_user: dict = Depends(get_current_user)):
@@ -246,6 +267,7 @@ async def update_llm_providers(
 
 
 # --- OCR Providers ---
+
 
 @router.get("/ocr-providers")
 async def get_ocr_providers(current_user: dict = Depends(get_current_user)):
@@ -303,6 +325,7 @@ async def update_ocr_providers(
 
 # --- Vision-LLM Providers ---
 
+
 @router.get("/vision-providers")
 async def get_vision_providers(current_user: dict = Depends(get_current_user)):
     """Get the ordered list of Vision-LLM providers."""
@@ -355,14 +378,20 @@ async def update_vision_providers(
 
 # --- Credentials ---
 
+
 def _count_credential_references(config, credential_id: str) -> dict:
     """Count how many LLM / Vision / OCR entries reference a credential."""
     llm_n = sum(1 for p in config.llm.providers if p.credential_id == credential_id)
     vision_n = sum(1 for p in config.vision.providers if p.credential_id == credential_id)
     ocr_n = sum(1 for p in config.ocr.providers if p.credential_id == credential_id)
     general_n = 1 if config.llm.general.credential_id == credential_id else 0
-    return {"llm": llm_n, "vision": vision_n, "ocr": ocr_n, "general": general_n,
-            "total": llm_n + vision_n + ocr_n + general_n}
+    return {
+        "llm": llm_n,
+        "vision": vision_n,
+        "ocr": ocr_n,
+        "general": general_n,
+        "total": llm_n + vision_n + ocr_n + general_n,
+    }
 
 
 @router.get("/credentials")
@@ -431,6 +460,7 @@ async def update_credentials(
 
 # --- General LLM ---
 
+
 @router.get("/general-llm")
 async def get_general_llm(current_user: dict = Depends(get_current_user)):
     """Return the general (non-pipeline) LLM configuration. Concurrency
@@ -479,7 +509,67 @@ async def update_general_llm(
     return {"status": "saved"}
 
 
+# --- Translation defaults ---
+
+
+@router.get("/translation-defaults")
+async def get_translation_defaults(current_user: dict = Depends(get_current_user)):
+    """Return the system-wide default OCR + LLM provider IDs used by
+    translation flows. Empty string means "fall through to first
+    enabled"; the doctor's translate-region endpoint applies these
+    after per-share overrides."""
+    config = get_config()
+    return {
+        "ocr_provider_id": config.ocr.translation_provider_id or "",
+        "llm_provider_id": config.llm.translation_provider_id or "",
+    }
+
+
+class TranslationDefaultsUpdate(BaseModel):
+    ocr_provider_id: str = ""
+    llm_provider_id: str = ""
+
+
+@router.put("/translation-defaults")
+async def update_translation_defaults(
+    body: TranslationDefaultsUpdate,
+    current_user: dict = Depends(require_role("admin")),
+):
+    """Persist the system translation provider defaults to settings.yaml.
+
+    Validates that any non-empty IDs reference real provider entries so
+    the dashboard can't write a stale ID that nothing resolves later.
+    """
+    config = get_config()
+
+    if body.ocr_provider_id and not any(p.id == body.ocr_provider_id for p in config.ocr.providers):
+        raise HTTPException(
+            status_code=400, detail=f"Unknown OCR provider id: {body.ocr_provider_id}"
+        )
+    if body.llm_provider_id and not any(p.id == body.llm_provider_id for p in config.llm.providers):
+        raise HTTPException(
+            status_code=400, detail=f"Unknown LLM provider id: {body.llm_provider_id}"
+        )
+
+    config_path = os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml")
+    path = Path(config_path)
+    data = {}
+    if path.exists():
+        data = yaml.safe_load(path.read_text()) or {}
+
+    config.ocr.translation_provider_id = body.ocr_provider_id
+    config.llm.translation_provider_id = body.llm_provider_id
+
+    data.setdefault("ocr", {})["translation_provider_id"] = body.ocr_provider_id
+    data.setdefault("llm", {})["translation_provider_id"] = body.llm_provider_id
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(data, default_flow_style=False, allow_unicode=True))
+
+    return {"status": "saved"}
+
+
 # --- Provider testing ---
+
 
 class TestProviderRequest(BaseModel):
     """Test-connection request.
@@ -489,11 +579,18 @@ class TestProviderRequest(BaseModel):
     the inline entry wins — this lets the UI test pending edits before the
     user clicks Save.
     """
+
     provider_id: str | None = None
     provider: dict | None = None
 
 
-def _resolve_test_entry(body: TestProviderRequest, saved_providers, entry_cls, *, preserve_secret_fields: tuple[str, ...]) -> object:
+def _resolve_test_entry(
+    body: TestProviderRequest,
+    saved_providers,
+    entry_cls,
+    *,
+    preserve_secret_fields: tuple[str, ...],
+) -> object:
     """Resolve which provider entry to test.
 
     If the request carries an inline ``provider``, build an entry from it,
@@ -531,8 +628,9 @@ async def test_llm_provider(
     inference slot or burning tokens.
     """
     config = get_config()
-    entry = _resolve_test_entry(body, config.llm.providers, LlmProviderEntry,
-                                preserve_secret_fields=("api_key",))
+    entry = _resolve_test_entry(
+        body, config.llm.providers, LlmProviderEntry, preserve_secret_fields=("api_key",)
+    )
     eff_type, base_url, api_key, model, _ = _resolve_test_connection(entry, kind="llm")
     return await _probe_metadata(eff_type, base_url, api_key, model)
 
@@ -545,18 +643,25 @@ async def test_ocr_provider(
     """Test connectivity to an OCR provider."""
     config = get_config()
     entry = _resolve_test_entry(
-        body, config.ocr.providers, OcrProviderEntry,
+        body,
+        config.ocr.providers,
+        OcrProviderEntry,
         preserve_secret_fields=("remote_api_key", "llm_api_key", "google_vision_key"),
     )
 
     try:
         if entry.type == "tesseract":
             import subprocess
+
             result = subprocess.run(
                 ["tesseract", "--version"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
-            version = result.stdout.split("\n")[0] if result.stdout else result.stderr.split("\n")[0]
+            version = (
+                result.stdout.split("\n")[0] if result.stdout else result.stderr.split("\n")[0]
+            )
             return {"ok": True, "detail": f"Tesseract {version}"}
 
         elif entry.type == "tesseract_remote":
@@ -566,7 +671,8 @@ async def test_ocr_provider(
 
         elif entry.type == "llm_vision":
             eff_type, base_url, api_key, model, _ = _resolve_test_connection(
-                entry, kind="llm_vision",
+                entry,
+                kind="llm_vision",
             )
             return await _probe_metadata(eff_type, base_url, api_key, model)
 
@@ -601,7 +707,8 @@ async def test_vision_provider(
     No image is uploaded, no inference is run.
     """
     config = get_config()
-    entry = _resolve_test_entry(body, config.vision.providers, VisionLlmProviderEntry,
-                                preserve_secret_fields=("api_key",))
+    entry = _resolve_test_entry(
+        body, config.vision.providers, VisionLlmProviderEntry, preserve_secret_fields=("api_key",)
+    )
     eff_type, base_url, api_key, model, _ = _resolve_test_connection(entry, kind="vision")
     return await _probe_metadata(eff_type, base_url, api_key, model)

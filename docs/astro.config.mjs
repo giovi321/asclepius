@@ -81,6 +81,7 @@ export default defineConfig({
             { label: 'User Management', link: '/admin-guide/user-management/' },
             { label: 'Session Management', link: '/admin-guide/session-management/' },
             { label: 'LLM Configuration', link: '/admin-guide/llm-configuration/' },
+            { label: 'Doctor shares', link: '/admin-guide/doctor-shares/' },
             { label: 'Backup & Restore', link: '/admin-guide/backup-restore/' },
           ],
         },

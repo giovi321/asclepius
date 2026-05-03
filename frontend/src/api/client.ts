@@ -23,6 +23,12 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       !window.location.pathname.startsWith("/login") &&
       !window.location.pathname.startsWith("/setup") &&
+      // The doctor share surface mounts under /share/* and uses a
+      // separate cookie + axios client. The admin AuthProvider's
+      // /auth/me probe fires there too (it wraps the whole app) and
+      // 401s — without this guard we'd kick the doctor to the admin
+      // login page on every share page load.
+      !window.location.pathname.startsWith("/share") &&
       !error.config?.url?.includes("/auth/me") &&
       !error.config?.url?.includes("/oidc/") &&
       !error.config?.url?.includes("/setup/")
@@ -30,7 +36,7 @@ api.interceptors.response.use(
       window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

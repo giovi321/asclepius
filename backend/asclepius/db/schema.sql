@@ -565,6 +565,93 @@ CREATE INDEX IF NOT EXISTS idx_norm_diagnosis_aliases_alias ON norm_diagnosis_al
 CREATE INDEX IF NOT EXISTS idx_norm_medication_aliases_alias ON norm_medication_aliases(alias);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_document ON invoice_items(document_id);
 
+-- ── Doctor share access ───────────────────────────────────────────
+-- A "share" is a curated, read-only window onto a subset of one patient's
+-- documents, granted to an outside doctor without creating a real user
+-- account. The doctor proves possession of an out-of-band 6-digit OTP
+-- (delivered manually by the admin) to obtain a short session.
+--
+-- Cookies, auth deps, and TTL rules for share sessions are deliberately
+-- separate from the regular ``sessions`` table so a share token can never
+-- be promoted into a normal account session.
+CREATE TABLE IF NOT EXISTS document_shares (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    -- sha256 of the URL token. Authoritative for lookup; the raw token
+    -- in token_clear is only kept so the admin can re-copy the share URL
+    -- from the dashboard without having to issue a fresh share.
+    token_hash TEXT NOT NULL UNIQUE,
+    -- Plaintext URL token. Same trust level as the rest of the DB — a
+    -- DB read already exposes everything (PHI, audit, sessions), so
+    -- adding the token does not change the threat model materially. Kept
+    -- nullable for legacy rows created before this column existed.
+    token_clear TEXT,
+    patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+    recipient_label TEXT NOT NULL,         -- "Dr. Rossi" — shown in audit log + watermark
+    recipient_contact TEXT NOT NULL,       -- email/phone the admin will use to deliver OTPs
+    contact_kind TEXT NOT NULL DEFAULT 'manual',  -- v1: only 'manual'; reserved: 'email','sms'
+    expires_at DATETIME NOT NULL,          -- absolute share expiry (defaults to +7d at create)
+    revoked_at DATETIME,
+    -- Per-share provider preferences. The doctor's translate-region call
+    -- uses these as fallbacks when the request doesn't override; admins
+    -- pick them in the share dialog so a doctor never has to think about
+    -- which OCR engine / LLM is configured. Both nullable; null falls
+    -- back to the system's first-enabled provider at translate time.
+    default_ocr_provider_id TEXT,
+    default_llm_provider_id TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_document_shares_patient ON document_shares(patient_id);
+CREATE INDEX IF NOT EXISTS idx_document_shares_active ON document_shares(revoked_at, expires_at);
+
+CREATE TABLE IF NOT EXISTS document_share_documents (
+    share_id INTEGER NOT NULL REFERENCES document_shares(id) ON DELETE CASCADE,
+    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    PRIMARY KEY (share_id, document_id)
+);
+CREATE INDEX IF NOT EXISTS idx_document_share_documents_doc ON document_share_documents(document_id);
+
+CREATE TABLE IF NOT EXISTS document_share_otps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    share_id INTEGER NOT NULL REFERENCES document_shares(id) ON DELETE CASCADE,
+    -- sha256(code). Store nothing about the raw 6 digits.
+    otp_hash TEXT NOT NULL,
+    -- Plaintext code is held briefly here so the admin's audit view can
+    -- read it back to convey to the doctor. NULLed on first verify and
+    -- on TTL sweep. Acceptable risk: only admin sessions can read it.
+    otp_clear TEXT,
+    expires_at DATETIME NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    consumed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_document_share_otps_share ON document_share_otps(share_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS document_share_sessions (
+    id TEXT PRIMARY KEY,                    -- random 32-byte URL-safe id
+    share_id INTEGER NOT NULL REFERENCES document_shares(id) ON DELETE CASCADE,
+    expires_at DATETIME NOT NULL,           -- absolute TTL, no sliding refresh
+    revoked_at DATETIME,
+    client_ip TEXT,
+    user_agent TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_document_share_sessions_share ON document_share_sessions(share_id);
+CREATE INDEX IF NOT EXISTS idx_document_share_sessions_active ON document_share_sessions(revoked_at, expires_at);
+
+CREATE TABLE IF NOT EXISTS document_share_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    share_id INTEGER NOT NULL,
+    session_id TEXT,
+    action TEXT NOT NULL,
+    document_id INTEGER,
+    client_ip TEXT,
+    user_agent TEXT,
+    detail TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_document_share_audit_share ON document_share_audit(share_id, id DESC);
+
 -- Compat view for external tooling that expects doctor_name / facility_name / patient_name
 -- columns on the documents table (see issue #16).
 CREATE VIEW IF NOT EXISTS documents_with_names AS

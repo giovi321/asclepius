@@ -33,16 +33,20 @@ LOG_BUFFER: deque[dict] = deque(maxlen=1000)
 
 class BufferHandler(logging.Handler):
     """Captures log records into an in-memory ring buffer."""
+
     def emit(self, record):
         import time
+
         ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(record.created))
-        LOG_BUFFER.append({
-            "ts": ts,
-            "time": record.created,
-            "level": record.levelname,
-            "module": record.name,
-            "message": record.getMessage(),
-        })
+        LOG_BUFFER.append(
+            {
+                "ts": ts,
+                "time": record.created,
+                "level": record.levelname,
+                "module": record.name,
+                "message": record.getMessage(),
+            }
+        )
 
 
 # Configure logging — show all asclepius modules at INFO level
@@ -97,6 +101,7 @@ async def lifespan(app: FastAPI):
     if config.pipeline.watch_enabled:
         import asyncio
         from asclepius.pipeline.watcher import start_watcher
+
         app.state.pipeline_task = asyncio.create_task(start_watcher(config, app.state))
 
     # Start backup scheduler if enabled
@@ -104,6 +109,7 @@ async def lifespan(app: FastAPI):
     if config.backup.enabled:
         import asyncio
         from asclepius.backup.scheduler import start_backup_scheduler
+
         app.state.backup_task = asyncio.create_task(start_backup_scheduler(config, app.state))
 
     yield
@@ -153,48 +159,78 @@ def create_app() -> FastAPI:
 
     # Register routers (will be added as they're implemented)
     from asclepius.auth.routes import router as auth_router
+
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 
     from asclepius.auth.oidc import router as oidc_router
+
     app.include_router(oidc_router, prefix="/api/auth", tags=["oidc"])
 
     from asclepius.patients.routes import router as patients_router
+
     app.include_router(patients_router, prefix="/api/patients", tags=["patients"])
 
     from asclepius.documents.routes import router as documents_router
+
     app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
 
     # Child-record edits live at /api/encounters/{id} and /api/medications/{id}
     # — separate prefix because they don't pivot on a document id in the URL.
     from asclepius.documents.child_routes import router as child_router
+
     app.include_router(child_router, prefix="/api", tags=["records"])
 
     from asclepius.events.routes import router as events_router
+
     app.include_router(events_router, prefix="/api/events", tags=["events"])
 
     from asclepius.lab_results.routes import router as lab_results_router
+
     app.include_router(lab_results_router, prefix="/api/lab-results", tags=["lab-results"])
 
     from asclepius.imaging.routes import router as imaging_router
+
     app.include_router(imaging_router, prefix="/api/imaging", tags=["imaging"])
 
     from asclepius.chat.routes import router as chat_router
+
     app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 
     from asclepius.normalization.routes import router as normalization_router
+
     app.include_router(normalization_router, prefix="/api/normalization", tags=["normalization"])
 
     from asclepius.pipeline.routes import router as pipeline_router
+
     app.include_router(pipeline_router, prefix="/api/pipeline", tags=["pipeline"])
 
     from asclepius.settings.routes import router as settings_router
+
     app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
 
     from asclepius.vault.routes import router as vault_router
+
     app.include_router(vault_router, prefix="/api/vault", tags=["vault"])
 
     from asclepius.setup.routes import router as setup_router
+
     app.include_router(setup_router, prefix="/api/setup", tags=["setup"])
+
+    # Doctor share access — three routers covering admin management,
+    # public OTP/session bootstrap, and the doctor-side read surface.
+    # Mounted at distinct prefixes so the public/doctor surface lives
+    # under ``/api/share`` (singular) while admin lives at ``/api/shares``.
+    from asclepius.share.admin_routes import router as share_admin_router
+
+    app.include_router(share_admin_router, prefix="/api/shares", tags=["shares"])
+
+    from asclepius.share.public_routes import router as share_public_router
+
+    app.include_router(share_public_router, prefix="/api/share", tags=["share-public"])
+
+    from asclepius.share.doctor_routes import router as share_doctor_router
+
+    app.include_router(share_doctor_router, prefix="/api/share", tags=["share-doctor"])
 
     # Serve frontend static files (production build)
     if STATIC_DIR.exists():
@@ -208,7 +244,7 @@ def create_app() -> FastAPI:
             ``STATIC_DIR`` (``..`` segments, symlinks pointing out, etc.)
             falls back to ``index.html`` instead of leaking host files.
             """
-            file_path = (STATIC_DIR / path)
+            file_path = STATIC_DIR / path
             if is_within(STATIC_DIR, file_path) and file_path.is_file():
                 return FileResponse(str(file_path.resolve()))
             index = STATIC_DIR / "index.html"

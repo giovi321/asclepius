@@ -212,6 +212,23 @@ class InboxHandler(FileSystemEventHandler):
 AUTO_STOP_THRESHOLD = 5  # consecutive provider failures before auto-stopping
 
 
+def _spawn_worker(config: AppConfig, queue: PriorityQueue, app_state) -> threading.Thread:
+    """Start the pipeline worker daemon thread and stash a reference on
+    app_state so the watchdog in ``start_watcher`` can detect when it
+    dies and respawn it."""
+    worker = threading.Thread(
+        target=_pipeline_worker,
+        args=(config, queue, app_state),
+        daemon=True,
+        name="pipeline-worker",
+    )
+    worker.start()
+    if app_state is not None:
+        app_state.pipeline_worker = worker
+    logger.info("Pipeline worker thread started")
+    return worker
+
+
 def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) -> None:
     """Worker thread that processes files. Runs in its own thread with its own event loop."""
     import asyncio
@@ -249,8 +266,14 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                                 vault_root=Path(config.vault.root_path),
                                 db=_db,
                             )
-                    except Exception:
-                        logger.debug("Inbox idle sweep failed (non-fatal)", exc_info=True)
+                    except BaseException:
+                        # CancelledError inherits from BaseException in
+                        # Python 3.8+, and we've seen aiosqlite.connect
+                        # raise it intermittently from inside this thread's
+                        # private loop. ``except Exception`` would let it
+                        # escape, killing the worker thread and silently
+                        # stalling every subsequent reprocess / translate.
+                        logger.warning("Inbox idle sweep failed (non-fatal)", exc_info=True)
                 continue
             # Picked up a file → reset idle counter so we don't sweep
             # mid-batch.
@@ -312,7 +335,9 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                             (queued_doc_id,),
                         )
                         await _db.commit()
-                except Exception:
+                except BaseException:
+                    # See the inbox-sweep handler above for why this is
+                    # ``BaseException`` and not ``Exception``.
                     logger.warning(
                         "Failed to reset doc status after cancel-skip (doc=%d)",
                         queued_doc_id,
@@ -474,15 +499,9 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
         app_state.pipeline_auto_stopped = False
         app_state.pipeline_auto_stop_reason = ""
 
-    # Start pipeline worker in a daemon thread
-    worker = threading.Thread(
-        target=_pipeline_worker,
-        args=(config, queue, app_state),
-        daemon=True,
-        name="pipeline-worker",
-    )
-    worker.start()
-    logger.info("Pipeline worker thread started")
+    # Start pipeline worker in a daemon thread. The watchdog below
+    # reads back the reference via app_state.pipeline_worker.
+    _spawn_worker(config, queue, app_state)
 
     # Start file watcher
     handler = InboxHandler(queue, inbox_root=Path(inbox_path))
@@ -529,10 +548,51 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
                 queued_label=str(f),
             )
 
-    # Keep the coroutine alive and periodically check for scheduled documents
+    # Keep the coroutine alive: every 5s we check the worker is still up
+    # (so a silent death from a transient async hiccup gets recovered
+    # automatically, not stranded until the next backend restart) and
+    # every ~60s we sweep for scheduled documents that have come due.
+    schedule_tick = 0
     try:
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(5)
+            schedule_tick += 1
+
+            # Worker liveness watchdog. The worker thread is daemon so a
+            # crash leaves no trace beyond the traceback in stderr, and
+            # subsequent enqueues silently sit in an orphaned queue. We
+            # spawn a fresh worker AND a fresh queue (the old PriorityQueue
+            # is unreachable to FastAPI handlers anyway, since they read
+            # ``app_state.pipeline_queue``). Stale ``queued_jobs`` /
+            # ``queue_depth`` are reset so the dashboard reflects the
+            # actual state of the new queue (empty).
+            cur_worker = getattr(app_state, "pipeline_worker", None)
+            if cur_worker is not None and not cur_worker.is_alive():
+                logger.warning("Pipeline worker thread died unexpectedly — respawning")
+                from asclepius.pipeline.processor import pipeline_status as _ps
+
+                _ps["queue_depth"] = 0
+                _ps["queued_jobs"] = []
+                _ps["queued_files"] = []
+                _ps["processing"] = None
+                _ps["processing_step"] = None
+                _ps["processing_doc_id"] = None
+                _ps["processing_pages"] = None
+                _ps["processing_page_current"] = None
+                _ps["current_job"] = None
+                new_queue: PriorityQueue = PriorityQueue()
+                if app_state is not None:
+                    app_state.pipeline_queue = new_queue
+                # Also point the watchdog Observer at the new queue so
+                # newly-dropped inbox files reach the new worker.
+                handler.queue = new_queue
+                _spawn_worker(config, new_queue, app_state)
+                queue = new_queue
+
+            if schedule_tick < 12:
+                continue
+            schedule_tick = 0
+
             # Check for scheduled documents whose process_at time has passed
             try:
                 import aiosqlite

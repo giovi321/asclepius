@@ -22,6 +22,8 @@ async def get_pipeline_status(request: Request, current_user: dict = Depends(get
     app_state = request.app.state
     task = getattr(app_state, "pipeline_task", None)
     watcher_active = task is not None and not task.done()
+    worker = getattr(app_state, "pipeline_worker", None)
+    worker_alive = worker is not None and worker.is_alive()
 
     # Enrich the gate snapshot with user-chosen display names, so the top-bar
     # chip reads "Chandra" instead of "fredrezones55/chandra-ocr-2". Matching
@@ -63,6 +65,7 @@ async def get_pipeline_status(request: Request, current_user: dict = Depends(get
     return {
         **enriched,
         "watcher_active": watcher_active,
+        "worker_alive": worker_alive,
         "auto_stopped": getattr(app_state, "pipeline_auto_stopped", False),
         "auto_stop_reason": getattr(app_state, "pipeline_auto_stop_reason", ""),
         "llm_queues": queues,

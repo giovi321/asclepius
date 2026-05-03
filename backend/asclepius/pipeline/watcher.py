@@ -56,6 +56,18 @@ def enqueue_job(
     render model badges before the worker picks the job up. Uploads leave
     this unset because providers are resolved per-page after extraction.
     """
+    # Clear any stale cooperative-cancel marker for this doc before
+    # enqueueing. Without this, a previously-cancelled doc would have its
+    # NEW reprocess / translate / ai_edit / region-translate job silently
+    # skipped by the worker (cancel marker outlives the job that earned
+    # it), leaving documents.status stuck on "pending" with no progress.
+    # Clicking Reprocess is an explicit "do this again" — the prior cancel
+    # no longer applies.
+    if queued_doc_id is not None:
+        from asclepius.pipeline.processor import cancelled_docs
+
+        cancelled_docs.discard(queued_doc_id)
+
     seq = next(_JOB_SEQ)
     queue.put((priority, seq, kind, payload))
 
@@ -282,6 +294,30 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 from asclepius.pipeline.processor import pipeline_status as _ps
 
                 _ps["queue_depth"] = max(0, _ps.get("queue_depth", 0) - 1)
+                # Belt-and-braces: ensure the document isn't left wedged in
+                # "pending" / "processing". The /cancel endpoint normally
+                # sets status="cancelled" before the worker pops, but if the
+                # caller forgot (or the marker was stale from a prior cycle)
+                # the UI would otherwise keep rendering a Queued chip with
+                # no worker behind it. Best-effort — failures here only
+                # affect cosmetics.
+                try:
+                    import aiosqlite as _aiosqlite
+
+                    async with _aiosqlite.connect(config.database.path) as _db:
+                        await _db.execute(
+                            """UPDATE documents
+                               SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+                               WHERE id = ? AND status IN ('pending', 'processing')""",
+                            (queued_doc_id,),
+                        )
+                        await _db.commit()
+                except Exception:
+                    logger.warning(
+                        "Failed to reset doc status after cancel-skip (doc=%d)",
+                        queued_doc_id,
+                        exc_info=True,
+                    )
                 continue
 
             try:

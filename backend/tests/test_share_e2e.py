@@ -21,43 +21,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-
-@pytest.fixture
-def share_app(tmp_path, monkeypatch):
-    """Build a fresh FastAPI app pointed at a throwaway sqlite + vault."""
-    # Use a temp vault + sqlite + secret so we don't touch the user's data.
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    inbox = vault / "inbox"
-    inbox.mkdir()
-    db_path = tmp_path / "asclepius.sqlite"
-
-    monkeypatch.setenv("ASCLEPIUS_SECRET_KEY", "x" * 64)
-    monkeypatch.setenv("ASCLEPIUS_ENV", "development")
-    monkeypatch.setenv("ASCLEPIUS_DB_PATH", str(db_path))
-    monkeypatch.setenv("ASCLEPIUS_VAULT_PATH", str(vault))
-    monkeypatch.setenv("ASCLEPIUS_COOKIE_SECURE", "false")
-
-    # Force the resolver to ignore any settings.yaml file on disk.
-    monkeypatch.setenv("ASCLEPIUS_CONFIG_PATH", str(tmp_path / "no_such_config.yaml"))
-
-    # ``get_config`` is ``@lru_cache``-d, so a prior test's cached config
-    # would otherwise win and the lifespan would init a stale db_path.
-    from asclepius.config import get_config
-
-    get_config.cache_clear()
-
-    from asclepius.db.connection import set_db_path
-
-    set_db_path(str(db_path))
-
-    from asclepius.main import create_app
-
-    app = create_app()
-    return app, vault, db_path
-
 
 def _seed(db_path: Path, vault: Path) -> dict:
     """Insert one admin user, one patient, one PDF document. Returns ids + token."""

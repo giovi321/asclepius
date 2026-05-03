@@ -324,6 +324,18 @@ class ShareConfig(BaseModel):
     # How long a verified doctor session lives before re-OTP is required.
     # Absolute, not sliding; activity does not extend it.
     session_ttl_minutes: int = 120
+    # Idle threshold for the single-session lock. A session whose
+    # ``last_seen_at`` is older than this is treated as dead: the
+    # doctor's UI is bounced back to the landing page on the next
+    # request, and the share's slot is freed for any queued waiter.
+    # Activity is signalled by every authenticated API call plus an
+    # explicit heartbeat ping while the page is visible.
+    idle_timeout_minutes: int = 10
+    # Lifetime of a queue token (set when a second device verifies an
+    # OTP while a session is already active). Short enough that a
+    # closed waiting tab cannot hold the slot, long enough that real
+    # waits are tolerable.
+    queue_ttl_minutes: int = 5
     # OTP code lifetime from the moment the doctor calls request-otp.
     otp_ttl_minutes: int = 10
     # Max OTP verify attempts per code before it locks (single-use anyway).

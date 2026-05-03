@@ -15,7 +15,7 @@ from starlette.types import ASGIApp
 
 from asclepius.auth.session import COOKIE_NAME
 from asclepius.config import AppConfig
-from asclepius.share.dependencies import SHARE_COOKIE_NAME
+from asclepius.share.dependencies import SHARE_COOKIE_NAME, SHARE_QUEUE_COOKIE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +101,19 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             # cookie on their response and therefore have no cookie on the
             # request.
             has_session_cookie = (
-                COOKIE_NAME in request.cookies or SHARE_COOKIE_NAME in request.cookies
+                COOKIE_NAME in request.cookies
+                or SHARE_COOKIE_NAME in request.cookies
+                or SHARE_QUEUE_COOKIE_NAME in request.cookies
             )
             exempt = any(path.startswith(p) for p in _CSRF_EXEMPT_PREFIXES) or path in (
                 "/api/auth/login",
+                # Logout is intentionally CSRF-exempt so the doctor's
+                # ``pagehide`` beacon (sendBeacon cannot set custom
+                # headers) can free the share's single-session slot
+                # the moment the tab closes. The worst a CSRF attacker
+                # could do here is log a user out — annoying, not
+                # a security boundary.
+                "/api/share/logout",
             )
             if has_session_cookie and not exempt:
                 header_val = request.headers.get(_CSRF_HEADER, "").strip()

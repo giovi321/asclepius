@@ -113,6 +113,24 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
                 await db.execute(f"ALTER TABLE document_shares ADD COLUMN {col} TEXT")
         await db.commit()
 
+    # ── document_share_sessions.last_seen_at (idempotent). Drives the
+    # idle-timeout check that frees the single-session slot for a queued
+    # doctor. Older sessions fall back to created_at-equivalent on first
+    # touch; we backfill with CURRENT_TIMESTAMP so they don't immediately
+    # appear idle on first request after migration.
+    cursor = await db.execute("PRAGMA table_info(document_share_sessions)")
+    sess_cols = {row[1] for row in await cursor.fetchall()}
+    if sess_cols and "last_seen_at" not in sess_cols:
+        # SQLite refuses non-constant defaults on ADD COLUMN, so we add
+        # the column NULLable, backfill, then leave it nullable (the
+        # service-layer code coalesces NULL to created_at when checking
+        # idleness, so this stays correct even if a row sneaks in NULL).
+        await db.execute("ALTER TABLE document_share_sessions ADD COLUMN last_seen_at DATETIME")
+        await db.execute(
+            "UPDATE document_share_sessions SET last_seen_at = CURRENT_TIMESTAMP WHERE last_seen_at IS NULL"
+        )
+        await db.commit()
+
     # ── region_translations.target_language additive column. Older rows
     # were always English (the prompt was hardcoded), so backfill that.
     cursor = await db.execute("PRAGMA table_info(region_translations)")

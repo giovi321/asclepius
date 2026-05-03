@@ -21,6 +21,7 @@ import FileBrowserPage from "@/pages/FileBrowserPage";
 import SharesPage from "@/pages/SharesPage";
 import ShareLandingPage from "@/pages/share/ShareLandingPage";
 import ShareVerifyPage from "@/pages/share/ShareVerifyPage";
+import ShareWaitingPage from "@/pages/share/ShareWaitingPage";
 import ShareDashboardPage from "@/pages/share/ShareDashboardPage";
 import ShareDocumentPage from "@/pages/share/ShareDocumentPage";
 import { ShareSessionProvider } from "@/contexts/ShareSessionContext";
@@ -70,6 +71,10 @@ export default function App() {
         <Route
           path="documents/:id"
           element={page("Share document", <ShareDocumentPage />)}
+        />
+        <Route
+          path="waiting"
+          element={page("Share waiting", <ShareWaitingPage />)}
         />
         <Route path=":token/verify" element={<ShareVerifyPage />} />
         <Route path=":token" element={<ShareLandingPage />} />

@@ -53,6 +53,7 @@ async def db_path(tmp_path):
 async def db(db_path):
     """Initialize a test database and return a connection."""
     from asclepius.db.init import initialize_database
+
     await initialize_database(db_path)
 
     async with aiosqlite.connect(db_path) as conn:
@@ -71,6 +72,7 @@ _AUTH_HEADERS = {"X-Requested-With": "XMLHttpRequest"}
 def _reset_rate_limit():
     """Clear the in-process login rate limiter between tests."""
     from asclepius.auth import rate_limit
+
     rate_limit._attempts.clear()
     yield
     rate_limit._attempts.clear()
@@ -83,6 +85,7 @@ async def app(db_path, tmp_vault):
 
     # Override config
     from asclepius.config import get_config
+
     get_config.cache_clear()
     config = get_config()
     config.database.path = db_path
@@ -94,16 +97,19 @@ async def app(db_path, tmp_vault):
 
     # Override DB path in connection module
     from asclepius.db.connection import set_db_path
+
     set_db_path(db_path)
 
     # Initialize DB
     from asclepius.db.init import initialize_database
+
     await initialize_database(db_path)
 
     # Seed a deterministic admin user. We create it directly rather than
     # going through the setup wizard so individual tests can still exercise
     # the wizard when needed.
     from asclepius.auth.session import hash_password
+
     async with aiosqlite.connect(db_path) as conn:
         await conn.execute("PRAGMA foreign_keys=ON")
         await conn.execute(
@@ -114,6 +120,7 @@ async def app(db_path, tmp_vault):
         await conn.commit()
 
     from asclepius.main import create_app
+
     application = create_app()
     return application
 
@@ -123,7 +130,9 @@ async def client(app):
     """Authenticated test client with the CSRF header pre-set."""
     transport = ASGITransport(app=app)
     async with AsyncClient(
-        transport=transport, base_url="http://test", headers=_AUTH_HEADERS,
+        transport=transport,
+        base_url="http://test",
+        headers=_AUTH_HEADERS,
     ) as ac:
         resp = await ac.post(
             "/api/auth/login",
@@ -138,6 +147,49 @@ async def unauthed_client(app):
     """Unauthenticated test client (no session cookie)."""
     transport = ASGITransport(app=app)
     async with AsyncClient(
-        transport=transport, base_url="http://test", headers=_AUTH_HEADERS,
+        transport=transport,
+        base_url="http://test",
+        headers=_AUTH_HEADERS,
     ) as ac:
         yield ac
+
+
+@pytest.fixture
+def share_app(tmp_path, monkeypatch):
+    """Build a fresh FastAPI app pointed at a throwaway sqlite + vault.
+
+    Used by every share-flow test. Sync (vs the ``app`` fixture above
+    which is async) because the share tests use the FastAPI TestClient,
+    which manages its own loop via ASGI.
+    """
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "inbox").mkdir()
+    db_path = tmp_path / "asclepius.sqlite"
+
+    monkeypatch.setenv("ASCLEPIUS_SECRET_KEY", "x" * 64)
+    monkeypatch.setenv("ASCLEPIUS_ENV", "development")
+    monkeypatch.setenv("ASCLEPIUS_DB_PATH", str(db_path))
+    monkeypatch.setenv("ASCLEPIUS_VAULT_PATH", str(vault))
+    monkeypatch.setenv("ASCLEPIUS_COOKIE_SECURE", "false")
+    monkeypatch.setenv("ASCLEPIUS_CONFIG_PATH", str(tmp_path / "no_such_config.yaml"))
+
+    from asclepius.config import get_config
+
+    get_config.cache_clear()
+
+    from asclepius.db.connection import set_db_path
+
+    set_db_path(str(db_path))
+
+    # The OTP rate limiter holds module-level per-IP / per-token deques.
+    # Across a pytest process every TestClient request looks like it
+    # comes from the same loopback IP, so without an explicit reset the
+    # 11th OTP request anywhere in the suite trips the per-IP cap.
+    from asclepius.share.rate_limit import _reset_otp_buckets
+
+    _reset_otp_buckets()
+
+    from asclepius.main import create_app
+
+    return create_app(), vault, db_path

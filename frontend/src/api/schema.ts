@@ -2421,12 +2421,100 @@ export interface paths {
     put?: never;
     /**
      * Verify Otp
-     * @description Exchange a valid OTP for a session cookie.
+     * @description Exchange a valid OTP for a session cookie OR a queue token.
      *
-     *     On success a row is written to ``document_share_sessions`` and the
-     *     ``asclepius_share`` cookie is set with ``max_age = session TTL``.
+     *     On success when the share has no live session, a row is written to
+     *     ``document_share_sessions`` and the ``asclepius_share`` cookie is
+     *     set with ``max_age = session TTL`` (returns ``status: "active"``).
+     *
+     *     When the share is already bound to a live session on another device
+     *     we instead mint a short-lived queue token, set
+     *     ``asclepius_share_queue``, and return ``status: "queued"`` (HTTP
+     *     202). The doctor's frontend then polls ``/claim`` until the active
+     *     session dies (logout, idle, TTL, revocation).
+     *
+     *     The OTP is consumed in either branch — the doctor proved possession
+     *     of the code; whether they get the session immediately or have to
+     *     wait depends on the share's state, not on the code's validity.
      */
     post: operations["verify_otp_api_share__token__verify_otp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Claim Session
+     * @description Promote a queue token into a real session, or report still-busy.
+     *
+     *     Polled by a queued doctor's UI every few seconds. Three outcomes:
+     *
+     *     - The slot is free → create a session, swap the cookies (clear
+     *       ``asclepius_share_queue``, set ``asclepius_share``), return 200
+     *       with ``status: "active"``.
+     *     - The slot is still busy → return 202 with ``status: "queued"``
+     *       and a ``retry_after_seconds`` hint. Cookie unchanged.
+     *     - The queue token is gone (expired, share revoked, or never set)
+     *       → return 410 Gone so the UI can punt the doctor back to the
+     *       landing page to re-OTP.
+     */
+    post: operations["claim_session_api_share_claim_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/queue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Cancel Queue
+     * @description Explicit cancel from the waiting UI. Idempotent.
+     */
+    delete: operations["cancel_queue_api_share_queue_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/heartbeat": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Heartbeat
+     * @description Bump ``last_seen_at`` on the current share session.
+     *
+     *     Called by the doctor's UI every ~60s while the page is visible and
+     *     the user has interacted recently. Without this, a doctor reading a
+     *     long PDF (no API traffic for minutes) would be flagged idle and
+     *     bounced. Returns 204 whether the session exists or not so the UI
+     *     does not need to differentiate.
+     */
+    post: operations["heartbeat_api_share_heartbeat_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2447,7 +2535,9 @@ export interface paths {
      * @description Revoke the current share session and clear its cookie.
      *
      *     Idempotent: if no cookie is set we still clear and return 200 so the
-     *     UI can call this on hard navigation away.
+     *     UI can call this on hard navigation away. Also clears any queue
+     *     cookie because a "log out" gesture from any share-related screen
+     *     should leave the doctor in a clean state.
      */
     post: operations["logout_api_share_logout_post"];
     delete?: never;
@@ -7914,6 +8004,62 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  claim_session_api_share_claim_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  cancel_queue_api_share_queue_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  heartbeat_api_share_heartbeat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

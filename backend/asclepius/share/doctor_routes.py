@@ -36,6 +36,7 @@ from asclepius.share import service as share_service
 from asclepius.share.dependencies import get_share_session
 from asclepius.share.rate_limit import translate_allowed, translate_headroom
 from asclepius.share.watermark import (
+    WatermarkError,
     watermark_image_bytes,
     watermark_pdf_bytes,
 )
@@ -335,18 +336,50 @@ async def share_serve_file(
     }
 
     if suffix == ".pdf":
-        body = watermark_pdf_bytes(
-            path,
-            label=session["recipient_label"],
-            opacity=cfg.share.watermark_opacity,
-        )
+        try:
+            body = watermark_pdf_bytes(
+                path,
+                label=session["recipient_label"],
+                opacity=cfg.share.watermark_opacity,
+            )
+        except WatermarkError:
+            await share_service.write_audit(
+                db,
+                share_id=session["share_id"],
+                action="view_file_failed",
+                session_id=session["id"],
+                document_id=doc_id,
+                client_ip=get_client_ip(request),
+                user_agent=request.headers.get("user-agent"),
+                detail={"reason": "watermark_failed"},
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Document temporarily unavailable. Please retry.",
+            )
         media_type = "application/pdf"
     elif suffix in {".png", ".jpg", ".jpeg", ".tiff", ".tif"}:
-        body, media_type = watermark_image_bytes(
-            path,
-            label=session["recipient_label"],
-            opacity=cfg.share.watermark_opacity,
-        )
+        try:
+            body, media_type = watermark_image_bytes(
+                path,
+                label=session["recipient_label"],
+                opacity=cfg.share.watermark_opacity,
+            )
+        except WatermarkError:
+            await share_service.write_audit(
+                db,
+                share_id=session["share_id"],
+                action="view_file_failed",
+                session_id=session["id"],
+                document_id=doc_id,
+                client_ip=get_client_ip(request),
+                user_agent=request.headers.get("user-agent"),
+                detail={"reason": "watermark_failed"},
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="Document temporarily unavailable. Please retry.",
+            )
     else:
         # Non-watermarkable formats are not exposed to the doctor surface.
         # Refusing rather than streaming raw bytes keeps the "no leak"

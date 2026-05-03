@@ -51,6 +51,20 @@ def otp_request_allowed(token_hash: str, ip: str) -> bool:
         return True
 
 
+def _reset_otp_buckets() -> None:
+    """Clear all per-IP and per-token OTP request counters.
+
+    Test-only escape hatch — production code never touches this. The
+    rate limit lives in module-level state so unit tests that exercise
+    the OTP flow more than ~10 times across a single pytest process
+    would otherwise trip the per-IP cap (every TestClient request
+    appears to come from ``127.0.0.1``).
+    """
+    with _otp_lock:
+        _otp_buckets_ip.clear()
+        _otp_buckets_token.clear()
+
+
 # ── Translate limiter ────────────────────────────────────────────
 
 # Per-session: the last translate timestamp. Used for the debounce.

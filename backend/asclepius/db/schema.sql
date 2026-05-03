@@ -633,12 +633,36 @@ CREATE TABLE IF NOT EXISTS document_share_sessions (
     share_id INTEGER NOT NULL REFERENCES document_shares(id) ON DELETE CASCADE,
     expires_at DATETIME NOT NULL,           -- absolute TTL, no sliding refresh
     revoked_at DATETIME,
+    -- Updated on every authenticated request (and explicit heartbeat ping).
+    -- Drives the idle-timeout check: a session goes inactive after
+    -- ``share.idle_timeout_minutes`` of silence, freeing the single-session
+    -- slot for a queued doctor. Defaulted on insert so older rows pre-
+    -- migration get a sensible value.
+    last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     client_ip TEXT,
     user_agent TEXT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_document_share_sessions_share ON document_share_sessions(share_id);
 CREATE INDEX IF NOT EXISTS idx_document_share_sessions_active ON document_share_sessions(revoked_at, expires_at);
+
+-- ── Queue for the single-session-per-share constraint ────────────────────
+-- A share permits exactly one live session at a time. When a second device
+-- verifies an OTP while a session is already active, instead of rejecting
+-- we hand back a queue token. The doctor's frontend polls /share/claim;
+-- once the active session dies (logout, idle, TTL, or revocation) the
+-- claim call promotes the queue entry into a real session and swaps the
+-- cookie. Queue rows are short-lived: ``queue_ttl_minutes`` config (5min
+-- default), so a closed waiting tab cannot hold the slot indefinitely.
+CREATE TABLE IF NOT EXISTS document_share_session_queue (
+    id TEXT PRIMARY KEY,                    -- sha256 of the cookie token
+    share_id INTEGER NOT NULL REFERENCES document_shares(id) ON DELETE CASCADE,
+    expires_at DATETIME NOT NULL,           -- absolute TTL
+    client_ip TEXT,
+    user_agent TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_document_share_session_queue_share ON document_share_session_queue(share_id, expires_at);
 
 CREATE TABLE IF NOT EXISTS document_share_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -7,10 +7,14 @@ import shareApi from "@/api/shareClient";
 /**
  * OTP verification step.
  *
- * Submits the 6-digit code to verify-otp. On success the backend sets
- * the `asclepius_share` cookie via Set-Cookie and we navigate to the
- * doctor dashboard, which calls /api/share/me with the new cookie in
- * place to load the curated document list.
+ * Submits the 6-digit code to verify-otp. The backend either:
+ *  - sets the ``asclepius_share`` session cookie and returns
+ *    ``status: "active"`` — we hard-navigate to the dashboard so the
+ *    new cookie is picked up by the next ``/api/share/me`` fetch, or
+ *  - sets the ``asclepius_share_queue`` cookie and returns
+ *    ``status: "queued"`` (HTTP 202) when another device is already
+ *    using this share — we hard-navigate to ``/share/waiting`` so the
+ *    polling state machine takes over.
  */
 export default function ShareVerifyPage() {
   const { token } = useParams<{ token: string }>();
@@ -29,10 +33,18 @@ export default function ShareVerifyPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await shareApi.post(`/${token}/verify-otp`, { code: trimmed });
+      const res = await shareApi.post<{ status: "active" | "queued" }>(
+        `/${token}/verify-otp`,
+        { code: trimmed },
+      );
       // Hard navigation so the new cookie is picked up by the next
-      // /api/share/me fetch on the dashboard mount.
-      window.location.href = "/share/dashboard";
+      // page mount. Both status values navigate; the destination
+      // depends on which cookie the server just set.
+      if (res.data?.status === "queued") {
+        window.location.href = "/share/waiting";
+      } else {
+        window.location.href = "/share/dashboard";
+      }
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 401) {

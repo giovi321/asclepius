@@ -9,6 +9,12 @@ the underlying content — fast enough to do on every request.
 We never modify the on-disk file: each share-served stream is a fresh
 in-memory copy with the overlay applied. The original vault bytes stay
 pristine.
+
+If stamping fails we raise ``WatermarkError`` rather than fall back to
+streaming raw bytes. The doctor surface promises every served file is
+attributable to the recipient; an unstamped fallback would silently
+break that promise. The route layer turns the error into a 503 and the
+audit row records the failure.
 """
 
 from __future__ import annotations
@@ -23,6 +29,10 @@ import fitz
 logger = logging.getLogger(__name__)
 
 
+class WatermarkError(RuntimeError):
+    """Stamping failed. Caller MUST NOT fall back to the raw vault bytes."""
+
+
 def watermark_pdf_bytes(
     file_path: Path,
     *,
@@ -31,16 +41,14 @@ def watermark_pdf_bytes(
 ) -> bytes:
     """Read ``file_path``, stamp every page, and return the new PDF bytes.
 
-    A failure during stamping is logged and we fall back to streaming the
-    raw file — better the doctor sees an unstamped doc than a hard error
-    after the OTP flow. The audit log still records the file view, so a
-    stamping outage is observable.
+    Raises :class:`WatermarkError` on any failure. The route layer maps
+    this to a 503 so the doctor never receives an unstamped file.
     """
     try:
         doc = fitz.open(str(file_path))
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to open PDF for watermark: %s", file_path)
-        return file_path.read_bytes()
+        raise WatermarkError(f"open failed: {file_path}") from exc
 
     try:
         ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
@@ -61,12 +69,9 @@ def watermark_pdf_bytes(
         buf = io.BytesIO()
         doc.save(buf, deflate=True, garbage=3)
         return buf.getvalue()
-    except Exception:
+    except Exception as exc:
         logger.exception("Watermark stamping failed for %s", file_path)
-        try:
-            return file_path.read_bytes()
-        except Exception:
-            return b""
+        raise WatermarkError(f"stamp failed: {file_path}") from exc
     finally:
         try:
             doc.close()
@@ -138,38 +143,46 @@ def watermark_image_bytes(
     We render via Pillow so we don't pull in another dep; the output is
     always PNG to dodge format-specific issues (TIFF transparency, JPEG
     re-compression artefacts).
+
+    Raises :class:`WatermarkError` on any failure — same contract as the
+    PDF path. An unstamped fallback would break the attribution
+    invariant the share surface relies on.
     """
     try:
         from PIL import Image, ImageDraw, ImageFont
-    except ImportError:
-        logger.warning("Pillow not available for image watermark — passing through")
-        return file_path.read_bytes(), _guess_mime(file_path)
+    except ImportError as exc:
+        logger.exception("Pillow not available for image watermark: %s", file_path)
+        raise WatermarkError("Pillow is required for image watermarking") from exc
 
     try:
         img = Image.open(file_path).convert("RGBA")
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to open image for watermark: %s", file_path)
-        return file_path.read_bytes(), _guess_mime(file_path)
+        raise WatermarkError(f"open failed: {file_path}") from exc
 
-    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    text = f"{label}  ·  {ts}"
     try:
-        font = ImageFont.load_default()
-    except Exception:
-        font = None
-    alpha = max(0, min(255, int(opacity * 255)))
-    # Three repetitions along the diagonal.
-    for fraction in (0.25, 0.5, 0.75):
-        x = int(img.size[0] * fraction)
-        y = int(img.size[1] * fraction)
-        draw.text((x, y), text, fill=(80, 80, 80, alpha), font=font)
+        overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        text = f"{label}  ·  {ts}"
+        try:
+            font = ImageFont.load_default()
+        except Exception:
+            font = None
+        alpha = max(0, min(255, int(opacity * 255)))
+        # Three repetitions along the diagonal.
+        for fraction in (0.25, 0.5, 0.75):
+            x = int(img.size[0] * fraction)
+            y = int(img.size[1] * fraction)
+            draw.text((x, y), text, fill=(80, 80, 80, alpha), font=font)
 
-    out = Image.alpha_composite(img, overlay)
-    buf = io.BytesIO()
-    out.convert("RGB").save(buf, format="PNG")
-    return buf.getvalue(), "image/png"
+        out = Image.alpha_composite(img, overlay)
+        buf = io.BytesIO()
+        out.convert("RGB").save(buf, format="PNG")
+        return buf.getvalue(), "image/png"
+    except Exception as exc:
+        logger.exception("Watermark stamping failed for image: %s", file_path)
+        raise WatermarkError(f"stamp failed: {file_path}") from exc
 
 
 def _guess_mime(path: Path) -> str:

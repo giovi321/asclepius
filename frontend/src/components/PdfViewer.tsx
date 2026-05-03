@@ -71,6 +71,15 @@ export default function PdfViewer({
   const [scale, setScale] = useState(1.0);
   const [userZoomed, setUserZoomed] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
+  // Natural page width in CSS pixels at scale 1.0 — captured from the
+  // page's onLoadSuccess. Used to derive the effective scale of the
+  // current "Fit" rendering so the +/- buttons can step from there
+  // instead of jumping to an absolute ``scale`` of 1.0 + step. Without
+  // this the first zoom click on a landscape page in a wide column
+  // shrinks the page (fit-equivalent ~1.5 → user click drops to 1.2).
+  const [pageOriginalWidth, setPageOriginalWidth] = useState<number | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const pageWrapperRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -199,6 +208,29 @@ export default function PdfViewer({
   // Debounce the scale so rapid zoom clicks don't flood the worker
   const debouncedScale = useDebouncedValue(scale, 150);
 
+  /** Effective scale currently rendered. In user-zoom mode that's just
+   * ``scale``; in fit mode it's containerWidth / originalWidth — the
+   * implicit scale react-pdf computes when ``width`` is set instead of
+   * ``scale``. Used as the basis for the next +/- step so a click after
+   * Fit doesn't jump to an absolute scale that's smaller than what the
+   * user is currently looking at. */
+  const effectiveScale = (() => {
+    if (userZoomed) return scale;
+    if (containerWidth && pageOriginalWidth) {
+      return containerWidth / pageOriginalWidth;
+    }
+    return 1.0;
+  })();
+
+  const stepZoom = (delta: number) => {
+    const next = Math.max(
+      ZOOM_MIN,
+      Math.min(ZOOM_MAX, +(effectiveScale + delta).toFixed(2)),
+    );
+    setScale(next);
+    setUserZoomed(true);
+  };
+
   // Ctrl+wheel zooms (mirrors DicomViewer's pattern). Native listener with
   // passive:false because React's synthetic onWheel is passive in modern
   // React and can't preventDefault — without that the browser intercepts
@@ -213,14 +245,13 @@ export default function PdfViewer({
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
       const delta = e.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP;
-      setScale((s) =>
-        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, +(s + delta).toFixed(2))),
-      );
-      setUserZoomed(true);
+      stepZoom(delta);
     };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
-  }, []);
+    // stepZoom closes over effectiveScale, so we need it as a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveScale]);
 
   // Click-and-drag pan. The viewer uses overflow:auto so panning is just
   // adjusting scrollLeft/scrollTop. Bound to the container so toolbar
@@ -375,10 +406,7 @@ export default function PdfViewer({
         <div className="flex items-center gap-1">
           {/* Zoom */}
           <button
-            onClick={() => {
-              setScale((s) => Math.max(ZOOM_MIN, +(s - 0.2).toFixed(1)));
-              setUserZoomed(true);
-            }}
+            onClick={() => stepZoom(-0.2)}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom out (Ctrl + scroll)"
           >
@@ -391,10 +419,7 @@ export default function PdfViewer({
             {userZoomed ? `${Math.round(scale * 100)}%` : "Fit"}
           </span>
           <button
-            onClick={() => {
-              setScale((s) => Math.min(ZOOM_MAX, +(s + 0.2).toFixed(1)));
-              setUserZoomed(true);
-            }}
+            onClick={() => stepZoom(0.2)}
             className="rounded p-1.5 hover:bg-accent"
             title="Zoom in (Ctrl + scroll)"
           >
@@ -550,6 +575,15 @@ export default function PdfViewer({
                 renderTextLayer={!selectionMode}
                 renderAnnotationLayer={!selectionMode}
                 onRenderError={onPageRenderError}
+                onLoadSuccess={(p) => {
+                  // ``originalWidth`` is the page's natural CSS-pixel width
+                  // at scale 1.0. Stashing it lets stepZoom convert the
+                  // fit-mode rendering into an equivalent scale before
+                  // applying the next +/- step (see effectiveScale above).
+                  if (p?.originalWidth) {
+                    setPageOriginalWidth(p.originalWidth);
+                  }
+                }}
                 loading={
                   <div className="text-muted-foreground text-sm py-8">
                     Rendering page...

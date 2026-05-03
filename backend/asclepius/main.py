@@ -72,6 +72,15 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("anthropic").setLevel(logging.WARNING)
 
+# Uvicorn pre-configures its own loggers with handlers that lack timestamps and
+# sets propagate=False, so its lines bypass our root formatter. Strip those
+# handlers and let records propagate up so every line is timestamped.
+for _uv_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+    _uv_logger = logging.getLogger(_uv_name)
+    for _h in list(_uv_logger.handlers):
+        _uv_logger.removeHandler(_h)
+    _uv_logger.propagate = True
+
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
 

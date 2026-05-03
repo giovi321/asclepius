@@ -3,6 +3,7 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { Hourglass, Loader2 } from "lucide-react";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import type { PipelineProviders } from "@/types";
+import { parseBackendTs } from "@/lib/utils";
 
 interface Props {
   docId: number;
@@ -182,7 +183,7 @@ function ProcessingTooltipBody({
   stageProvider: string | null;
 }) {
   const now = useNow(true);
-  const startedMs = startedAt ? new Date(startedAt).getTime() : null;
+  const startedMs = parseBackendTs(startedAt);
   const elapsed = startedMs ? Math.max(0, now - startedMs) : null;
   return (
     <div className="space-y-2">

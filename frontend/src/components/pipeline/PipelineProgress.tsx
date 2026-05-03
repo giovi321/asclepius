@@ -24,6 +24,7 @@ import api from "@/api/client";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useToast } from "@/contexts/ToastContext";
+import { parseBackendTs } from "@/lib/utils";
 
 const STAGE_LABELS: Record<string, string> = {
   ocr: "OCR",
@@ -268,7 +269,7 @@ function RunningCard({
       : 0;
 
   const now = useNow(true);
-  const startedAt = job.started_at ? new Date(job.started_at).getTime() : null;
+  const startedAt = parseBackendTs(job.started_at);
   const elapsed = startedAt ? Math.max(0, now - startedAt) : null;
   const providers = (job.providers ?? null) as PipelineProviders | null;
   const providerNames = (job.provider_names ??

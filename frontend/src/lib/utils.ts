@@ -25,7 +25,11 @@ export function getBestDate(doc: {
 export function formatDate(s: string | null | undefined): string {
   if (!s) return "No date";
   const d = new Date(s + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /**
@@ -36,6 +40,24 @@ export function formatDocType(type: string | null | undefined): string {
   return type.replace(/_/g, " ");
 }
 
+/**
+ * Parse an ISO timestamp coming from the backend, treating naive strings
+ * (no `Z`, no `+HH:MM` / `-HH:MM` offset) as UTC.
+ *
+ * Most backend writers use ``datetime.utcnow().isoformat()``, which emits
+ * naive ISO strings like ``2026-05-03T13:00:00``. ``new Date(...)`` parses
+ * those as **local** time per the ECMAScript spec, so an elapsed-time
+ * readout in CET ends up offset by +1/+2h from reality. Appending ``Z``
+ * before constructing the Date forces UTC interpretation, which matches
+ * what the backend actually wrote.
+ */
+export function parseBackendTs(ts: string | null | undefined): number | null {
+  if (!ts) return null;
+  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(ts);
+  const ms = new Date(hasTz ? ts : `${ts}Z`).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 // ─── Status badge styling ──────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -43,7 +65,8 @@ const STATUS_CLASSES: Record<string, string> = {
   failed: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
   processing: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   pending: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  needs_review: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+  needs_review:
+    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
   cancelled: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 

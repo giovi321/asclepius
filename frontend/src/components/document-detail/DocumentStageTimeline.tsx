@@ -26,6 +26,7 @@ import type {
 } from "@/types";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useCollapseState } from "@/components/document-detail/DocumentDetailHelpers";
+import { parseBackendTs } from "@/lib/utils";
 
 const STAGE_LABELS: Record<string, string> = {
   ocr: "OCR",
@@ -121,36 +122,28 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
 
 function formatTimestamp(ts: string | null): string {
   if (!ts) return "";
-  try {
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return ts;
-    return d.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  } catch {
-    return ts;
-  }
+  const ms = parseBackendTs(ts);
+  if (ms == null) return ts;
+  return new Date(ms).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
 function formatRunStartShort(ts: string | null): string {
   if (!ts) return "";
-  try {
-    const d = new Date(ts);
-    if (isNaN(d.getTime())) return ts;
-    return d.toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return ts;
-  }
+  const ms = parseBackendTs(ts);
+  if (ms == null) return ts;
+  return new Date(ms).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function durationMs(start: string | null, end: string | null): number | null {

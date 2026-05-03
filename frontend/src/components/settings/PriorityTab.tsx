@@ -411,11 +411,29 @@ function TranslationDefaultsCard({
           {saved ? "Saved" : saving ? "Saving…" : "Save"}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Resolution order at translate time: explicit request override (admin
-        region picker) → per-share default (admin set when creating a doctor
-        share) → these defaults → first-enabled provider in the list.
-      </p>
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>
+          These providers are used for every translate action <em>unless</em>
+          something more specific is set. From most-specific to least:
+        </p>
+        <ol className="list-decimal pl-5 space-y-0.5">
+          <li>
+            A one-off pick from the admin Translate dropdown on a document.
+          </li>
+          <li>The per-share preference saved when creating a doctor share.</li>
+          <li>
+            <strong>These settings</strong> — used whenever neither of the above
+            applies.
+          </li>
+          <li>
+            The first enabled entry in the priority list, as a final fallback.
+          </li>
+        </ol>
+        <p>
+          Set these to pin a specific OCR / LLM for translation across the
+          board, without remembering to pick it every time.
+        </p>
+      </div>
     </div>
   );
 }

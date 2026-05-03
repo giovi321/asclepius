@@ -54,16 +54,16 @@ The Revoke button in the share row marks the share inactive and immediately inva
 
 ## Translation defaults
 
-Settings → Document Analysis → Priority has a **Translation defaults** card. Pick an OCR provider and an LLM provider that should be used whenever someone (admin or doctor) translates a document or region. Empty means "fall through to first-enabled".
+Settings → Document Analysis → Priority has a **Translation defaults** card. Pick an OCR provider and an LLM provider that should be used whenever someone (admin or doctor) translates a document or region. Leave empty to skip this layer.
 
-Resolution order at translate time:
+Translation jobs walk a four-level cascade and use the first level that has a provider set. From most specific to least:
 
-1. Explicit override in the request body (admin-side region picker only)
-2. Per-share defaults the admin set when creating that share
-3. System translation defaults from this card
-4. First-enabled provider in the priority list
+1. **A one-off pick from the admin Translate dropdown** on a document. If you, as admin, click Translate → Region and pick OCR/LLM in the dropdowns, those choices override everything else. (Doctors don't have this control.)
+2. **The per-share preference** you saved when creating a doctor share. Applies to every translate the doctor does within that one share.
+3. **The Translation defaults card itself.** Used whenever neither of the above is set, regardless of who's translating.
+4. **The first enabled provider in the priority list** below the card. Final fallback if none of the layers above have anything to say.
 
-This lets you dedicate a fast / cheap model to translation without touching the main extraction pipeline.
+This is why the Translation defaults are useful: they let you pin a specific OCR / LLM for translation across every document and every share, without having to set the preference per-share or remember to pick it from the dropdown each time. A common setup is to leave levels 1 and 2 empty and use level 3 to point translation at a fast remote model, while the main extraction pipeline keeps using a local one.
 
 ## Security model
 

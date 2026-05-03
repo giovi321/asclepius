@@ -266,6 +266,22 @@ class LlmConfig(BaseModel):
     # this language via a prepended directive on every prompt. Defaults to
     # English to keep the historical behaviour.
     canonical_language: str = "English"
+    # Default target language for on-demand translation flows (whole doc
+    # + region). Doctors viewing a share link see this as the pre-selected
+    # value in the language picker. Must be a member of
+    # ``translation_allowed_languages``.
+    translation_target_language: str = "English"
+    # Allow-list of languages the doctor share view exposes in the picker
+    # and that the backend will accept in translate requests. Restricted
+    # at write time to a known subset.
+    translation_allowed_languages: list[str] = [
+        "English",
+        "Italian",
+        "German",
+        "French",
+        "Spanish",
+        "Russian",
+    ]
     # General-purpose LLM (non-pipeline). See GeneralLlmConfig.
     general: GeneralLlmConfig = GeneralLlmConfig()
     # Default LLM provider id used by translation flows. Same fallback

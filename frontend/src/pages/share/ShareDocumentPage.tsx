@@ -16,6 +16,7 @@ interface RegionTranslation {
   ocr_text: string | null;
   translated_text: string | null;
   has_thumbnail: boolean;
+  target_language: string | null;
   created_at: string;
 }
 
@@ -58,13 +59,28 @@ interface ShareDocumentDetail {
 export default function ShareDocumentPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { theme, toggleTheme } = useShareSession();
+  const { me, theme, toggleTheme } = useShareSession();
   const docId = id ? parseInt(id, 10) : 0;
   const [doc, setDoc] = useState<ShareDocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectionMode, setSelectionMode] = useState(false);
+
+  const allowedLanguages = me?.allowed_translation_languages?.length
+    ? me.allowed_translation_languages
+    : ["English"];
+  const defaultLanguage =
+    me?.default_translation_language || allowedLanguages[0];
+  const [targetLanguage, setTargetLanguage] = useState<string>(defaultLanguage);
+
+  // Sync the picker once /me lands (the page often mounts before the
+  // share session refresh resolves).
+  useEffect(() => {
+    if (me)
+      setTargetLanguage(me.default_translation_language || allowedLanguages[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.default_translation_language]);
 
   const refresh = async () => {
     try {
@@ -112,6 +128,7 @@ export default function ShareDocumentPage() {
       await shareApi.post(`/documents/${docId}/translate-region`, {
         page,
         bbox,
+        target_language: targetLanguage,
       });
       toast({
         title: "Region translation queued",
@@ -239,6 +256,10 @@ export default function ShareDocumentPage() {
               hasFile={doc.has_file}
               currentPage={currentPage}
               translationPending={hasPendingTranslation}
+              allowedLanguages={allowedLanguages}
+              defaultLanguage={defaultLanguage}
+              targetLanguage={targetLanguage}
+              onTargetLanguageChange={setTargetLanguage}
               onStartRegionSelection={() => setSelectionMode(true)}
               onQueued={refresh}
             />
@@ -266,6 +287,11 @@ export default function ShareDocumentPage() {
                     >
                       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
                         <span>Page {rt.page}</span>
+                        {rt.target_language && (
+                          <span className="rounded-full border bg-background px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                            {rt.target_language}
+                          </span>
+                        )}
                         {thumbUrl && (
                           <a
                             href={thumbUrl}

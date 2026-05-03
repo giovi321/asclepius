@@ -70,7 +70,7 @@ CHAT_SYSTEM_PROMPT: str = prompt_body("chat_system")
 FILENAME_GENERATION_PROMPT: str = prompt_body("filename_generation")
 LINK_SUGGESTION_PROMPT: str = prompt_body("link_suggestion")
 PAGE_CLASSIFICATION_PROMPT: str = prompt_body("page_classification")
-TRANSLATION_EN_PROMPT: str = prompt_body("translation_en")
+TRANSLATION_PROMPT: str = prompt_body("translation")
 EXTRACTION_PROMPT_LEGACY: str = prompt_body("extraction_legacy")
 EXTRACTION_PROMPT: str = EXTRACTION_PROMPT_LEGACY
 

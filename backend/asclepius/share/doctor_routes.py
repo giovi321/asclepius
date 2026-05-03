@@ -67,6 +67,7 @@ router = APIRouter()
 
 class ShareTranslateRequest(BaseModel):
     llm_provider_id: str | None = None
+    target_language: str | None = None
 
 
 class RegionBbox(BaseModel):
@@ -81,6 +82,7 @@ class ShareTranslateRegionRequest(BaseModel):
     bbox: RegionBbox
     ocr_provider_id: str | None = None
     llm_provider_id: str | None = None
+    target_language: str | None = None
 
 
 # ── Helpers ──────────────────────────────────────────────────────
@@ -148,6 +150,11 @@ async def share_me(
         per_share_per_hour=cfg.share.translate_per_share_per_hour,
     )
 
+    allowed_languages = list(cfg.llm.translation_allowed_languages) or ["English"]
+    default_language = cfg.llm.translation_target_language or "English"
+    if default_language not in allowed_languages:
+        default_language = allowed_languages[0]
+
     return {
         "recipient_label": session["recipient_label"],
         "patient_name": patient_name,
@@ -155,6 +162,8 @@ async def share_me(
         "session_expires_at": session["expires_at"],
         "documents": safe_docs,
         "translate_rate_limit": headroom,
+        "default_translation_language": default_language,
+        "allowed_translation_languages": allowed_languages,
     }
 
 
@@ -187,7 +196,8 @@ async def share_document_detail(
     # markup, so we clean on read instead of changing the storage shape.
     rt_cursor = await db.execute(
         """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
-                  ocr_text, translated_text, thumbnail_path, created_at
+                  ocr_text, translated_text, thumbnail_path,
+                  target_language, created_at
              FROM region_translations
             WHERE document_id = ?
             ORDER BY id DESC""",
@@ -467,6 +477,14 @@ async def share_translate(
     if llm_id:
         queued_providers["llm"] = llm_id
 
+    allowed_languages = list(cfg.llm.translation_allowed_languages) or ["English"]
+    target_language = body.target_language or cfg.llm.translation_target_language or "English"
+    if target_language not in allowed_languages:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Language '{target_language}' is not in the configured allow-list",
+        )
+
     enqueue_job(
         queue,
         "translate",
@@ -474,6 +492,7 @@ async def share_translate(
             "doc_id": doc_id,
             "llm_provider_id": body.llm_provider_id,
             "resolved_providers": queued_providers,
+            "target_language": target_language,
         },
         priority=0,
         queued_doc_id=doc_id,
@@ -489,7 +508,7 @@ async def share_translate(
         document_id=doc_id,
         client_ip=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
-        detail={"kind": "full"},
+        detail={"kind": "full", "target_language": target_language},
     )
 
     return {"status": "queued", "document_id": doc_id}
@@ -570,11 +589,22 @@ async def share_translate_region(
     if llm_id:
         queued_providers["llm"] = llm_id
 
+    # Target-language resolution: doctor's pick -> admin default -> "English".
+    # Validated against the admin allow-list so a tampered request can't
+    # ask for an unsupported language.
+    allowed_languages = list(cfg.llm.translation_allowed_languages) or ["English"]
+    target_language = body.target_language or cfg.llm.translation_target_language or "English"
+    if target_language not in allowed_languages:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Language '{target_language}' is not in the configured allow-list",
+        )
+
     cursor = await db.execute(
         """INSERT INTO region_translations
               (document_id, page, bbox_x, bbox_y, bbox_w, bbox_h,
-               ocr_provider_id, llm_provider_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               ocr_provider_id, llm_provider_id, target_language)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             doc_id,
             body.page,
@@ -584,6 +614,7 @@ async def share_translate_region(
             body.bbox.h,
             ocr_id,
             llm_id,
+            target_language,
         ),
     )
     await db.commit()
@@ -604,6 +635,7 @@ async def share_translate_region(
             "ocr_provider_id": ocr_id,
             "llm_provider_id": llm_id,
             "resolved_providers": queued_providers,
+            "target_language": target_language,
         },
         priority=0,
         queued_doc_id=doc_id,
@@ -619,7 +651,11 @@ async def share_translate_region(
         document_id=doc_id,
         client_ip=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
-        detail={"kind": "region", "region_id": region_row_id},
+        detail={
+            "kind": "region",
+            "region_id": region_row_id,
+            "target_language": target_language,
+        },
     )
 
     return {"status": "queued", "document_id": doc_id, "region_id": region_row_id}

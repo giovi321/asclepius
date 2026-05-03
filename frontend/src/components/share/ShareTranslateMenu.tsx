@@ -15,6 +15,17 @@ interface ShareTranslateMenuProps {
    * past the POST so the doctor can't queue a second job while one
    * is still processing. */
   translationPending?: boolean;
+  /** Languages the doctor is allowed to pick from, sourced from
+   * /share/me. The selected value is sent in the translate-region
+   * body and recorded on each region_translations row. */
+  allowedLanguages: string[];
+  /** Default language for the picker on first render. */
+  defaultLanguage: string;
+  /** Currently-selected language. The parent owns the state so the
+   * region-selection flow (which routes through onSelectionConfirm)
+   * can read the same value the menu shows. */
+  targetLanguage: string;
+  onTargetLanguageChange: (lang: string) => void;
   /** Called when the doctor picks "Translate selected region" — the
    * parent flips the viewer into selection mode and waits for a bbox
    * (it then calls /translate-region itself). */
@@ -27,7 +38,7 @@ interface ShareTranslateMenuProps {
 /**
  * Translate trigger for the doctor share view.
  *
- * One button + a popover with two choices:
+ * One button + a popover with a language picker and two choices:
  *  - "Translate current page" — POSTs /translate-region with a
  *    full-page bbox so the existing region-translate pipeline handles
  *    it without a new endpoint.
@@ -42,6 +53,10 @@ export default function ShareTranslateMenu({
   hasFile,
   currentPage,
   translationPending = false,
+  allowedLanguages,
+  defaultLanguage,
+  targetLanguage,
+  onTargetLanguageChange,
   onStartRegionSelection,
   onQueued,
 }: ShareTranslateMenuProps) {
@@ -50,6 +65,26 @@ export default function ShareTranslateMenu({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Ensure the parent's selected language is always one we can actually
+  // send; if the admin removed it from the allow-list since the doctor
+  // first loaded the page, fall back to the default (which the backend
+  // also enforces is in the allow-list).
+  useEffect(() => {
+    if (allowedLanguages.length === 0) return;
+    if (!allowedLanguages.includes(targetLanguage)) {
+      onTargetLanguageChange(
+        allowedLanguages.includes(defaultLanguage)
+          ? defaultLanguage
+          : allowedLanguages[0],
+      );
+    }
+  }, [
+    allowedLanguages,
+    defaultLanguage,
+    targetLanguage,
+    onTargetLanguageChange,
+  ]);
 
   // Click-outside to dismiss the popover.
   useEffect(() => {
@@ -79,9 +114,10 @@ export default function ShareTranslateMenu({
       await shareApi.post(`/documents/${documentId}/translate-region`, {
         page: currentPage,
         bbox: { x: 0, y: 0, w: 1, h: 1 },
+        target_language: targetLanguage,
       });
       setMessage(
-        `Translation of page ${currentPage} queued. The translation will appear under "Region translations" in a moment; refresh to see it.`,
+        `Translation of page ${currentPage} into ${targetLanguage} queued. The translation will appear under "Region translations" in a moment; refresh to see it.`,
       );
       onQueued?.();
     } catch (err: any) {
@@ -126,56 +162,77 @@ export default function ShareTranslateMenu({
       ? "A translation is in progress; please wait."
       : undefined;
 
+  const showPicker = allowedLanguages.length > 1;
+
   return (
     <div className="space-y-2">
-      <div className="relative inline-block" ref={popoverRef}>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          disabled={isBusy || !hasFile}
-          title={disabledReason}
-          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isBusy ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Translating...
-            </>
-          ) : (
-            <>
-              <Languages className="h-4 w-4" />
-              Translate
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </>
-          )}
-        </button>
-        {open && !isBusy && (
-          <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-lg border bg-background shadow-xl p-1.5 text-foreground">
-            <button
-              onClick={onTranslateCurrentPage}
-              className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+      <div className="flex flex-wrap items-center gap-2">
+        {showPicker && (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            Into
+            <select
+              value={targetLanguage}
+              onChange={(e) => onTargetLanguageChange(e.target.value)}
+              disabled={isBusy}
+              className="rounded-md border bg-background px-2 py-1 text-sm text-foreground disabled:opacity-50"
             >
-              <FileText className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-              <div className="min-w-0">
-                <div className="font-medium">Translate current page</div>
-                <div className="text-xs text-muted-foreground">
-                  Page {currentPage} only.
-                </div>
-              </div>
-            </button>
-            <button
-              onClick={onTranslateRegion}
-              className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-            >
-              <Crop className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-              <div className="min-w-0">
-                <div className="font-medium">Translate selected region</div>
-                <div className="text-xs text-muted-foreground">
-                  Drag a rectangle on the page.
-                </div>
-              </div>
-            </button>
-          </div>
+              {allowedLanguages.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
+        <div className="relative inline-block" ref={popoverRef}>
+          <button
+            onClick={() => setOpen((o) => !o)}
+            disabled={isBusy || !hasFile}
+            title={disabledReason}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isBusy ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              <>
+                <Languages className="h-4 w-4" />
+                Translate
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </>
+            )}
+          </button>
+          {open && !isBusy && (
+            <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-lg border bg-background shadow-xl p-1.5 text-foreground">
+              <button
+                onClick={onTranslateCurrentPage}
+                className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+              >
+                <FileText className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="font-medium">Translate current page</div>
+                  <div className="text-xs text-muted-foreground">
+                    Page {currentPage} into {targetLanguage}.
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={onTranslateRegion}
+                className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+              >
+                <Crop className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <div className="font-medium">Translate selected region</div>
+                  <div className="text-xs text-muted-foreground">
+                    Drag a rectangle on the page; output in {targetLanguage}.
+                  </div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {message && (
         <p className="text-xs text-muted-foreground max-w-md">{message}</p>

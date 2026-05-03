@@ -8870,6 +8870,31 @@
             ],
             "title": "Canonical Language"
           },
+          "translation_target_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Target Language"
+          },
+          "translation_allowed_languages": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation Allowed Languages"
+          },
           "ocr_engine": {
             "anyOf": [
               {
@@ -9508,6 +9533,17 @@
               }
             ],
             "title": "Llm Provider Id"
+          },
+          "target_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Language"
           }
         },
         "type": "object",
@@ -9526,6 +9562,17 @@
               }
             ],
             "title": "Llm Provider Id"
+          },
+          "target_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Language"
           }
         },
         "type": "object",

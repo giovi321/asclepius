@@ -38,6 +38,8 @@ export interface ShareMe {
   session_expires_at: string;
   documents: ShareDocument[];
   translate_rate_limit: ShareTranslateLimit;
+  default_translation_language: string;
+  allowed_translation_languages: string[];
 }
 
 interface ShareSessionContextType {

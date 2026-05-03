@@ -97,6 +97,7 @@ async def translate_region(
     ocr_provider_id: str | None = None,
     llm_provider_id: str | None = None,
     resolved_providers: dict[str, str | None] | None = None,
+    target_language: str | None = None,
 ) -> dict:
     """Crop, OCR, and translate the region pre-allocated as ``region_row_id``.
 
@@ -113,6 +114,10 @@ async def translate_region(
     _current_task = asyncio.current_task()
     if _current_task is not None:
         register_running_task(doc_id, _current_task)
+
+    resolved_target_language = (
+        target_language or getattr(config.llm, "translation_target_language", "") or "English"
+    )
 
     async with aiosqlite.connect(config.database.path) as db:
         db.row_factory = aiosqlite.Row
@@ -242,13 +247,16 @@ async def translate_region(
                 else:
                     llm = get_llm_provider(config)
 
-                prompt_template = await get_prompt(config.database.path, "translation_en")
-                user_message = prompt_template.format(ocr_text=ocr_text)
+                prompt_template = await get_prompt(config.database.path, "translation")
+                user_message = prompt_template.format(
+                    ocr_text=ocr_text,
+                    target_language=resolved_target_language,
+                )
                 response = await llm.chat(
                     messages=[{"role": "user", "content": user_message}],
                     system_prompt=(
-                        "You translate medical documents to English following "
-                        "the user's rules precisely."
+                        f"You translate medical documents to {resolved_target_language} "
+                        "following the user's rules precisely."
                     ),
                 )
                 translated = (response or "").strip()
@@ -263,9 +271,9 @@ async def translate_region(
                 )
                 await db.execute(
                     """UPDATE region_translations
-                          SET translated_text = ?, llm_model = ?
+                          SET translated_text = ?, llm_model = ?, target_language = ?
                         WHERE id = ?""",
-                    (translated, model_label, region_row_id),
+                    (translated, model_label, resolved_target_language, region_row_id),
                 )
                 await db.commit()
 

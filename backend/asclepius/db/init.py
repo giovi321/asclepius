@@ -113,6 +113,16 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
                 await db.execute(f"ALTER TABLE document_shares ADD COLUMN {col} TEXT")
         await db.commit()
 
+    # ── region_translations.target_language additive column. Older rows
+    # were always English (the prompt was hardcoded), so backfill that.
+    cursor = await db.execute("PRAGMA table_info(region_translations)")
+    rt_cols = {row[1] for row in await cursor.fetchall()}
+    if rt_cols and "target_language" not in rt_cols:
+        await db.execute(
+            "ALTER TABLE region_translations ADD COLUMN target_language TEXT NOT NULL DEFAULT 'English'"
+        )
+        await db.commit()
+
     # Skip the rest entirely on a fresh install (no documents yet).
     cursor = await db.execute("SELECT COUNT(*) FROM documents")
     n_docs = (await cursor.fetchone())[0]

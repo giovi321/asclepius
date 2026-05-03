@@ -44,6 +44,7 @@ router.include_router(view_prefs_router)
 
 # --- Top-level settings blob ---
 
+
 @router.get("")
 async def get_settings(current_user: dict = Depends(get_current_user)):
     config = get_config()
@@ -55,6 +56,8 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "retry_backoff_seconds": list(config.llm.retry_backoff_seconds),
             "provider_count": len([p for p in config.llm.providers if p.enabled]),
             "canonical_language": config.llm.canonical_language,
+            "translation_target_language": config.llm.translation_target_language,
+            "translation_allowed_languages": list(config.llm.translation_allowed_languages),
         },
         "ocr": {
             "engine": config.ocr.engine,
@@ -117,6 +120,8 @@ class SettingsUpdate(BaseModel):
     llm_max_retries: int | None = None
     llm_retry_backoff_seconds: list[int] | None = None
     canonical_language: str | None = None
+    translation_target_language: str | None = None
+    translation_allowed_languages: list[str] | None = None
     # OCR
     ocr_engine: str | None = None
     ocr_language: str | None = None
@@ -166,13 +171,40 @@ class SettingsUpdate(BaseModel):
     backup_retention_value: int | None = None
 
 
+# Languages the translation flows can target. Kept in sync with the
+# frontend Language settings tab. Only members of this set may appear in
+# ``llm.translation_allowed_languages``.
+KNOWN_TRANSLATION_LANGUAGES = (
+    "English",
+    "Italian",
+    "German",
+    "French",
+    "Spanish",
+    "Russian",
+)
+
+
 # Mapping: API field -> (yaml_section, yaml_key, config_dotpath)
 _SETTINGS_MAP = {
     "extraction_timeout": ("llm", "extraction_timeout", "llm.extraction_timeout"),
-    "llm_max_concurrent_requests": ("llm", "max_concurrent_requests", "llm.max_concurrent_requests"),
+    "llm_max_concurrent_requests": (
+        "llm",
+        "max_concurrent_requests",
+        "llm.max_concurrent_requests",
+    ),
     "llm_max_retries": ("llm", "max_retries", "llm.max_retries"),
     "llm_retry_backoff_seconds": ("llm", "retry_backoff_seconds", "llm.retry_backoff_seconds"),
     "canonical_language": ("llm", "canonical_language", "llm.canonical_language"),
+    "translation_target_language": (
+        "llm",
+        "translation_target_language",
+        "llm.translation_target_language",
+    ),
+    "translation_allowed_languages": (
+        "llm",
+        "translation_allowed_languages",
+        "llm.translation_allowed_languages",
+    ),
     "ocr_engine": ("ocr", "engine", "ocr.engine"),
     "ocr_language": ("ocr", "language", "ocr.language"),
     "ocr_confidence_threshold": ("ocr", "confidence_threshold", "ocr.confidence_threshold"),
@@ -184,17 +216,35 @@ _SETTINGS_MAP = {
     "llm_vision_ollama_url": ("ocr", "llm_vision_ollama_url", "ocr.llm_vision_ollama_url"),
     "google_vision_key": ("ocr", "google_vision_key", "ocr.google_vision_key"),
     "ocr_max_concurrent_vision_requests": (
-        "ocr", "max_concurrent_vision_requests", "ocr.max_concurrent_vision_requests",
+        "ocr",
+        "max_concurrent_vision_requests",
+        "ocr.max_concurrent_vision_requests",
     ),
     "pipeline_watch_enabled": ("pipeline", "watch_enabled", "pipeline.watch_enabled"),
-    "pipeline_poll_interval": ("pipeline", "poll_interval_seconds", "pipeline.poll_interval_seconds"),
-    "pipeline_retry_interval": ("pipeline", "retry_interval_seconds", "pipeline.retry_interval_seconds"),
+    "pipeline_poll_interval": (
+        "pipeline",
+        "poll_interval_seconds",
+        "pipeline.poll_interval_seconds",
+    ),
+    "pipeline_retry_interval": (
+        "pipeline",
+        "retry_interval_seconds",
+        "pipeline.retry_interval_seconds",
+    ),
     "pipeline_max_retries": ("pipeline", "max_retries", "pipeline.max_retries"),
     "pipeline_default_flow": ("pipeline", "default_flow", "pipeline.default_flow"),
     "vision_extraction_timeout": ("vision", "extraction_timeout", "vision.extraction_timeout"),
-    "vision_max_concurrent_requests": ("vision", "max_concurrent_requests", "vision.max_concurrent_requests"),
+    "vision_max_concurrent_requests": (
+        "vision",
+        "max_concurrent_requests",
+        "vision.max_concurrent_requests",
+    ),
     "vision_max_retries": ("vision", "max_retries", "vision.max_retries"),
-    "vision_retry_backoff_seconds": ("vision", "retry_backoff_seconds", "vision.retry_backoff_seconds"),
+    "vision_retry_backoff_seconds": (
+        "vision",
+        "retry_backoff_seconds",
+        "vision.retry_backoff_seconds",
+    ),
     "session_ttl_hours": ("auth", "session_ttl_hours", "auth.session_ttl_hours"),
     "oidc_enabled": ("oidc", "enabled", "oidc.enabled"),
     "oidc_provider_url": ("oidc", "provider_url", "oidc.provider_url"),
@@ -238,15 +288,68 @@ async def update_settings(
     if not changes:
         raise HTTPException(status_code=400, detail="No settings to update")
 
-    if "pipeline_default_flow" in changes and changes["pipeline_default_flow"] not in ("ocr_llm", "vision_llm"):
-        raise HTTPException(status_code=400, detail="default_flow must be 'ocr_llm' or 'vision_llm'")
+    if "pipeline_default_flow" in changes and changes["pipeline_default_flow"] not in (
+        "ocr_llm",
+        "vision_llm",
+    ):
+        raise HTTPException(
+            status_code=400, detail="default_flow must be 'ocr_llm' or 'vision_llm'"
+        )
 
-    if "backup_schedule" in changes and changes["backup_schedule"] not in ("hourly", "daily", "weekly"):
-        raise HTTPException(status_code=400, detail="backup_schedule must be hourly, daily, or weekly")
-    if "backup_retention_mode" in changes and changes["backup_retention_mode"] not in ("count", "days"):
-        raise HTTPException(status_code=400, detail="backup_retention_mode must be 'count' or 'days'")
+    if "backup_schedule" in changes and changes["backup_schedule"] not in (
+        "hourly",
+        "daily",
+        "weekly",
+    ):
+        raise HTTPException(
+            status_code=400, detail="backup_schedule must be hourly, daily, or weekly"
+        )
+    if "backup_retention_mode" in changes and changes["backup_retention_mode"] not in (
+        "count",
+        "days",
+    ):
+        raise HTTPException(
+            status_code=400, detail="backup_retention_mode must be 'count' or 'days'"
+        )
 
     config = get_config()
+
+    # Resolve final translation language allow-list + default for cross-field validation.
+    if "translation_allowed_languages" in changes or "translation_target_language" in changes:
+        new_allowed = changes.get(
+            "translation_allowed_languages",
+            list(config.llm.translation_allowed_languages),
+        )
+        if not isinstance(new_allowed, list) or not new_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="translation_allowed_languages must be a non-empty list",
+            )
+        unknown = [lang for lang in new_allowed if lang not in KNOWN_TRANSLATION_LANGUAGES]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown translation language(s): {', '.join(unknown)}",
+            )
+        # de-dupe while preserving order
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for lang in new_allowed:
+            if lang not in seen:
+                seen.add(lang)
+                deduped.append(lang)
+        changes["translation_allowed_languages"] = deduped
+        new_allowed = deduped
+
+        new_default = changes.get(
+            "translation_target_language",
+            config.llm.translation_target_language,
+        )
+        if new_default not in new_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="translation_target_language must be in translation_allowed_languages",
+            )
 
     for key, value in changes.items():
         if key not in _SETTINGS_MAP:
@@ -279,6 +382,7 @@ async def update_settings(
         import asyncio
 
         from asclepius.pipeline.watcher import start_watcher
+
         app_state = request.app.state
         if changes["pipeline_watch_enabled"]:
             task = getattr(app_state, "pipeline_task", None)
@@ -297,6 +401,7 @@ async def update_settings(
         import asyncio
 
         from asclepius.backup.scheduler import start_backup_scheduler
+
         app_state = request.app.state
 
         task = getattr(app_state, "backup_task", None)
@@ -305,12 +410,16 @@ async def update_settings(
             app_state.backup_task = None
 
         if config.backup.enabled:
-            app_state.backup_task = asyncio.create_task(
-                start_backup_scheduler(config, app_state)
-            )
+            app_state.backup_task = asyncio.create_task(start_backup_scheduler(config, app_state))
 
     ip = get_client_ip(request) if request else None
-    await audit_log(db, current_user["id"], "settings.update", "settings",
-                    details={"changed_keys": list(changes.keys())}, ip_address=ip)
+    await audit_log(
+        db,
+        current_user["id"],
+        "settings.update",
+        "settings",
+        details={"changed_keys": list(changes.keys())},
+        ip_address=ip,
+    )
 
     return {"status": "saved", "changes": changes}

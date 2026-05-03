@@ -3250,6 +3250,10 @@ export interface components {
       llm_retry_backoff_seconds?: number[] | null;
       /** Canonical Language */
       canonical_language?: string | null;
+      /** Translation Target Language */
+      translation_target_language?: string | null;
+      /** Translation Allowed Languages */
+      translation_allowed_languages?: string[] | null;
       /** Ocr Engine */
       ocr_engine?: string | null;
       /** Ocr Language */
@@ -3386,11 +3390,15 @@ export interface components {
       ocr_provider_id?: string | null;
       /** Llm Provider Id */
       llm_provider_id?: string | null;
+      /** Target Language */
+      target_language?: string | null;
     };
     /** ShareTranslateRequest */
     ShareTranslateRequest: {
       /** Llm Provider Id */
       llm_provider_id?: string | null;
+      /** Target Language */
+      target_language?: string | null;
     };
     /**
      * TestProviderRequest

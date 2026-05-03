@@ -46,8 +46,13 @@ async def translate_document(
     config: AppConfig,
     llm_provider_id: str | None = None,
     resolved_providers: dict[str, str | None] | None = None,
+    target_language: str | None = None,
 ) -> dict:
-    """Translate ``documents.ocr_text`` to English and persist as ``ocr_text_en``.
+    """Translate ``documents.ocr_text`` and persist as ``ocr_text_en``.
+
+    ``target_language`` defaults to ``config.llm.translation_target_language``.
+    The "_en" column name is historic; the column now stores text in whichever
+    language was selected.
 
     Returns a dict with ``status`` and ``document_id``. Does not modify
     the document's pipeline ``status`` — translation is an independent
@@ -111,7 +116,11 @@ async def translate_document(
         else:
             llm = get_llm_provider(config)
 
-        prompt_template = await get_prompt(config.database.path, "translation_en")
+        resolved_target_language = (
+            target_language or getattr(config.llm, "translation_target_language", "") or "English"
+        )
+
+        prompt_template = await get_prompt(config.database.path, "translation")
 
         # Reuse the page-aware chunker so paragraph and table boundaries
         # are respected. ``cleaned`` lacks page-cache parity with
@@ -137,10 +146,16 @@ async def translate_document(
 
                     progress.set_page(index, total=total_chunks)
 
-                    user_message = prompt_template.format(ocr_text=chunk["text"])
+                    user_message = prompt_template.format(
+                        ocr_text=chunk["text"],
+                        target_language=resolved_target_language,
+                    )
                     response = await llm.chat(
                         messages=[{"role": "user", "content": user_message}],
-                        system_prompt="You translate medical documents to English following the user's rules precisely.",
+                        system_prompt=(
+                            f"You translate medical documents to {resolved_target_language} "
+                            "following the user's rules precisely."
+                        ),
                     )
                     translated_parts.append(response.strip())
 

@@ -82,7 +82,7 @@ PROMPT_VARIABLE_KEYS: dict[str, list[str]] = {
         "other_documents",
     ],
     "page_classification": ["pages_text"],
-    "translation_en": ["ocr_text"],
+    "translation": ["ocr_text", "target_language"],
 }
 
 
@@ -162,9 +162,9 @@ PROMPT_REGISTRY = {
         "description": "Classify pages of multi-page documents into content types",
         "default_attr": "PAGE_CLASSIFICATION_PROMPT",
     },
-    "translation_en": {
-        "description": "On-demand translation of a document body to English",
-        "default_attr": "TRANSLATION_EN_PROMPT",
+    "translation": {
+        "description": "On-demand translation of a document body into a configurable target language",
+        "default_attr": "TRANSLATION_PROMPT",
     },
 }
 

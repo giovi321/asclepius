@@ -429,6 +429,7 @@ CREATE TABLE IF NOT EXISTS region_translations (
     llm_provider_id TEXT,
     llm_model TEXT,
     thumbnail_path TEXT,
+    target_language TEXT NOT NULL DEFAULT 'English',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_region_translations_doc

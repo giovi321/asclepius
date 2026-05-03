@@ -15,6 +15,7 @@ interface RegionTranslation {
   page: number;
   ocr_text: string | null;
   translated_text: string | null;
+  has_thumbnail: boolean;
   created_at: string;
 }
 
@@ -249,35 +250,67 @@ export default function ShareDocumentPage() {
                 Region translations
               </h2>
               <ul className="space-y-2">
-                {doc.region_translations.map((rt) => (
-                  <li
-                    key={rt.id}
-                    className="rounded-md border bg-card p-3 text-sm"
-                  >
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Page {rt.page}
-                    </div>
-                    {rt.translated_text ? (
-                      <p className="whitespace-pre-wrap">
-                        {rt.translated_text}
-                      </p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">
-                        Translating...
-                      </p>
-                    )}
-                    {rt.ocr_text && (
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-xs text-muted-foreground">
-                          Original text
-                        </summary>
-                        <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
-                          {rt.ocr_text}
+                {doc.region_translations.map((rt) => {
+                  // Mirrors the admin RegionTranslationsSection: small
+                  // inline thumbnail in the header row with a hover-
+                  // preview pop, click to open the full crop. The
+                  // backend's /api/share endpoint enforces share scope
+                  // before serving the bytes.
+                  const thumbUrl = rt.has_thumbnail
+                    ? `/api/share/documents/${doc.id}/region-translations/${rt.id}/thumbnail`
+                    : null;
+                  return (
+                    <li
+                      key={rt.id}
+                      className="rounded-md border bg-card p-3 text-sm"
+                    >
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <span>Page {rt.page}</span>
+                        {thumbUrl && (
+                          <a
+                            href={thumbUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group/thumb relative ml-auto block flex-shrink-0"
+                            title="Hover to preview, click to open full-size"
+                          >
+                            <img
+                              src={thumbUrl}
+                              alt={`Region on page ${rt.page}`}
+                              className="h-7 w-12 object-cover rounded border bg-background"
+                            />
+                            <div className="pointer-events-none absolute right-0 top-full mt-1 z-20 hidden rounded-md border bg-background p-1 shadow-xl group-hover/thumb:block">
+                              <img
+                                src={thumbUrl}
+                                alt=""
+                                className="max-h-64 max-w-xs object-contain"
+                              />
+                            </div>
+                          </a>
+                        )}
+                      </div>
+                      {rt.translated_text ? (
+                        <p className="whitespace-pre-wrap">
+                          {rt.translated_text}
                         </p>
-                      </details>
-                    )}
-                  </li>
-                ))}
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">
+                          Translating...
+                        </p>
+                      )}
+                      {rt.ocr_text && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs text-muted-foreground">
+                            Original text
+                          </summary>
+                          <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground">
+                            {rt.ocr_text}
+                          </p>
+                        </details>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

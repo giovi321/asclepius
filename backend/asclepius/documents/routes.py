@@ -263,7 +263,12 @@ async def get_doc(
     # Get document sections (page-level sectioning)
     sections = await get_document_sections(db, doc_id)
 
-    # Get ad-hoc region translations (newest first).
+    # Get ad-hoc region translations (newest first). Strip Chandra
+    # markup defensively here too — new rows are clean (the region
+    # translator pre-strips before persisting), but pre-existing rows
+    # still contain raw HTML that would otherwise render unreadable.
+    from asclepius.pipeline.text_utils import strip_chandra_markup
+
     rt_cursor = await db.execute(
         """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
                   ocr_text, translated_text,
@@ -274,7 +279,14 @@ async def get_doc(
             ORDER BY id DESC""",
         (doc_id,),
     )
-    region_translations = [dict(r) for r in await rt_cursor.fetchall()]
+    region_translations = []
+    for r in await rt_cursor.fetchall():
+        item = dict(r)
+        if item.get("ocr_text"):
+            item["ocr_text"] = strip_chandra_markup(item["ocr_text"])
+        if item.get("translated_text"):
+            item["translated_text"] = strip_chandra_markup(item["translated_text"])
+        region_translations.append(item)
 
     return {
         **doc,

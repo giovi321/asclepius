@@ -33,6 +33,7 @@ from asclepius.pipeline.stage_events import (
     stage,
 )
 from asclepius.pipeline.state import PIPELINE_STATE
+from asclepius.pipeline.text_utils import strip_chandra_markup
 from asclepius.util.paths import safe_vault_join
 
 logger = logging.getLogger(__name__)
@@ -210,7 +211,14 @@ async def translate_region(
                 if _is_cancelled(doc_id):
                     raise asyncio.CancelledError()
                 ocr_text, _ = await _ocr_pil_image(img, config, ocr_provider)
-                ocr_text = (ocr_text or "").strip()
+                # Chandra and other Vision-LLM engines emit a wall of
+                # ``<div data-bbox=...>`` tags that the LLM faithfully
+                # echoes into the translation. Strip the markup before
+                # we either persist or send it onward — the
+                # ``strip_chandra_markup`` helper preserves alt /
+                # data-label captions and paragraph structure, just
+                # without the layout DOM.
+                ocr_text = strip_chandra_markup((ocr_text or "").strip())
                 await db.execute(
                     "UPDATE region_translations SET ocr_text = ? WHERE id = ?",
                     (ocr_text, region_row_id),

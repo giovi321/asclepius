@@ -2523,6 +2523,32 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Region Thumbnail
+     * @description Serve the cropped PNG thumbnail for a region translation.
+     *
+     *     Mirrors the admin endpoint but scopes by the share session so the
+     *     doctor can only fetch thumbnails for documents in their share.
+     *     Returns 404 (not 403) for region IDs that exist but belong to a
+     *     different doc, matching the rest of the share surface — we don't
+     *     leak existence of unrelated rows.
+     */
+    get: operations["share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/share/documents/{doc_id}/translate": {
     parameters: {
       query?: never;
@@ -7991,6 +8017,38 @@ export interface operations {
       header?: never;
       path: {
         doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+        region_id: number;
       };
       cookie?: never;
     };

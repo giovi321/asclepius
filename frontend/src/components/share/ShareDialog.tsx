@@ -403,6 +403,11 @@ export default function ShareDialog({
                               )}
                               {revealOtp[s.id] && !loadingOtp[s.id] && (
                                 <div className="inline-flex items-center gap-1 ml-2">
+                                  {activeOtps[s.id]?.code && (
+                                    <CopyOtpInlineButton
+                                      code={activeOtps[s.id]!.code}
+                                    />
+                                  )}
                                   <button
                                     onClick={() => onRevealOtp(s.id)}
                                     className="rounded p-0.5 hover:bg-accent"
@@ -446,5 +451,31 @@ export default function ShareDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function CopyOtpInlineButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // older browsers may block navigator.clipboard outside HTTPS
+    }
+  };
+  return (
+    <button
+      onClick={onCopy}
+      className="rounded p-0.5 hover:bg-accent"
+      title={copied ? "Copied" : "Copy code"}
+    >
+      {copied ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </button>
   );
 }

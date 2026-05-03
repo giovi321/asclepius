@@ -6397,6 +6397,54 @@
         }
       }
     },
+    "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Region Thumbnail",
+        "description": "Serve the cropped PNG thumbnail for a region translation.\n\nMirrors the admin endpoint but scopes by the share session so the\ndoctor can only fetch thumbnails for documents in their share.\nReturns 404 (not 403) for region IDs that exist but belong to a\ndifferent doc, matching the rest of the share surface \u2014 we don't\nleak existence of unrelated rows.",
+        "operationId": "share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/share/documents/{doc_id}/translate": {
       "post": {
         "tags": ["share-doctor"],

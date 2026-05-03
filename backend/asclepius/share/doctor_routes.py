@@ -14,6 +14,7 @@ kind goes through here.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import aiosqlite
@@ -39,6 +40,22 @@ from asclepius.share.watermark import (
     watermark_pdf_bytes,
 )
 from asclepius.util.paths import UnsafePathError, safe_vault_join
+
+# Doctor-side region-translation text is rendered with
+# ``whitespace-pre-wrap``, so the paragraph-break ``\n\n`` that
+# strip_chandra_markup preserves shows as a full blank line between
+# every paragraph — visually wasteful for short translations like
+# "Medical History\n\nFollow-up visit..." Collapse runs of newlines
+# to a single one only for the doctor surface; admin display keeps
+# the original structure.
+_COLLAPSE_NEWLINES = re.compile(r"\n{2,}")
+
+
+def _compact_for_doctor(text: str | None) -> str | None:
+    if not text:
+        return text
+    return _COLLAPSE_NEWLINES.sub("\n", text)
+
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +187,7 @@ async def share_document_detail(
     # markup, so we clean on read instead of changing the storage shape.
     rt_cursor = await db.execute(
         """SELECT id, page, bbox_x, bbox_y, bbox_w, bbox_h,
-                  ocr_text, translated_text, created_at
+                  ocr_text, translated_text, thumbnail_path, created_at
              FROM region_translations
             WHERE document_id = ?
             ORDER BY id DESC""",
@@ -180,14 +197,18 @@ async def share_document_detail(
     # need to know which provider the admin configured, and surfacing it
     # would require revealing internal model identifiers (sometimes
     # tied to specific deployments). Storage isn't touched; we just
-    # don't SELECT it.
+    # don't SELECT it. ``thumbnail_path`` is collapsed to a boolean
+    # ``has_thumbnail`` so we don't leak the on-disk path.
     region_translations = []
     for r in await rt_cursor.fetchall():
         item = dict(r)
         if item.get("ocr_text"):
-            item["ocr_text"] = strip_chandra_markup(item["ocr_text"])
+            item["ocr_text"] = _compact_for_doctor(strip_chandra_markup(item["ocr_text"]))
         if item.get("translated_text"):
-            item["translated_text"] = strip_chandra_markup(item["translated_text"])
+            item["translated_text"] = _compact_for_doctor(
+                strip_chandra_markup(item["translated_text"])
+            )
+        item["has_thumbnail"] = bool(item.pop("thumbnail_path", None))
         region_translations.append(item)
 
     # Links — but filter to only docs that are also part of this share so
@@ -341,6 +362,52 @@ async def share_serve_file(
         content=body,
         media_type=media_type,
         headers=headers,
+    )
+
+
+@router.get("/documents/{doc_id}/region-translations/{region_id}/thumbnail")
+async def share_region_thumbnail(
+    doc_id: int,
+    region_id: int,
+    session: dict = Depends(get_share_session),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Serve the cropped PNG thumbnail for a region translation.
+
+    Mirrors the admin endpoint but scopes by the share session so the
+    doctor can only fetch thumbnails for documents in their share.
+    Returns 404 (not 403) for region IDs that exist but belong to a
+    different doc, matching the rest of the share surface — we don't
+    leak existence of unrelated rows.
+    """
+    from fastapi.responses import FileResponse
+    from asclepius.util.paths import safe_vault_join, UnsafePathError
+
+    # Confirm the doc is in this share before any DB lookup on the
+    # thumbnail itself; cheap permission gate keyed on the share.
+    await _ensure_doc_in_share(db, session["share_id"], doc_id)
+
+    cursor = await db.execute(
+        """SELECT thumbnail_path FROM region_translations
+            WHERE id = ? AND document_id = ?""",
+        (region_id, doc_id),
+    )
+    row = await cursor.fetchone()
+    if not row or not row["thumbnail_path"]:
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+
+    cfg = get_config()
+    try:
+        disk_path = safe_vault_join(Path(cfg.vault.root_path), row["thumbnail_path"])
+    except UnsafePathError:
+        raise HTTPException(status_code=400, detail="Invalid thumbnail path")
+    if not disk_path.is_file():
+        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+
+    return FileResponse(
+        path=str(disk_path),
+        media_type="image/png",
+        headers={"Cache-Control": "private, max-age=3600"},
     )
 
 

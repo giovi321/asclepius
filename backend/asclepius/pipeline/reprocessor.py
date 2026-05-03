@@ -19,6 +19,7 @@ from asclepius.pipeline.stage_events import (
     begin_job,
     plan_stages,
     record_stage,
+    set_current_stage,
 )
 from asclepius.pipeline.state import PIPELINE_STATE
 
@@ -128,7 +129,7 @@ async def reprocess_document(
         if run_ocr:
             _current_stage = STAGE_OCR
             _stage_started = datetime.utcnow().isoformat(timespec="seconds")
-            PIPELINE_STATE.pipeline_status["processing_step"] = "ocr"
+            set_current_stage(STAGE_OCR)
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
@@ -173,7 +174,7 @@ async def reprocess_document(
             # LLM-only but no OCR text — need to OCR first
             _current_stage = STAGE_OCR
             _stage_started = datetime.utcnow().isoformat(timespec="seconds")
-            PIPELINE_STATE.pipeline_status["processing_step"] = "ocr"
+            set_current_stage(STAGE_OCR)
             file_path = Path(config.vault.root_path) / doc["file_path"]
             if not file_path.exists():
                 await db.execute(
@@ -239,7 +240,7 @@ async def reprocess_document(
         # --- LLM phase ---
         _current_stage = STAGE_LLM_EXTRACTION
         _stage_started = datetime.utcnow().isoformat(timespec="seconds")
-        PIPELINE_STATE.pipeline_status["processing_step"] = "llm_extraction"
+        set_current_stage(STAGE_LLM_EXTRACTION)
         # Clear old extracted data before re-extraction (child tables + document metadata)
         for table in [
             "lab_results",
@@ -525,7 +526,7 @@ async def _reprocess_vision_llm(
         )
         _current_stage = STAGE_VISION_EXTRACTION
         _stage_started = datetime.utcnow().isoformat(timespec="seconds")
-        PIPELINE_STATE.pipeline_status["processing_step"] = "vision_extraction"
+        set_current_stage(STAGE_VISION_EXTRACTION)
         try:
             ocr_text, confidence, engine, vision_result, vision_entry = await extract_with_vision(
                 str(file_path),
@@ -563,7 +564,7 @@ async def _reprocess_vision_llm(
             )
             _current_stage = STAGE_LLM_EXTRACTION
             _stage_started = datetime.utcnow().isoformat(timespec="seconds")
-            PIPELINE_STATE.pipeline_status["processing_step"] = "llm_extraction"
+            set_current_stage(STAGE_LLM_EXTRACTION)
 
             _salvage_classification(vision_result)
             doc_type = _normalize_doc_type(vision_result.get("doc_type", "other"))

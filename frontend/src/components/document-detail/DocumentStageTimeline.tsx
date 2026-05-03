@@ -418,7 +418,7 @@ export default function DocumentStageTimeline({ documentId }: Props) {
       {open && (
         <div className="space-y-4 px-5 pb-5">
           {groups.map((g, gi) => (
-            <RunCard key={gi} group={g} isFirst={gi === 0 && isLive} />
+            <RunCard key={gi} group={g} />
           ))}
         </div>
       )}
@@ -426,7 +426,7 @@ export default function DocumentStageTimeline({ documentId }: Props) {
   );
 }
 
-function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
+function RunCard({ group }: { group: RunGroup }) {
   const isReprocess = group.job_kind === "reprocess";
   const isTranslate =
     group.job_kind === "translate" || group.job_kind === "translate_region";
@@ -483,17 +483,23 @@ function RunCard({ group, isFirst }: { group: RunGroup; isFirst: boolean }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold">{runLabel} run</span>
-            {isFirst && (
+            {/* Live-in-progress badge shown when any stage in this run is
+                still ``started`` — that's the authoritative signal, and
+                avoids the previous bug where the topmost (``isFirst``)
+                row always painted "In progress" alongside the default
+                "Completed" outcome even when the run had finished. */}
+            {outcome === "started" ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-500 text-white px-1.5 py-0.5 text-[10px] font-semibold">
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />
                 In progress
               </span>
+            ) : (
+              <span
+                className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${outcomeVis.pillClass}`}
+              >
+                {outcomeVis.label}
+              </span>
             )}
-            <span
-              className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${outcomeVis.pillClass}`}
-            >
-              {outcomeVis.label}
-            </span>
             {flow && (
               <span
                 className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${flow.pill}`}

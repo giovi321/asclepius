@@ -315,3 +315,39 @@ def begin_job(
 def end_job() -> None:
     """Clear ``current_job`` once the worker finishes a unit of work."""
     PIPELINE_STATE.pipeline_status["current_job"] = None
+
+
+def set_current_stage(
+    stage_name: str | None,
+    *,
+    page_total: int | None = None,
+    page_current: int | None = None,
+) -> None:
+    """Update the in-memory pointers to the currently executing stage.
+
+    Code paths that don't fit the ``async with stage(...)`` context manager
+    (the legacy reprocessor / processor branches that bracket their own
+    DB writes manually) call this to keep ``current_job["stage"]`` in
+    sync with the work they're actually doing. Without it the dashboard's
+    live timeline shows zero stages until the first one completes,
+    because synthesizeLiveGroup() needs ``stage`` set to render the
+    in-flight phase. Also mirrors the legacy ``processing_step`` /
+    ``processing_pages`` fields the older topbar chip still reads.
+    """
+    status = PIPELINE_STATE.pipeline_status
+    status["processing_step"] = stage_name
+    if page_total is not None:
+        status["processing_pages"] = page_total
+        status["processing_page_current"] = page_current or 0
+    job = status.get("current_job")
+    if isinstance(job, dict):
+        job["stage"] = stage_name
+        if page_total is not None:
+            job["page_total"] = page_total
+            job["page_current"] = page_current or 0
+        elif stage_name is None:
+            job["page_total"] = None
+            job["page_current"] = None
+        job["stage_provider"] = (
+            _provider_for_stage(stage_name, job.get("providers")) if stage_name else None
+        )

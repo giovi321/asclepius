@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/api/client";
-import { FileText, Trash2, X, Image as ImageIcon } from "lucide-react";
+import { FileText, Trash2, X, Image as ImageIcon, Unlink } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
   EditableSummary,
@@ -22,7 +22,6 @@ import {
   VaccinationsSection,
   DocumentSectionsList,
 } from "@/components/document-detail/ChildRecordSections";
-import ReportSlot from "@/components/imaging/ReportSlot";
 import NotesEditor from "@/components/document-detail/NotesEditor";
 import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
@@ -191,6 +190,30 @@ export default function DocumentDetailPage() {
     setSelectionMode(false);
   };
 
+  const handleUnlinkImaging = async () => {
+    const studyId = doc?.imaging_studies?.[0]?.id;
+    if (!studyId) return;
+    const ok = await confirm({
+      title: "Unlink this report from the imaging study?",
+      description:
+        "The PDF stays in the patient's documents and the DICOM study stays in /imaging — only the link between them is removed. The study will fall back to a placeholder report; you can re-attach this (or any other PDF) from the imaging view.",
+      variant: "destructive",
+      confirmText: "Unlink",
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/imaging/${studyId}/report`);
+      await loadDoc(false);
+      toast({ title: "Imaging study unlinked", variant: "success" });
+    } catch (e: any) {
+      toast({
+        title: "Unlink failed",
+        description: e?.response?.data?.detail || e.message,
+        variant: "error",
+      });
+    }
+  };
+
   const handleDelete = async () => {
     const ok = await confirm({
       title: "Delete this document?",
@@ -227,13 +250,22 @@ export default function DocumentDetailPage() {
         </div>
         <div className="flex gap-2">
           {doc.imaging_studies?.[0]?.id && (
-            <Link
-              to={`/imaging/${doc.imaging_studies[0].id}`}
-              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-              title="Open the DICOM viewer for this report's imaging study"
-            >
-              <ImageIcon className="h-4 w-4" /> Imaging view
-            </Link>
+            <>
+              <Link
+                to={`/imaging/${doc.imaging_studies[0].id}`}
+                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+                title="Open the DICOM viewer for this report's imaging study"
+              >
+                <ImageIcon className="h-4 w-4" /> Imaging view
+              </Link>
+              <button
+                onClick={handleUnlinkImaging}
+                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+                title="Detach this PDF from its imaging study (the PDF stays in documents)"
+              >
+                <Unlink className="h-4 w-4" /> Unlink imaging
+              </button>
+            </>
           )}
           {doc.file_path && (
             <a
@@ -304,31 +336,17 @@ export default function DocumentDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         <div className="space-y-4 min-w-0">
-          {isImagingDoc(doc) ? (
-            // Imaging documents: keep the metadata view focused on the
-            // report. The DICOM viewer + bundle files live on /imaging/:id;
-            // here we only render the report PDF (or upload/pick UI when
-            // it is a placeholder) and a link to the imaging view.
-            <ReportSlot
-              studyId={doc.imaging_studies?.[0]?.id}
-              patientId={doc.patient_id}
-              reportStatus={doc.file_path ? "attached" : "placeholder"}
-              documentId={doc.id}
-              onChanged={() => loadDoc(false)}
-            />
-          ) : (
-            <DocumentViewer
-              id={id!}
-              filePath={doc.file_path}
-              originalFilename={doc.original_filename}
-              onRotate={handleRotate}
-              imagingStudyId={doc.imaging_studies?.[0]?.id || null}
-              onReloaded={() => loadDoc(false)}
-              selectionMode={selectionMode}
-              onSelectionConfirm={handleSelectionConfirm}
-              onSelectionCancel={handleSelectionCancel}
-            />
-          )}
+          <DocumentViewer
+            id={id!}
+            filePath={doc.file_path}
+            originalFilename={doc.original_filename}
+            onRotate={handleRotate}
+            imagingStudyId={doc.imaging_studies?.[0]?.id || null}
+            onReloaded={() => loadDoc(false)}
+            selectionMode={selectionMode}
+            onSelectionConfirm={handleSelectionConfirm}
+            onSelectionCancel={handleSelectionCancel}
+          />
           {!isImagingPlaceholder(doc) && (
             <TranslatedTextSection
               text={doc.ocr_text_en}
@@ -374,9 +392,7 @@ export default function DocumentDetailPage() {
           <VaccinationsSection vaccinations={doc.vaccinations || []} />
 
           <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />
-          {!isImagingDoc(doc) && (
-            <AiEditForm docId={doc.id} onApplied={() => loadDoc(false)} />
-          )}
+          <AiEditForm docId={doc.id} onApplied={() => loadDoc(false)} />
 
           <LinksSection
             docId={Number(id)}

@@ -236,39 +236,47 @@ export default function DocumentViewer({
           </div>
         )}
 
-        {/* Recovery actions — always available. */}
+        {/* Recovery actions. Imaging documents (DICOM bundles + radiology
+            reports) intentionally hide the generic Pick / Upload controls
+            here — attach / replace lives on the imaging view alongside the
+            DICOM viewer, so the user picks a PDF in one place and isn't
+            offered two competing surfaces for the same action. */}
         <div className="flex flex-wrap gap-2 justify-center">
-          <button
-            onClick={openPicker}
-            disabled={busy}
-            className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-          >
-            <Search className="h-4 w-4" /> Pick file from vault
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            <Upload className="h-4 w-4" /> Upload replacement
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) uploadReplacement(f);
-              e.target.value = "";
-            }}
-          />
-          {imagingStudyId && (
+          {imagingStudyId ? (
             <Link
               to={`/imaging/${imagingStudyId}`}
-              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
             >
-              <ImageIcon className="h-4 w-4" /> Open in Imaging view
+              <ImageIcon className="h-4 w-4" /> Open in Imaging view to attach a
+              report
             </Link>
+          ) : (
+            <>
+              <button
+                onClick={openPicker}
+                disabled={busy}
+                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+              >
+                <Search className="h-4 w-4" /> Pick file from vault
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Upload className="h-4 w-4" /> Upload replacement
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadReplacement(f);
+                  e.target.value = "";
+                }}
+              />
+            </>
           )}
         </div>
 

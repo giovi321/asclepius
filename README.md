@@ -50,23 +50,24 @@ You'll need an LLM somewhere, a local Ollama instance, a vLLM server, or a Claud
 - Lab results are normalized across visits and languages. A "ferritin" in Italian, a typo'd "Ferrytin" in a German report, and "ferritin (s)" with weird units all end up on the same trend chart.
 - A built-in DICOM viewer handles MRI and CT studies with windowing, zoom, and pan, and can attach the radiology PDF report next to the frames so you read the doctor's narrative and the images in the same place.
 - The timeline view groups documents into medical events, a diagnosis, a course of treatment, a surgery and the follow-ups around it.
-- Full-text search (SQLite FTS5) and a small RAG chat layer let you ask things like *when did I last get a tetanus shot?*
+- Full-text search (SQLite FTS5) and a small RAG chat layer let you ask things like _when did I last get a tetanus shot?_
 - Multi-patient with role-based access, so you can keep records for a partner or your kids in the same install with separate access.
 - When you correct an extracted field, the change is captured and used as a few-shot example for similar documents later.
 - Every provider list (OCR, LLM, Vision-LLM) supports priority fallback, so a flaky endpoint hands off to the next one without you noticing.
+- **Doctor share links.** Hand a curated subset of one patient's records to an outside doctor for consultation: one-time URL + 6-digit OTP you read out by phone, watermarked PDFs, no download path, translate-current-page or translate-region only, 2-hour session, full audit trail. See [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.md).
 
 ## Tech stack
 
-| Component | Technology |
-|-----------|-----------|
-| Backend | Python + FastAPI |
-| Frontend | React + TypeScript + Vite + shadcn/ui |
-| Database | SQLite (via aiosqlite) |
-| OCR | Tesseract 5, LLM Vision, Google Vision |
-| LLM | Ollama, vLLM, Claude API, OpenAI API |
-| Vision-LLM | Ollama (Qwen2.5-VL, MiniCPM-V, …), Claude vision, GPT-4o |
-| DICOM | pydicom (server-side render to PNG with optional window-level override) |
-| Deployment | Docker Compose |
+| Component  | Technology                                                              |
+| ---------- | ----------------------------------------------------------------------- |
+| Backend    | Python + FastAPI                                                        |
+| Frontend   | React + TypeScript + Vite + shadcn/ui                                   |
+| Database   | SQLite (via aiosqlite)                                                  |
+| OCR        | Tesseract 5, LLM Vision, Google Vision                                  |
+| LLM        | Ollama, vLLM, Claude API, OpenAI API                                    |
+| Vision-LLM | Ollama (Qwen2.5-VL, MiniCPM-V, …), Claude vision, GPT-4o                |
+| DICOM      | pydicom (server-side render to PNG with optional window-level override) |
+| Deployment | Docker Compose                                                          |
 
 ## Before you self-host
 

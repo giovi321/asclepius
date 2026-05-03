@@ -7,6 +7,250 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-05-03 - sharing time: doctor-share access
+
+### Added
+
+- **Doctor share links.** Curated, OTP-gated, read-only access to a
+  selected subset of one patient's documents for an outside doctor —
+  no account creation, no SSO. Admin clicks **Share with doctor** on a
+  document (or bulk-selects rows in the documents list and uses the
+  bar action), names the recipient, picks expiry + OCR/LLM providers,
+  copies the URL, and reads the live OTP from the share row to the
+  doctor by phone. The doctor verifies, gets a 2-hour absolute-TTL
+  session, sees a stripped-down dashboard + watermarked PDF viewer
+  (every page stamped with their name + share id + UTC fetch time),
+  and can translate either the current page or a user-drawn region
+  via popover. New `/api/share*` and `/api/shares*` endpoint families,
+  five new tables (`document_shares`, `document_share_documents`,
+  `document_share_otps`, `document_share_sessions`,
+  `document_share_audit`), separate cookie (`asclepius_share`,
+  `Path=/api/share`, `SameSite=Strict`) and CSRF coverage. See
+  [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.md).
+- **Doctor Shares dashboard** at `/shares`. Lists every share the
+  caller can manage with status filters (multi-select active /
+  expired / revoked), inline OTP reveal + copy + refresh, copy-link
+  per row, total accesses, last access timestamp, and an inline
+  expandable audit panel showing every event (otp_request,
+  otp_verify_ok/fail, view_doc, view_file, translate, logout,
+  session_expired) with timestamp + IP + user-agent.
+- **Translation defaults card** under Settings → Document Analysis →
+  Priority. System-wide OCR + LLM provider preferences used by
+  translation flows (admin-side region translate AND doctor-side
+  share translates) when no closer override is set. Resolution
+  ladder: body override → per-share default → these defaults →
+  first-enabled provider.
+- **Per-share OCR + LLM defaults.** The share dialog has two new
+  dropdowns so admins can pin which providers a particular doctor's
+  translations should use, separate from the system defaults.
+- **Translate popover on the doctor surface.** One Translate button
+  with two choices — "Translate current page" and "Translate selected
+  region" (drag a rectangle on the PDF). Whole-document translation
+  is intentionally unavailable to doctors. Trigger stays disabled
+  past the request roundtrip while the worker is still chewing, and
+  the result appears in the "Region translations" panel automatically
+  via 4-second polling — no manual refresh.
+- **Server-side PDF watermarking** burned into every page of every
+  PDF served to a share session via PyMuPDF Shape + matrix transform
+  (rotate=45). Three diagonal repetitions per page so a screenshot of
+  any quadrant carries a copy of the recipient identifier.
+- **Dark mode in the doctor surface.** `useTheme` mounts inside
+  `ShareSessionProvider`, defaults to the doctor's `prefers-color-
+  scheme`, with a sun/moon toggle in both the dashboard and document
+  detail headers.
+- **Pan + Ctrl-zoom in the doctor PDF viewer.** Same affordances as
+  the admin viewer: click-and-drag pan, Ctrl/Cmd+wheel zoom,
+  Ctrl++ / Ctrl+- / Ctrl+0 keyboard shortcuts. Right-click and
+  Ctrl+S/Ctrl+P intercepted (cosmetic — screenshots can't be blocked,
+  but obvious save paths are removed).
+- **Persisted share token.** New nullable `token_clear` column on
+  `document_shares` (idempotent ALTER for existing installs) so the
+  dashboard can offer a copy-link button on rows after creation,
+  not only at the moment they're created. Lookup still uses the
+  indexed `token_hash`.
+- **`has_file` boolean** in the doctor's document detail response,
+  in place of the stripped `file_path`, so the doctor UI can decide
+  whether to enable Translate without ever seeing the vault path.
+
+### Changed
+
+- **Document type enum consolidated.** The `doc_type` enum is reduced
+  from 26 mixed values (which conflated document formats with medical
+  specialties) to a strict MECE set of 10: `invoice, prescription,
+  specialist_report, surgical_report, discharge, lab_test, vaccination,
+  medical_certificate, imaging_report, other`. Specialty information
+  remains in the dedicated `specialty_*` columns. A startup migration
+  remaps every legacy value (e.g. `bloodtest`, `labtest_other` →
+  `lab_test`; `dental`, `ophthalmology`, `mental_health`, `physio_report`,
+  `pathology_report`, `er_report` → `specialist_report`;
+  `radiology_report`, `imaging_dicom`, `imaging_other` → `imaging_report`;
+  `receipt` → `invoice`; `referral` → `prescription`;
+  `medical_cert` / `sick_leave` → `medical_certificate`;
+  `allergy`, `insurance_claim`, `insurance_doc`, `consent`,
+  `advance_directive`, `correspondence` → `other`). Affected
+  per-doc_type extraction prompts (`extraction_bloodtest` →
+  `extraction_lab_test`, `extraction_radiology_report` →
+  `extraction_imaging_report`) are renamed; the migration also
+  remaps any user-customized `custom_prompts.prompt_key` overrides.
+- **Searchable document-type picker.** The Type dropdown on the
+  document detail page now opens a searchable popover (filter as you
+  type, Enter to commit) instead of a flat native select, mirroring
+  the doctor / facility / specialty comboboxes elsewhere in the panel.
+- **Document detail inline-edit polish.** Inline-edit action buttons now
+  share a fixed `h-7` height so the Save / Delete / Close buttons line
+  up cleanly across the row (previously a text label and a 12px X icon
+  with the same padding still rendered different visual heights).
+  Cancel-edit buttons are now labelled "Close" via `title` /
+  `aria-label`, and clear-the-saved-value buttons are renamed to
+  "Delete" with a destructive tint. Every editor (`EditableField`,
+  `EditableSelect`, `EditableSummary`, `EditableCombobox`,
+  `IcdCodeSelect`, `DiagnosisHeading`) now exposes the Delete
+  affordance — only when a saved value exists, never on empty fields.
+- **Encounter card hierarchy.** The encounter section is restructured
+  into a three-tier card: diagnosis name (headline), ICD-10 as an
+  inline monospace pill on the same row, and Details as a stacked body
+  block with a left-rule indent. Fixes the previous mix of
+  small-caps / `text-sm` / `font-mono` / `font-medium` competing for
+  attention with no clear hierarchy.
+- **Multiline `EditableField` stacks now.** When `multiline=true`, the
+  label moves to its own line as a small-caps eyebrow and the value
+  renders left-aligned full width with `whitespace-pre-wrap`, instead
+  of fighting the one-line `flex justify-between` row. Single-line
+  fields keep the inline label-on-left, value-on-right pattern.
+- **Admin `GET /api/shares` listing query** rewritten to aggregate
+  audit access counts via a single `LEFT JOIN` against a pre-grouped
+  subquery instead of three correlated `SELECT` per row. Cost is now
+  `O(N + audit_total)` instead of `O(N × audit_rows_per_share)` —
+  ~10ms for 50 shares × 5000 audit rows on a local install.
+- **CI `openapi-drift` check** now runs prettier on the regenerated
+  artefacts so it matches what the local pre-commit hook produces.
+  Without this, every PR that regenerated OpenAPI failed CI on
+  formatting alone.
+
+### Fixed
+
+- **Reprocess + upload no longer race on the same Ollama**. The pipeline
+  worker queue now carries both inbox uploads and reprocess clicks, so
+  the "max one document at a time" invariant actually holds — previously
+  a `POST /documents/{id}/reprocess` ran as `asyncio.create_task` on the
+  FastAPI loop while uploads ran on the watcher's worker-thread loop, and
+  the credential gate's per-loop `cap=1` semaphores let both flows hit
+  the same Ollama in parallel. Reprocess clicks are enqueued at priority
+  0 (jump pending uploads), `retry-all-failed` at priority 10. See
+  [pipeline → Worker Queue](docs/src/content/docs/architecture/pipeline.md).
+- **Credential cap is now process-global**. The `asyncio.Semaphore` keyed
+  per `(loop_id, credential_id)` is replaced by a single
+  `threading.Semaphore` per credential, acquired from async via the
+  default executor. So a chat / AI-edit / filename suggestion firing on
+  the FastAPI loop while the pipeline is mid-page no longer doubles up
+  inflight requests against the credential's `max_concurrent`.
+- **Pre-commit hook now auto-stages OpenAPI artefacts**. When a backend
+  `.py` change drifts `frontend/src/openapi.json` /
+  `frontend/src/api/schema.ts`, the hook regenerates and `git add`s
+  them; `git commit` again to finish.
+- **Chandra (and other Ollama vision) OCR truncation.** Requests now
+  send `num_predict=-1` and `num_ctx=16384` so dense pages and
+  HTML-tagged Chandra output don't get cut at the Modelfile default
+  (often 2048 tokens, sometimes as low as 128). Previously the response
+  came back mid-sentence on long pages.
+- **Translate jobs are now visible in the live timeline + topbar chip.**
+  The translator wraps the chunk loop in `stage()` so
+  `current_job.stage = "translation"` is set and the synthesizer emits
+  a "started" event; without this the timeline previously rendered as
+  green/done with "0 stages" before the run had finished. The topbar
+  chip and `PipelineProgress` widget now recognise `kind="translate"`
+  with an emerald Translate label instead of falling back to the
+  Upload branch.
+- **Imaging placeholder docs can now be renamed.** Imaging placeholders
+  with extension-less `original_filename` (e.g. `MR Brain (report
+  pending)`) used to round-trip through generate-filename + rename and
+  fail with `Cannot change file extension from '' to '.pdf'`.
+  `generate-filename` now mirrors the doc's actual extension (empty
+  when none), and `rename` permits adding any extension when the
+  original has none.
+- **Doctor share `/me` 401 no longer triggers an admin-login redirect.**
+  The shared admin axios interceptor now skips its
+  `window.location.href = "/login"` branch on `/share/*` paths so the
+  doctor-share landing page can render even though the admin
+  AuthProvider's mount-time `/auth/me` probe 401s. Earlier, the
+  redirect kicked the doctor to the wrong URL on every page load.
+- **Doctor share landing no longer refresh-loops.** The dedicated
+  share-cookie axios interceptor used to do a hard
+  `window.location.href = "/share/{firstSegment}"` on any 401, which
+  on the landing page redirected to the same URL we were already on
+  and reloaded forever. Removed the redirect — the React session
+  context handles "no session" via state and uses
+  `navigate("/share")` (soft route) for deep-link fallbacks.
+- **Watermark actually applied.** Initial PDF stamping called
+  `page.insert_textbox(rotate=45, ...)`, which raises `ValueError:
+  rotate must be multiple of 90` and was silently caught — every
+  served PDF was un-stamped. Switched to `Shape.insert_textbox` with
+  a `morph=(pivot, Matrix(45))` transformation matrix; the e2e test
+  now `search_for`s the recipient label on the served bytes so the
+  regression cannot ride past again.
+- **Chandra HTML in the doctor's "view original text"** is now
+  stripped server-side via the existing `strip_chandra_markup`
+  helper before the response leaves the share endpoint. The viewer
+  used to show a wall of `<div data-bbox=...>` tags.
+
+### Added
+
+- **On-demand English translation of the document body.** Translate
+  toolbar action runs the cached `documents.ocr_text` through an LLM
+  using a new `translation_en` prompt and stores the English rendering
+  on `documents.ocr_text_en` (with `ocr_text_en_translated_at` and
+  `ocr_text_en_model`). OCR is never re-run; structured fields stay in
+  the source language. Enqueued as a new `translate` job kind on the
+  worker queue, surfaced in the live timeline + topbar chip with an
+  emerald Translate label. The Translated Text panel renders in the
+  left column directly under the PDF viewer, default expanded.
+- **Region-on-PDF translation.** Translate menu → Region tab → drag a
+  rectangle on the current page → confirm. Backend crops the page with
+  PyMuPDF using normalized `[0,1]` bbox coords, OCRs the crop with the
+  chosen engine, translates with the chosen LLM. New
+  `region_translations` table tracks bbox + OCR + translation +
+  thumbnail PNG (stored under `vault/region_translations/{doc_id}/`).
+  Each region renders as a card under the PDF with cropped thumbnail,
+  OCR text, translation, and a delete button. New endpoints:
+  `POST /api/documents/{id}/translate-region`,
+  `DELETE /api/documents/{id}/region-translations/{region_id}`,
+  `GET /api/documents/{id}/region-translations/{region_id}/thumbnail`.
+- **Duplicate-hash detection on upload.** `POST /api/documents/upload`
+  now hashes the file before insert; on a SHA-256 match it deletes the
+  just-uploaded copy and returns
+  `{status: "duplicate", existing_document_id, existing_filename,
+  existing_patient_id}` instead of swallowing the UNIQUE-constraint
+  failure or letting the pipeline rediscover it. The upload UI shows
+  an info row linking to the existing record.
+- **Collapsible sections on the document detail page.** Every right-
+  column section (Document Info, Medical Event, Lab Results,
+  Encounters, Medications, Vaccinations, Notes, AI Edit, Linked
+  Documents, Summary, Translated Text, OCR Text, Document Sections,
+  Pipeline Stages, Region Translations) is collapsible. Empty sections
+  start collapsed; per-section open/closed state persists in
+  localStorage.
+- **PDF viewer Ctrl/Cmd+scroll zoom and click-and-drag pan.** Native
+  wheel listener (`passive: false`) so the browser doesn't hijack
+  ctrl+wheel for full-page zoom; cursor switches between grab/grabbing
+  while dragging. Capped to the same 0.5–3.0 range as the toolbar.
+- **Persisted per-document stage timeline.** New `document_stage_events`
+  table records every OCR / vision / LLM / organize transition with
+  start time, finish time, status (`completed` / `failed` / `cancelled`
+  / `skipped`), job kind (`upload` / `reprocess`), and error message.
+  Surfaced via `GET /api/documents/{id}/stages` and rendered as a
+  vertical run-grouped timeline on the document detail page — every
+  upload + reprocess this doc has been through, with durations and
+  outcome pills.
+- **Dashboard PipelineProgress widget.** Replaces the old single-line
+  status with a card that shows the running job, its kind (Upload /
+  Reprocess), its flow (OCR + LLM / Vision-LLM), a connected horizontal
+  stepper across the planned stages, a live-ticking elapsed-time clock,
+  a shimmering page-progress bar, and an "Up next" rail mirroring the
+  worker queue. Idle and queued states have their own purpose-built
+  cards.
+- **Top-bar pipeline chip** now labels Upload vs Reprocess and tints the
+  ambient glow accordingly.
+
 ### Changed
 
 - **Document type enum consolidated.** The `doc_type` enum is reduced

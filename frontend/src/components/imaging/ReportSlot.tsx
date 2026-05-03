@@ -209,7 +209,21 @@ export default function ReportSlot({
           <PdfViewer
             key={`pdf-${documentId}`}
             url={`/api/documents/${documentId}/file`}
-            onRotate={async () => {}}
+            onRotate={async (degrees, pages) => {
+              try {
+                await api.post(`/documents/${documentId}/rotate`, {
+                  degrees,
+                  pages,
+                });
+                onChanged?.();
+              } catch (e: any) {
+                toast({
+                  title: "Rotate failed",
+                  description: e?.response?.data?.detail || e.message,
+                  variant: "error",
+                });
+              }
+            }}
           />
         </div>
         {showPicker && pickerMode === "replace" && (

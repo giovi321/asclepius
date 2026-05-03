@@ -71,7 +71,7 @@ This is why the Translation defaults are useful: they let you pin a specific OCR
 - Sessions are absolute 2-hour TTL with no sliding refresh. After 2 hours the doctor must request a new OTP.
 - Cookie is `asclepius_share`, scoped to `/api/share`, `HttpOnly`, `Secure`, `SameSite=Strict` — distinct from the regular admin cookie so a share session can never be promoted into an account session.
 - Translate is rate-limited per-session (1 request / 30s) and per-share (20 / rolling hour). Configurable via `share.translate_per_session_seconds` and `share.translate_per_share_per_hour`.
-- Watermark on every page is faint vector text with the recipient name + share id + UTC timestamp. Cannot prevent screenshots, but identifies the source if a screenshot ever surfaces externally.
+- Watermark on every page is faint vector text with the recipient name + UTC timestamp. Cannot prevent screenshots, but identifies the source if a screenshot ever surfaces externally.
 - All file responses set `Cache-Control: no-store` and `Content-Disposition: inline; filename=""`. The doctor's PDF viewer fetches bytes via XHR into a `Uint8Array` — no Object URL, no `<a download>`, right-click and Ctrl+S/P intercepted.
 
 ## Configuration knobs

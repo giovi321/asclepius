@@ -328,7 +328,6 @@ async def share_serve_file(
         body = watermark_pdf_bytes(
             path,
             label=session["recipient_label"],
-            share_id=session["share_id"],
             opacity=cfg.share.watermark_opacity,
         )
         media_type = "application/pdf"
@@ -336,7 +335,6 @@ async def share_serve_file(
         body, media_type = watermark_image_bytes(
             path,
             label=session["recipient_label"],
-            share_id=session["share_id"],
             opacity=cfg.share.watermark_opacity,
         )
     else:

@@ -27,7 +27,6 @@ def watermark_pdf_bytes(
     file_path: Path,
     *,
     label: str,
-    share_id: int,
     opacity: float = 0.20,
 ) -> bytes:
     """Read ``file_path``, stamp every page, and return the new PDF bytes.
@@ -45,7 +44,7 @@ def watermark_pdf_bytes(
 
     try:
         ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        text = f"{label}  ·  share #{share_id}  ·  {ts}"
+        text = f"{label}  ·  {ts}"
         # Diagonal stamp across the page. Repeated three times along the
         # diagonal so screenshots of any region carry at least one full copy.
         for page in doc:
@@ -132,7 +131,6 @@ def watermark_image_bytes(
     file_path: Path,
     *,
     label: str,
-    share_id: int,
     opacity: float = 0.20,
 ) -> tuple[bytes, str]:
     """Stamp a raster image (jpg/png/tiff) and return (bytes, mime_type).
@@ -156,7 +154,7 @@ def watermark_image_bytes(
     overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    text = f"{label}  ·  share #{share_id}  ·  {ts}"
+    text = f"{label}  ·  {ts}"
     try:
         font = ImageFont.load_default()
     except Exception:

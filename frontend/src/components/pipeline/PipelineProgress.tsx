@@ -271,6 +271,8 @@ function RunningCard({
   const startedAt = job.started_at ? new Date(job.started_at).getTime() : null;
   const elapsed = startedAt ? Math.max(0, now - startedAt) : null;
   const providers = (job.providers ?? null) as PipelineProviders | null;
+  const providerNames = (job.provider_names ??
+    null) as PipelineProviders | null;
 
   return (
     <div
@@ -348,6 +350,7 @@ function RunningCard({
         {providers && (
           <ProvidersRow
             providers={providers}
+            providerNames={providerNames}
             activeProviderId={job.stage_provider ?? null}
           />
         )}
@@ -361,6 +364,7 @@ function RunningCard({
             progressIndex={progressIndex}
             overallPct={overallPct}
             providers={providers}
+            providerNames={providerNames}
           />
         )}
 
@@ -387,6 +391,18 @@ function providerForStage(
   return providers.llm ?? null;
 }
 
+/** Prefer the user-chosen display name when the backend supplied one, else
+ * fall back to the raw provider id. Both are keyed by family. */
+function providerLabelForStage(
+  stage: string,
+  providers: PipelineProviders | null,
+  providerNames: PipelineProviders | null,
+): string | null {
+  return (
+    providerForStage(stage, providerNames) ?? providerForStage(stage, providers)
+  );
+}
+
 function Stepper({
   planned,
   done,
@@ -394,6 +410,7 @@ function Stepper({
   progressIndex,
   overallPct,
   providers,
+  providerNames,
 }: {
   planned: string[];
   done: Set<string>;
@@ -401,6 +418,7 @@ function Stepper({
   progressIndex: number;
   overallPct: number;
   providers?: PipelineProviders | null;
+  providerNames?: PipelineProviders | null;
 }) {
   return (
     <div>
@@ -481,12 +499,26 @@ function Stepper({
                 >
                   {stageLabel(s)}
                 </span>
-                {providerForStage(s, providers ?? null) && (
+                {providerLabelForStage(
+                  s,
+                  providers ?? null,
+                  providerNames ?? null,
+                ) && (
                   <span
                     className="mt-0.5 text-[10px] leading-tight max-w-full truncate text-muted-foreground/80"
-                    title={providerForStage(s, providers ?? null) ?? undefined}
+                    title={
+                      providerLabelForStage(
+                        s,
+                        providers ?? null,
+                        providerNames ?? null,
+                      ) ?? undefined
+                    }
                   >
-                    {providerForStage(s, providers ?? null)}
+                    {providerLabelForStage(
+                      s,
+                      providers ?? null,
+                      providerNames ?? null,
+                    )}
                   </span>
                 )}
               </li>
@@ -562,7 +594,12 @@ function QueueCard({
                 {badge.label}
               </span>
               <span className="truncate text-sm flex-1">{q.label}</span>
-              {q.providers && <ProviderPills providers={q.providers} />}
+              {q.providers && (
+                <ProviderPills
+                  providers={q.providers}
+                  providerNames={q.provider_names ?? null}
+                />
+              )}
             </>
           );
           const cls =
@@ -600,40 +637,81 @@ function QueueCard({
   );
 }
 
+type ProviderEntry = {
+  family: string;
+  familyKey: keyof PipelineProviders;
+  id: string;
+  label: string;
+};
+
+function buildProviderEntries(
+  providers: PipelineProviders,
+  providerNames: PipelineProviders | null | undefined,
+): ProviderEntry[] {
+  const out: ProviderEntry[] = [];
+  if (providers.ocr) {
+    out.push({
+      family: "OCR",
+      familyKey: "ocr",
+      id: providers.ocr,
+      label: providerNames?.ocr || providers.ocr,
+    });
+  }
+  if (providers.vision) {
+    out.push({
+      family: "Vision",
+      familyKey: "vision",
+      id: providers.vision,
+      label: providerNames?.vision || providers.vision,
+    });
+  }
+  if (providers.llm) {
+    out.push({
+      family: "LLM",
+      familyKey: "llm",
+      id: providers.llm,
+      label: providerNames?.llm || providers.llm,
+    });
+  }
+  return out;
+}
+
 function ProvidersRow({
   providers,
+  providerNames,
   activeProviderId,
 }: {
   providers: PipelineProviders;
+  providerNames?: PipelineProviders | null;
   activeProviderId: string | null;
 }) {
-  const entries: Array<[string, string]> = [];
-  if (providers.ocr) entries.push(["OCR", providers.ocr]);
-  if (providers.vision) entries.push(["Vision", providers.vision]);
-  if (providers.llm) entries.push(["LLM", providers.llm]);
+  const entries = buildProviderEntries(providers, providerNames);
   if (entries.length === 0) return null;
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
       <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         Models
       </span>
-      {entries.map(([family, id]) => {
+      {entries.map(({ family, id, label }) => {
         const active = id === activeProviderId;
+        const showRawId = label !== id;
         return (
           <span
             key={family}
             className={[
-              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono",
+              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5",
               active
                 ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
                 : "border-muted bg-muted/40 text-muted-foreground",
             ].join(" ")}
-            title={`${family}: ${id}`}
+            title={
+              showRawId ? `${family}: ${label} (${id})` : `${family}: ${id}`
+            }
           >
             <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">
               {family}
             </span>
-            <span className="truncate max-w-[140px]">{id}</span>
+            <span className="truncate max-w-[160px]">{label}</span>
           </span>
         );
       })}
@@ -641,26 +719,34 @@ function ProvidersRow({
   );
 }
 
-function ProviderPills({ providers }: { providers: PipelineProviders }) {
-  const entries: Array<[string, string]> = [];
-  if (providers.ocr) entries.push(["OCR", providers.ocr]);
-  if (providers.vision) entries.push(["Vision", providers.vision]);
-  if (providers.llm) entries.push(["LLM", providers.llm]);
+function ProviderPills({
+  providers,
+  providerNames,
+}: {
+  providers: PipelineProviders;
+  providerNames?: PipelineProviders | null;
+}) {
+  const entries = buildProviderEntries(providers, providerNames);
   if (entries.length === 0) return null;
   return (
     <span className="flex shrink-0 items-center gap-1">
-      {entries.map(([family, id]) => (
-        <span
-          key={family}
-          className="inline-flex items-center gap-0.5 rounded border border-muted bg-muted/40 px-1 py-0.5 text-[9px] font-mono text-muted-foreground"
-          title={`${family}: ${id}`}
-        >
-          <span className="font-semibold uppercase tracking-wide opacity-70">
-            {family}
+      {entries.map(({ family, id, label }) => {
+        const showRawId = label !== id;
+        return (
+          <span
+            key={family}
+            className="inline-flex items-center gap-0.5 rounded border border-muted bg-muted/40 px-1 py-0.5 text-[9px] text-muted-foreground"
+            title={
+              showRawId ? `${family}: ${label} (${id})` : `${family}: ${id}`
+            }
+          >
+            <span className="font-semibold uppercase tracking-wide opacity-70">
+              {family}
+            </span>
+            <span className="truncate max-w-[100px]">{label}</span>
           </span>
-          <span className="truncate max-w-[80px]">{id}</span>
-        </span>
-      ))}
+        );
+      })}
     </span>
   );
 }

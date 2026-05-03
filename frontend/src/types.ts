@@ -134,6 +134,10 @@ export interface PipelineCurrentJob {
   /** Provider IDs that will run for this job, keyed by family.
    * Populated by ``begin_job`` once providers are resolved. */
   providers?: PipelineProviders | null;
+  /** User-chosen display names for the same family→provider mapping. The
+   * backend resolves IDs against the live config so the dashboard can render
+   * friendly names instead of synthetic ids like ``ocr-1777371050725``. */
+  provider_names?: PipelineProviders | null;
   /** Provider ID currently driving the active stage. */
   stage_provider?: string | null;
 }
@@ -142,9 +146,11 @@ export interface PipelineQueuedJob {
   kind: PipelineJobKind;
   label: string;
   doc_id: number | null;
-  /** Provider IDs the job will use once it starts (reprocess only — uploads
+  /** Provider IDs the job will use once it starts (reprocess only; uploads
    * resolve providers per-page, so this is unset for them). */
   providers?: PipelineProviders | null;
+  /** Display-name counterpart to ``providers`` (see PipelineCurrentJob). */
+  provider_names?: PipelineProviders | null;
 }
 
 export interface PipelineStatus {

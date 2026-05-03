@@ -74,6 +74,9 @@ export default function DocumentQueueStatus({ docId }: Props) {
             pageTotal={current.page_total}
             startedAt={current.started_at}
             providers={(current.providers ?? null) as PipelineProviders | null}
+            providerNames={
+              (current.provider_names ?? null) as PipelineProviders | null
+            }
             stageProvider={current.stage_provider ?? null}
           />
         }
@@ -106,6 +109,10 @@ export default function DocumentQueueStatus({ docId }: Props) {
             aheadFilenames={aheadFilenames}
             providers={
               (queued[queueIndex].providers ?? null) as PipelineProviders | null
+            }
+            providerNames={
+              (queued[queueIndex].provider_names ??
+                null) as PipelineProviders | null
             }
           />
         }
@@ -163,6 +170,7 @@ function ProcessingTooltipBody({
   pageTotal,
   startedAt,
   providers,
+  providerNames,
   stageProvider,
 }: {
   stage: string | null | undefined;
@@ -170,6 +178,7 @@ function ProcessingTooltipBody({
   pageTotal: number | null | undefined;
   startedAt: string | null | undefined;
   providers: PipelineProviders | null;
+  providerNames: PipelineProviders | null;
   stageProvider: string | null;
 }) {
   const now = useNow(true);
@@ -202,7 +211,11 @@ function ProcessingTooltipBody({
         )}
       </div>
       {providers && (
-        <ProvidersBlock providers={providers} active={stageProvider} />
+        <ProvidersBlock
+          providers={providers}
+          providerNames={providerNames}
+          active={stageProvider}
+        />
       )}
     </div>
   );
@@ -212,10 +225,12 @@ function QueuedTooltipBody({
   ahead,
   aheadFilenames,
   providers,
+  providerNames,
 }: {
   ahead: number;
   aheadFilenames: string[];
   providers: PipelineProviders | null;
+  providerNames: PipelineProviders | null;
 }) {
   return (
     <div className="space-y-2">
@@ -249,22 +264,48 @@ function QueuedTooltipBody({
           </div>
         )}
       </div>
-      {providers && <ProvidersBlock providers={providers} active={null} />}
+      {providers && (
+        <ProvidersBlock
+          providers={providers}
+          providerNames={providerNames}
+          active={null}
+        />
+      )}
     </div>
   );
 }
 
 function ProvidersBlock({
   providers,
+  providerNames,
   active,
 }: {
   providers: PipelineProviders;
+  providerNames: PipelineProviders | null;
   active: string | null;
 }) {
-  const entries: Array<[string, string]> = [];
-  if (providers.ocr) entries.push(["OCR", providers.ocr]);
-  if (providers.vision) entries.push(["Vision", providers.vision]);
-  if (providers.llm) entries.push(["LLM", providers.llm]);
+  const entries: Array<{ family: string; id: string; label: string }> = [];
+  if (providers.ocr) {
+    entries.push({
+      family: "OCR",
+      id: providers.ocr,
+      label: providerNames?.ocr || providers.ocr,
+    });
+  }
+  if (providers.vision) {
+    entries.push({
+      family: "Vision",
+      id: providers.vision,
+      label: providerNames?.vision || providers.vision,
+    });
+  }
+  if (providers.llm) {
+    entries.push({
+      family: "LLM",
+      id: providers.llm,
+      label: providerNames?.llm || providers.llm,
+    });
+  }
   if (entries.length === 0) return null;
   return (
     <div className="space-y-1 border-t pt-2">
@@ -272,22 +313,26 @@ function ProvidersBlock({
         Models
       </p>
       <div className="flex flex-wrap gap-1">
-        {entries.map(([family, id]) => {
+        {entries.map(({ family, id, label }) => {
           const isActive = id === active;
+          const showRawId = label !== id;
           return (
             <span
               key={family}
               className={[
-                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-mono",
+                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
                 isActive
                   ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
                   : "border-muted bg-muted/40 text-muted-foreground",
               ].join(" ")}
+              title={
+                showRawId ? `${family}: ${label} (${id})` : `${family}: ${id}`
+              }
             >
               <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">
                 {family}
               </span>
-              {id}
+              {label}
             </span>
           );
         })}

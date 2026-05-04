@@ -347,6 +347,14 @@ class ShareConfig(BaseModel):
     translate_per_share_per_hour: int = 20  # cost cap: max requests / share / rolling hour
     # Watermark intensity (0.0–1.0) for the diagonal stamp burned into PDFs.
     watermark_opacity: float = 0.20
+    # Public origin used to build the share link the admin copies. When the
+    # admin app and the share container live on different hostnames (the
+    # split-mode deployment), the admin's host header is the LAN admin URL
+    # and the doctor cannot reach it. Set this to the public share host
+    # (e.g. ``https://med.example.com``) to pin every generated link to it.
+    # Empty string keeps the legacy behaviour: derive origin from the
+    # admin's request.
+    public_base_url: str = ""
 
 
 class BackupConfig(BaseModel):

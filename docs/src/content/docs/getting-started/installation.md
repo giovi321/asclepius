@@ -76,6 +76,8 @@ Application env vars are prefixed with `ASCLEPIUS_`. The `TZ` variable is a plai
 | `ASCLEPIUS_MODE` | `core` (full app) or `share` (public doctor-share surface only) | `core` |
 | `ASCLEPIUS_PORT` | Host port for `asclepius-core` (LAN-only) | `8070` |
 | `ASCLEPIUS_SHARE_PORT` | Host port for `asclepius-share` (publishable behind TLS) | `8071` |
+| `ASCLEPIUS_SHARE_PUBLIC_URL` | Public origin pinned into every share link the admin copies (e.g. `https://med.example.com`). Required for split-host deployments; leave empty when admin and doctor reach Asclepius on the same hostname. | `""` |
+| `FORWARDED_ALLOW_IPS` | uvicorn trust list for `X-Forwarded-*` headers. `*` accepts any source (safe inside a private Docker network); override to your reverse-proxy's IP for stricter defaults. | `*` |
 | `TZ` | Container timezone (IANA timezone name) | `Europe/Zurich` |
 
 Example `.env` file:

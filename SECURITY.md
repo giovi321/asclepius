@@ -33,6 +33,8 @@ What it does not change:
 
 - **Sessions still rely on `ASCLEPIUS_SECRET_KEY`.** The two containers must share the same key (the bundled compose file already wires this up). Treat the share container's environment as sensitive: it holds the secret key and any LLM/OCR API keys needed for region translation.
 - **Both containers write the SQLite database.** The connection helper sets `PRAGMA busy_timeout=5000` to ride out cross-process lock contention; backups and `VACUUM` should still happen during a quiet window.
+- **Set `ASCLEPIUS_SHARE_PUBLIC_URL` on the core container** to pin every generated share link to the public doctor host. Without it, the link the admin copies inherits the admin's LAN hostname and the doctor cannot reach it.
+- **`X-Forwarded-Proto` from your reverse proxy must be honored.** The image launches uvicorn with `--proxy-headers`, and `FORWARDED_ALLOW_IPS` defaults to `*`. Tighten it to the proxy's IP if anything else can reach the container, and make sure your proxy actually sets `X-Forwarded-Proto: https` so cookies, audit IPs, and URL generation see the right scheme.
 - **The doctor-share threat model is unchanged.** Token discovery, OTP brute-force, watermark spoofing, and the existing rate-limit caps are all the same; see [Doctor shares](https://giovi321.github.io/asclepius/admin-guide/doctor-shares/) for that surface's security analysis.
 
 Bind `asclepius-share`'s host port (default `8071`) behind your TLS reverse proxy and leave `asclepius-core` on `127.0.0.1`. Do **not** mount the public port directly without TLS termination, and do **not** bypass `ASCLEPIUS_COOKIE_SECURE=1` on the share container.

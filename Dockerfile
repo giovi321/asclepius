@@ -79,4 +79,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import os,urllib.request,sys; p=os.environ.get('ASCLEPIUS_BIND_PORT','8000'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{p}/health', timeout=3).status == 200 else 1)" || exit 1
 
 ENTRYPOINT ["/usr/local/bin/asclepius-entrypoint"]
-CMD ["uvicorn", "asclepius.main:app", "--timeout-keep-alive", "120"]
+# ``--proxy-headers`` makes uvicorn honor X-Forwarded-Proto / -For from a
+# trusted reverse proxy. Tighten the trust list at runtime with the
+# ``FORWARDED_ALLOW_IPS`` env var (default: every source — fine for a
+# Docker network where only your reverse proxy can reach the container).
+CMD ["uvicorn", "asclepius.main:app", "--timeout-keep-alive", "120", "--proxy-headers"]

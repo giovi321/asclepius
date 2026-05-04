@@ -112,10 +112,11 @@ Both containers read and write the same SQLite database and the same vault direc
 
 1. **Bind the right ports.** Leave `asclepius-core` on `127.0.0.1:8070` (or a private subnet). Bind `asclepius-share` only behind your TLS reverse proxy. Override the host ports with `ASCLEPIUS_PORT` and `ASCLEPIUS_SHARE_PORT` if needed.
 2. **Share `ASCLEPIUS_SECRET_KEY` between the two services** (the bundled compose file already does this via the `SECRET_KEY` env var). They must agree on the key for cookie signing and token hashing.
-3. **Keep the LLM / OCR keys on the share container too** if you want region translation to work — those calls run in-process. Strip the keys (and the share container will return 503 from translate endpoints) only if you do not need that feature.
-4. **Use HTTPS.** Keep `ASCLEPIUS_COOKIE_SECURE=1` (the production default) so the share session cookie carries the `Secure` attribute.
-5. **Verify after deploy.** `curl -i https://share.example.com/api/auth/login` must return `404`. `curl -i https://share.example.com/api/share/zzz/request-otp -X POST` must return `204`. `curl -i https://share.example.com/health` must show `"mode":"share"`.
-6. **Maintenance windows still apply.** If `asclepius-core` is down, the share container keeps serving views and accepting OTPs, but doctor-triggered translations queue up until core is back to drain them.
+3. **Pin the share-link host with `ASCLEPIUS_SHARE_PUBLIC_URL`.** The admin reaches the app on the LAN host (e.g. `https://asclepius.lan.example.com`), so the link the **Share with doctor** dialog generates inherits that hostname by default — and the doctor cannot reach it. Set `ASCLEPIUS_SHARE_PUBLIC_URL=https://med.example.com` on `asclepius-core` and every generated link is rewritten to point at the public origin. Leave empty for single-address deployments where admin and doctor share the same hostname.
+4. **Keep the LLM / OCR keys on the share container too** if you want region translation to work — those calls run in-process. Strip the keys (and the share container will return 503 from translate endpoints) only if you do not need that feature.
+5. **Use HTTPS.** Keep `ASCLEPIUS_COOKIE_SECURE=1` (the production default) so the share session cookie carries the `Secure` attribute. Make sure your reverse proxy sends `X-Forwarded-Proto: https`; the bundled image launches uvicorn with `--proxy-headers` so that header is honored, and `FORWARDED_ALLOW_IPS=*` is the default trust list (override it to your proxy's IP if the container is reachable from anywhere else).
+6. **Verify after deploy.** `curl -i https://share.example.com/api/auth/login` must return `404`. `curl -i https://share.example.com/api/share/zzz/request-otp -X POST` must return `204`. `curl -i https://share.example.com/health` must show `"mode":"share"`.
+7. **Maintenance windows still apply.** If `asclepius-core` is down, the share container keeps serving views and accepting OTPs, but doctor-triggered translations queue up until core is back to drain them.
 
 The threat model for what the doctor sees inside a session is unchanged from a LAN deployment — see [Security model](#security-model) above.
 
@@ -132,3 +133,4 @@ In `settings.yaml` under `share:`:
 | `translate_per_session_seconds` | 30 | Debounce for the doctor's translate button |
 | `translate_per_share_per_hour` | 20 | Rolling-hour cost cap per share |
 | `watermark_opacity` | 0.20 | Watermark text opacity (0.0–1.0) |
+| `public_base_url` | `""` | Public origin pinned into every share link the admin copies. Override with env var `ASCLEPIUS_SHARE_PUBLIC_URL`. Set this when admin and doctor reach Asclepius on different hostnames; leave empty when they share one. |

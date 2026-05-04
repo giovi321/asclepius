@@ -76,10 +76,16 @@ async def _require_admin_or_owner(
 def _build_share_url(request: Request, raw_token: str) -> str:
     """Construct the absolute share URL we hand back to the admin.
 
-    Prefers the same origin the admin used to call us (so reverse-proxy
-    setups Just Work) and falls back to a ``/share/{token}`` path-only
-    form if the host header is missing.
+    In split-mode deployments the admin and the doctor reach different
+    hostnames; ``share.public_base_url`` (env: ``ASCLEPIUS_SHARE_PUBLIC_URL``)
+    pins every generated link to the doctor-facing origin regardless of
+    which host the admin used. When unset, fall back to the admin's
+    request origin so single-address setups keep working unchanged.
     """
+    cfg = get_config()
+    public_base = (cfg.share.public_base_url or "").rstrip("/")
+    if public_base:
+        return f"{public_base}/share/{raw_token}"
     origin = ""
     host = request.headers.get("host")
     if host:

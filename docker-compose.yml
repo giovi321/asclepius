@@ -33,6 +33,15 @@ services:
       # The companion ``asclepius-share`` service runs the same image in
       # ``share`` mode for the public surface.
       - ASCLEPIUS_MODE=core
+      # Pin the share link the admin copies to the public doctor host.
+      # Leave empty for single-address deployments (link inherits the
+      # admin's origin); set to e.g. ``https://med.example.com`` when
+      # admin and doctor live on different hostnames.
+      - ASCLEPIUS_SHARE_PUBLIC_URL=${ASCLEPIUS_SHARE_PUBLIC_URL:-}
+      # Trust X-Forwarded-* from any source. Override (e.g. to your
+      # reverse-proxy IP) when the container is reachable from anywhere
+      # other than your trusted proxy.
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}
     restart: unless-stopped
     # The entrypoint starts as root to fix bind-mount ownership, then
     # drops to the unprivileged ``asclepius`` user via gosu. We therefore
@@ -79,6 +88,11 @@ services:
       - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
       - ASCLEPIUS_MODE=share
+      # Share container does not mint share links, but keep the var set
+      # for symmetry and so internal absolute URLs (audit log, headers)
+      # report the public origin.
+      - ASCLEPIUS_SHARE_PUBLIC_URL=${ASCLEPIUS_SHARE_PUBLIC_URL:-}
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}
     restart: unless-stopped
     depends_on:
       - asclepius-core

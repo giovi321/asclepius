@@ -38,27 +38,31 @@ def _migrate_legacy_llm_yaml(data: dict) -> bool:
     if not llm.get("providers") and had_legacy:
         provider = llm.get("provider", "ollama")
         timeout = llm.get("extraction_timeout", 120)
-        providers: list[dict] = [{
-            "id": "ollama-default",
-            "type": "ollama",
-            "name": "Ollama (Local)",
-            "enabled": provider == "ollama",
-            "priority": 1,
-            "base_url": llm.get("ollama_base_url", "http://ollama:11434"),
-            "model": llm.get("ollama_model", "llama3.1"),
-            "timeout": timeout,
-        }]
-        if llm.get("claude_api_key"):
-            providers.append({
-                "id": "claude-default",
-                "type": "claude",
-                "name": "Claude API",
-                "enabled": provider == "claude",
-                "priority": 2,
-                "api_key": llm["claude_api_key"],
-                "model": llm.get("claude_model", "claude-sonnet-4-20250514"),
+        providers: list[dict] = [
+            {
+                "id": "ollama-default",
+                "type": "ollama",
+                "name": "Ollama (Local)",
+                "enabled": provider == "ollama",
+                "priority": 1,
+                "base_url": llm.get("ollama_base_url", "http://ollama:11434"),
+                "model": llm.get("ollama_model", "llama3.1"),
                 "timeout": timeout,
-            })
+            }
+        ]
+        if llm.get("claude_api_key"):
+            providers.append(
+                {
+                    "id": "claude-default",
+                    "type": "claude",
+                    "name": "Claude API",
+                    "enabled": provider == "claude",
+                    "priority": 2,
+                    "api_key": llm["claude_api_key"],
+                    "model": llm.get("claude_model", "claude-sonnet-4-20250514"),
+                    "timeout": timeout,
+                }
+            )
         llm["providers"] = providers
         migrated = True
     for k in _LEGACY_LLM_KEYS:
@@ -82,7 +86,9 @@ def _migrate_vision_extraction_ocr_yaml(data: dict) -> bool:
     if not isinstance(ocr_providers, list) or not ocr_providers:
         return False
 
-    to_migrate = [p for p in ocr_providers if isinstance(p, dict) and p.get("type") == "vision_extraction"]
+    to_migrate = [
+        p for p in ocr_providers if isinstance(p, dict) and p.get("type") == "vision_extraction"
+    ]
     if not to_migrate:
         return False
 
@@ -108,7 +114,11 @@ def _migrate_vision_extraction_ocr_yaml(data: dict) -> bool:
         vision_providers.append(mapped)
         existing_ids.add(mapped["id"])
 
-    ocr["providers"] = [p for p in ocr_providers if not (isinstance(p, dict) and p.get("type") == "vision_extraction")]
+    ocr["providers"] = [
+        p
+        for p in ocr_providers
+        if not (isinstance(p, dict) and p.get("type") == "vision_extraction")
+    ]
     data["ocr"] = ocr
     data["vision"] = vision
     return True
@@ -144,8 +154,12 @@ def _normalise_base_url(cred_type: str, base_url: str) -> str:
 
 
 def _ensure_credential(
-    credentials: list[CredentialEntry], cred_type: str, base_url: str, api_key: str,
-    *, suggested_name: str = "",
+    credentials: list[CredentialEntry],
+    cred_type: str,
+    base_url: str,
+    api_key: str,
+    *,
+    suggested_name: str = "",
 ) -> CredentialEntry | None:
     """Find or create a credential for (type, base_url, api_key).
 
@@ -163,10 +177,15 @@ def _ensure_credential(
         if (c.type, c.base_url, c.api_key) == key:
             return c
     existing_of_type = sum(1 for c in credentials if c.type == cred_type)
-    name = suggested_name or f"Auto-imported {cred_type}" + (f" {existing_of_type + 1}" if existing_of_type else "")
+    name = suggested_name or f"Auto-imported {cred_type}" + (
+        f" {existing_of_type + 1}" if existing_of_type else ""
+    )
     entry = CredentialEntry(
-        id=_new_credential_id(), name=name, type=cred_type or "ollama",
-        base_url=clean_url, api_key=api_key,
+        id=_new_credential_id(),
+        name=name,
+        type=cred_type or "ollama",
+        base_url=clean_url,
+        api_key=api_key,
     )
     credentials.append(entry)
     return entry
@@ -203,10 +222,7 @@ def _migrate_credentials(config: AppConfig) -> bool:
     if not global_backoff:
         global_backoff = [30, 60, 120]
     for c in credentials:
-        pristine = (
-            c.max_retries == 3
-            and list(c.retry_backoff_seconds) == [30, 60, 120]
-        )
+        pristine = c.max_retries == 3 and list(c.retry_backoff_seconds) == [30, 60, 120]
         if pristine and (global_retries != 3 or global_backoff != [30, 60, 120]):
             c.max_retries = global_retries
             c.retry_backoff_seconds = list(global_backoff)
@@ -216,7 +232,10 @@ def _migrate_credentials(config: AppConfig) -> bool:
         if p.credential_id:
             continue
         cred = _ensure_credential(
-            credentials, p.type, p.base_url, p.api_key,
+            credentials,
+            p.type,
+            p.base_url,
+            p.api_key,
             suggested_name=p.name or f"Auto-imported {p.type}",
         )
         if cred is not None:
@@ -227,7 +246,10 @@ def _migrate_credentials(config: AppConfig) -> bool:
         if p.credential_id:
             continue
         cred = _ensure_credential(
-            credentials, p.type, p.base_url, p.api_key,
+            credentials,
+            p.type,
+            p.base_url,
+            p.api_key,
             suggested_name=p.name or f"Auto-imported {p.type}",
         )
         if cred is not None:
@@ -240,17 +262,26 @@ def _migrate_credentials(config: AppConfig) -> bool:
         cred: CredentialEntry | None = None
         if p.type == "tesseract_remote" and p.remote_url:
             cred = _ensure_credential(
-                credentials, "tesseract_remote", p.remote_url, p.remote_api_key,
+                credentials,
+                "tesseract_remote",
+                p.remote_url,
+                p.remote_api_key,
                 suggested_name=p.name or "Auto-imported tesseract_remote",
             )
         elif p.type == "llm_vision" and (p.llm_base_url or p.llm_api_key):
             cred = _ensure_credential(
-                credentials, p.llm_provider or "ollama", p.llm_base_url, p.llm_api_key,
+                credentials,
+                p.llm_provider or "ollama",
+                p.llm_base_url,
+                p.llm_api_key,
                 suggested_name=p.name or f"Auto-imported {p.llm_provider or 'ollama'}",
             )
         elif p.type == "google_vision" and p.google_vision_key:
             cred = _ensure_credential(
-                credentials, "google_vision", "", p.google_vision_key,
+                credentials,
+                "google_vision",
+                "",
+                p.google_vision_key,
                 suggested_name=p.name or "Auto-imported google_vision",
             )
         if cred is not None:
@@ -263,7 +294,10 @@ def _migrate_credentials(config: AppConfig) -> bool:
         first = _first_enabled_llm(config)
         if first is not None:
             cred = _ensure_credential(
-                credentials, first.type, first.base_url, first.api_key,
+                credentials,
+                first.type,
+                first.base_url,
+                first.api_key,
                 suggested_name=first.name or f"Auto-imported {first.type}",
             )
             if cred is not None:
@@ -301,11 +335,18 @@ def _apply_env_ollama_url(config: AppConfig, url: str) -> None:
         if p.type == "ollama":
             p.base_url = url
             return
-    config.llm.providers.append(LlmProviderEntry(
-        id="ollama-env", type="ollama", name="Ollama (Local)",
-        enabled=True, priority=len(config.llm.providers) + 1,
-        base_url=url, model="llama3.1", timeout=config.llm.extraction_timeout,
-    ))
+    config.llm.providers.append(
+        LlmProviderEntry(
+            id="ollama-env",
+            type="ollama",
+            name="Ollama (Local)",
+            enabled=True,
+            priority=len(config.llm.providers) + 1,
+            base_url=url,
+            model="llama3.1",
+            timeout=config.llm.extraction_timeout,
+        )
+    )
 
 
 def _apply_env_claude_key(config: AppConfig, key: str) -> None:
@@ -313,12 +354,18 @@ def _apply_env_claude_key(config: AppConfig, key: str) -> None:
         if p.type == "claude":
             p.api_key = key
             return
-    config.llm.providers.append(LlmProviderEntry(
-        id="claude-env", type="claude", name="Claude API",
-        enabled=False, priority=len(config.llm.providers) + 1,
-        api_key=key, model="claude-sonnet-4-20250514",
-        timeout=config.llm.extraction_timeout,
-    ))
+    config.llm.providers.append(
+        LlmProviderEntry(
+            id="claude-env",
+            type="claude",
+            name="Claude API",
+            enabled=False,
+            priority=len(config.llm.providers) + 1,
+            api_key=key,
+            model="claude-sonnet-4-20250514",
+            timeout=config.llm.extraction_timeout,
+        )
+    )
 
 
 def load_config() -> AppConfig:
@@ -347,7 +394,9 @@ def load_config() -> AppConfig:
                 "Migrated vision_extraction OCR providers to vision.providers - YAML persisted.",
             )
         except Exception:
-            logger.exception("Failed to persist vision migration - in-memory migration still applied")
+            logger.exception(
+                "Failed to persist vision migration - in-memory migration still applied"
+            )
 
     if env := os.environ.get("ASCLEPIUS_ENV"):
         config.server.environment = env
@@ -378,59 +427,73 @@ def load_config() -> AppConfig:
         if vision_key:
             config.ocr.google_vision_key = vision_key
             config.ocr.cloud_ocr_enabled = True
+    if share_public_url := os.environ.get("ASCLEPIUS_SHARE_PUBLIC_URL"):
+        config.share.public_base_url = share_public_url.rstrip("/")
 
     # Migrate legacy flat OCR config → provider list (pre-0.6 settings.yaml).
     if not config.ocr.providers:
         ocr_providers: list[OcrProviderEntry] = []
-        ocr_providers.append(OcrProviderEntry(
-            id="tesseract-default",
-            type="tesseract",
-            name="Tesseract (Local)",
-            enabled=(config.ocr.engine == "tesseract"),
-            priority=1,
-            language=config.ocr.language,
-            confidence_threshold=config.ocr.confidence_threshold,
-        ))
-        if config.ocr.remote_url:
-            ocr_providers.append(OcrProviderEntry(
-                id="tesseract-remote-default",
-                type="tesseract_remote",
-                name="Tesseract (Remote)",
-                enabled=(config.ocr.engine == "tesseract_remote"),
-                priority=2,
-                remote_url=config.ocr.remote_url,
-                remote_api_key=config.ocr.remote_api_key,
+        ocr_providers.append(
+            OcrProviderEntry(
+                id="tesseract-default",
+                type="tesseract",
+                name="Tesseract (Local)",
+                enabled=(config.ocr.engine == "tesseract"),
+                priority=1,
                 language=config.ocr.language,
-            ))
+                confidence_threshold=config.ocr.confidence_threshold,
+            )
+        )
+        if config.ocr.remote_url:
+            ocr_providers.append(
+                OcrProviderEntry(
+                    id="tesseract-remote-default",
+                    type="tesseract_remote",
+                    name="Tesseract (Remote)",
+                    enabled=(config.ocr.engine == "tesseract_remote"),
+                    priority=2,
+                    remote_url=config.ocr.remote_url,
+                    remote_api_key=config.ocr.remote_api_key,
+                    language=config.ocr.language,
+                )
+            )
         if config.ocr.llm_vision_model or config.ocr.engine == "llm_vision":
             fallback_llm = _first_enabled_llm(config)
-            ocr_providers.append(OcrProviderEntry(
-                id="llm-vision-default",
-                type="llm_vision",
-                name="LLM Vision OCR",
-                enabled=(config.ocr.engine == "llm_vision"),
-                priority=3 if config.ocr.remote_url else 2,
-                llm_provider=config.ocr.llm_vision_provider or (fallback_llm.type if fallback_llm else "ollama"),
-                llm_model=config.ocr.llm_vision_model,
-                llm_base_url=config.ocr.llm_vision_ollama_url or (fallback_llm.base_url if fallback_llm else ""),
-                llm_api_key="",
-            ))
+            ocr_providers.append(
+                OcrProviderEntry(
+                    id="llm-vision-default",
+                    type="llm_vision",
+                    name="LLM Vision OCR",
+                    enabled=(config.ocr.engine == "llm_vision"),
+                    priority=3 if config.ocr.remote_url else 2,
+                    llm_provider=config.ocr.llm_vision_provider
+                    or (fallback_llm.type if fallback_llm else "ollama"),
+                    llm_model=config.ocr.llm_vision_model,
+                    llm_base_url=config.ocr.llm_vision_ollama_url
+                    or (fallback_llm.base_url if fallback_llm else ""),
+                    llm_api_key="",
+                )
+            )
         if config.ocr.google_vision_key:
-            ocr_providers.append(OcrProviderEntry(
-                id="google-vision-default",
-                type="google_vision",
-                name="Google Cloud Vision",
-                enabled=(config.ocr.engine == "google_vision"),
-                priority=len(ocr_providers) + 1,
-                google_vision_key=config.ocr.google_vision_key,
-            ))
+            ocr_providers.append(
+                OcrProviderEntry(
+                    id="google-vision-default",
+                    type="google_vision",
+                    name="Google Cloud Vision",
+                    enabled=(config.ocr.engine == "google_vision"),
+                    priority=len(ocr_providers) + 1,
+                    google_vision_key=config.ocr.google_vision_key,
+                )
+            )
         config.ocr.providers = ocr_providers
 
     migrated_creds = _migrate_credentials(config)
     if migrated_creds:
         try:
             data.setdefault("llm", {})["providers"] = [p.model_dump() for p in config.llm.providers]
-            data.setdefault("vision", {})["providers"] = [p.model_dump() for p in config.vision.providers]
+            data.setdefault("vision", {})["providers"] = [
+                p.model_dump() for p in config.vision.providers
+            ]
             data.setdefault("ocr", {})["providers"] = [p.model_dump() for p in config.ocr.providers]
             data["llm"]["general"] = config.llm.general.model_dump()
             data["credentials"] = [c.model_dump() for c in config.credentials]
@@ -440,7 +503,9 @@ def load_config() -> AppConfig:
                 len(config.credentials),
             )
         except Exception:
-            logger.exception("Failed to persist credential migration - in-memory migration still applied")
+            logger.exception(
+                "Failed to persist credential migration - in-memory migration still applied"
+            )
 
     return config
 
@@ -456,7 +521,9 @@ def get_active_llm_provider_config(config: AppConfig, priority: int = 1) -> LlmP
     return None
 
 
-def get_active_vision_provider_config(config: AppConfig, priority: int = 1) -> VisionLlmProviderEntry | None:
+def get_active_vision_provider_config(
+    config: AppConfig, priority: int = 1
+) -> VisionLlmProviderEntry | None:
     """Get the enabled Vision-LLM provider at the given priority rank (1-based)."""
     enabled = sorted(
         [p for p in config.vision.providers if p.enabled],
@@ -494,7 +561,7 @@ def _validate_production_config(config: AppConfig) -> None:
     if config.auth.secret_key == DEFAULT_SECRET_PLACEHOLDER:
         problems.append(
             "ASCLEPIUS_SECRET_KEY is still the placeholder; generate one with "
-            "`python -c \"import secrets; print(secrets.token_urlsafe(48))\"`."
+            '`python -c "import secrets; print(secrets.token_urlsafe(48))"`.'
         )
     elif len(config.auth.secret_key) < 32:
         problems.append("ASCLEPIUS_SECRET_KEY must be at least 32 characters.")

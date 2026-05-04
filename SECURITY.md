@@ -20,7 +20,7 @@ For anything beyond a single user on a trusted LAN, you must front Asclepius wit
 
 ## Exposing only doctor shares to the internet
 
-If you need outside doctors to reach a curated subset of records over the public internet, run the bundled `asclepius-share` container instead of opening port `8070`. It is the same image started with `ASCLEPIUS_MODE=share`, mounts only `/api/share/*` and the `/share/...` SPA pages, and returns `404` for every admin or patient route. The pipeline watcher and backup scheduler do not run there; translate jobs land in the shared SQLite queue and the core container drains them.
+If you need outside doctors to reach a curated subset of records over the public internet, run the bundled `asclepius-share` container instead of opening port `8070`. It is the same image started with `ASCLEPIUS_MODE=share`, mounts only `/api/share/*` and the `/share/...` SPA pages, and returns `404` for every admin or patient route. The inbox watcher and backup scheduler do not run there (only the core container watches the shared inbox); the share container does run a local pipeline worker so doctor translate jobs are drained in-process.
 
 What this gives you:
 

@@ -477,6 +477,56 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
         loop.close()
 
 
+async def start_translate_worker(config: AppConfig, app_state=None) -> None:
+    """Spawn a pipeline worker without the inbox observer or scheduled-doc
+    sweeper. Used by the share-only container so doctor translate jobs
+    have a local worker to consume them.
+
+    The full ``start_watcher`` cannot run in share mode because both
+    containers would race on the same inbox directory and re-ingest each
+    other's files. A translate-only worker is in-process by design — the
+    doctor's translate request enqueues onto ``app_state.pipeline_queue``
+    and the worker thread we spawn here drains it.
+    """
+    queue: PriorityQueue = PriorityQueue()
+    if app_state is not None:
+        app_state.pipeline_queue = queue
+        app_state.pipeline_auto_stopped = False
+        app_state.pipeline_auto_stop_reason = ""
+
+    _spawn_worker(config, queue, app_state)
+    logger.info("Translate worker started (share mode)")
+
+    # Watchdog: respawn the worker if its thread dies. Same logic as the
+    # full watcher's liveness check, minus the file-watcher rebind.
+    try:
+        while True:
+            await asyncio.sleep(5)
+            cur_worker = getattr(app_state, "pipeline_worker", None) if app_state else None
+            if cur_worker is not None and not cur_worker.is_alive():
+                logger.warning(
+                    "Translate worker thread died unexpectedly — respawning",
+                )
+                from asclepius.pipeline.processor import pipeline_status as _ps
+
+                _ps["queue_depth"] = 0
+                _ps["queued_jobs"] = []
+                _ps["queued_files"] = []
+                _ps["processing"] = None
+                _ps["processing_step"] = None
+                _ps["processing_doc_id"] = None
+                _ps["processing_pages"] = None
+                _ps["processing_page_current"] = None
+                _ps["current_job"] = None
+                new_queue: PriorityQueue = PriorityQueue()
+                if app_state is not None:
+                    app_state.pipeline_queue = new_queue
+                _spawn_worker(config, new_queue, app_state)
+                queue = new_queue
+    except asyncio.CancelledError:
+        logger.info("Translate worker stopped")
+
+
 async def start_watcher(config: AppConfig, app_state=None) -> None:
     """Start the file watcher and pipeline worker thread.
 

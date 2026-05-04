@@ -125,9 +125,11 @@ async def lifespan(app: FastAPI):
 
     # Note: no default admin user is created — the setup wizard handles first-user creation
 
-    # Background tasks only run in core mode. The share container is API-only
-    # and drains nothing: translate jobs land in pipeline_queue (shared SQLite)
-    # and the core container's worker picks them up.
+    # Background tasks: full inbox watcher + backup scheduler only in core
+    # mode. Share mode still needs an in-process pipeline worker so the
+    # doctor's translate requests have a local consumer for their queue
+    # jobs, but without the inbox observer that would race the core
+    # container.
     app.state.pipeline_task = None
     app.state.pipeline_auto_stopped = False
     app.state.pipeline_auto_stop_reason = ""
@@ -145,6 +147,11 @@ async def lifespan(app: FastAPI):
             from asclepius.backup.scheduler import start_backup_scheduler
 
             app.state.backup_task = asyncio.create_task(start_backup_scheduler(config, app.state))
+    elif mode == "share":
+        import asyncio
+        from asclepius.pipeline.watcher import start_translate_worker
+
+        app.state.pipeline_task = asyncio.create_task(start_translate_worker(config, app.state))
 
     yield
 

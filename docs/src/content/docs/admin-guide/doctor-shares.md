@@ -87,7 +87,8 @@ In share mode the FastAPI app starts with everything stripped except the doctor 
 | `/api/share/{token}/request-otp`, `verify-otp`, `claim`, `queue`, `heartbeat`, `logout` | Mounted (public OTP / queue / session bootstrap) |
 | `/api/share/me`, `/documents/{id}`, `/file`, `/translate-region`, region-translation thumbnails | Mounted (doctor read surface) |
 | `/api/auth`, `/api/patients`, `/api/documents`, `/api/pipeline`, `/api/settings`, `/api/vault`, `/api/setup`, `/api/shares` (admin), every other admin router | **Not mounted — returns 404** |
-| Pipeline watcher, backup scheduler | **Not started** — share is API-only |
+| Inbox watcher, backup scheduler | **Not started** — only the core container watches the shared inbox |
+| In-process pipeline worker | **Started** — drains the doctor's translate jobs locally (queue is per-process, not the SQLite `pipeline_queue` table) |
 | SPA fallback | Only serves `index.html` for `/`, `/share`, and `/share/...`. `/admin`, `/login`, `/patients`, etc. return 404 |
 | `/health` | Mounted; reports `{"status": "ok", "mode": "share"}` so you can verify the deployment |
 
@@ -106,7 +107,7 @@ Token minting and revocation stay on the core admin app — the share container 
                         asclepius-core         (host port 8070, LAN only)
 ```
 
-Both containers read and write the same SQLite database and the same vault directory; cookies and tokens stay valid across processes because they share `ASCLEPIUS_SECRET_KEY`. Translate jobs the doctor triggers from the public container land in the shared `pipeline_queue` table, and the core container's worker drains them.
+Both containers read and write the same SQLite database and the same vault directory; cookies and tokens stay valid across processes because they share `ASCLEPIUS_SECRET_KEY`. Each container runs its own in-process pipeline worker: the core container drains admin uploads / reprocess / translate jobs from its own queue, the share container drains the doctor's translate jobs from its own queue. Both write the same `region_translations` and audit tables back to the shared SQLite, so results show up in the admin UI as well.
 
 ### Deployment checklist
 
@@ -116,7 +117,7 @@ Both containers read and write the same SQLite database and the same vault direc
 4. **Keep the LLM / OCR keys on the share container too** if you want region translation to work — those calls run in-process. Strip the keys (and the share container will return 503 from translate endpoints) only if you do not need that feature.
 5. **Use HTTPS.** Keep `ASCLEPIUS_COOKIE_SECURE=1` (the production default) so the share session cookie carries the `Secure` attribute. Make sure your reverse proxy sends `X-Forwarded-Proto: https`; the bundled image launches uvicorn with `--proxy-headers` so that header is honored, and `FORWARDED_ALLOW_IPS=*` is the default trust list (override it to your proxy's IP if the container is reachable from anywhere else).
 6. **Verify after deploy.** `curl -i https://share.example.com/api/auth/login` must return `404`. `curl -i https://share.example.com/api/share/zzz/request-otp -X POST` must return `204`. `curl -i https://share.example.com/health` must show `"mode":"share"`.
-7. **Maintenance windows still apply.** If `asclepius-core` is down, the share container keeps serving views and accepting OTPs, but doctor-triggered translations queue up until core is back to drain them.
+7. **Maintenance windows.** Each container drains its own queue, so doctor translates keep working even when `asclepius-core` is down — only admin-side uploads and reprocess jobs pause.
 
 The threat model for what the doctor sees inside a session is unchanged from a LAN deployment — see [Security model](#security-model) above.
 

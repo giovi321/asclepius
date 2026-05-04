@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { LogOut, FileText, Calendar, Moon, Sun } from "lucide-react";
 
 import { useShareSession } from "@/contexts/ShareSessionContext";
+import ShareLogo from "@/components/share/ShareLogo";
 
 /**
  * Doctor's home view inside an active share.
@@ -24,12 +25,16 @@ export default function ShareDashboardPage() {
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold">{me.patient_name}</h1>
-            <p className="text-xs text-muted-foreground">
-              Shared with {me.recipient_label} · you will be logged out
-              automatically in <SessionCountdown iso={me.session_expires_at} />
-            </p>
+          <div className="flex items-center gap-3">
+            <ShareLogo size="sm" />
+            <div>
+              <h1 className="text-lg font-semibold">{me.patient_name}</h1>
+              <p className="text-xs text-muted-foreground">
+                Shared with {me.recipient_label} · you will be logged out
+                automatically in{" "}
+                <SessionCountdown iso={me.session_expires_at} />
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button

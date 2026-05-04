@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2, ShieldCheck } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
+import ShareLogo from "@/components/share/ShareLogo";
 
 /**
  * Entry point for a share link.
@@ -44,6 +45,9 @@ export default function ShareLandingPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm space-y-6">
+        <div className="flex justify-center">
+          <ShareLogo size="md" />
+        </div>
         <div className="flex items-center gap-2 text-primary">
           <ShieldCheck className="h-6 w-6" />
           <h1 className="text-lg font-semibold">Secure document share</h1>

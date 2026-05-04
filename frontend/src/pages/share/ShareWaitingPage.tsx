@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Hourglass, Loader2, X } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
+import ShareLogo from "@/components/share/ShareLogo";
 
 /**
  * Queueing UX.
@@ -91,6 +92,9 @@ export default function ShareWaitingPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm space-y-6">
+        <div className="flex justify-center">
+          <ShareLogo size="md" />
+        </div>
         <div className="flex items-center gap-2 text-primary">
           <Hourglass className="h-6 w-6" />
           <h1 className="text-lg font-semibold">Share is currently in use</h1>

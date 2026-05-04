@@ -7,6 +7,7 @@ import ShareDocumentViewer, {
   type NormalizedBbox,
 } from "@/components/share/ShareDocumentViewer";
 import ShareTranslateMenu from "@/components/share/ShareTranslateMenu";
+import ShareLogo from "@/components/share/ShareLogo";
 import { useToast } from "@/contexts/ToastContext";
 import { useShareSession } from "@/contexts/ShareSessionContext";
 
@@ -155,12 +156,15 @@ export default function ShareDocumentPage() {
     return (
       <div className="min-h-screen bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 py-6">
-          <Link
-            to="/share/dashboard"
-            className="inline-flex items-center gap-1 text-sm hover:underline"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to documents
-          </Link>
+          <div className="flex items-center gap-3">
+            <ShareLogo size="sm" />
+            <Link
+              to="/share/dashboard"
+              className="inline-flex items-center gap-1 text-sm hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to documents
+            </Link>
+          </div>
           <p className="mt-6 text-sm text-destructive">{error}</p>
         </div>
       </div>
@@ -171,12 +175,15 @@ export default function ShareDocumentPage() {
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link
-            to="/share/dashboard"
-            className="inline-flex items-center gap-1.5 text-sm hover:underline"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Link>
+          <div className="flex items-center gap-3">
+            <ShareLogo size="sm" />
+            <Link
+              to="/share/dashboard"
+              className="inline-flex items-center gap-1.5 text-sm hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Link>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted-foreground">
               Read-only view

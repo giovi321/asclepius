@@ -168,6 +168,7 @@ async def create_share(
 
 @router.get("")
 async def list_shares(
+    request: Request,
     patient_id: int | None = Query(default=None),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
@@ -179,11 +180,25 @@ async def list_shares(
 
     Without ``patient_id``: all shares the caller can manage. Admins see
     everything; non-admins see only shares for patients they own.
+
+    Each row carries a ``share_url`` decorated with the current public
+    base URL so the dashboard's "Copy link" button hands the admin the
+    *doctor-facing* URL even when the admin is logged in on the LAN
+    host. Falls back to ``request.url.scheme + host`` when
+    ``share.public_base_url`` is empty.
     """
     if patient_id is not None:
         await _require_admin_or_owner(db, current_user, patient_id)
-        return await share_service.list_shares_for_patient(db, patient_id)
-    return await share_service.list_shares_for_user(db, current_user)
+        rows = await share_service.list_shares_for_patient(db, patient_id)
+    else:
+        rows = await share_service.list_shares_for_user(db, current_user)
+    for row in rows:
+        token = row.get("token_clear")
+        if token:
+            row["share_url"] = _build_share_url(request, token)
+        else:
+            row["share_url"] = None
+    return rows
 
 
 @router.delete("/{share_id}")

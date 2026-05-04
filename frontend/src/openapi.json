@@ -6381,7 +6381,7 @@
       "get": {
         "tags": ["shares"],
         "summary": "List Shares",
-        "description": "List shares.\n\nWith ``patient_id``: scoped to that patient (admin/owner only \u2014 same\npermission gate as creation).\n\nWithout ``patient_id``: all shares the caller can manage. Admins see\neverything; non-admins see only shares for patients they own.",
+        "description": "List shares.\n\nWith ``patient_id``: scoped to that patient (admin/owner only \u2014 same\npermission gate as creation).\n\nWithout ``patient_id``: all shares the caller can manage. Admins see\neverything; non-admins see only shares for patients they own.\n\nEach row carries a ``share_url`` decorated with the current public\nbase URL so the dashboard's \"Copy link\" button hands the admin the\n*doctor-facing* URL even when the admin is logged in on the LAN\nhost. Falls back to ``request.url.scheme + host`` when\n``share.public_base_url`` is empty.",
         "operationId": "list_shares_api_shares_get",
         "parameters": [
           {

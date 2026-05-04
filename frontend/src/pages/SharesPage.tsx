@@ -25,6 +25,10 @@ interface ShareSummary {
    * token_clear column existed — those rows can't show a copy-link
    * button (admin must reissue if they need a new link). */
   token_clear: string | null;
+  /** Server-built share link, decorated with ``share.public_base_url``
+   * if set so split-host deployments hand the admin the doctor-facing
+   * URL. Null when the row has no ``token_clear``. */
+  share_url: string | null;
   recipient_label: string;
   recipient_contact: string;
   contact_kind: string;
@@ -393,7 +397,10 @@ export default function SharesPage() {
                               token_clear=null and we can't recover the
                               raw URL from the hash. Admin must reissue. */}
                           {!isRevoked && !isExpired && s.token_clear && (
-                            <CopyLinkButton token={s.token_clear} />
+                            <CopyLinkButton
+                              token={s.token_clear}
+                              shareUrl={s.share_url}
+                            />
                           )}
                           {!isRevoked && (
                             <button
@@ -516,15 +523,21 @@ function OtpCell({
   );
 }
 
-function CopyLinkButton({ token }: { token: string }) {
+function CopyLinkButton({
+  token,
+  shareUrl,
+}: {
+  token: string;
+  shareUrl: string | null;
+}) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
-    // Reconstruct the same URL the admin saw in the create dialog —
-    // origin + /share/{token}. We do not store the full URL because
-    // origin can vary across deployments (reverse proxy, direct), and
-    // computing it client-side guarantees the link the admin copies
-    // matches the page they're on.
-    const url = `${window.location.origin}/share/${token}`;
+    // Server-built URL respects ``share.public_base_url`` so split-host
+    // setups (LAN admin + public doctor host) hand the admin the
+    // doctor-facing URL. Fall back to the admin's own origin only when
+    // the server didn't provide one (single-host deployments where
+    // public_base_url is empty AND the host header was missing).
+    const url = shareUrl || `${window.location.origin}/share/${token}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

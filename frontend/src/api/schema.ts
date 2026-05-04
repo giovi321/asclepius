@@ -2589,6 +2589,12 @@ export interface paths {
      *
      *     Without ``patient_id``: all shares the caller can manage. Admins see
      *     everything; non-admins see only shares for patients they own.
+     *
+     *     Each row carries a ``share_url`` decorated with the current public
+     *     base URL so the dashboard's "Copy link" button hands the admin the
+     *     *doctor-facing* URL even when the admin is logged in on the LAN
+     *     host. Falls back to ``request.url.scheme + host`` when
+     *     ``share.public_base_url`` is empty.
      */
     get: operations["list_shares_api_shares_get"];
     put?: never;

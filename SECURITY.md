@@ -18,6 +18,25 @@ For anything beyond a single user on a trusted LAN, you must front Asclepius wit
 
 **Do not bind port `8070` to a public interface.** Keep it on `127.0.0.1` or a private subnet, and reach it via VPN (WireGuard, Tailscale, etc.) or a reverse proxy that enforces auth.
 
+## Exposing only doctor shares to the internet
+
+If you need outside doctors to reach a curated subset of records over the public internet, run the bundled `asclepius-share` container instead of opening port `8070`. It is the same image started with `ASCLEPIUS_MODE=share`, mounts only `/api/share/*` and the `/share/...` SPA pages, and returns `404` for every admin or patient route. The pipeline watcher and backup scheduler do not run there; translate jobs land in the shared SQLite queue and the core container drains them.
+
+What this gives you:
+
+- **No admin login on the public port.** `/api/auth/login` is not mounted, so the LAN-only username/password flow is unreachable from the internet even if someone guesses your credentials.
+- **No patient enumeration.** `/api/patients`, `/api/documents`, `/api/shares` (admin), `/api/pipeline`, `/api/settings`, `/api/vault`, `/api/setup`, and friends all return `404`. Token creation stays on the core container.
+- **Tighter SPA surface.** `/admin`, `/login`, `/patients`, etc. return `404` from the share container; only `/`, `/share`, and `/share/...` serve the SPA shell.
+- **One audit trail.** Both containers write to the same SQLite database, so every OTP request, doctor view, and translate from the public port shows up in the regular admin audit panel.
+
+What it does not change:
+
+- **Sessions still rely on `ASCLEPIUS_SECRET_KEY`.** The two containers must share the same key (the bundled compose file already wires this up). Treat the share container's environment as sensitive: it holds the secret key and any LLM/OCR API keys needed for region translation.
+- **Both containers write the SQLite database.** The connection helper sets `PRAGMA busy_timeout=5000` to ride out cross-process lock contention; backups and `VACUUM` should still happen during a quiet window.
+- **The doctor-share threat model is unchanged.** Token discovery, OTP brute-force, watermark spoofing, and the existing rate-limit caps are all the same; see [Doctor shares](https://giovi321.github.io/asclepius/admin-guide/doctor-shares/) for that surface's security analysis.
+
+Bind `asclepius-share`'s host port (default `8071`) behind your TLS reverse proxy and leave `asclepius-core` on `127.0.0.1`. Do **not** mount the public port directly without TLS termination, and do **not** bypass `ASCLEPIUS_COOKIE_SECURE=1` on the share container.
+
 ## How to report
 
 Open a private advisory from the repo's [Security tab](https://github.com/giovi321/asclepius/security) ("Report a vulnerability").

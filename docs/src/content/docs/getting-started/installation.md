@@ -11,6 +11,8 @@ For any deployment that is reachable from outside a trusted network, or that has
 - A **VPN** (WireGuard, Tailscale, …) or an **authenticating reverse proxy**.
 
 The local username/password login should be treated as a single-user convenience, not a production auth system. Bind port `8070` to `127.0.0.1` or a private subnet, never `0.0.0.0` on a public host.
+
+The one exception is the **doctor-share surface**. The bundled `asclepius-share` service (same image, `ASCLEPIUS_MODE=share`) only mounts `/api/share/*` and the `/share/...` SPA pages, returns 404 for every admin or patient route, and is the supported way to publish that surface over the public internet. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet).
 :::
 
 ## Prerequisites
@@ -40,11 +42,14 @@ Edit `config/settings.yaml` to configure your LLM provider, OCR settings, and ot
 docker compose up -d
 ```
 
-This starts a single service:
+This starts two services from the same image:
 
-- **asclepius** -- the main application on port `8070` (mapped from container port `8000`)
+- **asclepius-core** -- the full application (admin, pipeline, settings, doctor-share admin) on port `8070` (mapped from container port `8000`). Keep this one on the LAN.
+- **asclepius-share** -- the same image started with `ASCLEPIUS_MODE=share`. Mounts only the doctor-share routes (`/api/share/*` plus the `/share/...` SPA pages); every admin or patient route returns 404. Bind it to a public TLS proxy if you want outside doctors to reach a shared record. Default host port `8071`. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet).
 
-The container includes:
+If you do not plan to expose share access to the internet, you can simply leave the share service running on `127.0.0.1:8071` (no harm done), or remove it from `docker-compose.yml`. The core service is fully functional on its own.
+
+Each container includes:
 
 - Python 3.12 + FastAPI backend
 - Pre-built React frontend (served as static files)
@@ -68,6 +73,9 @@ Application env vars are prefixed with `ASCLEPIUS_`. The `TZ` variable is a plai
 | `ASCLEPIUS_DB_PATH` | Overrides `database.path` | `/vault/asclepius.sqlite` |
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` | `config/settings.yaml` |
 | `ASCLEPIUS_ENV` | `development` or `production` (affects log formatting) | `production` |
+| `ASCLEPIUS_MODE` | `core` (full app) or `share` (public doctor-share surface only) | `core` |
+| `ASCLEPIUS_PORT` | Host port for `asclepius-core` (LAN-only) | `8070` |
+| `ASCLEPIUS_SHARE_PORT` | Host port for `asclepius-share` (publishable behind TLS) | `8071` |
 | `TZ` | Container timezone (IANA timezone name) | `Europe/Zurich` |
 
 Example `.env` file:

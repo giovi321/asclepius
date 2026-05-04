@@ -19,7 +19,7 @@ Asclepius takes the pile of PDFs, scans, discharge letters, and phone photos of 
 
 After that, you can plot a hemoglobin trend across a decade, scroll a timeline of every appointment, or just ask plain-language questions about your history. When a specialist needs to look at part of your file, you can hand them a one-time link plus a 6-digit code instead of emailing PDFs around.
 
-It runs in one Docker container on your own machine. Your records stay there unless you tell them otherwise.
+It runs in one Docker container on your own machine, with an optional sibling container that exposes only the doctor-share surface to the internet. Your records stay there unless you tell them otherwise.
 
 <p align="center">
   <img src="docs/public/assets/diagrams/journey.svg" alt="From a stack of paper to one searchable archive" width="900" />
@@ -64,6 +64,7 @@ When you need a second opinion, you don't want to attach a stack of scans to an 
 - **Watermarked, no-download viewer.** PDFs are rendered server-side with a faint vector watermark on every page carrying the recipient's name and UTC timestamp. The viewer fetches bytes into memory, so right-click, Ctrl+S, and Ctrl+P are intercepted.
 - **Targeted translation, not a free LLM tunnel.** The doctor can translate the current page or drag a rectangle to translate a region. Whole-document translation isn't exposed. Rate-limited per session and per share. You pick which OCR and LLM provider runs the translation, per share or globally.
 - **Full audit trail.** Every OTP request, view, file fetch, translate, and logout is logged with timestamp, IP, and user-agent. Revoke kills active sessions instantly.
+- **Safe internet exposure (optional second container).** The bundled `docker-compose.yml` ships a sibling service `asclepius-share` that runs the same image with `ASCLEPIUS_MODE=share`. It mounts only the doctor-share routes (`/api/share/*` and the `/share/...` SPA pages); admin login, patient CRUD, settings, pipeline, and even the share-management endpoints all return 404. Bind that one port to the public internet behind your TLS proxy and keep the core admin port (`8070`) on the LAN.
 
 Full reference: [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.md).
 
@@ -91,6 +92,8 @@ A few things stop being safe the moment strangers can reach it:
 - Files in the inbox flow into LLM prompts, so any document from an untrusted source is a potential injection vector.
 
 For anything beyond a single user on a trusted LAN, front it with an OIDC provider like [Authentik](https://goauthentik.io/), Keycloak, or Auth0, or keep the whole thing behind a VPN. [`SECURITY.md`](SECURITY.md) has the full picture.
+
+The exception is the doctor-share surface. The `asclepius-share` container in `docker-compose.yml` is the supported way to publish only that surface: same image, `ASCLEPIUS_MODE=share`, every other route returns 404. See the [doctor-shares guide](docs/src/content/docs/admin-guide/doctor-shares.md) for the deployment walkthrough.
 
 ## Development
 

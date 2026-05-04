@@ -74,6 +74,51 @@ This is why the Translation defaults are useful: they let you pin a specific OCR
 - Watermark on every page is faint vector text with the recipient name + UTC timestamp. Cannot prevent screenshots, but identifies the source if a screenshot ever surfaces externally.
 - All file responses set `Cache-Control: no-store` and `Content-Disposition: inline; filename=""`. The doctor's PDF viewer fetches bytes via XHR into a `Uint8Array` — no Object URL, no `<a download>`, right-click and Ctrl+S/P intercepted.
 
+## Publishing the share surface to the internet
+
+The bundled `docker-compose.yml` ships two services. `asclepius-core` is the full app, kept on the LAN. `asclepius-share` runs the same image with `ASCLEPIUS_MODE=share` and is the **only** container you should ever bind to a public port.
+
+### What share mode mounts
+
+In share mode the FastAPI app starts with everything stripped except the doctor surface:
+
+| Surface | Behaviour in share mode |
+|---|---|
+| `/api/share/{token}/request-otp`, `verify-otp`, `claim`, `queue`, `heartbeat`, `logout` | Mounted (public OTP / queue / session bootstrap) |
+| `/api/share/me`, `/documents/{id}`, `/file`, `/translate-region`, region-translation thumbnails | Mounted (doctor read surface) |
+| `/api/auth`, `/api/patients`, `/api/documents`, `/api/pipeline`, `/api/settings`, `/api/vault`, `/api/setup`, `/api/shares` (admin), every other admin router | **Not mounted — returns 404** |
+| Pipeline watcher, backup scheduler | **Not started** — share is API-only |
+| SPA fallback | Only serves `index.html` for `/`, `/share`, and `/share/...`. `/admin`, `/login`, `/patients`, etc. return 404 |
+| `/health` | Mounted; reports `{"status": "ok", "mode": "share"}` so you can verify the deployment |
+
+Token minting and revocation stay on the core admin app — the share container has no `/api/shares` endpoint, so even leaking its environment cannot let anyone create a new token.
+
+### Topology
+
+```
+    Internet  ──TLS──▶  Reverse proxy (nginx / Caddy / Traefik)
+                              │
+                              ▼
+                        asclepius-share        (host port 8071, ASCLEPIUS_MODE=share)
+                              │
+              shared SQLite + vault bind mounts
+                              │
+                        asclepius-core         (host port 8070, LAN only)
+```
+
+Both containers read and write the same SQLite database and the same vault directory; cookies and tokens stay valid across processes because they share `ASCLEPIUS_SECRET_KEY`. Translate jobs the doctor triggers from the public container land in the shared `pipeline_queue` table, and the core container's worker drains them.
+
+### Deployment checklist
+
+1. **Bind the right ports.** Leave `asclepius-core` on `127.0.0.1:8070` (or a private subnet). Bind `asclepius-share` only behind your TLS reverse proxy. Override the host ports with `ASCLEPIUS_PORT` and `ASCLEPIUS_SHARE_PORT` if needed.
+2. **Share `ASCLEPIUS_SECRET_KEY` between the two services** (the bundled compose file already does this via the `SECRET_KEY` env var). They must agree on the key for cookie signing and token hashing.
+3. **Keep the LLM / OCR keys on the share container too** if you want region translation to work — those calls run in-process. Strip the keys (and the share container will return 503 from translate endpoints) only if you do not need that feature.
+4. **Use HTTPS.** Keep `ASCLEPIUS_COOKIE_SECURE=1` (the production default) so the share session cookie carries the `Secure` attribute.
+5. **Verify after deploy.** `curl -i https://share.example.com/api/auth/login` must return `404`. `curl -i https://share.example.com/api/share/zzz/request-otp -X POST` must return `204`. `curl -i https://share.example.com/health` must show `"mode":"share"`.
+6. **Maintenance windows still apply.** If `asclepius-core` is down, the share container keeps serving views and accepting OTPs, but doctor-triggered translations queue up until core is back to drain them.
+
+The threat model for what the doctor sees inside a session is unchanged from a LAN deployment — see [Security model](#security-model) above.
+
 ## Configuration knobs
 
 In `settings.yaml` under `share:`:

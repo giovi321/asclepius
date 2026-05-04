@@ -147,6 +147,12 @@ Each queue entry is a tagged tuple `(priority, seq, kind, payload)`:
 
 Routing reprocess through the same queue as uploads — instead of spawning it as an `asyncio.create_task` on the FastAPI loop — fixes a class of concurrency bugs that used to surface as "the OCR chip switched mid-run." Before the queue refactor, a reprocess started in the FastAPI loop and a fresh upload in the worker loop would each acquire a separate `cap=1` slot from the credential gate (semaphores were keyed per-loop) and run in parallel against the same Ollama server. Both flows now share the worker loop, the queue, and the gate.
 
+### Worker per mode
+
+In `core` mode the worker thread is launched by `start_watcher()` alongside the inbox file watcher and the scheduled-document sweeper.
+
+In `share` mode the inbox watcher and scheduled-doc sweeper are **not** started — the public surface has no admin uploads to ingest, and a duplicate inbox watcher in a sibling container would race the core watcher on the same files. But the doctor's translate endpoint still enqueues `translate_region` jobs onto the in-process queue, so a translate-only worker is launched by `start_translate_worker()`. Same `_spawn_worker` underneath, same liveness watchdog (5 s tick, respawn on death), same credential-keyed gate. Each container drains its own queue; jobs the doctor triggers never cross the process boundary.
+
 When a file appears in `vault/inbox/`:
 
 1. The watcher does a short size-stability poll (≤ 2 s) so a still-being-written file doesn't enter the queue half-formed.
@@ -242,7 +248,7 @@ The `provider_name` stored in the database is the user-configured display name (
 2. Send each page image to the LLM (Claude, OpenAI, or Ollama with vision model)
 3. LLM transcribes all visible text, preserving structure
 4. Transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) retry with per-credential backoff (defaults to `[30, 60, 120]` seconds, configurable via `CredentialEntry.max_retries` / `retry_backoff_seconds`)
-5. Per-page calls are serialized through a **process-global** semaphore keyed by `credential_id`. All kinds (LLM, Vision-LLM, LLM-vision OCR) on the same credential share the same slots, so an Ollama server set to `max_concurrent=1` runs at most one request total — even when the FastAPI loop (chat, AI features) and the worker loop are both active
+5. Per-page calls are serialized through a **process-global** semaphore keyed by `credential_id`. All kinds (LLM, Vision-LLM, LLM-vision OCR) on the same credential share the same slots, so an Ollama server set to `max_concurrent=1` runs at most one request total — even when the FastAPI loop (chat, AI features) and the worker loop are both active. **Caveat:** the gate is in-memory, so split-mode deployments (a `core` container + a `share` container, see [Doctor shares](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet)) each have their own copy. A credential reachable from both containers can run `2 × max_concurrent` requests in the absolute worst case. Halve the cap or use a dedicated credential per surface if your hardware can't handle the doubled ceiling.
 6. Can use a **separate** provider/model/URL from the extraction LLM
 
 ### Remote Tesseract

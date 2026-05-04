@@ -8,7 +8,7 @@ All endpoints require authentication unless noted. Base prefix: `/api`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/health` | No | Returns `{"status": "ok"}` |
+| `GET` | `/health` | No | Returns `{"status": "ok", "mode": "core"\|"share"}`. Mounted in both run modes. The frontend reads `mode` on boot to decide whether to render the admin SPA tree or the share-only tree. |
 
 ## Setup (first launch)
 
@@ -409,6 +409,67 @@ For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.pro
 | `GET` | `/api/settings/users/{id}/access` | Yes | Get user's patient access |
 | `POST` | `/api/settings/users/{id}/access` | Yes | Grant patient access |
 | `DELETE` | `/api/settings/users/{id}/access/{patient_id}` | Yes | Revoke patient access |
+
+## Doctor shares (admin)
+
+Mounted under `/api/shares` (plural) in **core mode only** — the share
+container serves a stripped surface and 404s every admin path. All
+admin endpoints require admin OR patient-owner role; non-admins see
+only shares for patients they own.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/shares` | Admin/owner | Create a share. Body: `{patient_id, document_ids[], recipient_label, recipient_contact, expires_in_days?, default_ocr_provider_id?, default_llm_provider_id?}`. Response: `{share_id, share_url, expires_at}`. The `share_url` honors `share.public_base_url` (env: `ASCLEPIUS_SHARE_PUBLIC_URL`), so split-host setups hand the admin the doctor-facing URL. |
+| `GET` | `/api/shares` | Yes | List shares the caller can manage. Optional `?patient_id=N` to scope. Each row includes `share_url` decorated the same way. |
+| `DELETE` | `/api/shares/{share_id}` | Admin/owner | Revoke a share. Marks `revoked_at` and immediately invalidates every active doctor session for that share. Idempotent. |
+| `GET` | `/api/shares/{share_id}/audit` | Admin/owner | Full audit trail for a share. With `?include_active_otp=true`, also returns the live OTP code. |
+| `GET` | `/api/shares/{share_id}/active-otp` | Admin/owner | Just the live OTP (`{active_otp: {code, expires_at, attempts} \| null}`). Cheaper than `/audit?include_active_otp=true` when the dashboard only needs the code. |
+| `GET` | `/api/shares/{share_id}/documents` | Admin/owner | Preview the documents in this share (same JOIN shape the doctor sees). |
+| `GET` | `/api/shares/{share_id}/sessions` | Admin/owner | Active doctor session(s) and queued waiters. Response: `{active: [...], queued: [...]}`. Each active row carries an `is_idle` flag. The cookie-equivalent session.id is intentionally NOT exposed — the admin handle is SQLite `rowid` so an exfiltrated response cannot be replayed as an auth token. |
+| `DELETE` | `/api/shares/{share_id}/sessions/{rowid}` | Admin/owner | Force-terminate a single active session. Idempotent. |
+| `DELETE` | `/api/shares/{share_id}/queue/{rowid}` | Admin/owner | Drop a single queued waiter. Idempotent. |
+
+### Audit actions
+
+The audit log records these `action` strings:
+
+- `otp_request` — fresh code issued to the doctor
+- `otp_verify_ok` / `otp_verify_fail` — OTP verification outcome
+- `view_doc` — doctor opened a document
+- `view_file` — doctor fetched the watermarked PDF bytes
+- `translate` — doctor queued a region or full-page translation
+- `logout` / `session_expired` — session ended on the doctor's side
+- `share.session.revoke` — admin force-killed an active session
+- `share.queue.drop` — admin dropped a queued waiter
+- `share.create` / `share.revoke` — admin created or revoked the share
+
+## Doctor shares (public)
+
+Mounted under `/api/share` (singular) in **both core and share modes**.
+Authentication is by share-specific cookie, not the admin session
+cookie — share auth and admin auth are entirely isolated.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/share/{token}/request-otp` | Token | Issue a fresh OTP for the share token. Always returns 204 — the body never reveals whether the token is valid, so an attacker cannot enumerate. |
+| `POST` | `/api/share/{token}/verify-otp` | Token + OTP | Body: `{code: "123456"}`. On success either sets the `asclepius_share` cookie and returns 200 `{status: "active"}`, or sets the `asclepius_share_queue` cookie and returns 202 `{status: "queued", queue_expires_at}` when another device already holds the slot. 401 on bad code; 429 when the per-IP rate limit fires. |
+| `POST` | `/api/share/claim` | Queue cookie | Polled by a queued waiter every 5s. Returns `{status: "active"}` (and sets the session cookie) when the slot freed up, `{status: "queued", queue_expires_at}` while still waiting, or 410 when the queue token expired or the share was revoked. |
+| `DELETE` | `/api/share/queue` | Queue cookie | Explicit cancel from the waiting page. Drops the queue entry and clears the cookie. 204. |
+| `POST` | `/api/share/heartbeat` | Session cookie | Keepalive — bumps `last_seen_at` so the idle clock resets while the doctor is reading. 204. |
+| `POST` | `/api/share/logout` | Session cookie | Revoke the session and clear cookies. CSRF-exempt so `navigator.sendBeacon` works on tab close. 200. |
+
+### Doctor read surface
+
+Same `/api/share` prefix; requires a valid `asclepius_share` cookie.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/share/me` | Dashboard payload: patient name, document list, recipient label, session expiry, allowed translation languages, default language. |
+| `GET` | `/api/share/documents/{doc_id}` | Document detail (same JOIN shape the admin sees, minus encounter notes which are deliberately hidden). |
+| `GET` | `/api/share/documents/{doc_id}/file` | Watermarked PDF/image bytes. Fresh watermark on every request with the recipient's name + UTC timestamp. `Cache-Control: no-store`. |
+| `POST` | `/api/share/documents/{doc_id}/translate-region` | Body: `{page, bbox: {x, y, w, h}, target_language?, ocr_provider_id?, llm_provider_id?}`. Pre-allocates a `region_translations` row, enqueues a `translate_region` job. Rate-limited per session (debounce) and per share (rolling-hour cap). |
+| `POST` | `/api/share/documents/{doc_id}/translate` | Deprecated whole-document variant kept for the e2e test only; the doctor UI no longer exposes a button. |
+| `GET` | `/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail` | Cropped PNG thumbnail of a region translation. |
 
 ## Vault file browser
 

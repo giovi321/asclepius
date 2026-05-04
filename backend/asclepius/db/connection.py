@@ -28,4 +28,7 @@ async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
+        # Two containers (core + share) write the same SQLite file; give writers
+        # 5s to acquire the lock instead of failing immediately on contention.
+        await db.execute("PRAGMA busy_timeout=5000")
         yield db

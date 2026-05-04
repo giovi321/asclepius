@@ -21,6 +21,313 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/share/{token}/request-otp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Request Otp
+     * @description Generate and store a fresh OTP for this share.
+     *
+     *     The doctor sees only ``204 No Content`` — they receive the actual
+     *     code from the admin out-of-band. This intentionally does not leak
+     *     whether the token resolves to a real share: an invalid token returns
+     *     the same shape, but no audit/OTP rows are created.
+     */
+    post: operations["request_otp_api_share__token__request_otp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/{token}/verify-otp": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Verify Otp
+     * @description Exchange a valid OTP for a session cookie OR a queue token.
+     *
+     *     On success when the share has no live session, a row is written to
+     *     ``document_share_sessions`` and the ``asclepius_share`` cookie is
+     *     set with ``max_age = session TTL`` (returns ``status: "active"``).
+     *
+     *     When the share is already bound to a live session on another device
+     *     we instead mint a short-lived queue token, set
+     *     ``asclepius_share_queue``, and return ``status: "queued"`` (HTTP
+     *     202). The doctor's frontend then polls ``/claim`` until the active
+     *     session dies (logout, idle, TTL, revocation).
+     *
+     *     The OTP is consumed in either branch — the doctor proved possession
+     *     of the code; whether they get the session immediately or have to
+     *     wait depends on the share's state, not on the code's validity.
+     */
+    post: operations["verify_otp_api_share__token__verify_otp_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Claim Session
+     * @description Promote a queue token into a real session, or report still-busy.
+     *
+     *     Polled by a queued doctor's UI every few seconds. Three outcomes:
+     *
+     *     - The slot is free → create a session, swap the cookies (clear
+     *       ``asclepius_share_queue``, set ``asclepius_share``), return 200
+     *       with ``status: "active"``.
+     *     - The slot is still busy → return 202 with ``status: "queued"``
+     *       and a ``retry_after_seconds`` hint. Cookie unchanged.
+     *     - The queue token is gone (expired, share revoked, or never set)
+     *       → return 410 Gone so the UI can punt the doctor back to the
+     *       landing page to re-OTP.
+     */
+    post: operations["claim_session_api_share_claim_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/queue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Cancel Queue
+     * @description Explicit cancel from the waiting UI. Idempotent.
+     */
+    delete: operations["cancel_queue_api_share_queue_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/heartbeat": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Heartbeat
+     * @description Bump ``last_seen_at`` on the current share session.
+     *
+     *     Called by the doctor's UI every ~60s while the page is visible and
+     *     the user has interacted recently. Without this, a doctor reading a
+     *     long PDF (no API traffic for minutes) would be flagged idle and
+     *     bounced. Returns 204 whether the session exists or not so the UI
+     *     does not need to differentiate.
+     */
+    post: operations["heartbeat_api_share_heartbeat_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Logout
+     * @description Revoke the current share session and clear its cookie.
+     *
+     *     Idempotent: if no cookie is set we still clear and return 200 so the
+     *     UI can call this on hard navigation away. Also clears any queue
+     *     cookie because a "log out" gesture from any share-related screen
+     *     should leave the doctor in a clean state.
+     */
+    post: operations["logout_api_share_logout_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Me
+     * @description Doctor dashboard payload: patient label, share metadata, doc list,
+     *     and current translate-rate-limit headroom.
+     */
+    get: operations["share_me_api_share_me_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Document Detail
+     * @description Full document view — labs, encounters, medications, vaccinations,
+     *     sections, region translations, and links scoped to the share's docs.
+     */
+    get: operations["share_document_detail_api_share_documents__doc_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Serve File
+     * @description Stream a watermarked copy of the document file.
+     *
+     *     The original vault bytes are never streamed unmodified — every
+     *     response is a fresh in-memory render with the doctor's identity
+     *     burned onto every page (PDF) or composited onto the image (PNG/JPG).
+     */
+    get: operations["share_serve_file_api_share_documents__doc_id__file_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    /** Share Head File */
+    head: operations["share_head_file_api_share_documents__doc_id__file_head"];
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Region Thumbnail
+     * @description Serve the cropped PNG thumbnail for a region translation.
+     *
+     *     Mirrors the admin endpoint but scopes by the share session so the
+     *     doctor can only fetch thumbnails for documents in their share.
+     *     Returns 404 (not 403) for region IDs that exist but belong to a
+     *     different doc, matching the rest of the share surface — we don't
+     *     leak existence of unrelated rows.
+     */
+    get: operations["share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/translate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Share Translate
+     * @deprecated
+     * @description DEPRECATED: whole-document translation via the doctor surface.
+     *
+     *     Kept for backward compatibility (the e2e test still exercises it)
+     *     but the doctor UI no longer exposes a button. Use
+     *     ``/documents/{doc_id}/translate-region`` with a full-page bbox
+     *     (x=0, y=0, w=1, h=1) instead — that path is rate-limited the same
+     *     way and lets the doctor pick which page to translate.
+     */
+    post: operations["share_translate_api_share_documents__doc_id__translate_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/documents/{doc_id}/translate-region": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Share Translate Region
+     * @description Region translate — same behaviour as the admin endpoint, scoped
+     *     to the share and rate-limited like ``share_translate``.
+     *
+     *     Provider resolution order (each falls through if missing):
+     *     1. The body override sent by the doctor's UI.
+     *     2. The per-share defaults the admin saved at share-creation time.
+     *     3. The system's first-enabled provider.
+     */
+    post: operations["share_translate_region_api_share_documents__doc_id__translate_region_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/login": {
     parameters: {
       query?: never;
@@ -2385,313 +2692,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/share/{token}/request-otp": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Request Otp
-     * @description Generate and store a fresh OTP for this share.
-     *
-     *     The doctor sees only ``204 No Content`` — they receive the actual
-     *     code from the admin out-of-band. This intentionally does not leak
-     *     whether the token resolves to a real share: an invalid token returns
-     *     the same shape, but no audit/OTP rows are created.
-     */
-    post: operations["request_otp_api_share__token__request_otp_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/{token}/verify-otp": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Verify Otp
-     * @description Exchange a valid OTP for a session cookie OR a queue token.
-     *
-     *     On success when the share has no live session, a row is written to
-     *     ``document_share_sessions`` and the ``asclepius_share`` cookie is
-     *     set with ``max_age = session TTL`` (returns ``status: "active"``).
-     *
-     *     When the share is already bound to a live session on another device
-     *     we instead mint a short-lived queue token, set
-     *     ``asclepius_share_queue``, and return ``status: "queued"`` (HTTP
-     *     202). The doctor's frontend then polls ``/claim`` until the active
-     *     session dies (logout, idle, TTL, revocation).
-     *
-     *     The OTP is consumed in either branch — the doctor proved possession
-     *     of the code; whether they get the session immediately or have to
-     *     wait depends on the share's state, not on the code's validity.
-     */
-    post: operations["verify_otp_api_share__token__verify_otp_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/claim": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Claim Session
-     * @description Promote a queue token into a real session, or report still-busy.
-     *
-     *     Polled by a queued doctor's UI every few seconds. Three outcomes:
-     *
-     *     - The slot is free → create a session, swap the cookies (clear
-     *       ``asclepius_share_queue``, set ``asclepius_share``), return 200
-     *       with ``status: "active"``.
-     *     - The slot is still busy → return 202 with ``status: "queued"``
-     *       and a ``retry_after_seconds`` hint. Cookie unchanged.
-     *     - The queue token is gone (expired, share revoked, or never set)
-     *       → return 410 Gone so the UI can punt the doctor back to the
-     *       landing page to re-OTP.
-     */
-    post: operations["claim_session_api_share_claim_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/queue": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    /**
-     * Cancel Queue
-     * @description Explicit cancel from the waiting UI. Idempotent.
-     */
-    delete: operations["cancel_queue_api_share_queue_delete"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/heartbeat": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Heartbeat
-     * @description Bump ``last_seen_at`` on the current share session.
-     *
-     *     Called by the doctor's UI every ~60s while the page is visible and
-     *     the user has interacted recently. Without this, a doctor reading a
-     *     long PDF (no API traffic for minutes) would be flagged idle and
-     *     bounced. Returns 204 whether the session exists or not so the UI
-     *     does not need to differentiate.
-     */
-    post: operations["heartbeat_api_share_heartbeat_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/logout": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Logout
-     * @description Revoke the current share session and clear its cookie.
-     *
-     *     Idempotent: if no cookie is set we still clear and return 200 so the
-     *     UI can call this on hard navigation away. Also clears any queue
-     *     cookie because a "log out" gesture from any share-related screen
-     *     should leave the doctor in a clean state.
-     */
-    post: operations["logout_api_share_logout_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/me": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Share Me
-     * @description Doctor dashboard payload: patient label, share metadata, doc list,
-     *     and current translate-rate-limit headroom.
-     */
-    get: operations["share_me_api_share_me_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/documents/{doc_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Share Document Detail
-     * @description Full document view — labs, encounters, medications, vaccinations,
-     *     sections, region translations, and links scoped to the share's docs.
-     */
-    get: operations["share_document_detail_api_share_documents__doc_id__get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/documents/{doc_id}/file": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Share Serve File
-     * @description Stream a watermarked copy of the document file.
-     *
-     *     The original vault bytes are never streamed unmodified — every
-     *     response is a fresh in-memory render with the doctor's identity
-     *     burned onto every page (PDF) or composited onto the image (PNG/JPG).
-     */
-    get: operations["share_serve_file_api_share_documents__doc_id__file_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    /** Share Head File */
-    head: operations["share_head_file_api_share_documents__doc_id__file_head"];
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Share Region Thumbnail
-     * @description Serve the cropped PNG thumbnail for a region translation.
-     *
-     *     Mirrors the admin endpoint but scopes by the share session so the
-     *     doctor can only fetch thumbnails for documents in their share.
-     *     Returns 404 (not 403) for region IDs that exist but belong to a
-     *     different doc, matching the rest of the share surface — we don't
-     *     leak existence of unrelated rows.
-     */
-    get: operations["share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/documents/{doc_id}/translate": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Share Translate
-     * @deprecated
-     * @description DEPRECATED: whole-document translation via the doctor surface.
-     *
-     *     Kept for backward compatibility (the e2e test still exercises it)
-     *     but the doctor UI no longer exposes a button. Use
-     *     ``/documents/{doc_id}/translate-region`` with a full-page bbox
-     *     (x=0, y=0, w=1, h=1) instead — that path is rate-limited the same
-     *     way and lets the doctor pick which page to translate.
-     */
-    post: operations["share_translate_api_share_documents__doc_id__translate_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/share/documents/{doc_id}/translate-region": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Share Translate Region
-     * @description Region translate — same behaviour as the admin endpoint, scoped
-     *     to the share and rate-limited like ``share_translate``.
-     *
-     *     Provider resolution order (each falls through if missing):
-     *     1. The body override sent by the doctor's UI.
-     *     2. The per-share defaults the admin saved at share-creation time.
-     *     3. The system's first-enabled provider.
-     */
-    post: operations["share_translate_region_api_share_documents__doc_id__translate_region_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3611,6 +3611,361 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+    };
+  };
+  request_otp_api_share__token__request_otp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  verify_otp_api_share__token__verify_otp_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VerifyOtpRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  claim_session_api_share_claim_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  cancel_queue_api_share_queue_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  heartbeat_api_share_heartbeat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  logout_api_share_logout_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  share_me_api_share_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  share_document_detail_api_share_documents__doc_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_serve_file_api_share_documents__doc_id__file_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_head_file_api_share_documents__doc_id__file_head: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+        region_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_translate_api_share_documents__doc_id__translate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ShareTranslateRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_translate_region_api_share_documents__doc_id__translate_region_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        doc_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShareTranslateRegionRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -7922,361 +8277,6 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  request_otp_api_share__token__request_otp_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        token: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  verify_otp_api_share__token__verify_otp_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        token: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["VerifyOtpRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  claim_session_api_share_claim_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
-  cancel_queue_api_share_queue_delete: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  heartbeat_api_share_heartbeat_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  logout_api_share_logout_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
-  share_me_api_share_me_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-    };
-  };
-  share_document_detail_api_share_documents__doc_id__get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_serve_file_api_share_documents__doc_id__file_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_head_file_api_share_documents__doc_id__file_head: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-        region_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_translate_api_share_documents__doc_id__translate_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["ShareTranslateRequest"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_translate_region_api_share_documents__doc_id__translate_region_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        doc_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ShareTranslateRegionRequest"];
-      };
-    };
     responses: {
       /** @description Successful Response */
       200: {

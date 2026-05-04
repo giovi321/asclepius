@@ -3,9 +3,19 @@
 Wires together the lifespan (DB init, pipeline watcher), middleware stack
 (security headers, CSRF, request-size limit, optional CORS), API routers,
 and the frontend SPA fallback.
+
+Two run modes, selected by the ``ASCLEPIUS_MODE`` env var:
+
+* ``core`` (default) — full app: admin, doctor, pipeline, settings, every
+  router. Background watcher and backup scheduler run here.
+* ``share`` — public doctor-share surface only. Mounts ``share_public_router``
+  and ``share_doctor_router`` (both at ``/api/share``) and refuses every
+  other path. Used in a second container that is the only one exposed to
+  the internet, so opening the share URL never reveals the rest of the app.
 """
 
 import logging
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -84,10 +94,22 @@ for _uv_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
 
+def _get_mode() -> str:
+    """Return the run mode (``core`` or ``share``); defaults to ``core``."""
+    raw = os.environ.get("ASCLEPIUS_MODE", "core").strip().lower()
+    return raw if raw in ("core", "share") else "core"
+
+
+# Catch-all SPA paths allowed in share mode. Empty string covers the root URL.
+SHARE_SPA_PATHS = {"", "share"}
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown."""
     config = get_config()
+    mode = _get_mode()
+    logging.getLogger("asclepius").info("Starting Asclepius in %s mode", mode)
 
     # Ensure vault directories exist
     for dir_path in [
@@ -103,23 +125,26 @@ async def lifespan(app: FastAPI):
 
     # Note: no default admin user is created — the setup wizard handles first-user creation
 
-    # Start pipeline watcher (imported here to avoid circular imports)
+    # Background tasks only run in core mode. The share container is API-only
+    # and drains nothing: translate jobs land in pipeline_queue (shared SQLite)
+    # and the core container's worker picks them up.
     app.state.pipeline_task = None
     app.state.pipeline_auto_stopped = False
     app.state.pipeline_auto_stop_reason = ""
-    if config.pipeline.watch_enabled:
-        import asyncio
-        from asclepius.pipeline.watcher import start_watcher
-
-        app.state.pipeline_task = asyncio.create_task(start_watcher(config, app.state))
-
-    # Start backup scheduler if enabled
     app.state.backup_task = None
-    if config.backup.enabled:
-        import asyncio
-        from asclepius.backup.scheduler import start_backup_scheduler
 
-        app.state.backup_task = asyncio.create_task(start_backup_scheduler(config, app.state))
+    if mode == "core":
+        if config.pipeline.watch_enabled:
+            import asyncio
+            from asclepius.pipeline.watcher import start_watcher
+
+            app.state.pipeline_task = asyncio.create_task(start_watcher(config, app.state))
+
+        if config.backup.enabled:
+            import asyncio
+            from asclepius.backup.scheduler import start_backup_scheduler
+
+            app.state.backup_task = asyncio.create_task(start_backup_scheduler(config, app.state))
 
     yield
 
@@ -161,78 +186,16 @@ def create_app() -> FastAPI:
             allow_headers=["Content-Type", "X-Requested-With"],
         )
 
+    mode = _get_mode()
+
     # Health check
     @app.get("/health")
     async def health():
-        return {"status": "ok"}
+        return {"status": "ok", "mode": mode}
 
-    # Register routers (will be added as they're implemented)
-    from asclepius.auth.routes import router as auth_router
-
-    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
-
-    from asclepius.auth.oidc import router as oidc_router
-
-    app.include_router(oidc_router, prefix="/api/auth", tags=["oidc"])
-
-    from asclepius.patients.routes import router as patients_router
-
-    app.include_router(patients_router, prefix="/api/patients", tags=["patients"])
-
-    from asclepius.documents.routes import router as documents_router
-
-    app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
-
-    # Child-record edits live at /api/encounters/{id} and /api/medications/{id}
-    # — separate prefix because they don't pivot on a document id in the URL.
-    from asclepius.documents.child_routes import router as child_router
-
-    app.include_router(child_router, prefix="/api", tags=["records"])
-
-    from asclepius.events.routes import router as events_router
-
-    app.include_router(events_router, prefix="/api/events", tags=["events"])
-
-    from asclepius.lab_results.routes import router as lab_results_router
-
-    app.include_router(lab_results_router, prefix="/api/lab-results", tags=["lab-results"])
-
-    from asclepius.imaging.routes import router as imaging_router
-
-    app.include_router(imaging_router, prefix="/api/imaging", tags=["imaging"])
-
-    from asclepius.chat.routes import router as chat_router
-
-    app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
-
-    from asclepius.normalization.routes import router as normalization_router
-
-    app.include_router(normalization_router, prefix="/api/normalization", tags=["normalization"])
-
-    from asclepius.pipeline.routes import router as pipeline_router
-
-    app.include_router(pipeline_router, prefix="/api/pipeline", tags=["pipeline"])
-
-    from asclepius.settings.routes import router as settings_router
-
-    app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
-
-    from asclepius.vault.routes import router as vault_router
-
-    app.include_router(vault_router, prefix="/api/vault", tags=["vault"])
-
-    from asclepius.setup.routes import router as setup_router
-
-    app.include_router(setup_router, prefix="/api/setup", tags=["setup"])
-
-    # Doctor share access — three routers covering admin management,
-    # public OTP/session bootstrap, and the doctor-side read surface.
-    # Mounted at distinct prefixes so the public/doctor surface lives
-    # under ``/api/share`` (singular) while admin lives at ``/api/shares``.
-    from asclepius.share.admin_routes import router as share_admin_router
-
-    app.include_router(share_admin_router, prefix="/api/shares", tags=["shares"])
-
+    # Doctor-share routers (public OTP/session bootstrap + read surface) are
+    # mounted in BOTH modes — they are the entire purpose of share mode and
+    # part of the regular admin app in core mode.
     from asclepius.share.public_routes import router as share_public_router
 
     app.include_router(share_public_router, prefix="/api/share", tags=["share-public"])
@@ -240,6 +203,75 @@ def create_app() -> FastAPI:
     from asclepius.share.doctor_routes import router as share_doctor_router
 
     app.include_router(share_doctor_router, prefix="/api/share", tags=["share-doctor"])
+
+    # All other routers — admin auth, patient CRUD, pipeline, settings, vault,
+    # setup wizard, plus the share *admin* router that mints/revokes tokens —
+    # are core-only. The share container does NOT mount them, so they cannot
+    # be reached from the public port even with a valid admin password.
+    if mode == "core":
+        from asclepius.auth.routes import router as auth_router
+
+        app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+
+        from asclepius.auth.oidc import router as oidc_router
+
+        app.include_router(oidc_router, prefix="/api/auth", tags=["oidc"])
+
+        from asclepius.patients.routes import router as patients_router
+
+        app.include_router(patients_router, prefix="/api/patients", tags=["patients"])
+
+        from asclepius.documents.routes import router as documents_router
+
+        app.include_router(documents_router, prefix="/api/documents", tags=["documents"])
+
+        # Child-record edits live at /api/encounters/{id} and /api/medications/{id}
+        # — separate prefix because they don't pivot on a document id in the URL.
+        from asclepius.documents.child_routes import router as child_router
+
+        app.include_router(child_router, prefix="/api", tags=["records"])
+
+        from asclepius.events.routes import router as events_router
+
+        app.include_router(events_router, prefix="/api/events", tags=["events"])
+
+        from asclepius.lab_results.routes import router as lab_results_router
+
+        app.include_router(lab_results_router, prefix="/api/lab-results", tags=["lab-results"])
+
+        from asclepius.imaging.routes import router as imaging_router
+
+        app.include_router(imaging_router, prefix="/api/imaging", tags=["imaging"])
+
+        from asclepius.chat.routes import router as chat_router
+
+        app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+
+        from asclepius.normalization.routes import router as normalization_router
+
+        app.include_router(
+            normalization_router, prefix="/api/normalization", tags=["normalization"]
+        )
+
+        from asclepius.pipeline.routes import router as pipeline_router
+
+        app.include_router(pipeline_router, prefix="/api/pipeline", tags=["pipeline"])
+
+        from asclepius.settings.routes import router as settings_router
+
+        app.include_router(settings_router, prefix="/api/settings", tags=["settings"])
+
+        from asclepius.vault.routes import router as vault_router
+
+        app.include_router(vault_router, prefix="/api/vault", tags=["vault"])
+
+        from asclepius.setup.routes import router as setup_router
+
+        app.include_router(setup_router, prefix="/api/setup", tags=["setup"])
+
+        from asclepius.share.admin_routes import router as share_admin_router
+
+        app.include_router(share_admin_router, prefix="/api/shares", tags=["shares"])
 
     # Serve frontend static files (production build)
     if STATIC_DIR.exists():
@@ -252,10 +284,20 @@ def create_app() -> FastAPI:
             Guards against path traversal: any request that resolves outside
             ``STATIC_DIR`` (``..`` segments, symlinks pointing out, etc.)
             falls back to ``index.html`` instead of leaking host files.
+
+            In ``share`` mode, the SPA shell is only returned for the share
+            allowlist (``/``, ``/share``, ``/share/...``). Anything else,
+            including unmounted ``/api/*`` paths that fall through to this
+            handler, returns 404 so the public surface never reveals the
+            admin app's existence.
             """
             file_path = STATIC_DIR / path
             if is_within(STATIC_DIR, file_path) and file_path.is_file():
                 return FileResponse(str(file_path.resolve()))
+            if mode == "share":
+                first_segment = path.split("/", 1)[0]
+                if first_segment not in SHARE_SPA_PATHS:
+                    return JSONResponse({"detail": "Not found"}, status_code=404)
             index = STATIC_DIR / "index.html"
             if not index.exists():
                 return JSONResponse({"detail": "Frontend not built"}, status_code=404)

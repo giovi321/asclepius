@@ -24,6 +24,7 @@ async def initialize_database(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute("PRAGMA busy_timeout=5000")
 
         # Execute schema
         schema_sql = SCHEMA_PATH.read_text()

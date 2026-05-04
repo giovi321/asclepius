@@ -22,6 +22,430 @@
         }
       }
     },
+    "/api/share/{token}/request-otp": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Request Otp",
+        "description": "Generate and store a fresh OTP for this share.\n\nThe doctor sees only ``204 No Content`` \u2014 they receive the actual\ncode from the admin out-of-band. This intentionally does not leak\nwhether the token resolves to a real share: an invalid token returns\nthe same shape, but no audit/OTP rows are created.",
+        "operationId": "request_otp_api_share__token__request_otp_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/{token}/verify-otp": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Verify Otp",
+        "description": "Exchange a valid OTP for a session cookie OR a queue token.\n\nOn success when the share has no live session, a row is written to\n``document_share_sessions`` and the ``asclepius_share`` cookie is\nset with ``max_age = session TTL`` (returns ``status: \"active\"``).\n\nWhen the share is already bound to a live session on another device\nwe instead mint a short-lived queue token, set\n``asclepius_share_queue``, and return ``status: \"queued\"`` (HTTP\n202). The doctor's frontend then polls ``/claim`` until the active\nsession dies (logout, idle, TTL, revocation).\n\nThe OTP is consumed in either branch \u2014 the doctor proved possession\nof the code; whether they get the session immediately or have to\nwait depends on the share's state, not on the code's validity.",
+        "operationId": "verify_otp_api_share__token__verify_otp_post",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/claim": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Claim Session",
+        "description": "Promote a queue token into a real session, or report still-busy.\n\nPolled by a queued doctor's UI every few seconds. Three outcomes:\n\n- The slot is free \u2192 create a session, swap the cookies (clear\n  ``asclepius_share_queue``, set ``asclepius_share``), return 200\n  with ``status: \"active\"``.\n- The slot is still busy \u2192 return 202 with ``status: \"queued\"``\n  and a ``retry_after_seconds`` hint. Cookie unchanged.\n- The queue token is gone (expired, share revoked, or never set)\n  \u2192 return 410 Gone so the UI can punt the doctor back to the\n  landing page to re-OTP.",
+        "operationId": "claim_session_api_share_claim_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/queue": {
+      "delete": {
+        "tags": ["share-public"],
+        "summary": "Cancel Queue",
+        "description": "Explicit cancel from the waiting UI. Idempotent.",
+        "operationId": "cancel_queue_api_share_queue_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/share/heartbeat": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Heartbeat",
+        "description": "Bump ``last_seen_at`` on the current share session.\n\nCalled by the doctor's UI every ~60s while the page is visible and\nthe user has interacted recently. Without this, a doctor reading a\nlong PDF (no API traffic for minutes) would be flagged idle and\nbounced. Returns 204 whether the session exists or not so the UI\ndoes not need to differentiate.",
+        "operationId": "heartbeat_api_share_heartbeat_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/share/logout": {
+      "post": {
+        "tags": ["share-public"],
+        "summary": "Logout",
+        "description": "Revoke the current share session and clear its cookie.\n\nIdempotent: if no cookie is set we still clear and return 200 so the\nUI can call this on hard navigation away. Also clears any queue\ncookie because a \"log out\" gesture from any share-related screen\nshould leave the doctor in a clean state.",
+        "operationId": "logout_api_share_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/me": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Me",
+        "description": "Doctor dashboard payload: patient label, share metadata, doc list,\nand current translate-rate-limit headroom.",
+        "operationId": "share_me_api_share_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Document Detail",
+        "description": "Full document view \u2014 labs, encounters, medications, vaccinations,\nsections, region translations, and links scoped to the share's docs.",
+        "operationId": "share_document_detail_api_share_documents__doc_id__get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/file": {
+      "head": {
+        "tags": ["share-doctor"],
+        "summary": "Share Head File",
+        "operationId": "share_head_file_api_share_documents__doc_id__file_head",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Serve File",
+        "description": "Stream a watermarked copy of the document file.\n\nThe original vault bytes are never streamed unmodified \u2014 every\nresponse is a fresh in-memory render with the doctor's identity\nburned onto every page (PDF) or composited onto the image (PNG/JPG).",
+        "operationId": "share_serve_file_api_share_documents__doc_id__file_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
+      "get": {
+        "tags": ["share-doctor"],
+        "summary": "Share Region Thumbnail",
+        "description": "Serve the cropped PNG thumbnail for a region translation.\n\nMirrors the admin endpoint but scopes by the share session so the\ndoctor can only fetch thumbnails for documents in their share.\nReturns 404 (not 403) for region IDs that exist but belong to a\ndifferent doc, matching the rest of the share surface \u2014 we don't\nleak existence of unrelated rows.",
+        "operationId": "share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          },
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/translate": {
+      "post": {
+        "tags": ["share-doctor"],
+        "summary": "Share Translate",
+        "description": "DEPRECATED: whole-document translation via the doctor surface.\n\nKept for backward compatibility (the e2e test still exercises it)\nbut the doctor UI no longer exposes a button. Use\n``/documents/{doc_id}/translate-region`` with a full-page bbox\n(x=0, y=0, w=1, h=1) instead \u2014 that path is rate-limited the same\nway and lets the doctor pick which page to translate.",
+        "operationId": "share_translate_api_share_documents__doc_id__translate_post",
+        "deprecated": true,
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareTranslateRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/share/documents/{doc_id}/translate-region": {
+      "post": {
+        "tags": ["share-doctor"],
+        "summary": "Share Translate Region",
+        "description": "Region translate \u2014 same behaviour as the admin endpoint, scoped\nto the share and rate-limited like ``share_translate``.\n\nProvider resolution order (each falls through if missing):\n1. The body override sent by the doctor's UI.\n2. The per-share defaults the admin saved at share-creation time.\n3. The system's first-enabled provider.",
+        "operationId": "share_translate_region_api_share_documents__doc_id__translate_region_post",
+        "parameters": [
+          {
+            "name": "doc_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Doc Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareTranslateRegionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/login": {
       "post": {
         "tags": ["auth"],
@@ -6142,430 +6566,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/{token}/request-otp": {
-      "post": {
-        "tags": ["share-public"],
-        "summary": "Request Otp",
-        "description": "Generate and store a fresh OTP for this share.\n\nThe doctor sees only ``204 No Content`` \u2014 they receive the actual\ncode from the admin out-of-band. This intentionally does not leak\nwhether the token resolves to a real share: an invalid token returns\nthe same shape, but no audit/OTP rows are created.",
-        "operationId": "request_otp_api_share__token__request_otp_post",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/{token}/verify-otp": {
-      "post": {
-        "tags": ["share-public"],
-        "summary": "Verify Otp",
-        "description": "Exchange a valid OTP for a session cookie OR a queue token.\n\nOn success when the share has no live session, a row is written to\n``document_share_sessions`` and the ``asclepius_share`` cookie is\nset with ``max_age = session TTL`` (returns ``status: \"active\"``).\n\nWhen the share is already bound to a live session on another device\nwe instead mint a short-lived queue token, set\n``asclepius_share_queue``, and return ``status: \"queued\"`` (HTTP\n202). The doctor's frontend then polls ``/claim`` until the active\nsession dies (logout, idle, TTL, revocation).\n\nThe OTP is consumed in either branch \u2014 the doctor proved possession\nof the code; whether they get the session immediately or have to\nwait depends on the share's state, not on the code's validity.",
-        "operationId": "verify_otp_api_share__token__verify_otp_post",
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Token"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyOtpRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/claim": {
-      "post": {
-        "tags": ["share-public"],
-        "summary": "Claim Session",
-        "description": "Promote a queue token into a real session, or report still-busy.\n\nPolled by a queued doctor's UI every few seconds. Three outcomes:\n\n- The slot is free \u2192 create a session, swap the cookies (clear\n  ``asclepius_share_queue``, set ``asclepius_share``), return 200\n  with ``status: \"active\"``.\n- The slot is still busy \u2192 return 202 with ``status: \"queued\"``\n  and a ``retry_after_seconds`` hint. Cookie unchanged.\n- The queue token is gone (expired, share revoked, or never set)\n  \u2192 return 410 Gone so the UI can punt the doctor back to the\n  landing page to re-OTP.",
-        "operationId": "claim_session_api_share_claim_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/queue": {
-      "delete": {
-        "tags": ["share-public"],
-        "summary": "Cancel Queue",
-        "description": "Explicit cancel from the waiting UI. Idempotent.",
-        "operationId": "cancel_queue_api_share_queue_delete",
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          }
-        }
-      }
-    },
-    "/api/share/heartbeat": {
-      "post": {
-        "tags": ["share-public"],
-        "summary": "Heartbeat",
-        "description": "Bump ``last_seen_at`` on the current share session.\n\nCalled by the doctor's UI every ~60s while the page is visible and\nthe user has interacted recently. Without this, a doctor reading a\nlong PDF (no API traffic for minutes) would be flagged idle and\nbounced. Returns 204 whether the session exists or not so the UI\ndoes not need to differentiate.",
-        "operationId": "heartbeat_api_share_heartbeat_post",
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          }
-        }
-      }
-    },
-    "/api/share/logout": {
-      "post": {
-        "tags": ["share-public"],
-        "summary": "Logout",
-        "description": "Revoke the current share session and clear its cookie.\n\nIdempotent: if no cookie is set we still clear and return 200 so the\nUI can call this on hard navigation away. Also clears any queue\ncookie because a \"log out\" gesture from any share-related screen\nshould leave the doctor in a clean state.",
-        "operationId": "logout_api_share_logout_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/me": {
-      "get": {
-        "tags": ["share-doctor"],
-        "summary": "Share Me",
-        "description": "Doctor dashboard payload: patient label, share metadata, doc list,\nand current translate-rate-limit headroom.",
-        "operationId": "share_me_api_share_me_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/documents/{doc_id}": {
-      "get": {
-        "tags": ["share-doctor"],
-        "summary": "Share Document Detail",
-        "description": "Full document view \u2014 labs, encounters, medications, vaccinations,\nsections, region translations, and links scoped to the share's docs.",
-        "operationId": "share_document_detail_api_share_documents__doc_id__get",
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/documents/{doc_id}/file": {
-      "head": {
-        "tags": ["share-doctor"],
-        "summary": "Share Head File",
-        "operationId": "share_head_file_api_share_documents__doc_id__file_head",
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": ["share-doctor"],
-        "summary": "Share Serve File",
-        "description": "Stream a watermarked copy of the document file.\n\nThe original vault bytes are never streamed unmodified \u2014 every\nresponse is a fresh in-memory render with the doctor's identity\nburned onto every page (PDF) or composited onto the image (PNG/JPG).",
-        "operationId": "share_serve_file_api_share_documents__doc_id__file_get",
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/documents/{doc_id}/region-translations/{region_id}/thumbnail": {
-      "get": {
-        "tags": ["share-doctor"],
-        "summary": "Share Region Thumbnail",
-        "description": "Serve the cropped PNG thumbnail for a region translation.\n\nMirrors the admin endpoint but scopes by the share session so the\ndoctor can only fetch thumbnails for documents in their share.\nReturns 404 (not 403) for region IDs that exist but belong to a\ndifferent doc, matching the rest of the share surface \u2014 we don't\nleak existence of unrelated rows.",
-        "operationId": "share_region_thumbnail_api_share_documents__doc_id__region_translations__region_id__thumbnail_get",
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          },
-          {
-            "name": "region_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Region Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/documents/{doc_id}/translate": {
-      "post": {
-        "tags": ["share-doctor"],
-        "summary": "Share Translate",
-        "description": "DEPRECATED: whole-document translation via the doctor surface.\n\nKept for backward compatibility (the e2e test still exercises it)\nbut the doctor UI no longer exposes a button. Use\n``/documents/{doc_id}/translate-region`` with a full-page bbox\n(x=0, y=0, w=1, h=1) instead \u2014 that path is rate-limited the same\nway and lets the doctor pick which page to translate.",
-        "operationId": "share_translate_api_share_documents__doc_id__translate_post",
-        "deprecated": true,
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ShareTranslateRequest",
-                "default": {}
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/share/documents/{doc_id}/translate-region": {
-      "post": {
-        "tags": ["share-doctor"],
-        "summary": "Share Translate Region",
-        "description": "Region translate \u2014 same behaviour as the admin endpoint, scoped\nto the share and rate-limited like ``share_translate``.\n\nProvider resolution order (each falls through if missing):\n1. The body override sent by the doctor's UI.\n2. The per-share defaults the admin saved at share-creation time.\n3. The system's first-enabled provider.",
-        "operationId": "share_translate_region_api_share_documents__doc_id__translate_region_post",
-        "parameters": [
-          {
-            "name": "doc_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Doc Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ShareTranslateRegionRequest"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",

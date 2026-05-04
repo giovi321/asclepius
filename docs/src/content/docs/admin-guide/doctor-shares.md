@@ -35,6 +35,17 @@ The doctor's "Request access code" click puts a fresh OTP into the share's audit
 
 A small copy button next to the code copies it to the clipboard.
 
+### Watching active sessions and the queue
+
+Click the chevron on the left of a share row to expand it. Above the audit log you'll see a **Sessions** panel listing:
+
+- **Active** — at most one row (the share is single-session-per-link). Each row shows when the session started, the doctor's last heartbeat, the absolute expiry, the client IP and User-Agent, and a **Live** or **Idle** badge. Idle means the doctor stopped sending heartbeats past `share.idle_timeout_minutes`; the queue treats those as a free slot, but the row stays in the table until killed or until it expires.
+- **Queued** — every device waiting for the slot to free up, in arrival order. Each row shows when they joined the queue and when their queue token expires.
+
+Each row has a **Kill** (active) or **Drop** (queued) action. Killing the active session bounces the doctor back to the landing page on their next request and lets queued waiters claim the slot immediately. Dropping a queued waiter just removes them from the queue. Both actions are recorded in the audit trail as `share.session.revoke` and `share.queue.drop`.
+
+The session row IDs returned by the API are SQLite ``rowid`` values, not the raw cookie. The cookie value is never exposed via the admin API, so an exfiltrated response cannot be replayed as a doctor's session token.
+
 ### Watching the audit trail
 
 Every interaction the doctor (or anyone with the URL) makes is recorded:
@@ -45,6 +56,8 @@ Every interaction the doctor (or anyone with the URL) makes is recorded:
 - `view_file` — fetched the PDF bytes
 - `translate` — queued a translation
 - `logout` / `session_expired`
+- `share.session.revoke` — admin force-killed an active doctor session
+- `share.queue.drop` — admin dropped a queued waiter
 
 Each row carries timestamp, IP address, and user-agent. Click the chevron on the left of a share row to expand the audit panel inline. The total access count and last access timestamp are also surfaced as columns on the table for at-a-glance review.
 

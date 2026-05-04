@@ -2698,6 +2698,79 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/shares/{share_id}/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Sessions
+     * @description Currently-active doctor session(s) and queued waiters for a share.
+     *
+     *     Active sessions are filtered by ``revoked_at IS NULL`` and TTL; the
+     *     ``is_idle`` flag tells the admin whether the queue treats the row as
+     *     a free slot. Queue rows are filtered by their own TTL.
+     *
+     *     The session row's primary key (which doubles as the cookie value) is
+     *     intentionally NOT returned — the admin's terminate action keys on
+     *     SQLite ``rowid`` instead, so an exfiltrated API response cannot be
+     *     replayed as an authentication token.
+     */
+    get: operations["share_sessions_api_shares__share_id__sessions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}/sessions/{rowid}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Share Revoke Session
+     * @description Force-terminate a specific doctor session for this share.
+     *
+     *     Idempotent: revoking an already-revoked row is a no-op. The next
+     *     request the doctor makes is rejected with 401 and they bounce back
+     *     to the landing page; queued waiters can immediately claim the slot.
+     */
+    delete: operations["share_revoke_session_api_shares__share_id__sessions__rowid__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}/queue/{rowid}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Share Drop Queue
+     * @description Drop a queued waiter for this share. Idempotent.
+     */
+    delete: operations["share_drop_queue_api_shares__share_id__queue__rowid__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8279,6 +8352,101 @@ export interface operations {
       header?: never;
       path: {
         share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_sessions_api_shares__share_id__sessions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_revoke_session_api_shares__share_id__sessions__rowid__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+        rowid: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  share_drop_queue_api_shares__share_id__queue__rowid__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+        rowid: number;
       };
       cookie?: never;
     };

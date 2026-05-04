@@ -6587,6 +6587,141 @@
           }
         }
       }
+    },
+    "/api/shares/{share_id}/sessions": {
+      "get": {
+        "tags": ["shares"],
+        "summary": "Share Sessions",
+        "description": "Currently-active doctor session(s) and queued waiters for a share.\n\nActive sessions are filtered by ``revoked_at IS NULL`` and TTL; the\n``is_idle`` flag tells the admin whether the queue treats the row as\na free slot. Queue rows are filtered by their own TTL.\n\nThe session row's primary key (which doubles as the cookie value) is\nintentionally NOT returned \u2014 the admin's terminate action keys on\nSQLite ``rowid`` instead, so an exfiltrated API response cannot be\nreplayed as an authentication token.",
+        "operationId": "share_sessions_api_shares__share_id__sessions_get",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}/sessions/{rowid}": {
+      "delete": {
+        "tags": ["shares"],
+        "summary": "Share Revoke Session",
+        "description": "Force-terminate a specific doctor session for this share.\n\nIdempotent: revoking an already-revoked row is a no-op. The next\nrequest the doctor makes is rejected with 401 and they bounce back\nto the landing page; queued waiters can immediately claim the slot.",
+        "operationId": "share_revoke_session_api_shares__share_id__sessions__rowid__delete",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "rowid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Rowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}/queue/{rowid}": {
+      "delete": {
+        "tags": ["shares"],
+        "summary": "Share Drop Queue",
+        "description": "Drop a queued waiter for this share. Idempotent.",
+        "operationId": "share_drop_queue_api_shares__share_id__queue__rowid__delete",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "rowid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Rowid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

@@ -58,6 +58,33 @@ interface ActiveOtp {
   attempts: number;
 }
 
+interface ActiveSessionRow {
+  rowid: number;
+  share_id: number;
+  expires_at: string;
+  last_seen_at: string | null;
+  client_ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  /** True when the session has been silent past the idle timeout — the
+   * queue treats it as a free slot but the row is not yet revoked. */
+  is_idle: boolean;
+}
+
+interface QueuedSessionRow {
+  rowid: number;
+  share_id: number;
+  expires_at: string;
+  client_ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+interface SessionsResponse {
+  active: ActiveSessionRow[];
+  queued: QueuedSessionRow[];
+}
+
 type ShareStatus = "active" | "expired" | "revoked";
 
 const ALL_STATUSES: ShareStatus[] = ["active", "expired", "revoked"];
@@ -87,6 +114,12 @@ export default function SharesPage() {
     Record<number, AuditEvent[]>
   >({});
   const [auditLoading, setAuditLoading] = useState<Record<number, boolean>>({});
+  const [sessionsByShare, setSessionsByShare] = useState<
+    Record<number, SessionsResponse>
+  >({});
+  const [sessionsLoading, setSessionsLoading] = useState<
+    Record<number, boolean>
+  >({});
   const [activeOtp, setActiveOtp] = useState<Record<number, ActiveOtp | null>>(
     {},
   );
@@ -189,12 +222,34 @@ export default function SharesPage() {
     }
   };
 
+  const loadSessions = async (id: number) => {
+    setSessionsLoading((s) => ({ ...s, [id]: true }));
+    try {
+      const res = await api.get<SessionsResponse>(`/shares/${id}/sessions`);
+      setSessionsByShare((s) => ({
+        ...s,
+        [id]: { active: res.data.active || [], queued: res.data.queued || [] },
+      }));
+    } catch (err: any) {
+      toast({
+        title: "Could not load sessions",
+        description: err?.response?.data?.detail || err.message,
+        variant: "error",
+      });
+    } finally {
+      setSessionsLoading((s) => ({ ...s, [id]: false }));
+    }
+  };
+
   const onToggleAudit = async (id: number) => {
     if (expandedId === id) {
       setExpandedId(null);
       return;
     }
     setExpandedId(id);
+    // Fetch sessions on every expand so the data is fresh — sessions
+    // come and go quickly, unlike audit history which only ever grows.
+    loadSessions(id);
     if (auditByShare[id]) return;
     setAuditLoading((s) => ({ ...s, [id]: true }));
     try {
@@ -208,6 +263,41 @@ export default function SharesPage() {
       });
     } finally {
       setAuditLoading((s) => ({ ...s, [id]: false }));
+    }
+  };
+
+  const onRevokeSession = async (shareId: number, rowid: number) => {
+    if (
+      !confirm(
+        "Kill this active doctor session? They will be bounced back to the landing page.",
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(`/shares/${shareId}/sessions/${rowid}`);
+      toast({ title: "Session terminated", variant: "success" });
+      loadSessions(shareId);
+    } catch (err: any) {
+      toast({
+        title: "Could not terminate session",
+        description: err?.response?.data?.detail || err.message,
+        variant: "error",
+      });
+    }
+  };
+
+  const onDropQueue = async (shareId: number, rowid: number) => {
+    try {
+      await api.delete(`/shares/${shareId}/queue/${rowid}`);
+      toast({ title: "Queue entry dropped", variant: "success" });
+      loadSessions(shareId);
+    } catch (err: any) {
+      toast({
+        title: "Could not drop queue entry",
+        description: err?.response?.data?.detail || err.message,
+        variant: "error",
+      });
     }
   };
 
@@ -417,7 +507,16 @@ export default function SharesPage() {
                     {isOpen && (
                       <tr className="bg-muted/10">
                         <td></td>
-                        <td colSpan={9} className="px-3 py-3">
+                        <td colSpan={9} className="px-3 py-3 space-y-4">
+                          <SessionsPanel
+                            loading={!!sessionsLoading[s.id]}
+                            data={sessionsByShare[s.id]}
+                            onRefresh={() => loadSessions(s.id)}
+                            onRevokeSession={(rowid) =>
+                              onRevokeSession(s.id, rowid)
+                            }
+                            onDropQueue={(rowid) => onDropQueue(s.id, rowid)}
+                          />
                           <AuditPanel
                             loading={!!auditLoading[s.id]}
                             events={auditByShare[s.id] || []}
@@ -585,6 +684,175 @@ function CopyCodeButton({ code }: { code: string }) {
         <Copy className="h-3 w-3" />
       )}
     </button>
+  );
+}
+
+function SessionsPanel({
+  loading,
+  data,
+  onRefresh,
+  onRevokeSession,
+  onDropQueue,
+}: {
+  loading: boolean;
+  data: SessionsResponse | undefined;
+  onRefresh: () => void;
+  onRevokeSession: (rowid: number) => void;
+  onDropQueue: (rowid: number) => void;
+}) {
+  const active = data?.active || [];
+  const queued = data?.queued || [];
+  const empty = !loading && active.length === 0 && queued.length === 0;
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground mb-2">
+        <Activity className="h-3 w-3" /> Sessions
+        <button
+          onClick={onRefresh}
+          className="rounded p-0.5 hover:bg-accent"
+          title="Refresh sessions"
+          aria-label="Refresh sessions"
+        >
+          <RefreshCw className="h-3 w-3" />
+        </button>
+      </div>
+      {loading ? (
+        <div className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+          <Loader2 className="h-3 w-3 animate-spin" /> Loading...
+        </div>
+      ) : empty ? (
+        <div className="text-xs text-muted-foreground italic">
+          No active session and no waiters.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {active.length > 0 && (
+            <SessionsTable
+              title="Active"
+              caption="At most one slot per share. Idle sessions are still
+                       listed but the queue treats them as free."
+              rows={active}
+              actionLabel="Kill"
+              actionTitle="Force-terminate this session"
+              onAction={onRevokeSession}
+              renderStatus={(r) =>
+                r.is_idle ? (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    idle
+                  </span>
+                ) : (
+                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    live
+                  </span>
+                )
+              }
+            />
+          )}
+          {queued.length > 0 && (
+            <SessionsTable
+              title={`Queued (${queued.length})`}
+              caption="Waiters are first-come, first-served once the active
+                       session ends."
+              rows={queued}
+              actionLabel="Drop"
+              actionTitle="Drop this queued waiter"
+              onAction={onDropQueue}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface SessionTableRow {
+  rowid: number;
+  expires_at: string;
+  client_ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+  last_seen_at?: string | null;
+  is_idle?: boolean;
+}
+
+function SessionsTable<T extends SessionTableRow>({
+  title,
+  caption,
+  rows,
+  actionLabel,
+  actionTitle,
+  onAction,
+  renderStatus,
+}: {
+  title: string;
+  caption: string;
+  rows: T[];
+  actionLabel: string;
+  actionTitle: string;
+  onAction: (rowid: number) => void;
+  renderStatus?: (r: T) => React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border bg-card overflow-hidden">
+      <div className="bg-muted/30 px-2 py-1 text-[11px] font-semibold uppercase text-muted-foreground">
+        {title}
+      </div>
+      <table className="w-full text-xs">
+        <thead className="bg-muted/20 text-muted-foreground">
+          <tr>
+            <th className="text-left px-2 py-1 w-20">Status</th>
+            <th className="text-left px-2 py-1">Started</th>
+            <th className="text-left px-2 py-1">Last seen</th>
+            <th className="text-left px-2 py-1">Expires</th>
+            <th className="text-left px-2 py-1">IP</th>
+            <th className="text-left px-2 py-1">User-Agent</th>
+            <th className="text-right px-2 py-1 w-20"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {rows.map((r) => (
+            <tr key={r.rowid}>
+              <td className="px-2 py-1">
+                {renderStatus ? (
+                  renderStatus(r)
+                ) : (
+                  <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                    waiting
+                  </span>
+                )}
+              </td>
+              <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
+                {formatLocal(r.created_at)}
+              </td>
+              <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
+                {r.last_seen_at ? formatLocal(r.last_seen_at) : "—"}
+              </td>
+              <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
+                {formatLocal(r.expires_at)}
+              </td>
+              <td className="px-2 py-1 font-mono text-muted-foreground">
+                {r.client_ip || ""}
+              </td>
+              <td className="px-2 py-1 text-muted-foreground truncate max-w-[260px]">
+                {r.user_agent || ""}
+              </td>
+              <td className="px-2 py-1 text-right">
+                <button
+                  onClick={() => onAction(r.rowid)}
+                  className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-0.5 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                  title={actionTitle}
+                >
+                  <Trash2 className="h-3 w-3" /> {actionLabel}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="px-2 py-1 text-[11px] italic text-muted-foreground border-t">
+        {caption}
+      </p>
+    </div>
   );
 }
 

@@ -568,6 +568,93 @@ async def purge_expired_queue(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
+# ── Admin-side session/queue listing and termination ──────────────
+
+
+async def list_active_sessions_for_share(
+    db: aiosqlite.Connection,
+    share_id: int,
+    *,
+    idle_timeout_minutes: int,
+) -> list[dict]:
+    """List non-revoked, not-past-TTL sessions for the share, with
+    metadata the admin needs (IP, UA, timestamps).
+
+    The cookie-equivalent ``id`` column is intentionally NOT returned —
+    we expose ``rowid`` instead so the admin's terminate action can key
+    on a stable handle that does not double as an authentication token.
+    Each row carries an ``is_idle`` flag computed against
+    ``idle_timeout_minutes`` so the UI can flag dead-but-not-revoked
+    sessions (the queue treats those as free slots).
+    """
+    now_iso = utcnow_iso()
+    cursor = await db.execute(
+        """SELECT s.rowid AS rowid, s.share_id, s.expires_at, s.last_seen_at,
+                  s.client_ip, s.user_agent, s.created_at
+             FROM document_share_sessions s
+            WHERE s.share_id = ?
+              AND s.revoked_at IS NULL
+              AND s.expires_at > ?
+            ORDER BY s.created_at DESC""",
+        (share_id, now_iso),
+    )
+    rows = [dict(r) for r in await cursor.fetchall()]
+    if idle_timeout_minutes > 0:
+        cutoff = (datetime.utcnow() - timedelta(minutes=idle_timeout_minutes)).isoformat(
+            timespec="seconds"
+        )
+        for row in rows:
+            last = row.get("last_seen_at") or row.get("created_at")
+            row["is_idle"] = bool(last and last.replace(" ", "T") < cutoff)
+    else:
+        for row in rows:
+            row["is_idle"] = False
+    return rows
+
+
+async def revoke_session_by_rowid(db: aiosqlite.Connection, share_id: int, rowid: int) -> bool:
+    """Mark a single session revoked, scoped to ``share_id`` so an admin
+    cannot accidentally kill a session belonging to another share.
+    Returns True iff a row was actually updated (idempotent on retries).
+    """
+    cursor = await db.execute(
+        """UPDATE document_share_sessions
+              SET revoked_at = CURRENT_TIMESTAMP
+            WHERE rowid = ? AND share_id = ? AND revoked_at IS NULL""",
+        (rowid, share_id),
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
+async def list_queued_for_share(db: aiosqlite.Connection, share_id: int) -> list[dict]:
+    """List queue rows still usable (not past TTL) for this share."""
+    now_iso = utcnow_iso()
+    cursor = await db.execute(
+        """SELECT q.rowid AS rowid, q.share_id, q.expires_at, q.client_ip,
+                  q.user_agent, q.created_at
+             FROM document_share_session_queue q
+            WHERE q.share_id = ?
+              AND q.expires_at > ?
+            ORDER BY q.created_at ASC""",
+        (share_id, now_iso),
+    )
+    return [dict(r) for r in await cursor.fetchall()]
+
+
+async def delete_queue_entry_by_rowid(db: aiosqlite.Connection, share_id: int, rowid: int) -> bool:
+    """Drop a queue entry by rowid, scoped to ``share_id``. Returns True
+    iff a row was actually deleted.
+    """
+    cursor = await db.execute(
+        """DELETE FROM document_share_session_queue
+            WHERE rowid = ? AND share_id = ?""",
+        (rowid, share_id),
+    )
+    await db.commit()
+    return cursor.rowcount > 0
+
+
 # ── Audit listing for admin ──────────────────────────────────────
 
 

@@ -294,3 +294,92 @@ async def share_document_list(
         raise HTTPException(status_code=404, detail="Share not found")
     await _require_admin_or_owner(db, current_user, share["patient_id"])
     return await share_service.share_documents(db, share_id)
+
+
+@router.get("/{share_id}/sessions")
+async def share_sessions(
+    share_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Currently-active doctor session(s) and queued waiters for a share.
+
+    Active sessions are filtered by ``revoked_at IS NULL`` and TTL; the
+    ``is_idle`` flag tells the admin whether the queue treats the row as
+    a free slot. Queue rows are filtered by their own TTL.
+
+    The session row's primary key (which doubles as the cookie value) is
+    intentionally NOT returned — the admin's terminate action keys on
+    SQLite ``rowid`` instead, so an exfiltrated API response cannot be
+    replayed as an authentication token.
+    """
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+
+    cfg = get_config()
+    active = await share_service.list_active_sessions_for_share(
+        db, share_id, idle_timeout_minutes=cfg.share.idle_timeout_minutes
+    )
+    queued = await share_service.list_queued_for_share(db, share_id)
+    return {"active": active, "queued": queued}
+
+
+@router.delete("/{share_id}/sessions/{rowid}")
+async def share_revoke_session(
+    share_id: int,
+    rowid: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Force-terminate a specific doctor session for this share.
+
+    Idempotent: revoking an already-revoked row is a no-op. The next
+    request the doctor makes is rejected with 401 and they bounce back
+    to the landing page; queued waiters can immediately claim the slot.
+    """
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+
+    revoked = await share_service.revoke_session_by_rowid(db, share_id, rowid)
+    await audit_log(
+        db,
+        current_user["id"],
+        "share.session.revoke",
+        resource_type="share",
+        resource_id=share_id,
+        details={"session_rowid": rowid, "revoked": revoked},
+        ip_address=get_client_ip(request),
+    )
+    return {"revoked": revoked}
+
+
+@router.delete("/{share_id}/queue/{rowid}")
+async def share_drop_queue(
+    share_id: int,
+    rowid: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Drop a queued waiter for this share. Idempotent."""
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+
+    deleted = await share_service.delete_queue_entry_by_rowid(db, share_id, rowid)
+    await audit_log(
+        db,
+        current_user["id"],
+        "share.queue.drop",
+        resource_type="share",
+        resource_id=share_id,
+        details={"queue_rowid": rowid, "deleted": deleted},
+        ip_address=get_client_ip(request),
+    )
+    return {"deleted": deleted}

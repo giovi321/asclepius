@@ -31,16 +31,11 @@ Asclepius does **not** bundle an LLM server. You must provide your own Ollama in
 git clone https://github.com/giovi321/asclepius.git
 cd asclepius
 
-# Create your configuration
-cp config/settings.example.yaml config/settings.yaml
-```
-
-Edit `config/settings.yaml` to configure your LLM provider, OCR settings, and other options. See [Configuration](configuration.md) for a full reference.
-
-```bash
 # Start the application
 docker compose up -d
 ```
+
+The container boots with sensible defaults; no `settings.yaml` is required up front. Open <http://localhost:8070>, complete the first-launch wizard, then configure your LLM provider, OCR settings, and other options from the **Settings** page in the webui. Saved settings are persisted to `./data/settings.yaml` (the host-side bind mount of `/data/config/`). See [Configuration](configuration.md) for the full reference of every option you can tune.
 
 This starts two services from the same image:
 

@@ -36,12 +36,10 @@ It runs in one Docker container on your own machine, with an optional sibling co
 ```bash
 git clone https://github.com/giovi321/asclepius.git
 cd asclepius
-cp config/settings.example.yaml config/settings.yaml
-# edit config/settings.yaml, at minimum point it at one LLM provider
 docker compose up -d
 ```
 
-Open <http://localhost:8070>. A first-launch wizard creates your admin account and your first patient profile, and you're ready to drop files into the inbox.
+Open <http://localhost:8070>. A first-launch wizard creates your admin account and your first patient profile, then point the **Settings** page at one LLM provider (Ollama, vLLM, Claude, or OpenAI) and you're ready to drop files into the inbox. Your saved settings are persisted to `./data/settings.yaml`.
 
 You'll need an LLM somewhere, a local Ollama instance, a vLLM server, or a Claude or OpenAI API key. The container is small on purpose; the model lives elsewhere.
 

@@ -114,12 +114,10 @@ The bundled username/password authentication is intentionally minimal: no rate l
 ```bash
 git clone https://github.com/giovi321/asclepius.git
 cd asclepius
-cp config/settings.example.yaml config/settings.yaml
-# Edit settings.yaml with your LLM and OCR configuration
 docker compose up -d
 ```
 
-Then open [http://localhost:8070](http://localhost:8070). On first launch, a **setup wizard** will guide you through creating your admin account and first patient profile.
+Then open [http://localhost:8070](http://localhost:8070). On first launch, a **setup wizard** will guide you through creating your admin account and first patient profile. Once logged in, configure your LLM and OCR providers from the **Settings** page; saved settings are persisted to `./data/settings.yaml`.
 
 :::tip[Setup Wizard]
 The wizard only appears once, when no users exist in the database. It creates your admin account and a first patient profile pre-filled with your name.

@@ -17,6 +17,13 @@ updates:
     groups:
       npm:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Major-version bumps on frontend libraries are intentional migrations,
+    # not background updates; a regrouped tailwind v4 / vite 8 / recharts 3
+    # run pulls in real API breaks. Leave them to manual bumps.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

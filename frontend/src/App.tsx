@@ -75,6 +75,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Gate the first-run wizard: once any user exists the wizard must be
+ * completely inaccessible (mirroring ownCloud's behaviour). Redirect
+ * authenticated users home and unauthenticated users to login so the
+ * route can never reveal the install form a second time.
+ */
+function SetupRoute() {
+  const { user, loading, needsSetup } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+  if (!needsSetup) return <Navigate to={user ? "/" : "/login"} replace />;
+  return <SetupWizardPage />;
+}
+
 /** Wrap a page element in its own ErrorBoundary so one crash doesn't blank the shell. */
 const page = (label: string, el: React.ReactNode) => (
   <ErrorBoundary label={label}>{el}</ErrorBoundary>
@@ -122,7 +141,7 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/setup" element={<SetupWizardPage />} />
+      <Route path="/setup" element={<SetupRoute />} />
       <Route path="/login" element={<LoginPage />} />
       {/* Doctor share surface — lives outside ProtectedRoute and outside
           the regular AuthContext-bound AppLayout so account auth and

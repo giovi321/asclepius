@@ -13,6 +13,10 @@
   <img src="https://img.shields.io/badge/node-20%2B-green" alt="Node 20+">
 </p>
 
+<p align="center">
+  <a href="https://giovi321.github.io/asclepius/"><img src="https://img.shields.io/badge/Read_the_docs-2563eb?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Read the documentation"></a>
+</p>
+
 > **Personal-use software.** Not HIPAA / GDPR certified. Do not expose to the public internet without OIDC + TLS. See [Before you self-host](#before-you-self-host) below.
 
 If you've ever spent twenty minutes hunting for a blood test from three years ago, this is for you.

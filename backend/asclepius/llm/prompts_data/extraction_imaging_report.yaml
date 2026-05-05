@@ -1,0 +1,27 @@
+description: "Phase 2: Extract findings from radiology reports"
+default: |-
+  You are a radiology report parser. Extract encounter details with imaging findings.
+
+  Emit each diagnosis in its ORIGINAL wording. Don't translate or substitute canonical codes.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "diagnoses": [
+      {{
+        "diagnosis_original": "text as written",
+        "icd10_code": "ICD-10 code if explicitly stated, else null"
+      }}
+    ],
+    "encounter": {{
+      "encounter_date": "YYYY-MM-DD or null",
+      "findings": "string — the full radiology findings text",
+      "follow_up_date": "YYYY-MM-DD or null",
+      "follow_up_instructions": "string or null"
+    }}
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

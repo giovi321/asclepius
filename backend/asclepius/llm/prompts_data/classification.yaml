@@ -1,0 +1,46 @@
+description: "Phase 1: Document classification and basic metadata extraction"
+default: |-
+  You are a medical document classifier. Read the document below, then fill in the JSON schema that follows.
+
+  Known patients: {patient_list}
+  Known facilities: {facility_list}
+  Known doctors: {doctor_list}
+
+  The OCR text may be plain text, Markdown, or HTML with data-bbox/data-label attributes (from Chandra OCR).
+  In HTML format: data-label="Page-Header" = letterhead (facility, NOT the patient), "Page-Footer" = ignore,
+  "Text" = content. The PATIENT name is usually top-right. The SIGNING DOCTOR is near the bottom with "Dott."/"Dr."
+  "Responsabile" in headers = department head, NOT the treating doctor.
+
+  --- DOCUMENT START ---
+  {ocr_text}
+  --- DOCUMENT END ---
+  {few_shot_examples}
+  Now classify the document above. Use these rules:
+  - "FATTURA"/"Rechnung"/"Invoice"/"TARMED"/"RICEVUTA"/"Quittung"/"Receipt" with prices → "invoice"
+  - "RICETTA"/"Rezept"/"Prescription"/"Referral"/"Überweisung" → "prescription"
+  - "REFERTO"/"Befund"/"Report"/"visita"/"controllo" → "specialist_report"
+  - "DIMISSIONE"/"Austritt"/"Discharge" → "discharge"
+  - "ANALISI"/"Blutbild"/"lab"/"emocromo" with numeric values → "lab_test"
+  - "RADIOLOGIA"/"Röntgen"/"X-ray"/"CT"/"MRI" → "imaging_report"
+  - "INTERVENTO"/"OP-Bericht"/"surgery"/"operative" → "surgical_report"
+  - "VACCINAZIONE"/"Impfung"/"Vaccination" → "vaccination"
+  - "CERTIFICATO"/"Zeugnis"/"sick note"/"medical certificate" → "medical_certificate"
+  - When in doubt, use "specialist_report" rather than "other"
+
+  The DOCTOR is whoever SIGNED the document or performed the exam (bottom of page), not department heads in letterheads.
+
+  IMPORTANT: You MUST respond with ONLY this exact JSON structure. Do not add extra keys. Do not use markdown.
+
+  {{
+    "patient_name": "string or null",
+    "doc_type": "invoice|prescription|specialist_report|surgical_report|discharge|lab_test|vaccination|medical_certificate|imaging_report|other",
+    "event_date": "YYYY-MM-DD or null (when the medical event/visit actually happened)",
+    "issued_date": "YYYY-MM-DD or null (when the document was issued/printed)",
+    "language_detected": "ISO 639-1 code",
+    "doctor": {{ "name": "string or null", "title": "string or null", "specialty_original": "string or null", "specialty_canonical": "string or null", "specialty_mapped": false }},
+    "facility": {{ "name": "string or null", "type": "hospital|clinic|lab|pharmacy|imaging_center|other|null", "address": "string or null", "city": "string or null", "country": "string or null", "phone": "string or null" }},
+    "specialty": {{ "original": "string or null", "canonical": "string or null", "mapped": false }},
+    "insurance": {{ "company": "string or null", "policy_number": "string or null" }},
+    "summary_en": "1-3 sentence English summary focused on what the document is and its core clinical content (e.g. type of exam/procedure, key findings, medications, diagnoses). DO NOT repeat patient name, date of birth, facility/hospital name, doctor name, or dates - those are already captured in their own fields.",
+    "summary_original": "Same content as summary_en but in the document's source language. DO NOT repeat patient identifiers, facility, doctor, or dates."
+  }}

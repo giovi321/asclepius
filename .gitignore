@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local agent / assistant tooling (never commit)
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Config (real settings, not example)
+config/settings.yaml
+
+# Vault data (never commit patient data)
+/vault/
+
+# SQLite databases
+*.sqlite
+*.db
+
+# Docker
+ollama_data/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MkDocs build
+site/
+
+# Local LOINC distribution (registered download from Regenstrief — not
+# redistributable wholesale; only the per-install overlay CSV at the
+# build-script path is read by build_lab_tests.py)
+/Loinc_*/
+/scripts/build_knowledge/loinc.csv

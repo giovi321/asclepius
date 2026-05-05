@@ -1,0 +1,224 @@
+---
+title: Development setup
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+- Python 3.13+
+- Node.js 20+
+- Tesseract OCR installed locally
+- An Ollama instance or Claude API key for testing
+
+## Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
+```
+
+### Install Tesseract OCR
+
+<Tabs>
+  <TabItem label="Ubuntu / Debian">
+    ```bash
+    sudo apt install tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-deu
+    ```
+  </TabItem>
+  <TabItem label="macOS">
+    ```bash
+    brew install tesseract
+    ```
+  </TabItem>
+  <TabItem label="Windows">
+    Download from [UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) and add to PATH.
+  </TabItem>
+</Tabs>
+
+### Run the backend
+
+```bash
+# Create config
+cp config/settings.example.yaml config/settings.yaml
+# Edit settings.yaml - configure at least one entry in llm.providers (and, if using the Vision-LLM flow, vision.providers)
+
+# Create vault directories
+mkdir -p vault/inbox vault/patients vault/unclassified
+
+# Run with auto-reload
+uvicorn asclepius.main:app --reload --port 8000
+```
+
+The backend API is available at `http://localhost:8000`.
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend dev server runs on `http://localhost:5173` and proxies API calls to `http://localhost:8000` (configured in `vite.config.ts`).
+
+## Project structure
+
+```
+asclepius/
+├── backend/
+│   └── asclepius/
+│       ├── main.py              # FastAPI app entry point
+│       ├── middleware.py        # Security headers, CSRF, body-size cap
+│       ├── config/              # Settings package
+│       │   ├── models.py        # Pydantic config models
+│       │   └── resolver.py      # YAML + env var resolution
+│       ├── audit/               # Audit log writer + 4xx/5xx middleware
+│       ├── auth/                # Session auth, OIDC, cookies, rate limiter
+│       ├── patients/            # Patient CRUD
+│       ├── documents/           # Document CRUD, upload, file serve, AI edit
+│       ├── events/              # Medical events CRUD
+│       ├── lab_results/         # Lab results API
+│       ├── imaging/             # Imaging studies + DICOM
+│       ├── chat/                # RAG chat
+│       │   ├── message_builder.py  # System prompt + context assembly
+│       │   ├── provider_router.py  # Route message to the right LLM
+│       │   └── service.py
+│       ├── normalization/       # Canonical tables + alias lookup
+│       │   ├── alias_lookup.py  # Central alias-table read path
+│       │   ├── resolver.py      # Exact + fuzzy match + auto-create
+│       │   ├── auto_merge.py    # Auto-merge proposal engine
+│       │   └── knowledge_base.py # ATC / ICD-10 / LOINC lookup
+│       ├── pipeline/            # Ingestion pipeline
+│       │   ├── state.py         # PipelineState dataclass (status, cancels, tasks)
+│       │   ├── watcher.py       # File watcher (watchdog)
+│       │   ├── processor.py     # Main processing orchestrator
+│       │   ├── reprocessor.py   # Reprocess entry point
+│       │   ├── ocr.py           # OCR engines
+│       │   ├── ocr_cache.py     # Per-page OCR cache helpers
+│       │   ├── extractor.py     # Phase 1/2 extraction orchestration
+│       │   ├── extractor_db.py  # Extraction DB writes
+│       │   ├── entity_matching.py # Doctor / facility upsert
+│       │   ├── chunked_extraction.py # Chunked + bisect-on-truncate
+│       │   ├── section_processor.py  # Page-level sectioning
+│       │   ├── vision_extractor.py   # Vision-LLM single-step flow
+│       │   ├── few_shot.py      # Retrieval-augmented examples
+│       │   ├── provider_factory.py # Build LLM / OCR / vision providers
+│       │   ├── organizer.py     # File organization
+│       │   └── dicom_ingest.py  # DICOM-specific processing
+│       ├── llm/                 # LLM providers
+│       │   ├── base.py          # Abstract LLM provider
+│       │   ├── ollama.py        # Ollama provider
+│       │   ├── claude.py        # Claude provider
+│       │   ├── openai_provider.py # OpenAI provider
+│       │   ├── gate.py          # Per-credential concurrency gate
+│       │   ├── json_utils.py    # JSON salvage + truncation detection
+│       │   ├── prompts.py       # Loader that exposes prompts as module constants
+│       │   ├── prompts_data/    # Prompt templates as YAML (one file per prompt)
+│       │   └── prompt_manager.py # Custom prompt overrides
+│       ├── settings/            # Settings API, split by topic
+│       │   ├── routes.py        # /api/settings mount point
+│       │   ├── provider_routes.py # LLM / OCR / Vision providers + credentials
+│       │   ├── prompts_routes.py  # Prompt overrides
+│       │   ├── users_routes.py    # User + patient-access CRUD
+│       │   ├── logs_routes.py     # Log tail + audit log + sessions
+│       │   └── backup_routes.py   # SQLite backup download
+│       ├── util/
+│       │   ├── dates.py         # Canonical best-date SQL + parsing
+│       │   └── paths.py         # safe_vault_join, safe_filename
+│       ├── backup/              # Scheduled backups
+│       ├── setup/               # First-run wizard
+│       └── db/                  # Schema + migrations
+├── frontend/
+│   └── src/
+│       ├── App.tsx              # Routes
+│       ├── api/
+│       │   ├── client.ts        # fetch wrapper
+│       │   └── schema.ts        # Types generated from the FastAPI OpenAPI
+│       ├── components/          # Reusable components + per-page ErrorBoundary
+│       │   ├── document-detail/ # DocumentViewer, ReprocessMenu, MetadataEditor, …
+│       │   ├── documents/       # DocumentFilters, BulkActionsBar, DocumentTable, …
+│       │   └── settings/        # ProvidersTab, NormalizationTab, … (with sub-folders)
+│       ├── contexts/            # React contexts (Auth, Patient)
+│       ├── hooks/
+│       │   └── data/            # Shared session-cached resources (useDoctors, …)
+│       ├── pages/               # Page components
+│       └── types.ts             # Re-exports from api/schema.ts
+├── config/
+│   └── settings.example.yaml    # Example configuration
+├── bundled_config/
+│   └── knowledge/               # ATC / ICD-10 / LOINC JSON for auto-merge
+├── docs/                        # Astro + Starlight documentation
+├── docker-compose.yml
+└── Dockerfile
+```
+
+### Regenerating frontend API types
+
+The frontend types in `src/api/schema.ts` are generated from the FastAPI OpenAPI spec. After touching a request/response model on the backend:
+
+```bash
+python backend/scripts/export_openapi.py
+npm --prefix frontend run gen:api
+```
+
+You normally don't have to remember this step. The repo ships a pre-commit hook (`.pre-commit-config.yaml`) that runs both commands automatically whenever a backend `.py` file is staged, then `git add`s the regenerated `frontend/src/openapi.json` and `frontend/src/api/schema.ts`. If anything actually changed, pre-commit aborts the commit with `Files were modified by this hook` so you can review the diff; re-running `git commit` then succeeds with the artefacts included. To activate it once per clone:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+The same regen check runs in CI (`openapi-drift` job) so a PR that skips the hook still fails the build.
+
+## Building for production
+
+The Dockerfile handles the full build:
+
+1. Stage 1: build the React frontend (`npm run build`)
+2. Stage 2: set up the Python backend with the built frontend as static files
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+The built frontend is served by FastAPI as static files from `/app/static`.
+
+## Database
+
+The database is initialized automatically on first startup. The schema is defined in `backend/asclepius/db/schema.sql`.
+
+To reset the database during development:
+
+```bash
+rm vault/asclepius.sqlite
+# Restart the backend
+```
+
+There is no default admin account. On a fresh database, the backend serves the **setup wizard** at `/setup` so you can create the first user (and first patient) through the UI.
+
+## Testing
+
+```bash
+cd backend
+pytest
+```
+
+## Useful commands
+
+```bash
+# Rebuild and restart
+docker compose up -d --build
+
+# View logs
+docker compose logs -f asclepius
+
+# Access the container shell
+docker compose exec asclepius bash
+
+# Check database
+sqlite3 vault/asclepius.sqlite ".tables"
+```

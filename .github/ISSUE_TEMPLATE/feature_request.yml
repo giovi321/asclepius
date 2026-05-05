@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a new feature or enhancement.
+title: "[feature] "
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do and why is the current behaviour insufficient?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: High-level description of the change you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? Why does the proposal win?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Security / privacy implications
+      description: |
+        Does this feature change how PHI is stored, displayed, or shared?
+        Does it introduce a new external dependency or API call?
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true

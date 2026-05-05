@@ -1,0 +1,98 @@
+services:
+  asclepius-core:
+    image: asclepius
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${ASCLEPIUS_PORT:-8070}:${ASCLEPIUS_BIND_PORT:-8000}"
+    volumes:
+      - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
+      - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
+    environment:
+      - TZ=${TZ:-Europe/Zurich}
+      # PUID/PGID make the in-container unprivileged user match the host
+      # owner of the bind-mounted ./data and ./vault directories so
+      # SQLite and the pipeline can write. Defaults to 1000:1000.
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - ASCLEPIUS_ENV=${ASCLEPIUS_ENV:-production}
+      - ASCLEPIUS_COOKIE_SECURE=${ASCLEPIUS_COOKIE_SECURE:-1}
+      # Interface/port the uvicorn process binds to inside the container.
+      # Usually leave as the defaults; override for IPv6-only hosts or to
+      # run multiple replicas on distinct ports.
+      - ASCLEPIUS_BIND_HOST=${ASCLEPIUS_BIND_HOST:-0.0.0.0}
+      - ASCLEPIUS_BIND_PORT=${ASCLEPIUS_BIND_PORT:-8000}
+      - ASCLEPIUS_VAULT_PATH=/data/vault
+      - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
+      - ASCLEPIUS_DB_PATH=/data/config/asclepius.sqlite
+      - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set — see .env.example}
+      - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
+      # Run mode: ``core`` mounts every router and runs the pipeline watcher.
+      # The companion ``asclepius-share`` service runs the same image in
+      # ``share`` mode for the public surface.
+      - ASCLEPIUS_MODE=core
+      # Pin the share link the admin copies to the public doctor host.
+      # Leave empty for single-address deployments (link inherits the
+      # admin's origin); set to e.g. ``https://med.example.com`` when
+      # admin and doctor live on different hostnames.
+      - ASCLEPIUS_SHARE_PUBLIC_URL=${ASCLEPIUS_SHARE_PUBLIC_URL:-}
+      # Trust X-Forwarded-* from any source. Override (e.g. to your
+      # reverse-proxy IP) when the container is reachable from anywhere
+      # other than your trusted proxy.
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}
+    restart: unless-stopped
+    # The entrypoint starts as root to fix bind-mount ownership, then
+    # drops to the unprivileged ``asclepius`` user via gosu. We therefore
+    # can't use ``cap_drop: ALL`` or ``no-new-privileges`` without also
+    # pre-chowning the host directories; keeping these commented out
+    # gives a friendly out-of-the-box experience. Re-enable after you
+    # ``chown -R 1000:1000 ./data ./vault`` on the host.
+    # security_opt:
+    #   - no-new-privileges:true
+    # cap_drop:
+    #   - ALL
+
+  # Public-facing share surface. Same image as ``asclepius-core``, same vault
+  # and SQLite database (bind-mounted), but only ``/api/share/*`` and the
+  # ``/share/...`` SPA paths are reachable. Bind this port behind your TLS
+  # reverse proxy (nginx/traefik) and keep ``asclepius-core`` on the LAN.
+  asclepius-share:
+    image: asclepius
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${ASCLEPIUS_SHARE_PORT:-8071}:${ASCLEPIUS_BIND_PORT:-8000}"
+    volumes:
+      - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
+      - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
+    environment:
+      - TZ=${TZ:-Europe/Zurich}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - ASCLEPIUS_ENV=${ASCLEPIUS_ENV:-production}
+      - ASCLEPIUS_COOKIE_SECURE=${ASCLEPIUS_COOKIE_SECURE:-1}
+      - ASCLEPIUS_BIND_HOST=${ASCLEPIUS_BIND_HOST:-0.0.0.0}
+      - ASCLEPIUS_BIND_PORT=${ASCLEPIUS_BIND_PORT:-8000}
+      - ASCLEPIUS_VAULT_PATH=/data/vault
+      - ASCLEPIUS_CONFIG_PATH=/data/config/settings.yaml
+      - ASCLEPIUS_DB_PATH=/data/config/asclepius.sqlite
+      # Share container needs the same SECRET_KEY as core so token hashes,
+      # OTP hashes, and signed cookies validate across both processes.
+      - ASCLEPIUS_SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set — see .env.example}
+      # Region translation runs in-process on the share container, so it
+      # needs the LLM/OCR keys too. Strip these only if you also disable
+      # the translate endpoint.
+      - ASCLEPIUS_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ASCLEPIUS_GOOGLE_VISION_KEY=${GOOGLE_VISION_KEY:-}
+      - ASCLEPIUS_MODE=share
+      # Share container does not mint share links, but keep the var set
+      # for symmetry and so internal absolute URLs (audit log, headers)
+      # report the public origin.
+      - ASCLEPIUS_SHARE_PUBLIC_URL=${ASCLEPIUS_SHARE_PUBLIC_URL:-}
+      - FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}
+    restart: unless-stopped
+    depends_on:
+      - asclepius-core

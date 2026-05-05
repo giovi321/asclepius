@@ -1,0 +1,40 @@
+description: "Phase 2: Extract encounter details with operative findings"
+default: |-
+  You are a surgical report parser. Extract encounter details with operative findings.
+
+  Emit each diagnosis and medication ingredient in its ORIGINAL wording.
+
+  Respond in JSON only. No markdown.
+
+  {{
+    "diagnoses": [
+      {{
+        "diagnosis_original": "text as written",
+        "icd10_code": "ICD-10 code if explicitly stated, else null"
+      }}
+    ],
+    "medications": [
+      {{
+        "brand_name": "string or null",
+        "active_ingredient_original": "ingredient name as written",
+        "dosage": "string",
+        "form": "tablet|capsule|cream|injection|syrup|drops|inhaler|patch|suppository|other|null",
+        "frequency": "string",
+        "duration": "string or null",
+        "quantity": "string or null"
+      }}
+    ],
+    "encounter": {{
+      "encounter_date": "YYYY-MM-DD or null",
+      "admission_date": "YYYY-MM-DD or null",
+      "discharge_date": "YYYY-MM-DD or null",
+      "findings": "string — the operative findings",
+      "follow_up_date": "YYYY-MM-DD or null",
+      "follow_up_instructions": "string or null"
+    }}
+  }}
+
+  OCR text:
+  ---
+  {ocr_text}
+  ---

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" role="img" aria-label="From a stack of paper to one searchable archive">
+  <defs>
+    <pattern id="dotsj" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.9" fill="rgba(28,25,23,0.08)"/>
+    </pattern>
+    <marker id="arrow-j" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#8E4449"/>
+    </marker>
+    <style>
+      .eyebrow{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;letter-spacing:0.2em;fill:#78716c;}
+      .title{font-family:'Instrument Serif',Georgia,serif;font-size:24px;fill:#1c1917;}
+      .ital{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:14px;fill:#8E4449;}
+      .cap{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:10px;fill:#57534e;letter-spacing:0.04em;}
+      .item{font-family:'Geist','Inter',system-ui,sans-serif;font-size:12px;fill:#1c1917;font-weight:500;}
+      .yr{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:10px;fill:#57534e;}
+    </style>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#faf7f2"/>
+  <rect width="100%" height="100%" fill="url(#dotsj)" opacity="0.6"/>
+
+  <text x="40" y="44" class="eyebrow">ASCLEPIUS · WHAT IT DOES</text>
+  <text x="40" y="76" class="title">A lifetime of paper, in one searchable place</text>
+
+  <!-- LEFT: messy stack -->
+  <text x="128" y="128" class="eyebrow">BEFORE</text>
+
+  <g transform="translate(200,220)">
+    <g transform="rotate(-14)">
+      <rect x="-72" y="-52" width="144" height="104" rx="3" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+      <line x1="-56" y1="-30" x2="40" y2="-30" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-16" x2="52" y2="-16" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-2"  x2="32" y2="-2"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="12"  x2="48" y2="12"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="26"  x2="20" y2="26"  stroke="#a8a29e" stroke-width="1"/>
+    </g>
+    <g transform="rotate(8)">
+      <rect x="-72" y="-52" width="144" height="104" rx="3" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+      <line x1="-56" y1="-30" x2="48" y2="-30" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-16" x2="32" y2="-16" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-2"  x2="52" y2="-2"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="12"  x2="40" y2="12"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="26"  x2="28" y2="26"  stroke="#a8a29e" stroke-width="1"/>
+    </g>
+    <g transform="rotate(-3)">
+      <rect x="-72" y="-52" width="144" height="104" rx="3" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
+      <line x1="-56" y1="-30" x2="44" y2="-30" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-16" x2="52" y2="-16" stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="-2"  x2="36" y2="-2"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="12"  x2="48" y2="12"  stroke="#a8a29e" stroke-width="1"/>
+      <line x1="-56" y1="26"  x2="24" y2="26"  stroke="#a8a29e" stroke-width="1"/>
+    </g>
+  </g>
+
+  <text x="200" y="316" class="cap" text-anchor="middle">PDFs · scans · phone photos · DICOM</text>
+
+  <!-- MIDDLE: arrow -->
+  <text x="468" y="208" class="ital" text-anchor="middle">reads, extracts, files</text>
+  <line x1="368" y1="232" x2="568" y2="232" stroke="#8E4449" stroke-width="2" marker-end="url(#arrow-j)"/>
+
+  <!-- RIGHT: clean timeline -->
+  <text x="620" y="128" class="eyebrow">AFTER</text>
+
+  <line x1="660" y1="156" x2="660" y2="296" stroke="#a8a29e" stroke-width="1"/>
+
+  <circle cx="660" cy="172" r="5" fill="#8E4449"/>
+  <text x="676" y="172" class="yr" dominant-baseline="central">2026</text>
+  <text x="708" y="172" class="item" dominant-baseline="central">Annual checkup · lipid panel</text>
+
+  <circle cx="660" cy="208" r="4" fill="#1c1917"/>
+  <text x="676" y="208" class="yr" dominant-baseline="central">2024</text>
+  <text x="708" y="208" class="item" dominant-baseline="central">Knee surgery · 6 follow-ups</text>
+
+  <circle cx="660" cy="244" r="4" fill="#1c1917"/>
+  <text x="676" y="244" class="yr" dominant-baseline="central">2022</text>
+  <text x="708" y="244" class="item" dominant-baseline="central">MRI shoulder · physio plan</text>
+
+  <circle cx="660" cy="280" r="4" fill="#1c1917"/>
+  <text x="676" y="280" class="yr" dominant-baseline="central">2019</text>
+  <text x="708" y="280" class="item" dominant-baseline="central">Bloodwork · 14 markers normalized</text>
+
+  <text x="620" y="332" class="cap">one searchable archive per patient</text>
+</svg>

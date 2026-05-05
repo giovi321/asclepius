@@ -1,0 +1,109 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+database:
+  path: "/vault/asclepius.sqlite"
+
+vault:
+  root_path: "/vault"
+  inbox_path: "/vault/inbox"
+  patients_path: "/vault/patients"
+  unclassified_path: "/vault/unclassified"
+
+auth:
+  secret_key: "change-me-in-production"
+  session_ttl_hours: 720 # 30 days
+
+# OIDC / SSO (Authentik, Keycloak, etc.)
+oidc:
+  enabled: false
+  provider_url: "" # e.g. https://auth.example.com/application/o/asclepius/
+  client_id: ""
+  client_secret: ""
+  # Add "groups" (Authentik / most Keycloak setups) when syncing roles so
+  # the userinfo endpoint actually returns the group membership.
+  scopes: "openid profile email"
+  auto_create_user: true # create user on first OIDC login
+  username_claim: "preferred_username"
+  display_name_claim: "name"
+
+  # Role sync — when enabled, users.role is recomputed on every OIDC login
+  # from the provider's group/role claim. First match wins in the order
+  # admin → editor → viewer; if nothing matches, default_role is used.
+  #
+  # Authentik exposes group names under the "groups" claim (requires the
+  # "groups" scope). Keycloak's realm roles live at "realm_access.roles"
+  # (nested), and client-specific roles at e.g.
+  # "resource_access.<client-id>.roles".
+  sync_roles: false
+  roles_claim: "groups"
+  admin_roles: [] # e.g. ["asclepius-admins"]
+  editor_roles: [] # e.g. ["asclepius-editors"]
+  viewer_roles: [] # e.g. ["asclepius-viewers"]
+  default_role: "viewer"
+
+ocr:
+  engine: "tesseract" # tesseract, tesseract_remote, llm_vision, google_vision
+  language: "eng+ita+deu" # Tesseract language codes
+  confidence_threshold: 0.7
+  cloud_ocr_enabled: false
+  google_vision_key: ""
+  remote_url: "" # URL for remote Tesseract server (when engine=tesseract_remote)
+  remote_api_key: ""
+  # LLM Vision OCR (when engine=llm_vision):
+  # Uses the LLM to read page images directly — best accuracy for messy docs.
+  # For Ollama: set llm_vision_model to a vision model (e.g. "llava", "llama3.2-vision")
+  # For Claude: uses Claude's native vision capability
+  llm_vision_model: "" # e.g. "llava:13b" or "llama3.2-vision" (empty = use main llm model)
+  # Serialise vision-OCR requests to avoid queue-induced read timeouts on
+  # Ollama. Default 1 = one page at a time (safest for self-hosted Ollama).
+  max_concurrent_vision_requests: 1
+
+llm:
+  extraction_timeout: 120 # seconds — overall extraction call timeout
+  max_concurrent_requests: 2 # how many LLM calls may run in parallel (1 = serialized)
+  max_retries: 3 # retries on ReadTimeout / ConnectError (0 = no retries)
+  retry_backoff_seconds: [30, 60, 120] # sleep between successive retries
+  canonical_language: "English"
+  # Ordered list of providers — tried in priority order. Edit via the webui
+  # (Settings → Document Analysis → LLM Providers) rather than hand-editing.
+  providers:
+    - id: "ollama-default"
+      type: "ollama" # ollama | vllm | claude | openai
+      name: "Ollama (Local)"
+      enabled: true
+      priority: 1
+      base_url: "http://ollama:11434"
+      model: "llama3.1"
+      api_key: ""
+      timeout: 120
+
+# Vision-LLM flow — alternative to OCR + text-LLM. Each page image is sent to
+# a vision-capable model that returns OCR text AND structured extraction in
+# one call. Switch on via pipeline.default_flow = "vision_llm" or via the
+# per-document Reprocess menu.
+vision:
+  extraction_timeout: 600 # per-page vision call timeout (seconds)
+  max_concurrent_requests: 2
+  max_retries: 3
+  retry_backoff_seconds: [30, 60, 120]
+  providers: [] # e.g. Qwen2.5-VL on Ollama, Claude vision, GPT-4o
+  # Example — uncomment and adjust to enable:
+  # providers:
+  #   - id: "qwen25vl-1"
+  #     type: "ollama"                # ollama | claude | openai
+  #     name: "Qwen2.5-VL"
+  #     enabled: true
+  #     priority: 1
+  #     base_url: "http://ollama:11434"
+  #     model: "qwen2.5vl:7b"
+  #     api_key: ""
+  #     timeout: 600
+
+pipeline:
+  watch_enabled: true
+  poll_interval_seconds: 5
+  retry_interval_seconds: 300 # retry failed LLM extractions
+  max_retries: 3
+  default_flow: "ocr_llm" # "ocr_llm" or "vision_llm" — applied to new uploads

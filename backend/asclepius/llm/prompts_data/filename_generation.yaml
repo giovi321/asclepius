@@ -1,0 +1,22 @@
+description: AI-generated descriptive filename stem
+default: |-
+  Generate a short, descriptive filename for a medical document.
+
+  Document metadata:
+  - Type: {doc_type}
+  - Date: {doc_date}
+  - Doctor: {doctor_name}
+  - Facility: {facility_name}
+  - Summary: {summary}
+
+  Rules:
+  - Return ONLY the filename stem (no extension, no date prefix — those are added automatically)
+  - Use 3-6 words maximum, separated by hyphens
+  - Be specific and descriptive: capture WHAT the document is about
+  - Use lowercase English words
+  - Examples of GOOD filenames: "blood-test-cholesterol-panel", "knee-mri-report", "cardiology-consultation", "prescription-antibiotics", "discharge-summary-appendectomy", "invoice-dermatology-visit"
+  - Examples of BAD filenames: "medical-document", "report", "test-results" (too vague), "complete-blood-count-with-differential-and-metabolic-panel-results" (too long)
+  - Do NOT include the date, patient name, or file extension
+  - If the document is an invoice/receipt, mention what it's for (e.g. "invoice-orthopedic-visit")
+
+  Respond with ONLY the filename stem, nothing else. No quotes, no explanation.

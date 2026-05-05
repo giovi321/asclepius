@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asclepius"
+version = "1.0.0"
+description = "Asclepius — self-hosted medical records manager"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "aiosqlite>=0.20.0",
+    "python-multipart>=0.0.12",
+    "itsdangerous>=2.2.0",
+    "bcrypt>=4.2.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    "pyyaml>=6.0.2",
+    "watchdog>=5.0.0",
+    "pytesseract>=0.3.13",
+    "pydicom>=3.0.0",
+    "pymupdf>=1.24.0",
+    "httpx>=0.27.0",
+    "anthropic>=0.39.0",
+    "pillow>=10.4.0",
+    "python-magic>=0.4.27",
+    "authlib>=1.3.0",
+    "numpy>=1.26.0",
+    "rapidfuzz>=3.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "ruff>=0.7.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"asclepius.llm" = ["prompts_data/*.yaml"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"

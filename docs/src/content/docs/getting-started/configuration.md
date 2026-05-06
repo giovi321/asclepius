@@ -139,7 +139,7 @@ The pipeline tries providers in priority order; on failure it falls through to t
 
 `pipeline.default_flow` only affects **new uploads**. Existing documents can be reprocessed with any of four modes (OCR+LLM, OCR only, LLM only, Vision-LLM) from the document detail page.
 
-See [LLM & OCR Configuration](../admin-guide/llm-configuration.md) for full details, YAML examples, and recommended models.
+See [LLM & OCR Configuration](../admin-guide/llm-configuration/) for full details, YAML examples, and recommended models.
 
 ### Concurrency caps
 
@@ -195,7 +195,7 @@ oidc:
   display_name_claim: "name"
 ```
 
-See [User Management](../admin-guide/user-management.md) for details on configuring SSO.
+See [User Management](../admin-guide/user-management/) for details on configuring SSO.
 
 ## Security
 
@@ -226,7 +226,7 @@ These environment variables override `settings.yaml` values:
 | `ASCLEPIUS_ANTHROPIC_API_KEY` | `api_key` on the first `llm.providers` entry of type `claude` (creates one if none exists) |
 | `ASCLEPIUS_GOOGLE_VISION_KEY` | `ocr.google_vision_key` (also enables `cloud_ocr_enabled`) |
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` (default: `config/settings.yaml`) |
-| `ASCLEPIUS_MODE` | Run mode: `core` (full app, default) or `share` (public doctor-share surface only — mounts `/api/share/*` and `/share/...` SPA pages, returns 404 for everything else; see [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet)) |
+| `ASCLEPIUS_MODE` | Run mode: `core` (full app, default) or `share` (public doctor-share surface only — mounts `/api/share/*` and `/share/...` SPA pages, returns 404 for everything else; see [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet)) |
 | `ASCLEPIUS_SHARE_PUBLIC_URL` | `share.public_base_url` — pin every generated share link to this origin (e.g. `https://med.example.com`). Required for split-host deployments; leave empty when admin and doctor share one hostname. |
 | `FORWARDED_ALLOW_IPS` | uvicorn trust list for `X-Forwarded-*` headers (`*` = any). Override to your reverse-proxy IP for stricter defaults. |
 | `TZ` | Container timezone (default: `Europe/Zurich`) |

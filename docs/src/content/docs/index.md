@@ -15,7 +15,7 @@ Asclepius is built for one person managing their own family's records, not a har
 
 The bundled username/password authentication is intentionally minimal: no rate limiting, no MFA, no account lockout, and no brute-force protection. The chat feature lets the LLM author SQLite `SELECT` queries against your medical database, which makes it a prompt-injection target and exposes a SQL injection surface if untrusted users can reach the chat endpoint. Documents in the inbox flow into LLM prompts as well, so files from untrusted sources can carry injection payloads.
 
-**For any multi-user or remote-access deployment, configure an OIDC provider such as [Authentik](https://goauthentik.io/), Keycloak, or Auth0** and treat the local-password flow as a single-user convenience only. See [Installation](getting-started/installation.md) and [User Management](admin-guide/user-management.md).
+**For any multi-user or remote-access deployment, configure an OIDC provider such as [Authentik](https://goauthentik.io/), Keycloak, or Auth0** and treat the local-password flow as a single-user convenience only. See [Installation](getting-started/installation/) and [User Management](admin-guide/user-management/).
 :::
 
 <div class="diagram-frame">
@@ -143,4 +143,4 @@ Asclepius runs as a **single Docker container**. The FastAPI backend serves the 
 
 The ingestion pipeline runs as a background asyncio task, so processing never blocks HTTP requests. Files live on disk inside a vault directory; all metadata sits in SQLite.
 
-See [Architecture Overview](architecture/overview.md) for the full picture.
+See [Architecture Overview](architecture/overview/) for the full picture.

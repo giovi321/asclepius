@@ -4,7 +4,7 @@ title: "Architecture Overview"
 
 Asclepius runs as a **single Docker container**. A Python/FastAPI backend serves both the REST API and the pre-built React frontend, and every LLM call goes out to an external service you point it at. There is no bundled model server.
 
-For deployments that need to publish doctor shares to the public internet, the bundled `docker-compose.yml` ships a sibling `asclepius-share` service: same image, started with `ASCLEPIUS_MODE=share`, mounts only the doctor-share routers, refuses every admin and patient route. Both containers share the SQLite database and vault on disk. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet) for the deployment topology.
+For deployments that need to publish doctor shares to the public internet, the bundled `docker-compose.yml` ships a sibling `asclepius-share` service: same image, started with `ASCLEPIUS_MODE=share`, mounts only the doctor-share routers, refuses every admin and patient route. Both containers share the SQLite database and vault on disk. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet) for the deployment topology.
 
 <div class="diagram-frame">
 <svg viewBox="0 0 1040 560" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Asclepius architecture diagram" style="display:block;width:100%;height:auto;max-width:100%;">
@@ -200,7 +200,7 @@ For deployments that need to publish doctor shares to the public internet, the b
     - Organize file into `vault/patients/{slug}/{year}/`
 4. Per-document progress tracking (step + current page) visible on Dashboard
 
-See [Processing Pipeline](pipeline.md) for the complete flow.
+See [Processing Pipeline](pipeline/) for the complete flow.
 
 ## Key Design Decisions
 

@@ -107,7 +107,7 @@ The chat system prompt and SQL generation prompt can be customized from **Settin
 - `chat_system` -- The system prompt that defines the assistant's personality and behavior
 - `sql_generation` -- The prompt that instructs the LLM how to generate SQL queries from questions
 
-See [LLM Configuration](../admin-guide/llm-configuration.md#custom-prompts) for details.
+See [LLM Configuration](../admin-guide/llm-configuration/#custom-prompts) for details.
 
 ## Limitations
 

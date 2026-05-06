@@ -2,7 +2,7 @@
 title: "First Steps"
 ---
 
-After [installation](./installation.md), the first-launch **setup wizard**
+After [installation](./installation/), the first-launch **setup wizard**
 creates your admin account and first patient and logs you in. After that,
 three things matter before you can ingest documents.
 
@@ -49,10 +49,10 @@ their own stages.
 
 ## Next steps
 
-- [OIDC / SSO setup](../admin-guide/user-management.md) for enterprise auth
-- [LLM and OCR settings](../admin-guide/llm-configuration.md) for
+- [OIDC / SSO setup](../admin-guide/user-management/) for enterprise auth
+- [LLM and OCR settings](../admin-guide/llm-configuration/) for
   extraction quality
-- [Custom prompts](../admin-guide/llm-configuration.md#custom-prompts)
-- [Normalization](../user-guide/normalization.md) for cross-language
+- [Custom prompts](../admin-guide/llm-configuration/#custom-prompts)
+- [Normalization](../user-guide/normalization/) for cross-language
   consistency
-- [Automated backups](../admin-guide/backup-restore.md)
+- [Automated backups](../admin-guide/backup-restore/)

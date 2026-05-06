@@ -50,7 +50,7 @@ Lab test names are normalized to canonical forms using the normalization system,
 
 - "Hämoglobin" (German), "Haemoglobin" (British English), "Hemoglobin" (American English) all map to the canonical `HEMOGLOBIN`
 
-See [Normalization](normalization.md) for managing canonical names and aliases.
+See [Normalization](../user-guide/normalization/) for managing canonical names and aliases.
 
 ## Data model
 

@@ -7,12 +7,12 @@ Asclepius is **not hardened for direct public-internet exposure**. The built-in 
 
 For any deployment that is reachable from outside a trusted network, or that has more than a single user, you **must** front Asclepius with one of:
 
-- An **OIDC provider** such as [Authentik](https://goauthentik.io/), Keycloak, Auth0, or Google (recommended, see [User Management](../admin-guide/user-management.md)), and/or
+- An **OIDC provider** such as [Authentik](https://goauthentik.io/), Keycloak, Auth0, or Google (recommended, see [User Management](../admin-guide/user-management/)), and/or
 - A **VPN** (WireGuard, Tailscale, …) or an **authenticating reverse proxy**.
 
 The local username/password login should be treated as a single-user convenience, not a production auth system. Bind port `8070` to `127.0.0.1` or a private subnet, never `0.0.0.0` on a public host.
 
-The one exception is the **doctor-share surface**. The bundled `asclepius-share` service (same image, `ASCLEPIUS_MODE=share`) only mounts `/api/share/*` and the `/share/...` SPA pages, returns 404 for every admin or patient route, and is the supported way to publish that surface over the public internet. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet).
+The one exception is the **doctor-share surface**. The bundled `asclepius-share` service (same image, `ASCLEPIUS_MODE=share`) only mounts `/api/share/*` and the `/share/...` SPA pages, returns 404 for every admin or patient route, and is the supported way to publish that surface over the public internet. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet).
 :::
 
 ## Prerequisites
@@ -35,12 +35,12 @@ cd asclepius
 docker compose up -d
 ```
 
-The container boots with sensible defaults; no `settings.yaml` is required up front. Open <http://localhost:8070>, complete the first-launch wizard, then configure your LLM provider, OCR settings, and other options from the **Settings** page in the webui. Saved settings are persisted to `./data/settings.yaml` (the host-side bind mount of `/data/config/`). See [Configuration](configuration.md) for the full reference of every option you can tune.
+The container boots with sensible defaults; no `settings.yaml` is required up front. Open <http://localhost:8070>, complete the first-launch wizard, then configure your LLM provider, OCR settings, and other options from the **Settings** page in the webui. Saved settings are persisted to `./data/settings.yaml` (the host-side bind mount of `/data/config/`). See [Configuration](../getting-started/configuration/) for the full reference of every option you can tune.
 
 This starts two services from the same image:
 
 - **asclepius-core** -- the full application (admin, pipeline, settings, doctor-share admin) on port `8070` (mapped from container port `8000`). Keep this one on the LAN.
-- **asclepius-share** -- the same image started with `ASCLEPIUS_MODE=share`. Mounts only the doctor-share routes (`/api/share/*` plus the `/share/...` SPA pages); every admin or patient route returns 404. Bind it to a public TLS proxy if you want outside doctors to reach a shared record. Default host port `8071`. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet).
+- **asclepius-share** -- the same image started with `ASCLEPIUS_MODE=share`. Mounts only the doctor-share routes (`/api/share/*` plus the `/share/...` SPA pages); every admin or patient route returns 404. Bind it to a public TLS proxy if you want outside doctors to reach a shared record. Default host port `8071`. See [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet).
 
 If you do not plan to expose share access to the internet, you can simply leave the share service running on `127.0.0.1:8071` (no harm done), or remove it from `docker-compose.yml`. The core service is fully functional on its own.
 
@@ -110,7 +110,7 @@ llm:
       timeout: 120
 ```
 
-If Ollama runs on a different machine, use that machine's IP or hostname. Vision-LLM providers reference the **same** credential, see [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the Vision-LLM flow.
+If Ollama runs on a different machine, use that machine's IP or hostname. Vision-LLM providers reference the **same** credential, see [LLM & OCR Configuration](../admin-guide/llm-configuration/#vision-llm-providers) for the Vision-LLM flow.
 
 ### Volume Mounts
 
@@ -141,4 +141,4 @@ The setup wizard is shown only when no users exist in the database. After setup,
 
 ## Manual Installation (Development)
 
-For development, you can run the backend and frontend separately. See [Development Setup](../development/setup.md) for details.
+For development, you can run the backend and frontend separately. See [Development Setup](../development/setup/) for details.

@@ -393,7 +393,7 @@ All LLM prompts are editable from **Settings** > **Document Analysis** > **Promp
 | `link_suggestion` | Suggest related documents for linking |
 | `page_classification` | Classify pages of multi-page documents |
 
-**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_lab_test`, `extraction_prescription`, …) only receive `{ocr_text}`, canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline.md#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat, the SQL-generation prompt is the tool-call.
+**Which prompts actually inject known-entity lists.** Only `classification`, `document_edit`, and the legacy `extraction_legacy` template expand `{patient_list}` / `{facility_list}` / `{doctor_list}` into the full JSON of known entities. The per-type extraction prompts (`extraction_lab_test`, `extraction_prescription`, …) only receive `{ocr_text}`, canonical lab tests, medications, diagnoses, specialties, doctors and facilities are matched in Python *after* extraction (see [pipeline → Name Normalization](../architecture/pipeline/#name-normalization)). `chat_system` receives a bounded `{patient_context}` rollup, not the full entity tables, and there is no MCP server or vector retrieval behind chat, the SQL-generation prompt is the tool-call.
 
 ### Available variables
 
@@ -469,7 +469,7 @@ Variables suffixed with `?` are optional.
 
 The Normalization sub-tab (under Document Analysis) manages canonical mappings for medical terms, doctors, and facilities. When the LLM extracts terms like lab test names, diagnoses, medications, specialties, doctor names, and facility names, they are auto-mapped to canonical entries. Use "Confirm all" to mark auto-mapped aliases as human-reviewed. Use "Merge" to consolidate duplicate entries (e.g., "Dr. H. Mueller" and "Dr. Hans Mueller").
 
-See [Normalization](../user-guide/normalization.md) for details.
+See [Normalization](../user-guide/normalization/) for details.
 
 ## Correction-driven learning
 

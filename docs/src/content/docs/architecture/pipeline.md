@@ -247,7 +247,7 @@ The `provider_name` stored in the database is the user-configured display name (
 2. Send each page image to the LLM (Claude, OpenAI, or Ollama with vision model)
 3. LLM transcribes all visible text, preserving structure
 4. Transient failures (ReadTimeout, ConnectError, HTTP 429/5xx) retry with per-credential backoff (defaults to `[30, 60, 120]` seconds, configurable via `CredentialEntry.max_retries` / `retry_backoff_seconds`)
-5. Per-page calls are serialized through a **process-global** semaphore keyed by `credential_id`. All kinds (LLM, Vision-LLM, LLM-vision OCR) on the same credential share the same slots, so an Ollama server set to `max_concurrent=1` runs at most one request total — even when the FastAPI loop (chat, AI features) and the worker loop are both active. **Caveat:** the gate is in-memory, so split-mode deployments (a `core` container + a `share` container, see [Doctor shares](../admin-guide/doctor-shares.md#publishing-the-share-surface-to-the-internet)) each have their own copy. A credential reachable from both containers can run `2 × max_concurrent` requests in the absolute worst case. Halve the cap or use a dedicated credential per surface if your hardware can't handle the doubled ceiling.
+5. Per-page calls are serialized through a **process-global** semaphore keyed by `credential_id`. All kinds (LLM, Vision-LLM, LLM-vision OCR) on the same credential share the same slots, so an Ollama server set to `max_concurrent=1` runs at most one request total — even when the FastAPI loop (chat, AI features) and the worker loop are both active. **Caveat:** the gate is in-memory, so split-mode deployments (a `core` container + a `share` container, see [Doctor shares](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet)) each have their own copy. A credential reachable from both containers can run `2 × max_concurrent` requests in the absolute worst case. Halve the cap or use a dedicated credential per surface if your hardware can't handle the doubled ceiling.
 6. Can use a **separate** provider/model/URL from the extraction LLM
 
 ### Remote Tesseract
@@ -277,7 +277,7 @@ Retries on transient failures are controlled per-credential (`max_retries`, `ret
 
 **Best for:** Documents where OCR quality is poor, or when you'd rather not maintain separate OCR + text-LLM stacks.
 
-**Recommended local model:** `qwen2.5vl:7b` (~6 GB VRAM) on Ollama. See [LLM & OCR Configuration](../admin-guide/llm-configuration.md#vision-llm-providers) for the full size-vs-VRAM matrix.
+**Recommended local model:** `qwen2.5vl:7b` (~6 GB VRAM) on Ollama. See [LLM & OCR Configuration](../admin-guide/llm-configuration/#vision-llm-providers) for the full size-vs-VRAM matrix.
 
 ## Two-Phase Extraction
 

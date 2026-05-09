@@ -143,7 +143,7 @@ export function ToggleField({
   description?: string;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <div>
         <span className="text-sm font-medium">{label}</span>
         {description && (
@@ -152,7 +152,7 @@ export function ToggleField({
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${value ? "bg-primary" : "bg-muted"}`}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${value ? "bg-primary" : "bg-muted"}`}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`}
@@ -177,8 +177,12 @@ export function useSettingsSave() {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }
-    } catch {
-      toast({ title: "Failed to save settings", variant: "error" });
+    } catch (e: any) {
+      toast({
+        title: "Failed to save settings",
+        description: e?.response?.data?.detail || e?.message,
+        variant: "error",
+      });
     }
     setSaving(false);
   };

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-09
+
+### Fixed
+- Settings: `ToggleField` no longer squashes the toggle when the description text wraps to multiple lines. Adds row gap and prevents the toggle button from being shrunk under flex layout. Affects every toggle on every settings tab.
+- Settings: a failed save now shows the backend error detail in the toast description instead of silently displaying only "Failed to save settings", matching the error-surfacing pattern used elsewhere in the app.
+
 ## [1.1.0] - 2026-05-09
 
 ### Added

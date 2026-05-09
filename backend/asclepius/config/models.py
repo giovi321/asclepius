@@ -100,6 +100,11 @@ class OidcConfig(BaseModel):
     viewer_roles: list[str] = []
     # Local role granted when sync is on and no mapping matches.
     default_role: str = "viewer"
+    # When true and ``enabled`` is true, the login page hides the
+    # username/password form and shows only the SSO button. UI-only:
+    # /api/auth/login stays functional as a break-glass path if the
+    # IDP is unreachable.
+    hide_password_login: bool = False
 
 
 class CredentialEntry(BaseModel):

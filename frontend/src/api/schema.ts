@@ -3493,6 +3493,8 @@ export interface components {
       oidc_viewer_roles?: string[] | null;
       /** Oidc Default Role */
       oidc_default_role?: string | null;
+      /** Oidc Hide Password Login */
+      oidc_hide_password_login?: boolean | null;
       /** Backup Enabled */
       backup_enabled?: boolean | null;
       /** Backup Include Database */

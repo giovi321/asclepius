@@ -104,6 +104,7 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "editor_roles": list(config.oidc.editor_roles),
             "viewer_roles": list(config.oidc.viewer_roles),
             "default_role": config.oidc.default_role,
+            "hide_password_login": config.oidc.hide_password_login,
         },
         "vault": {
             "root_path": config.vault.root_path,
@@ -162,6 +163,7 @@ class SettingsUpdate(BaseModel):
     oidc_editor_roles: list[str] | None = None
     oidc_viewer_roles: list[str] | None = None
     oidc_default_role: str | None = None
+    oidc_hide_password_login: bool | None = None
     # Backup scheduler
     backup_enabled: bool | None = None
     backup_include_database: bool | None = None
@@ -260,6 +262,11 @@ _SETTINGS_MAP = {
     "oidc_editor_roles": ("oidc", "editor_roles", "oidc.editor_roles"),
     "oidc_viewer_roles": ("oidc", "viewer_roles", "oidc.viewer_roles"),
     "oidc_default_role": ("oidc", "default_role", "oidc.default_role"),
+    "oidc_hide_password_login": (
+        "oidc",
+        "hide_password_login",
+        "oidc.hide_password_login",
+    ),
     "backup_enabled": ("backup", "enabled", "backup.enabled"),
     "backup_include_database": ("backup", "include_database", "backup.include_database"),
     "backup_include_vault": ("backup", "include_vault", "backup.include_vault"),

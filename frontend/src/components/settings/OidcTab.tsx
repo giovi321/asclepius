@@ -44,6 +44,7 @@ export default function OidcTab() {
       oidc_editor_roles: (settingsData.oidc.editor_roles || []).join(", "),
       oidc_viewer_roles: (settingsData.oidc.viewer_roles || []).join(", "),
       oidc_default_role: settingsData.oidc.default_role || "viewer",
+      oidc_hide_password_login: !!settingsData.oidc.hide_password_login,
     });
   }, [settingsData]);
 
@@ -106,6 +107,10 @@ export default function OidcTab() {
             f.oidc_default_role !== (s.oidc.default_role || "")
               ? f.oidc_default_role
               : undefined,
+          oidc_hide_password_login:
+            f.oidc_hide_password_login !== !!s.oidc.hide_password_login
+              ? f.oidc_hide_password_login
+              : undefined,
         })
       }
     >
@@ -114,6 +119,12 @@ export default function OidcTab() {
         value={f.oidc_enabled}
         onChange={(v) => setF({ ...f, oidc_enabled: v })}
         description="Show 'Sign in with SSO' on the login page"
+      />
+      <ToggleField
+        label="Hide password login"
+        value={f.oidc_hide_password_login}
+        onChange={(v) => setF({ ...f, oidc_hide_password_login: v })}
+        description="When SSO is enabled, hide the username/password form on the login page. The login API stays available so an admin can still recover if the IDP is down."
       />
       <TextField
         label="Provider URL"

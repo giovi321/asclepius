@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
@@ -91,6 +92,20 @@ def _get_oidc_client() -> AsyncOAuth2Client:
     )
 
 
+async def _fetch_oidc_metadata(provider_url: str) -> dict:
+    """Fetch the provider's OIDC discovery document.
+
+    authlib's AsyncOAuth2Client has no built-in discovery helper, so we
+    fetch /.well-known/openid-configuration directly. Re-fetched per
+    request: discovery responses are tiny and the IDP caches them.
+    """
+    discovery_url = provider_url.rstrip("/") + DISCOVERY_PATH
+    async with httpx.AsyncClient(timeout=10.0) as http:
+        resp = await http.get(discovery_url)
+        resp.raise_for_status()
+        return resp.json()
+
+
 @router.get("/oidc/enabled")
 async def oidc_enabled():
     """Check if OIDC is configured and enabled."""
@@ -98,6 +113,9 @@ async def oidc_enabled():
     return {
         "enabled": config.oidc.enabled,
         "provider_url": config.oidc.provider_url if config.oidc.enabled else None,
+        # AND on the server so the flag can never hide the form when OIDC
+        # is off (otherwise a stale flag would lock everyone out).
+        "hide_password_login": config.oidc.enabled and config.oidc.hide_password_login,
     }
 
 
@@ -112,7 +130,7 @@ async def oidc_login(request: Request):
 
     # Discover OIDC endpoints
     provider_url = config.oidc.provider_url.rstrip("/")
-    metadata = await client.fetch_server_metadata(provider_url)
+    metadata = await _fetch_oidc_metadata(provider_url)
 
     # Build callback URL
     callback_url = str(request.url_for("oidc_callback"))
@@ -173,7 +191,7 @@ async def oidc_callback(
 
     # Discover endpoints
     provider_url = config.oidc.provider_url.rstrip("/")
-    metadata = await client.fetch_server_metadata(provider_url)
+    metadata = await _fetch_oidc_metadata(provider_url)
 
     # Exchange code for token — authlib populates the client credentials
     # into its session, so we do not need to retain the token ourselves.

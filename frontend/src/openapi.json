@@ -9471,6 +9471,17 @@
             ],
             "title": "Oidc Default Role"
           },
+          "oidc_hide_password_login": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Hide Password Login"
+          },
           "backup_enabled": {
             "anyOf": [
               {

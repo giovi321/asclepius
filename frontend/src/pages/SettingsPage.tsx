@@ -16,20 +16,30 @@ import LanguageTab from "@/components/settings/LanguageTab";
 import BackupTab from "@/components/settings/BackupTab";
 import LogsTab from "@/components/settings/LogsTab";
 import ViewColumnsTab from "@/components/settings/ViewColumnsTab";
+import { useAuth } from "@/contexts/AuthContext";
 
+// Tabs whose endpoints require admin role on the backend. Non-admins see
+// these gone from the tab bar entirely; if they hit one of these URLs
+// directly we fall back to the default visible tab.
 const TABS = [
-  { key: "analysis", label: "Document Analysis", icon: FileSearch },
-  { key: "pipeline", label: "Pipeline", icon: Workflow },
-  { key: "columns", label: "Table columns", icon: Columns3 },
-  { key: "language", label: "Language", icon: Languages },
-  { key: "access", label: "Access & Identity", icon: Shield },
-  { key: "backup", label: "Backup", icon: Download },
-  { key: "logs", label: "Logs", icon: ScrollText },
+  {
+    key: "analysis",
+    label: "Document Analysis",
+    icon: FileSearch,
+    adminOnly: true,
+  },
+  { key: "pipeline", label: "Pipeline", icon: Workflow, adminOnly: true },
+  { key: "columns", label: "Table columns", icon: Columns3, adminOnly: false },
+  { key: "language", label: "Language", icon: Languages, adminOnly: true },
+  { key: "access", label: "Access & Identity", icon: Shield, adminOnly: true },
+  { key: "backup", label: "Backup", icon: Download, adminOnly: true },
+  { key: "logs", label: "Logs", icon: ScrollText, adminOnly: true },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 const TAB_KEYS: readonly TabKey[] = TABS.map((t) => t.key);
-const DEFAULT_TAB: TabKey = "analysis";
+const ADMIN_DEFAULT_TAB: TabKey = "analysis";
+const NON_ADMIN_DEFAULT_TAB: TabKey = "columns";
 
 function isTabKey(v: string | undefined): v is TabKey {
   return !!v && (TAB_KEYS as readonly string[]).includes(v);
@@ -50,6 +60,8 @@ export default function SettingsPage() {
   // Normalization entity type) parse their own slot further down the pathname.
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const segments = location.pathname.split("/").filter(Boolean); // ['settings', tab?, subtab?, ...]
   const slug = segments[1];
@@ -60,7 +72,24 @@ export default function SettingsPage() {
     }
   }, [slug, navigate]);
 
-  const activeTab: TabKey = isTabKey(slug) ? slug : DEFAULT_TAB;
+  const visibleTabs = TABS.filter((t) => isAdmin || !t.adminOnly);
+  const defaultTab: TabKey = isAdmin
+    ? ADMIN_DEFAULT_TAB
+    : NON_ADMIN_DEFAULT_TAB;
+  const requestedTab: TabKey = isTabKey(slug) ? slug : defaultTab;
+  const requestedMeta = TABS.find((t) => t.key === requestedTab);
+  const allowed = !!requestedMeta && (isAdmin || !requestedMeta.adminOnly);
+  const activeTab: TabKey = allowed ? requestedTab : defaultTab;
+
+  // If a non-admin lands on /settings/<admin-tab>, rewrite the URL so refresh
+  // and bookmarks resolve cleanly. Don't redirect during the auth-loading
+  // phase: user is still null then.
+  useEffect(() => {
+    if (!user) return;
+    if (slug && !LEGACY_TOP_REWRITES[slug] && !allowed) {
+      navigate(`/settings/${defaultTab}`, { replace: true });
+    }
+  }, [user, slug, allowed, defaultTab, navigate]);
 
   const setActiveTab = (key: TabKey) => {
     navigate(`/settings/${key}`, { replace: false });
@@ -69,7 +98,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <div className="flex border-b overflow-x-auto overflow-y-hidden">
-        {TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const Icon = t.icon;
           const isActive = activeTab === t.key;
           return (

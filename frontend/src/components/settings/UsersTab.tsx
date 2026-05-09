@@ -39,29 +39,53 @@ export default function UsersTab() {
   const [auditTotal, setAuditTotal] = useState(0);
   // User id whose access modal is currently open, null otherwise.
   const [accessForUser, setAccessForUser] = useState<number | null>(null);
+  // Set when /settings/users returns 403 so we can render an explainer
+  // instead of an empty table. SettingsPage already hides this whole tab
+  // from non-admins; this is defence-in-depth for direct URL access.
+  const [forbidden, setForbidden] = useState(false);
 
   const loadUsers = async () => {
-    const res = await api.get("/settings/users");
-    const list: any[] = res.data || [];
-    setUsers(list);
-    // Fetch every user's grants in parallel so the row chips and the modal
-    // open without additional round-trips.
-    const entries = await Promise.all(
-      list.map(async (u) => {
-        try {
-          const r = await api.get(`/settings/users/${u.id}/access`);
-          return [u.id, (r.data || []) as Grant[]] as const;
-        } catch {
-          return [u.id, [] as Grant[]] as const;
-        }
-      }),
-    );
-    setGrants(Object.fromEntries(entries));
+    try {
+      const res = await api.get("/settings/users");
+      const list: any[] = res.data || [];
+      setUsers(list);
+      // Fetch every user's grants in parallel so the row chips and the modal
+      // open without additional round-trips.
+      const entries = await Promise.all(
+        list.map(async (u) => {
+          try {
+            const r = await api.get(`/settings/users/${u.id}/access`);
+            return [u.id, (r.data || []) as Grant[]] as const;
+          } catch {
+            return [u.id, [] as Grant[]] as const;
+          }
+        }),
+      );
+      setGrants(Object.fromEntries(entries));
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        setForbidden(true);
+      }
+    }
   };
 
   useEffect(() => {
-    loadUsers().catch(() => {});
+    loadUsers();
   }, []);
+
+  if (forbidden) {
+    return (
+      <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">
+          Admin access required
+        </p>
+        <p>
+          Only administrators can list and manage users. Sign in as an admin (or
+          ask one to grant you the admin role) to use this page.
+        </p>
+      </div>
+    );
+  }
 
   const loadAuditLog = async () => {
     try {

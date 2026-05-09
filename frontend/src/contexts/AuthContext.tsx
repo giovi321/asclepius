@@ -5,6 +5,7 @@ interface User {
   id: number;
   username: string;
   display_name: string | null;
+  role: string;
   patients: { id: number; slug: string; display_name: string; role: string }[];
 }
 

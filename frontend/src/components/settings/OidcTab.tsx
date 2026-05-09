@@ -154,7 +154,7 @@ export default function OidcTab() {
         label="Auto-create Users"
         value={f.oidc_auto_create_user}
         onChange={(v) => setF({ ...f, oidc_auto_create_user: v })}
-        description="Create a local user on first OIDC login"
+        description="Create a local user on first OIDC login. Auto-created users start with the 'editor' role unless 'Sync roles on login' below maps them to admin. Promote them via the Users tab if needed."
       />
       <TextField
         label="Username Claim"

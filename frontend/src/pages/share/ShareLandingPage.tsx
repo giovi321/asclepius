@@ -7,7 +7,6 @@ import ShareLogo from "@/components/share/ShareLogo";
 
 type DeliveryInfo = {
   delivery: "manual" | "email";
-  to_masked: string | null;
 };
 
 /**
@@ -17,8 +16,10 @@ type DeliveryInfo = {
  * share delivers its OTP via email or asks the admin to convey it
  * manually — the copy on the page and the post-submit redirect both
  * adapt to that. The endpoint returns the same shape for an invalid
- * token as for a valid manual share, so this fetch does not leak
- * token validity beyond "this is an email share for ***@example.com".
+ * token as for a valid manual share, so this fetch only reveals that
+ * the share is email-delivery vs not. The recipient address is never
+ * surfaced — neither here nor in the endpoint response — so a shoulder-
+ * surfer cannot learn the doctor's mailbox from the landing page.
  *
  * Clicking "Request access code" calls request-otp. For email shares
  * the server dispatches an SMTP message synchronously; a 502 here
@@ -44,7 +45,7 @@ export default function ShareLandingPage() {
       .catch(() => {
         // Network glitch — fall back to neutral copy. The verify step
         // will still work either way.
-        if (!cancelled) setInfo({ delivery: "manual", to_masked: null });
+        if (!cancelled) setInfo({ delivery: "manual" });
       });
     return () => {
       cancelled = true;
@@ -81,15 +82,16 @@ export default function ShareLandingPage() {
   };
 
   // Copy varies by delivery method. While ``info`` is loading we show
-  // a neutral string so the page is never blank.
+  // a neutral string so the page is never blank. The recipient address
+  // is intentionally NOT shown — the doctor knows where their mailbox
+  // is, and printing it on the landing page would let a shoulder-surfer
+  // or anyone who opens the URL on a shared computer learn it.
   let bodyCopy: string;
   if (info?.delivery === "email") {
-    const where = info.to_masked
-      ? `the inbox at ${info.to_masked}`
-      : "the mailbox the practice has on file for you";
     bodyCopy =
-      `You have been invited to view a curated set of medical documents. ` +
-      `Click below to send a 6-digit access code to ${where}.`;
+      "You have been invited to view a curated set of medical documents. " +
+      "Click below and we will email you a 6-digit access code at the " +
+      "address your contact has on file for you.";
   } else {
     bodyCopy =
       "You have been invited to view a curated set of medical documents. " +

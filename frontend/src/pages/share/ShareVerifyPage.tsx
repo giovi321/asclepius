@@ -7,7 +7,6 @@ import ShareLogo from "@/components/share/ShareLogo";
 
 type DeliveryInfo = {
   delivery: "manual" | "email";
-  to_masked: string | null;
 };
 
 /**
@@ -39,7 +38,7 @@ export default function ShareVerifyPage() {
       })
       .catch(() => {
         // Same fallback as the landing page — neutral copy.
-        if (!cancelled) setInfo({ delivery: "manual", to_masked: null });
+        if (!cancelled) setInfo({ delivery: "manual" });
       });
     return () => {
       cancelled = true;
@@ -94,23 +93,9 @@ export default function ShareVerifyPage() {
           <h1 className="text-lg font-semibold">Enter your access code</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          {info?.delivery === "email" ? (
-            <>
-              Check{" "}
-              {info.to_masked ? (
-                <span className="font-mono">{info.to_masked}</span>
-              ) : (
-                "your inbox"
-              )}{" "}
-              for the 6-digit code we just sent. The code is valid for a limited
-              time and can only be used once.
-            </>
-          ) : (
-            <>
-              Enter the 6-digit code provided to you. The code is valid for a
-              limited time and can only be used once.
-            </>
-          )}
+          {info?.delivery === "email"
+            ? "Check your inbox for the 6-digit code we just sent. The code is valid for a limited time and can only be used once."
+            : "Enter the 6-digit code provided to you. The code is valid for a limited time and can only be used once."}
         </p>
         <form onSubmit={onSubmit} className="space-y-3">
           <input

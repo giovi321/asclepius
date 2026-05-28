@@ -64,32 +64,28 @@ async def share_info(
 ):
     """Public, unauthenticated metadata about a share token.
 
-    Returns the OTP delivery method and (for email shares) a masked
-    recipient address so the doctor's landing / verify pages can show
-    the right copy ("Check the inbox at j***@example.com" vs "Ask your
-    contact for the code") without the doctor having to click Request
-    first.
+    Returns only the OTP delivery method (``"manual"`` or ``"email"``)
+    so the doctor's landing / verify pages can show the right copy
+    ("we will email you a code" vs "your contact will tell you the
+    code") without the doctor having to click Request first.
+
+    Deliberately does NOT return the recipient address — not even a
+    masked form. A leaked share URL must not let a visitor learn the
+    recipient's email domain or local-part hint.
 
     Constant-shape guard: an invalid or revoked token returns the same
-    payload as a valid *manual* share — ``{"delivery": "manual",
-    "to_masked": null}``. So the only thing this endpoint reveals about
-    token validity is "the token resolves to an email share" vs "not".
-    A leaked URL was the credential anyway, so this is not a meaningful
-    additional disclosure; the win is that the doctor's UI never bluffs
-    about how the code will arrive.
+    payload as a valid *manual* share — ``{"delivery": "manual"}``. So
+    the only thing this endpoint reveals about token validity is "the
+    token resolves to an email share" vs "not". A leaked URL was the
+    credential anyway, so this is not a meaningful additional
+    disclosure; the win is that the doctor's UI never bluffs about
+    how the code will arrive.
     """
     share = await share_service.get_share_by_token(db, token)
     if not share or not share_service.is_share_active(share):
-        return {"delivery": "manual", "to_masked": None}
+        return {"delivery": "manual"}
     delivery = share.get("otp_delivery") or "manual"
-    to_masked: str | None = None
-    if delivery == "email":
-        contact = share.get("recipient_contact") or ""
-        if "@" in contact:
-            local, domain = contact.split("@", 1)
-            if local:
-                to_masked = f"{local[0]}***@{domain}"
-    return {"delivery": delivery, "to_masked": to_masked}
+    return {"delivery": delivery}
 
 
 @router.post("/{token}/request-otp", status_code=204)

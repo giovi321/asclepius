@@ -57,6 +57,41 @@ class VerifyOtpRequest(BaseModel):
     code: str = Field(min_length=4, max_length=12)
 
 
+@router.get("/{token}/info")
+async def share_info(
+    token: str,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Public, unauthenticated metadata about a share token.
+
+    Returns the OTP delivery method and (for email shares) a masked
+    recipient address so the doctor's landing / verify pages can show
+    the right copy ("Check the inbox at j***@example.com" vs "Ask your
+    contact for the code") without the doctor having to click Request
+    first.
+
+    Constant-shape guard: an invalid or revoked token returns the same
+    payload as a valid *manual* share — ``{"delivery": "manual",
+    "to_masked": null}``. So the only thing this endpoint reveals about
+    token validity is "the token resolves to an email share" vs "not".
+    A leaked URL was the credential anyway, so this is not a meaningful
+    additional disclosure; the win is that the doctor's UI never bluffs
+    about how the code will arrive.
+    """
+    share = await share_service.get_share_by_token(db, token)
+    if not share or not share_service.is_share_active(share):
+        return {"delivery": "manual", "to_masked": None}
+    delivery = share.get("otp_delivery") or "manual"
+    to_masked: str | None = None
+    if delivery == "email":
+        contact = share.get("recipient_contact") or ""
+        if "@" in contact:
+            local, domain = contact.split("@", 1)
+            if local:
+                to_masked = f"{local[0]}***@{domain}"
+    return {"delivery": delivery, "to_masked": to_masked}
+
+
 @router.post("/{token}/request-otp", status_code=204)
 async def request_otp(
     token: str,

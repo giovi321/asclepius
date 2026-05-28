@@ -1,9 +1,14 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { KeyRound, Loader2 } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareLogo from "@/components/share/ShareLogo";
+
+type DeliveryInfo = {
+  delivery: "manual" | "email";
+  to_masked: string | null;
+};
 
 /**
  * OTP verification step.
@@ -22,6 +27,24 @@ export default function ShareVerifyPage() {
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<DeliveryInfo | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    shareApi
+      .get<DeliveryInfo>(`/${token}/info`)
+      .then((res) => {
+        if (!cancelled) setInfo(res.data);
+      })
+      .catch(() => {
+        // Same fallback as the landing page — neutral copy.
+        if (!cancelled) setInfo({ delivery: "manual", to_masked: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -71,8 +94,23 @@ export default function ShareVerifyPage() {
           <h1 className="text-lg font-semibold">Enter your access code</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Enter the 6-digit code provided to you. The code is valid for a
-          limited time and can only be used once.
+          {info?.delivery === "email" ? (
+            <>
+              Check{" "}
+              {info.to_masked ? (
+                <span className="font-mono">{info.to_masked}</span>
+              ) : (
+                "your inbox"
+              )}{" "}
+              for the 6-digit code we just sent. The code is valid for a limited
+              time and can only be used once.
+            </>
+          ) : (
+            <>
+              Enter the 6-digit code provided to you. The code is valid for a
+              limited time and can only be used once.
+            </>
+          )}
         </p>
         <form onSubmit={onSubmit} className="space-y-3">
           <input

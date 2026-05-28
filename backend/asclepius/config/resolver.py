@@ -3,6 +3,7 @@
 import logging
 import os
 import secrets as _secrets
+import time
 import uuid as _uuid
 from functools import lru_cache
 from pathlib import Path
@@ -585,16 +586,82 @@ def _validate_production_config(config: AppConfig) -> None:
 
 
 @lru_cache
-def get_config() -> AppConfig:
-    """Get cached application configuration.
-
-    Validates the production configuration on first access; a misconfigured
-    production deployment will fail fast here instead of silently signing
-    cookies with a well-known key.
-    """
+def _load_cached_config() -> AppConfig:
+    """Inner cached loader; ``get_config`` calls this after the
+    mtime-throttled freshness check decides whether the cache is valid."""
     config = load_config()
     _validate_production_config(config)
     return config
+
+
+# Cross-container hot-reload state.
+#
+# The doctor-share architecture runs the same image as two processes —
+# the admin/core container handles settings PATCH (mutates its own
+# in-memory config and writes settings.yaml), and the share container
+# serves the public surface. Without a reload, the share container's
+# ``lru_cache``'d config stays frozen at startup, so an SMTP setting
+# enabled in the UI never reaches it and email-OTP request-otp calls
+# return 502 ("SMTP is disabled").
+#
+# Fix: track the YAML's mtime and, when ``get_config`` is called more
+# than ``_RELOAD_CHECK_INTERVAL_S`` after the last check, ``stat`` the
+# file. If it has been modified since the last load, clear the cache so
+# the next call rebuilds from disk. Throttling keeps the cost down on
+# the hot path (one ``stat`` per 5 s per process at worst).
+_RELOAD_CHECK_INTERVAL_S: float = 5.0
+_last_check_at: float = 0.0
+_known_mtime: float | None = None
+
+
+def _config_path() -> Path:
+    return Path(os.environ.get("ASCLEPIUS_CONFIG_PATH", "config/settings.yaml"))
+
+
+def get_config() -> AppConfig:
+    """Get the cached application config, auto-reloading when the YAML
+    on disk changes.
+
+    The auto-reload exists for the split-mode deployment where the
+    share container does not handle settings PATCH itself — without it,
+    the share container would serve stale SMTP / share configuration
+    until it was restarted.
+
+    The mtime check is throttled to once per
+    ``_RELOAD_CHECK_INTERVAL_S``; in steady state this is one ``stat``
+    call per 5 s per process. PATCH-in-process callers see no change
+    in behaviour: the handler mutates the in-memory config in place
+    BEFORE writing the YAML, so even when the subsequent reload re-
+    reads the file the values are identical.
+    """
+    global _last_check_at, _known_mtime
+    now = time.monotonic()
+    if now - _last_check_at >= _RELOAD_CHECK_INTERVAL_S:
+        _last_check_at = now
+        try:
+            mtime = _config_path().stat().st_mtime
+        except OSError:
+            mtime = None
+        if mtime is not None:
+            if _known_mtime is None:
+                _known_mtime = mtime
+            elif mtime > _known_mtime:
+                _load_cached_config.cache_clear()
+                _known_mtime = mtime
+    return _load_cached_config()
+
+
+# Preserve the original ``get_config.cache_clear()`` surface that tests
+# (and the rare reset-cache callsite) rely on. Resetting the mtime
+# bookkeeping at the same time guarantees the next call rebuilds.
+def _reset_config_cache() -> None:
+    global _last_check_at, _known_mtime
+    _load_cached_config.cache_clear()
+    _last_check_at = 0.0
+    _known_mtime = None
+
+
+get_config.cache_clear = _reset_config_cache  # type: ignore[attr-defined]
 
 
 def generate_secret_key() -> str:

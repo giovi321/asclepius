@@ -554,7 +554,8 @@ def test_smtp_disabled_blocks_email_share_creation(share_app, monkeypatch):
 
 
 def test_info_endpoint_manual_share(share_app, monkeypatch):
-    """/info on a manual share returns delivery=manual, to_masked=null."""
+    """/info on a manual share returns just delivery=manual — no
+    recipient information of any kind."""
     from fastapi.testclient import TestClient
 
     app, vault, db_path = share_app
@@ -565,11 +566,13 @@ def test_info_endpoint_manual_share(share_app, monkeypatch):
 
         r = client.get(f"/api/share/{token}/info")
         assert r.status_code == 200
-        assert r.json() == {"delivery": "manual", "to_masked": None}
+        assert r.json() == {"delivery": "manual"}
 
 
-def test_info_endpoint_email_share_returns_masked_address(share_app, monkeypatch):
-    """/info on an email share returns delivery=email + masked recipient."""
+def test_info_endpoint_email_share_does_not_leak_recipient(share_app, monkeypatch):
+    """/info on an email share returns the delivery method ONLY — the
+    recipient address (even masked) must never leave the server via
+    this unauthenticated endpoint."""
     from fastapi.testclient import TestClient
 
     app, vault, db_path = share_app
@@ -581,7 +584,13 @@ def test_info_endpoint_email_share_returns_masked_address(share_app, monkeypatch
 
         r = client.get(f"/api/share/{token}/info")
         assert r.status_code == 200
-        assert r.json() == {"delivery": "email", "to_masked": "d***@example.com"}
+        payload = r.json()
+        assert payload == {"delivery": "email"}
+        # Belt-and-braces — no key anywhere in the payload (or in any
+        # nested string) should leak the recipient.
+        serialised = r.text
+        assert "doc@example.com" not in serialised
+        assert "@example.com" not in serialised
 
 
 def test_info_endpoint_invalid_token_lies_as_manual(share_app, monkeypatch):
@@ -595,7 +604,7 @@ def test_info_endpoint_invalid_token_lies_as_manual(share_app, monkeypatch):
         _seed_minimal(db_path, vault)
         r = client.get("/api/share/this-token-does-not-exist/info")
         assert r.status_code == 200
-        assert r.json() == {"delivery": "manual", "to_masked": None}
+        assert r.json() == {"delivery": "manual"}
 
 
 def test_email_share_rejects_non_email_contact(share_app, monkeypatch):

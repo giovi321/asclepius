@@ -3,7 +3,7 @@
   "info": {
     "title": "Asclepius",
     "description": "Self-hosted medical records manager",
-    "version": "1.2.2"
+    "version": "1.2.3"
   },
   "paths": {
     "/health": {
@@ -26,7 +26,7 @@
       "get": {
         "tags": ["share-public"],
         "summary": "Share Info",
-        "description": "Public, unauthenticated metadata about a share token.\n\nReturns the OTP delivery method and (for email shares) a masked\nrecipient address so the doctor's landing / verify pages can show\nthe right copy (\"Check the inbox at j***@example.com\" vs \"Ask your\ncontact for the code\") without the doctor having to click Request\nfirst.\n\nConstant-shape guard: an invalid or revoked token returns the same\npayload as a valid *manual* share \u2014 ``{\"delivery\": \"manual\",\n\"to_masked\": null}``. So the only thing this endpoint reveals about\ntoken validity is \"the token resolves to an email share\" vs \"not\".\nA leaked URL was the credential anyway, so this is not a meaningful\nadditional disclosure; the win is that the doctor's UI never bluffs\nabout how the code will arrive.",
+        "description": "Public, unauthenticated metadata about a share token.\n\nReturns only the OTP delivery method (``\"manual\"`` or ``\"email\"``)\nso the doctor's landing / verify pages can show the right copy\n(\"we will email you a code\" vs \"your contact will tell you the\ncode\") without the doctor having to click Request first.\n\nDeliberately does NOT return the recipient address \u2014 not even a\nmasked form. A leaked share URL must not let a visitor learn the\nrecipient's email domain or local-part hint.\n\nConstant-shape guard: an invalid or revoked token returns the same\npayload as a valid *manual* share \u2014 ``{\"delivery\": \"manual\"}``. So\nthe only thing this endpoint reveals about token validity is \"the\ntoken resolves to an email share\" vs \"not\". A leaked URL was the\ncredential anyway, so this is not a meaningful additional\ndisclosure; the win is that the doctor's UI never bluffs about\nhow the code will arrive.",
         "operationId": "share_info_api_share__token__info_get",
         "parameters": [
           {

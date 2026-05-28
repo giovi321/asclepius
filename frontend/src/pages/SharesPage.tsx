@@ -32,6 +32,10 @@ interface ShareSummary {
   recipient_label: string;
   recipient_contact: string;
   contact_kind: string;
+  /** "manual" (legacy default) or "email". Email shares hide the
+   * Show-active-code button because the OTP plaintext is never
+   * persisted — there is nothing to show. */
+  otp_delivery?: string;
   expires_at: string;
   revoked_at: string | null;
   created_at: string;
@@ -463,7 +467,22 @@ export default function SharesPage() {
                           : "never"}
                       </td>
                       <td className="px-3 py-2 align-top">
-                        {!isRevoked && !isExpired ? (
+                        {isRevoked || isExpired ? (
+                          <span className="text-xs text-muted-foreground italic">
+                            n/a
+                          </span>
+                        ) : s.otp_delivery === "email" ? (
+                          // The OTP plaintext is never persisted for
+                          // email shares — the admin cannot read it
+                          // back. Showing the Show button would just
+                          // dead-end on an empty `active_otp`.
+                          <span className="text-xs text-muted-foreground italic whitespace-normal">
+                            Emailed to{" "}
+                            <span className="font-mono not-italic">
+                              {s.recipient_contact}
+                            </span>
+                          </span>
+                        ) : (
                           <OtpCell
                             visible={!!otpVisible[s.id]}
                             loading={!!otpLoading[s.id]}
@@ -474,10 +493,6 @@ export default function SharesPage() {
                             }
                             onRefresh={() => onShowOtp(s.id)}
                           />
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">
-                            n/a
-                          </span>
                         )}
                       </td>
                       <td className="px-3 py-2 align-top whitespace-nowrap">
@@ -923,8 +938,12 @@ function AuditPanel({
 function ActionLabel({ action }: { action: string }) {
   const map: Record<string, string> = {
     otp_request: "OTP requested",
+    otp_email_sent: "OTP emailed",
+    otp_email_failed: "Email delivery failed",
+    otp_email_rate_limited: "Email rate-limited",
     otp_verify_ok: "OTP verified",
     otp_verify_fail: "OTP failed",
+    "share.locked": "Share locked (3-strike)",
     view_doc: "Viewed document",
     view_file: "Viewed file",
     translate: "Translated",
@@ -932,13 +951,19 @@ function ActionLabel({ action }: { action: string }) {
     session_expired: "Session expired",
   };
   const tone =
-    action === "otp_verify_fail"
+    action === "otp_verify_fail" ||
+    action === "otp_email_failed" ||
+    action === "share.locked"
       ? "text-red-600 dark:text-red-400"
-      : action === "view_file" || action === "view_doc"
-        ? "text-emerald-700 dark:text-emerald-400"
-        : action === "translate"
-          ? "text-blue-700 dark:text-blue-400"
-          : "text-foreground";
+      : action === "otp_email_sent"
+        ? "text-blue-700 dark:text-blue-400"
+        : action === "otp_email_rate_limited"
+          ? "text-amber-600 dark:text-amber-400"
+          : action === "view_file" || action === "view_doc"
+            ? "text-emerald-700 dark:text-emerald-400"
+            : action === "translate"
+              ? "text-blue-700 dark:text-blue-400"
+              : "text-foreground";
   return (
     <span className={`inline-flex items-center gap-1 ${tone}`}>
       <Activity className="h-3 w-3" /> {map[action] || action}

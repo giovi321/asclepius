@@ -266,7 +266,7 @@ async def run_current_job(config: AppConfig) -> Path:
 def _next_due(config: AppConfig) -> float:
     last = last_backup_time(config)
     if last is None:
-        return time.time()
+        return 0.0
     return last + _interval_seconds(config.backup.schedule)
 
 
@@ -284,21 +284,27 @@ async def start_backup_scheduler(config: AppConfig, app_state) -> None:
     )
     try:
         while True:
-            if not config.backup.enabled or compute_kind(config) is None:
-                await asyncio.sleep(3600)
-                continue
+            try:
+                if not config.backup.enabled or compute_kind(config) is None:
+                    await asyncio.sleep(3600)
+                    continue
 
-            now = time.time()
-            due = _next_due(config)
-            if due <= now:
-                try:
-                    await run_current_job(config)
-                except Exception:
-                    logger.exception("Backup job failed")
-                due = time.time() + _interval_seconds(config.backup.schedule)
+                now = time.time()
+                due = _next_due(config)
+                if due <= now:
+                    try:
+                        await run_current_job(config)
+                    except Exception:
+                        logger.exception("Backup job failed")
+                    due = time.time() + _interval_seconds(config.backup.schedule)
 
-            sleep_for = max(5.0, min(3600.0, due - time.time()))
-            await asyncio.sleep(sleep_for)
+                sleep_for = max(5.0, min(3600.0, due - time.time()))
+                await asyncio.sleep(sleep_for)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Backup scheduler iteration failed; retrying in 60s")
+                await asyncio.sleep(60)
     except asyncio.CancelledError:
         logger.info("Backup scheduler stopped")
         raise

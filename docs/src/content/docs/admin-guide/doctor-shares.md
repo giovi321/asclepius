@@ -43,7 +43,7 @@ The dialog returns a URL exactly once. Send that to the doctor however you like 
 
 A small copy button next to the code copies it to the clipboard.
 
-**Email shares.** The OTP is sent automatically to the recipient address when the doctor clicks "Request access code". The dashboard does **not** show the code for email shares — even an admin cannot read it back, because the plaintext is never written to the database. The share row instead displays "Code emailed to: doctor@example.com". You only ever send the share link; the code travels via email.
+**Email shares.** The OTP is sent automatically to the recipient address when the doctor clicks "Request access code". The dashboard does **not** show the code for email shares — even an admin cannot read it back, because the plaintext is never written to the database. The Active-code column on the Shares dashboard instead reads "Emailed to doctor@example.com" with no Show button. You only ever send the share link; the code travels via email.
 
 If SMTP delivery fails (server unreachable, rejected envelope, etc.) the doctor's UI surfaces a 502 with a "switch this share to manual delivery" hint, and an `otp_email_failed` row goes into the audit trail. Revoke and recreate the share as manual to recover.
 

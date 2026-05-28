@@ -234,3 +234,7 @@ In `settings.yaml` under `share:`:
 | `public_base_url` | `""` | Public origin pinned into every share link the admin copies. Override with env var `ASCLEPIUS_SHARE_PUBLIC_URL`. Set this when admin and doctor reach Asclepius on different hostnames; leave empty when they share one. |
 
 SMTP transport (host, port, credentials, TLS mode, from address) lives under a separate `smtp:` section — see [Configuration → SMTP](../../getting-started/configuration/#smtp). The Email tab in the admin UI edits both sections from one place.
+
+:::note[Cross-container settings sync]
+In the split-mode deployment (`asclepius-core` + `asclepius-share`), settings PATCH only mutates the core container's in-memory config. The share container picks up the new `settings.yaml` automatically — `get_config()` checks the file's mtime every ~5 s and reloads when it changes — so an SMTP setting enabled in the admin UI reaches the share container within seconds, no restart required. Long-lived background tasks already running in the share container (e.g. the in-process translate worker started at lifespan-time) still hold a reference to the pre-reload config object; if you change one of those settings (translation provider IDs, timeouts), restart the share container to be safe.
+:::

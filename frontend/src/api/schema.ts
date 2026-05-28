@@ -21,6 +21,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/share/{token}/info": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Info
+     * @description Public, unauthenticated metadata about a share token.
+     *
+     *     Returns the OTP delivery method and (for email shares) a masked
+     *     recipient address so the doctor's landing / verify pages can show
+     *     the right copy ("Check the inbox at j***@example.com" vs "Ask your
+     *     contact for the code") without the doctor having to click Request
+     *     first.
+     *
+     *     Constant-shape guard: an invalid or revoked token returns the same
+     *     payload as a valid *manual* share — ``{"delivery": "manual",
+     *     "to_masked": null}``. So the only thing this endpoint reveals about
+     *     token validity is "the token resolves to an email share" vs "not".
+     *     A leaked URL was the credential anyway, so this is not a meaningful
+     *     additional disclosure; the win is that the doctor's UI never bluffs
+     *     about how the code will arrive.
+     */
+    get: operations["share_info_api_share__token__info_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/share/{token}/request-otp": {
     parameters: {
       query?: never;
@@ -3759,6 +3793,37 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+    };
+  };
+  share_info_api_share__token__info_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

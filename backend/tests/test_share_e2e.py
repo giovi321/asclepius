@@ -553,6 +553,51 @@ def test_smtp_disabled_blocks_email_share_creation(share_app, monkeypatch):
         assert "SMTP" in res.json()["detail"]
 
 
+def test_info_endpoint_manual_share(share_app, monkeypatch):
+    """/info on a manual share returns delivery=manual, to_masked=null."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        res = _create_share(client, seed, otp_delivery="manual", contact="phone")
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+
+        r = client.get(f"/api/share/{token}/info")
+        assert r.status_code == 200
+        assert r.json() == {"delivery": "manual", "to_masked": None}
+
+
+def test_info_endpoint_email_share_returns_masked_address(share_app, monkeypatch):
+    """/info on an email share returns delivery=email + masked recipient."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        res = _create_share(client, seed, otp_delivery="email", contact="doc@example.com")
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+
+        r = client.get(f"/api/share/{token}/info")
+        assert r.status_code == 200
+        assert r.json() == {"delivery": "email", "to_masked": "d***@example.com"}
+
+
+def test_info_endpoint_invalid_token_lies_as_manual(share_app, monkeypatch):
+    """An invalid (or revoked) token returns the same shape as a valid
+    manual share so the only thing this endpoint reveals about token
+    validity is the email-or-not bit."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        _seed_minimal(db_path, vault)
+        r = client.get("/api/share/this-token-does-not-exist/info")
+        assert r.status_code == 200
+        assert r.json() == {"delivery": "manual", "to_masked": None}
+
+
 def test_email_share_rejects_non_email_contact(share_app, monkeypatch):
     """Email delivery + non-email contact → 400."""
     from fastapi.testclient import TestClient

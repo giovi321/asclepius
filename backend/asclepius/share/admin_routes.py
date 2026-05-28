@@ -10,7 +10,9 @@ this router and never reach the doctor's surface.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta
+from typing import Literal
 
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -22,6 +24,10 @@ from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.patients.service import check_patient_access
 from asclepius.share import service as share_service
+
+# Same shape as the regex in asclepius.email.sender — duplicated here to
+# avoid the admin route pulling in the email package at import time.
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +48,11 @@ class ShareCreateRequest(BaseModel):
     # parity with the admin-side translate flow.
     default_ocr_provider_id: str | None = None
     default_llm_provider_id: str | None = None
+    # 'manual' (legacy default): the OTP is shown to the admin in the
+    # dashboard and they convey it out-of-band. 'email': the OTP is
+    # sent automatically to ``recipient_contact``; requires SMTP to be
+    # enabled in settings and ``recipient_contact`` to be a valid email.
+    otp_delivery: Literal["manual", "email"] = "manual"
 
 
 class ShareCreateResponse(BaseModel):
@@ -124,6 +135,23 @@ async def create_share(
         )
 
     cfg = get_config()
+
+    # Email delivery requires SMTP to be configured and the recipient
+    # contact to actually look like an email. Fail fast at create time
+    # so the admin learns immediately instead of when the doctor first
+    # hits ``request-otp``.
+    if body.otp_delivery == "email":
+        if not cfg.smtp.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail="Email OTP delivery requires SMTP to be enabled in settings",
+            )
+        if not _EMAIL_RE.match(body.recipient_contact.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail="Recipient contact must be a valid email address for email delivery",
+            )
+
     expires_at = (datetime.utcnow() + timedelta(days=body.expires_in_days)).isoformat(
         timespec="seconds"
     )
@@ -138,6 +166,7 @@ async def create_share(
         created_by_user_id=current_user["id"],
         default_ocr_provider_id=body.default_ocr_provider_id,
         default_llm_provider_id=body.default_llm_provider_id,
+        otp_delivery=body.otp_delivery,
     )
 
     await audit_log(
@@ -151,6 +180,7 @@ async def create_share(
             "document_count": len(body.document_ids),
             "recipient_label": body.recipient_label,
             "expires_in_days": body.expires_in_days,
+            "otp_delivery": body.otp_delivery,
         },
         ip_address=get_client_ip(request),
     )
@@ -275,6 +305,12 @@ async def share_active_otp(
     if not share:
         raise HTTPException(status_code=404, detail="Share not found")
     await _require_admin_or_owner(db, current_user, share["patient_id"])
+    # Defense in depth: for email-delivery shares we never persist
+    # otp_clear, so this would return None anyway. Short-circuit so
+    # the API contract is explicit and a future bug that accidentally
+    # writes otp_clear for these shares still doesn't leak.
+    if share.get("otp_delivery") == "email":
+        return {"active_otp": None}
     return {"active_otp": await share_service.get_active_otp_clear(db, share_id)}
 
 

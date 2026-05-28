@@ -227,3 +227,341 @@ def _run_share_flow(client, seed):
     # Still 204 — we don't leak token validity. But the share is inert:
     # a verify call would 401.
     assert res.status_code == 204
+
+
+# ── Email-OTP delivery ───────────────────────────────────────────
+
+
+def _enable_smtp(monkeypatch):
+    """Flip SMTP on in the cached config so the public-share request-otp
+    endpoint takes the email branch and the admin share-create accepts
+    ``otp_delivery='email'``."""
+    from asclepius.config import get_config
+
+    cfg = get_config()
+    cfg.smtp.enabled = True
+    cfg.smtp.host = "smtp.test"
+    cfg.smtp.port = 587
+    cfg.smtp.from_address = "noreply@test"
+    cfg.smtp.use_starttls = True
+    cfg.smtp.use_tls = False
+
+
+def _patch_send(monkeypatch):
+    """Replace the network-touching ``send_otp_email`` with a capturing
+    stub. Returns the list it records into so the test can assert on
+    every call (one per request-otp)."""
+    calls: list[dict] = []
+
+    async def _capture(cfg, *, to, code, recipient_label, expires_minutes, share_label=""):
+        calls.append(
+            {
+                "to": to,
+                "code": code,
+                "recipient_label": recipient_label,
+                "expires_minutes": expires_minutes,
+            }
+        )
+
+    # Patch on the import site the route module pulled in.
+    monkeypatch.setattr(
+        "asclepius.share.public_routes.send_otp_email",
+        _capture,
+    )
+    return calls
+
+
+def _seed_minimal(db_path, vault):
+    """Cheap seed without the heavy PDF — most email tests don't need it."""
+    import sqlite3
+    import secrets
+    from datetime import datetime, timedelta
+
+    from itsdangerous import URLSafeTimedSerializer
+    from asclepius.auth.session import hash_password
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            "INSERT INTO users (username, password_hash, display_name, role) "
+            "VALUES (?, ?, ?, 'admin')",
+            ("admin", hash_password("x"), "Admin"),
+        )
+        admin_id = cur.lastrowid
+        cur = conn.execute(
+            "INSERT INTO patients (slug, display_name) VALUES (?, ?)",
+            ("p", "P"),
+        )
+        patient_id = cur.lastrowid
+        # Cheap stub PDF file — file_path can't be empty for the share docs.
+        pdf_path = vault / "patients" / "p" / "a.pdf"
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+        cur = conn.execute(
+            """INSERT INTO documents
+                  (patient_id, file_path, original_filename, doc_type,
+                   ocr_text, status, uploaded_by_user_id)
+               VALUES (?, ?, ?, 'lab_test', '', 'done', ?)""",
+            (patient_id, "patients/p/a.pdf", "a.pdf", admin_id),
+        )
+        doc_id = cur.lastrowid
+        sid = secrets.token_urlsafe(32)
+        conn.execute(
+            "INSERT INTO sessions (session_id, user_id, expires_at) VALUES (?, ?, ?)",
+            (sid, admin_id, (datetime.utcnow() + timedelta(hours=1)).isoformat(timespec="seconds")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    s = URLSafeTimedSerializer("x" * 64)
+    return {
+        "admin_cookie": s.dumps({"sid": sid}),
+        "patient_id": patient_id,
+        "doc_id": doc_id,
+    }
+
+
+def _create_share(client, seed, *, otp_delivery, contact):
+    cookies = {"asclepius_session": seed["admin_cookie"]}
+    csrf = {"X-Requested-With": "XMLHttpRequest"}
+    res = client.post(
+        "/api/shares",
+        json={
+            "patient_id": seed["patient_id"],
+            "document_ids": [seed["doc_id"]],
+            "recipient_label": "Dr. T",
+            "recipient_contact": contact,
+            "expires_in_days": 7,
+            "otp_delivery": otp_delivery,
+        },
+        cookies=cookies,
+        headers=csrf,
+    )
+    return res
+
+
+def test_email_delivery_calls_sender(share_app, monkeypatch):
+    """request-otp on an email share invokes send_otp_email with the
+    recipient stored on the share row (NOT a value from the request)."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        calls = _patch_send(monkeypatch)
+
+        res = _create_share(client, seed, otp_delivery="email", contact="doc@example.com")
+        assert res.status_code == 200, res.text
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+
+        res = client.post(
+            f"/api/share/{token}/request-otp",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert res.status_code == 204
+        assert len(calls) == 1
+        assert calls[0]["to"] == "doc@example.com"
+        assert len(calls[0]["code"]) == 6
+        assert calls[0]["recipient_label"] == "Dr. T"
+
+
+def test_email_share_admin_cannot_read_otp_clear(share_app, monkeypatch):
+    """The admin's /active-otp endpoint must return null for email shares
+    even after a successful request-otp — closes the rogue-admin hole."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        _patch_send(monkeypatch)
+
+        res = _create_share(client, seed, otp_delivery="email", contact="d@e.com")
+        share_id = res.json()["share_id"]
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+
+        client.post(
+            f"/api/share/{token}/request-otp",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        res = client.get(
+            f"/api/shares/{share_id}/active-otp",
+            cookies={"asclepius_session": seed["admin_cookie"]},
+        )
+        assert res.status_code == 200
+        assert res.json()["active_otp"] is None
+
+
+def test_three_failures_revoke_email_share(share_app, monkeypatch):
+    """3 consecutive verify-otp failures on an email share revoke it."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        _patch_send(monkeypatch)
+
+        res = _create_share(client, seed, otp_delivery="email", contact="d@e.com")
+        share_id = res.json()["share_id"]
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        # Request an OTP so there is a row to verify against.
+        client.post(f"/api/share/{token}/request-otp", headers=csrf)
+
+        # 3 wrong verifies → on the 3rd, the share is revoked.
+        for _ in range(3):
+            r = client.post(
+                f"/api/share/{token}/verify-otp",
+                json={"code": "000000"},
+                headers=csrf,
+            )
+            assert r.status_code == 401
+
+        # Verify share is now revoked in the DB.
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            row = conn.execute(
+                "SELECT revoked_at, consecutive_otp_failures FROM document_shares WHERE id = ?",
+                (share_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        assert row[0] is not None  # revoked_at set
+        assert row[1] >= 3
+
+
+def test_three_failures_revoke_manual_share(share_app, monkeypatch):
+    """Lockout applies to manual shares too — per product decision."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        # No SMTP needed — manual delivery.
+
+        res = _create_share(client, seed, otp_delivery="manual", contact="phone")
+        share_id = res.json()["share_id"]
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        client.post(f"/api/share/{token}/request-otp", headers=csrf)
+        for _ in range(3):
+            r = client.post(
+                f"/api/share/{token}/verify-otp",
+                json={"code": "999999"},
+                headers=csrf,
+            )
+            assert r.status_code == 401
+
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            row = conn.execute(
+                "SELECT revoked_at FROM document_shares WHERE id = ?",
+                (share_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        assert row[0] is not None
+
+
+def test_resend_cooldown_blocks_rapid_repeat(share_app, monkeypatch):
+    """Two request-otp calls inside the cooldown window → second is 429."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        _patch_send(monkeypatch)
+        # Stretch the cooldown so timing flakiness doesn't matter.
+        from asclepius.config import get_config
+
+        get_config().share.email_otp_resend_cooldown_seconds = 60
+
+        res = _create_share(client, seed, otp_delivery="email", contact="d@e.com")
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        r1 = client.post(f"/api/share/{token}/request-otp", headers=csrf)
+        assert r1.status_code == 204
+        r2 = client.post(f"/api/share/{token}/request-otp", headers=csrf)
+        assert r2.status_code == 429
+        assert "retry-after" in {k.lower() for k in r2.headers.keys()}
+
+
+def test_daily_email_cap_blocks_at_threshold(share_app, monkeypatch):
+    """When ``email_otp_daily_cap`` audit rows already exist for today,
+    the next request-otp is rejected before any code is generated."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+        _patch_send(monkeypatch)
+        # Lower the cap so we don't have to insert 20 rows.
+        from asclepius.config import get_config
+
+        get_config().share.email_otp_daily_cap = 2
+        # And drop the cooldown so it doesn't fire first.
+        get_config().share.email_otp_resend_cooldown_seconds = 0
+
+        res = _create_share(client, seed, otp_delivery="email", contact="d@e.com")
+        share_id = res.json()["share_id"]
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        # Pre-load audit rows simulating two prior sends.
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            for _ in range(2):
+                conn.execute(
+                    "INSERT INTO document_share_audit (share_id, action) VALUES (?, 'otp_email_sent')",
+                    (share_id,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+        r = client.post(f"/api/share/{token}/request-otp", headers=csrf)
+        assert r.status_code == 429
+
+
+def test_smtp_disabled_blocks_email_share_creation(share_app, monkeypatch):
+    """Picking otp_delivery='email' while SMTP is off → 400 at create time."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        # Make sure SMTP is OFF.
+        from asclepius.config import get_config
+
+        get_config().smtp.enabled = False
+
+        res = _create_share(client, seed, otp_delivery="email", contact="d@e.com")
+        assert res.status_code == 400
+        assert "SMTP" in res.json()["detail"]
+
+
+def test_email_share_rejects_non_email_contact(share_app, monkeypatch):
+    """Email delivery + non-email contact → 400."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed_minimal(db_path, vault)
+        _enable_smtp(monkeypatch)
+
+        res = _create_share(client, seed, otp_delivery="email", contact="not-an-email")
+        assert res.status_code == 400
+        assert "email" in res.json()["detail"].lower()

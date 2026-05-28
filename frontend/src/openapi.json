@@ -3,7 +3,7 @@
   "info": {
     "title": "Asclepius",
     "description": "Self-hosted medical records manager",
-    "version": "1.1.3"
+    "version": "1.2.0"
   },
   "paths": {
     "/health": {
@@ -5672,6 +5672,44 @@
         }
       }
     },
+    "/api/settings/smtp/test": {
+      "post": {
+        "tags": ["settings"],
+        "summary": "Smtp Test",
+        "description": "Send a fixed diagnostic message to ``body.to``.\n\nReturns ``{\"ok\": true}`` on success, or a 400/502 with a short\nerror description on failure. The SMTP server's raw response is\nnever returned \u2014 we only surface the underlying exception's class\nname so the admin learns the failure mode without giving an\nattacker a way to fingerprint internal infrastructure.",
+        "operationId": "smtp_test_api_settings_smtp_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmtpTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings/users": {
       "get": {
         "tags": ["settings"],
@@ -9547,6 +9585,171 @@
               }
             ],
             "title": "Backup Retention Value"
+          },
+          "smtp_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Enabled"
+          },
+          "smtp_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Host"
+          },
+          "smtp_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Port"
+          },
+          "smtp_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Username"
+          },
+          "smtp_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Password"
+          },
+          "smtp_use_tls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Use Tls"
+          },
+          "smtp_use_starttls": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Use Starttls"
+          },
+          "smtp_from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp From Address"
+          },
+          "smtp_from_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp From Name"
+          },
+          "smtp_timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smtp Timeout Seconds"
+          },
+          "share_email_otp_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Email Otp Subject"
+          },
+          "share_email_otp_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Email Otp Body"
+          },
+          "share_lockout_after_failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Lockout After Failed"
+          },
+          "share_email_otp_daily_cap": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Email Otp Daily Cap"
+          },
+          "share_email_otp_resend_cooldown_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Email Otp Resend Cooldown Seconds"
           }
         },
         "type": "object",
@@ -9662,6 +9865,12 @@
               }
             ],
             "title": "Default Llm Provider Id"
+          },
+          "otp_delivery": {
+            "type": "string",
+            "enum": ["manual", "email"],
+            "title": "Otp Delivery",
+            "default": "manual"
           }
         },
         "type": "object",
@@ -9767,6 +9976,19 @@
         },
         "type": "object",
         "title": "ShareTranslateRequest"
+      },
+      "SmtpTestRequest": {
+        "properties": {
+          "to": {
+            "type": "string",
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "To"
+          }
+        },
+        "type": "object",
+        "required": ["to"],
+        "title": "SmtpTestRequest"
       },
       "TestProviderRequest": {
         "properties": {

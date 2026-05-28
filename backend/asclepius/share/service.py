@@ -185,20 +185,30 @@ async def create_share(
     created_by_user_id: int,
     default_ocr_provider_id: str | None = None,
     default_llm_provider_id: str | None = None,
+    otp_delivery: str = "manual",
 ) -> tuple[int, str]:
     """Insert a share + its document membership rows. Returns (share_id, raw_token).
 
     The raw token is returned to the caller exactly once. Provider
     defaults are stored on the share row so doctor-side translate calls
     can use them without the doctor seeing a provider picker.
+
+    ``otp_delivery`` chooses how the doctor receives each OTP:
+    ``'manual'`` keeps the legacy admin-reads-it-back flow; ``'email'``
+    causes the public ``request-otp`` endpoint to send the code via SMTP
+    to ``recipient_contact`` and to NEVER persist the plaintext code on
+    the OTP row (so even a rogue admin cannot read it back).
     """
+    if otp_delivery not in ("manual", "email"):
+        raise ValueError(f"Invalid otp_delivery: {otp_delivery!r}")
     raw_token = generate_share_token()
     cursor = await db.execute(
         """INSERT INTO document_shares
               (token_hash, token_clear, patient_id, created_by_user_id,
                recipient_label, recipient_contact, contact_kind, expires_at,
-               default_ocr_provider_id, default_llm_provider_id)
-           VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?)""",
+               default_ocr_provider_id, default_llm_provider_id,
+               otp_delivery)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             hash_token(raw_token),
             raw_token,
@@ -206,9 +216,11 @@ async def create_share(
             created_by_user_id,
             recipient_label,
             recipient_contact,
+            otp_delivery,  # contact_kind mirrors delivery for backward compat
             expires_at_iso,
             default_ocr_provider_id or None,
             default_llm_provider_id or None,
+            otp_delivery,
         ),
     )
     share_id = cursor.lastrowid
@@ -242,18 +254,67 @@ async def revoke_share(db: aiosqlite.Connection, share_id: int) -> None:
 # ── OTP ──────────────────────────────────────────────────────────
 
 
+class OtpCooldownError(Exception):
+    """Raised by :func:`issue_otp` when an email-delivery share asks for
+    a new OTP before the configured cooldown has elapsed. Carries the
+    number of seconds the caller should wait before retrying so the
+    public endpoint can surface a useful ``Retry-After`` value."""
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(f"OTP resend cooldown active; retry in {retry_after_seconds}s")
+        self.retry_after_seconds = max(1, retry_after_seconds)
+
+
+async def _last_otp_age_seconds(db: aiosqlite.Connection, share_id: int) -> int | None:
+    """Seconds since the most recent (consumed or not) OTP for the share.
+
+    Returns ``None`` if no OTP has ever been issued. Used for the
+    email-resend cooldown check; we deliberately measure against any OTP
+    (not only unconsumed ones) so that a quick consume + re-request
+    cycle still respects the cooldown.
+    """
+    cursor = await db.execute(
+        """SELECT CAST((julianday('now') - julianday(created_at)) * 86400 AS INTEGER)
+             FROM document_share_otps
+            WHERE share_id = ?
+            ORDER BY id DESC LIMIT 1""",
+        (share_id,),
+    )
+    row = await cursor.fetchone()
+    if not row or row[0] is None:
+        return None
+    return int(row[0])
+
+
 async def issue_otp(
     db: aiosqlite.Connection,
     *,
     share_id: int,
     ttl_minutes: int,
+    delivery: str = "manual",
+    cooldown_seconds: int = 0,
 ) -> str:
     """Generate, store, and return a fresh OTP code.
 
     Older unconsumed codes for this share are invalidated so only one
     pending code is ever live — prevents accidental verification of a
     code the admin already discarded.
+
+    When ``delivery == 'email'`` the plaintext code is NOT persisted in
+    ``otp_clear`` — the doctor receives it by mail and the admin's
+    read-back path (``/active-otp``) returns ``None``. Closes the
+    "rogue admin reads the OTP they just emailed" hole.
+
+    When ``cooldown_seconds > 0`` and the previous OTP for this share
+    is younger than that threshold, raises :class:`OtpCooldownError`.
+    The check is skipped for ``cooldown_seconds == 0`` (current default
+    for the manual flow, which has its own per-IP rate limit upstream).
     """
+    if cooldown_seconds > 0:
+        last_age = await _last_otp_age_seconds(db, share_id)
+        if last_age is not None and last_age < cooldown_seconds:
+            raise OtpCooldownError(cooldown_seconds - last_age)
+
     await db.execute(
         """UPDATE document_share_otps
               SET consumed_at = CURRENT_TIMESTAMP, otp_clear = NULL
@@ -261,14 +322,69 @@ async def issue_otp(
         (share_id,),
     )
     code = generate_otp_code()
+    stored_clear: str | None = None if delivery == "email" else code
     await db.execute(
         """INSERT INTO document_share_otps
               (share_id, otp_hash, otp_clear, expires_at)
            VALUES (?, ?, ?, ?)""",
-        (share_id, hash_token(code), code, in_minutes(ttl_minutes)),
+        (share_id, hash_token(code), stored_clear, in_minutes(ttl_minutes)),
     )
     await db.commit()
     return code
+
+
+# ── Share-level consecutive-failure lockout ──────────────────────
+
+
+async def bump_consecutive_failures(db: aiosqlite.Connection, share_id: int) -> int:
+    """Increment the per-share failure counter and return the new value.
+
+    Used by the verify-OTP path to drive the share-level lockout: when
+    the counter hits ``share.share_lockout_after_failed`` the caller
+    revokes the share.
+    """
+    await db.execute(
+        """UPDATE document_shares
+              SET consecutive_otp_failures = COALESCE(consecutive_otp_failures, 0) + 1
+            WHERE id = ?""",
+        (share_id,),
+    )
+    await db.commit()
+    cursor = await db.execute(
+        "SELECT consecutive_otp_failures FROM document_shares WHERE id = ?",
+        (share_id,),
+    )
+    row = await cursor.fetchone()
+    return int((row[0] if row and row[0] is not None else 0))
+
+
+async def reset_consecutive_failures(db: aiosqlite.Connection, share_id: int) -> None:
+    """Zero the per-share failure counter — call on successful verify."""
+    await db.execute(
+        """UPDATE document_shares
+              SET consecutive_otp_failures = 0
+            WHERE id = ? AND consecutive_otp_failures != 0""",
+        (share_id,),
+    )
+    await db.commit()
+
+
+async def count_email_otps_today(db: aiosqlite.Connection, share_id: int) -> int:
+    """Count ``otp_email_sent`` audit rows for this share in the last 24 h.
+
+    Used to enforce ``share.email_otp_daily_cap``. SQLite's
+    ``datetime('now','-1 day')`` and ``document_share_audit.created_at``
+    are both in UTC, so no timezone gymnastics are needed.
+    """
+    cursor = await db.execute(
+        """SELECT COUNT(*) FROM document_share_audit
+            WHERE share_id = ?
+              AND action = 'otp_email_sent'
+              AND created_at >= datetime('now', '-1 day')""",
+        (share_id,),
+    )
+    row = await cursor.fetchone()
+    return int(row[0] if row and row[0] is not None else 0)
 
 
 async def verify_otp(
@@ -692,7 +808,8 @@ async def list_audit(db: aiosqlite.Connection, share_id: int, limit: int = 200) 
 # difference between a snappy dashboard and a multi-second wait.
 _SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.token_clear,
                           sh.recipient_label, sh.recipient_contact,
-                          sh.contact_kind, sh.expires_at, sh.revoked_at, sh.created_at,
+                          sh.contact_kind, sh.otp_delivery,
+                          sh.expires_at, sh.revoked_at, sh.created_at,
                           sh.default_ocr_provider_id, sh.default_llm_provider_id,
                           u.username AS created_by_username,
                           p.display_name AS patient_name,

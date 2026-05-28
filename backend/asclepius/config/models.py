@@ -360,6 +360,63 @@ class ShareConfig(BaseModel):
     # Empty string keeps the legacy behaviour: derive origin from the
     # admin's request.
     public_base_url: str = ""
+    # ── Email-OTP delivery (used when a share is created with
+    # ``otp_delivery='email'``). The 30 s resend cooldown and the daily
+    # cap layer on top of the per-IP / per-token hourly rate limit in
+    # ``share/rate_limit.py``; without these, a leaked share URL could
+    # be used to flood the doctor's inbox even though the OTP itself
+    # cannot be brute-forced thanks to ``otp_max_attempts`` +
+    # ``share_lockout_after_failed``.
+    email_otp_subject: str = "Your access code for medical records"
+    email_otp_body: str = (
+        "Hello {recipient_label},\n\n"
+        "Your one-time access code is: {code}\n\n"
+        "This code expires in {expires_minutes} minutes. Enter it on the page\n"
+        "your contact at {from_name} shared with you.\n\n"
+        "If you did not expect this email, ignore it — the code is useless\n"
+        "without the accompanying link.\n"
+    )
+    # Share is revoked after this many consecutive OTP verify failures.
+    # Applies to BOTH manual and email delivery (per product decision)
+    # so a brute-force attempt over the wire kills the share regardless
+    # of how the code was conveyed.
+    share_lockout_after_failed: int = 3
+    # Hard cap on email-OTP requests per share per rolling 24 h. Cheap
+    # SQL-counted: looks at ``document_share_audit`` for the
+    # ``otp_email_sent`` rows tied to the share. Default 20 is well
+    # above any sane real-world flow.
+    email_otp_daily_cap: int = 20
+    # Minimum seconds between two ``request-otp`` calls for the same
+    # share when ``otp_delivery='email'``. Stacks on top of the existing
+    # hourly per-token cap.
+    email_otp_resend_cooldown_seconds: int = 30
+
+
+class SmtpConfig(BaseModel):
+    """SMTP transport for outbound mail (currently used by the doctor-share
+    email-OTP flow; other use cases can ride the same transport).
+
+    Plaintext SMTP is rejected by the sender except when ``host`` is
+    ``localhost``/``127.0.0.1`` (dev convenience). For production, set
+    ``use_tls`` (implicit TLS, port 465) OR ``use_starttls`` (STARTTLS,
+    port 587). Setting neither against a non-local host will fail at
+    send time, not at config-load — this lets the UI surface a clear
+    "Send test email" error rather than refusing to start the app.
+
+    ``password`` can also be supplied via ``ASCLEPIUS_SMTP_PASSWORD`` so
+    the secret never has to touch the YAML on disk in container deploys.
+    """
+
+    enabled: bool = False
+    host: str = ""
+    port: int = 587
+    username: str = ""
+    password: str = ""
+    use_tls: bool = False  # implicit TLS (port 465)
+    use_starttls: bool = True  # STARTTLS upgrade (port 587)
+    from_address: str = ""
+    from_name: str = "Asclepius"
+    timeout_seconds: int = 15
 
 
 class BackupConfig(BaseModel):
@@ -391,5 +448,6 @@ class AppConfig(BaseModel):
     pipeline: PipelineConfig = PipelineConfig()
     backup: BackupConfig = BackupConfig()
     share: ShareConfig = ShareConfig()
+    smtp: SmtpConfig = SmtpConfig()
     # Shared credentials referenced by LLM / Vision / OCR provider entries.
     credentials: list[CredentialEntry] = []

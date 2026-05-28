@@ -110,6 +110,24 @@ async def _run_migrations(db: aiosqlite.Connection) -> None:
         for col in ("token_clear", "default_ocr_provider_id", "default_llm_provider_id"):
             if col not in cols:
                 await db.execute(f"ALTER TABLE document_shares ADD COLUMN {col} TEXT")
+        # otp_delivery: 'manual' (legacy default) | 'email'. Added with
+        # a TEXT default so SQLite accepts ADD COLUMN with a constant
+        # default; the NOT NULL constraint on the canonical schema is
+        # not enforced for the additive variant (SQLite limitation) but
+        # the application always supplies a value at insert time.
+        if "otp_delivery" not in cols:
+            await db.execute(
+                "ALTER TABLE document_shares "
+                "ADD COLUMN otp_delivery TEXT NOT NULL DEFAULT 'manual'"
+            )
+        # consecutive_otp_failures: per-share verify-failure counter for
+        # the share-level lockout. INTEGER default 0 is constant-valued
+        # and accepted by SQLite ADD COLUMN.
+        if "consecutive_otp_failures" not in cols:
+            await db.execute(
+                "ALTER TABLE document_shares "
+                "ADD COLUMN consecutive_otp_failures INTEGER NOT NULL DEFAULT 0"
+            )
         await db.commit()
 
     # ── document_share_sessions.last_seen_at (idempotent). Drives the

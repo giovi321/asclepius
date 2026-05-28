@@ -2307,6 +2307,32 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/settings/smtp/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Smtp Test
+     * @description Send a fixed diagnostic message to ``body.to``.
+     *
+     *     Returns ``{"ok": true}`` on success, or a 400/502 with a short
+     *     error description on failure. The SMTP server's raw response is
+     *     never returned — we only surface the underlying exception's class
+     *     name so the admin learns the failure mode without giving an
+     *     attacker a way to fingerprint internal infrastructure.
+     */
+    post: operations["smtp_test_api_settings_smtp_test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/settings/users": {
     parameters: {
       query?: never;
@@ -3507,6 +3533,36 @@ export interface components {
       backup_retention_mode?: string | null;
       /** Backup Retention Value */
       backup_retention_value?: number | null;
+      /** Smtp Enabled */
+      smtp_enabled?: boolean | null;
+      /** Smtp Host */
+      smtp_host?: string | null;
+      /** Smtp Port */
+      smtp_port?: number | null;
+      /** Smtp Username */
+      smtp_username?: string | null;
+      /** Smtp Password */
+      smtp_password?: string | null;
+      /** Smtp Use Tls */
+      smtp_use_tls?: boolean | null;
+      /** Smtp Use Starttls */
+      smtp_use_starttls?: boolean | null;
+      /** Smtp From Address */
+      smtp_from_address?: string | null;
+      /** Smtp From Name */
+      smtp_from_name?: string | null;
+      /** Smtp Timeout Seconds */
+      smtp_timeout_seconds?: number | null;
+      /** Share Email Otp Subject */
+      share_email_otp_subject?: string | null;
+      /** Share Email Otp Body */
+      share_email_otp_body?: string | null;
+      /** Share Lockout After Failed */
+      share_lockout_after_failed?: number | null;
+      /** Share Email Otp Daily Cap */
+      share_email_otp_daily_cap?: number | null;
+      /** Share Email Otp Resend Cooldown Seconds */
+      share_email_otp_resend_cooldown_seconds?: number | null;
     };
     /** SetupRequest */
     SetupRequest: {
@@ -3542,6 +3598,12 @@ export interface components {
       default_ocr_provider_id?: string | null;
       /** Default Llm Provider Id */
       default_llm_provider_id?: string | null;
+      /**
+       * Otp Delivery
+       * @default manual
+       * @enum {string}
+       */
+      otp_delivery: "manual" | "email";
     };
     /** ShareCreateResponse */
     ShareCreateResponse: {
@@ -3570,6 +3632,11 @@ export interface components {
       llm_provider_id?: string | null;
       /** Target Language */
       target_language?: string | null;
+    };
+    /** SmtpTestRequest */
+    SmtpTestRequest: {
+      /** To */
+      to: string;
     };
     /**
      * TestProviderRequest
@@ -7618,6 +7685,39 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["TestProviderRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  smtp_test_api_settings_smtp_test_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SmtpTestRequest"];
       };
     };
     responses: {

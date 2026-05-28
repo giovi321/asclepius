@@ -429,6 +429,11 @@ def load_config() -> AppConfig:
             config.ocr.cloud_ocr_enabled = True
     if share_public_url := os.environ.get("ASCLEPIUS_SHARE_PUBLIC_URL"):
         config.share.public_base_url = share_public_url.rstrip("/")
+    # SMTP password override: lets container deployments inject the secret
+    # via env without it ever being written to settings.yaml. The web UI
+    # PATCH path still works; if both are set, env wins on every restart.
+    if smtp_password := os.environ.get("ASCLEPIUS_SMTP_PASSWORD"):
+        config.smtp.password = smtp_password
 
     # Migrate legacy flat OCR config → provider list (pre-0.6 settings.yaml).
     if not config.ocr.providers:

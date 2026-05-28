@@ -117,6 +117,36 @@ pipeline:
   retry_interval_seconds: 300        # Wait before retrying failed extractions
   max_retries: 3                     # Max retry attempts for failed documents
   default_flow: "ocr_llm"            # "ocr_llm" or "vision_llm", which path new uploads use
+
+# SMTP transport (used by the doctor-share email-OTP flow)
+smtp:
+  enabled: false                     # Master switch — when off, email-OTP shares cannot be created
+  host: ""                           # smtp.example.com
+  port: 587                          # 587 for STARTTLS, 465 for implicit TLS
+  username: ""
+  password: ""                       # Override with ASCLEPIUS_SMTP_PASSWORD env var
+  use_tls: false                     # Implicit TLS (port 465)
+  use_starttls: true                 # STARTTLS upgrade (port 587)
+  from_address: ""                   # noreply@example.com
+  from_name: "Asclepius"
+  timeout_seconds: 15                # SMTP send wall-clock timeout
+
+# Doctor-share knobs (full list in admin-guide/doctor-shares)
+share:
+  session_ttl_minutes: 120
+  otp_ttl_minutes: 10
+  otp_max_attempts: 5                # Wrong-code attempts on a single OTP
+  share_lockout_after_failed: 3      # Consecutive verify failures → share auto-revoked
+  email_otp_resend_cooldown_seconds: 30   # Min gap between two request-otp calls
+  email_otp_daily_cap: 20            # Max OTP emails per share per rolling 24 h
+  email_otp_subject: "Your access code for medical records"
+  email_otp_body: |
+    Hello {recipient_label},
+
+    Your one-time access code is: {code}
+
+    This code expires in {expires_minutes} minutes. Enter it on the page
+    your contact at {from_name} shared with you.
 ```
 
 ## Providers and processing flows
@@ -197,6 +227,35 @@ oidc:
 
 See [User Management](../admin-guide/user-management/) for details on configuring SSO.
 
+## SMTP
+
+SMTP is opt-in. Without it, every doctor share falls back to manual OTP delivery — the admin reads the code over the phone — and the "Email" delivery option in the share dialog is disabled.
+
+To enable email delivery, configure transport in Settings → Email (or in YAML):
+
+```yaml
+smtp:
+  enabled: true
+  host: "smtp.example.com"
+  port: 587
+  username: "asclepius@example.com"
+  password: "..."                    # OR inject via ASCLEPIUS_SMTP_PASSWORD env var
+  use_starttls: true                 # port 587
+  # use_tls: true                    # for implicit TLS on port 465 instead
+  from_address: "noreply@example.com"
+  from_name: "Dr. Smith's Office"
+```
+
+Hard requirements:
+
+- **TLS is mandatory** when `host` is anything other than `localhost` / `127.0.0.1`. Pick exactly one of `use_starttls` (port 587, recommended) or `use_tls` (port 465). Plaintext sends to a non-local host raise `PlaintextRefused` at send time.
+- **`from_address` must be set** when `enabled: true` — it goes into the `From:` header and is what the recipient's mailbox sees.
+- **`from_name`** is purely cosmetic; it appears alongside `from_address` in the `From:` header and is one of the placeholders the OTP email template can interpolate.
+
+After saving SMTP settings, use the **Send test email** button on the Email tab to verify connectivity. The test endpoint surfaces the underlying exception class on failure (e.g. `SMTPAuthenticationError`, `SMTPConnectError`) but never the raw server response — SMTP servers can echo back attacker-controlled bytes, so the audit trail and the toast only carry stable labels.
+
+The email body and subject for the OTP message live under `share.email_otp_subject` and `share.email_otp_body`. They support a small set of literal `{placeholder}` tokens — `{code}`, `{recipient_label}`, `{expires_minutes}`, `{share_label}`, `{from_name}`. See [Doctor shares → Email template](../../admin-guide/doctor-shares/#email-template) for the full reference.
+
 ## Security
 
 :::caution[Change the secret key]
@@ -228,5 +287,6 @@ These environment variables override `settings.yaml` values:
 | `ASCLEPIUS_CONFIG_PATH` | Path to `settings.yaml` (default: `config/settings.yaml`) |
 | `ASCLEPIUS_MODE` | Run mode: `core` (full app, default) or `share` (public doctor-share surface only — mounts `/api/share/*` and `/share/...` SPA pages, returns 404 for everything else; see [Doctor shares → Publishing the share surface](../admin-guide/doctor-shares/#publishing-the-share-surface-to-the-internet)) |
 | `ASCLEPIUS_SHARE_PUBLIC_URL` | `share.public_base_url` — pin every generated share link to this origin (e.g. `https://med.example.com`). Required for split-host deployments; leave empty when admin and doctor share one hostname. |
+| `ASCLEPIUS_SMTP_PASSWORD` | `smtp.password` — inject the SMTP password without writing it to `settings.yaml`. When both are set, the env var wins on every restart. Recommended for container deployments where credentials are managed by an external secrets store. |
 | `FORWARDED_ALLOW_IPS` | uvicorn trust list for `X-Forwarded-*` headers (`*` = any). Override to your reverse-proxy IP for stricter defaults. |
 | `TZ` | Container timezone (default: `Europe/Zurich`) |

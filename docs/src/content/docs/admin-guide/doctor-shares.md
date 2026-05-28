@@ -2,14 +2,21 @@
 title: "Doctor shares"
 ---
 
-Doctor shares let you hand a curated subset of one patient's records to an outside doctor for consultation, without creating a real account for them. The doctor opens a one-time link, verifies a 6-digit code you give them out-of-band, and gets a short, read-only session that can view the listed documents and translate them. PDFs are watermarked with the doctor's name on every page; nothing can be downloaded from the UI.
+Doctor shares let you hand a curated subset of one patient's records to an outside doctor for consultation, without creating a real account for them. The doctor opens a one-time link, verifies a 6-digit code, and gets a short, read-only session that can view the listed documents and translate them. PDFs are watermarked with the doctor's name on every page; nothing can be downloaded from the UI.
+
+You pick how the code reaches the doctor when you create the share:
+
+- **Manual** (default) — the OTP appears in the admin dashboard and you read it over the phone, the same way it always worked.
+- **Email** — the OTP is sent automatically by SMTP to the recipient address you recorded on the share. Requires SMTP to be configured first (Settings → Email).
+
+Once the share exists you cannot change the delivery method — revoke and create a new one.
 
 ## What the doctor sees
 
 A stripped-down surface mounted at `/share/{token}`:
 
 - **Landing page** — single button to "Request access code". Clicking it issues a fresh OTP server-side; the response gives the doctor no information either way.
-- **OTP entry** — six numeric digits. Five attempts then the code burns. Codes expire after ten minutes.
+- **OTP entry** — six numeric digits. Codes expire after ten minutes (`share.otp_ttl_minutes`). Five attempts then the individual code burns (`share.otp_max_attempts`). On the **third** consecutive verify failure across any sequence of codes the **whole share is revoked** and any live session is killed — see [Share-level lockout](#share-level-lockout) below.
 - **Dashboard** — every shared document, with patient name, expiry countdown ("you will be logged out automatically in 1h 23m 45s"), and a sun/moon toggle for dark mode (defaults to the doctor's system preference).
 - **Document detail** — the watermarked PDF on the left, structured data on the right (lab results, medications, vaccinations, summaries, region translations). No edit buttons, no delete, no download. Encounters are deliberately hidden — those often contain free-text physician notes that don't belong on an outside surface.
 - **Translate** — a popover with two options: "Translate current page" or "Translate selected region" (drag a rectangle on the PDF). Whole-document translation is not exposed. The button stays disabled while a translation is in flight, and the new translation appears automatically in the "Region translations" panel — no manual refresh.
@@ -23,7 +30,8 @@ From any document detail page, click **Share with doctor** next to Delete. Or fr
 The dialog asks for:
 
 - **Recipient name** — shown on the watermark and in the audit log. Free text.
-- **Contact** — for your records only. Could be a phone number or anything else; the doctor never sees this field.
+- **OTP delivery** — pick **manual** or **email**. The email option is greyed out until SMTP is configured.
+- **Contact / recipient email** — when delivery is *manual*, this field is free-text for your own records (the doctor never sees it). When delivery is *email*, the field becomes the recipient address: it is validated as an email both client- and server-side, and is the **only** place the OTP will ever be sent. The address is read straight off the share row at send time — the public `request-otp` endpoint cannot substitute a different address.
 - **Expires after (days)** — absolute, no extensions.
 - **OCR + LLM provider** — the providers used when the doctor clicks Translate. "Default" falls back to the system-wide [Translation Defaults](#translation-defaults) below.
 
@@ -31,9 +39,13 @@ The dialog returns a URL exactly once. Send that to the doctor however you like 
 
 ### Conveying the code
 
-The doctor's "Request access code" click puts a fresh OTP into the share's audit log. Open the share row in the **Doctor Shares** dashboard (`/shares` in the sidebar), click **Show**, and read the 6-digit number. Convey it by phone or in person — anywhere except a channel the same person could have intercepted to see the link.
+**Manual shares.** The doctor's "Request access code" click puts a fresh OTP into the share's audit log. Open the share row in the **Doctor Shares** dashboard (`/shares` in the sidebar), click **Show**, and read the 6-digit number. Convey it by phone or in person — anywhere except a channel the same person could have intercepted to see the link.
 
 A small copy button next to the code copies it to the clipboard.
+
+**Email shares.** The OTP is sent automatically to the recipient address when the doctor clicks "Request access code". The dashboard does **not** show the code for email shares — even an admin cannot read it back, because the plaintext is never written to the database. The share row instead displays "Code emailed to: doctor@example.com". You only ever send the share link; the code travels via email.
+
+If SMTP delivery fails (server unreachable, rejected envelope, etc.) the doctor's UI surfaces a 502 with a "switch this share to manual delivery" hint, and an `otp_email_failed` row goes into the audit trail. Revoke and recreate the share as manual to recover.
 
 ### Watching active sessions and the queue
 
@@ -51,7 +63,11 @@ The session row IDs returned by the API are SQLite ``rowid`` values, not the raw
 Every interaction the doctor (or anyone with the URL) makes is recorded:
 
 - `otp_request` — fresh code issued
+- `otp_email_sent` — email-delivery code dispatched (`detail.to_masked` shows e.g. `j***@example.com`)
+- `otp_email_failed` — SMTP rejected the send (`detail.cause` carries the exception class name; the raw SMTP response is never logged)
+- `otp_email_rate_limited` — request rejected because the daily email cap or the resend cooldown fired
 - `otp_verify_ok` / `otp_verify_fail`
+- `share.locked` — share auto-revoked after the consecutive-failure threshold; `detail.reason` is `otp_brute_force_manual` or `otp_brute_force_email` so you can tell at a glance whether the failures came over the phone or over HTTP
 - `view_doc` — opened a document
 - `view_file` — fetched the PDF bytes
 - `translate` — queued a translation
@@ -64,6 +80,28 @@ Each row carries timestamp, IP address, and user-agent. Click the chevron on the
 ### Revoking
 
 The Revoke button in the share row marks the share inactive and immediately invalidates any active doctor session. Subsequent OTP requests against the same token still respond `204` (we don't leak token validity) but the verify call rejects.
+
+### Share-level lockout
+
+A wrong-code count is kept per **share** in addition to the per-code attempt counter (`share.otp_max_attempts`, default 5). After the third consecutive failed `verify-otp` against the same share — regardless of how many OTP codes were issued in between — Asclepius:
+
+1. Sets `revoked_at` on the share row.
+2. Revokes every active session on that share (the cookie is rejected on the doctor's next request, queued waiters get bounced to the landing page).
+3. Writes a `share.locked` row to the audit trail with `detail.reason = otp_brute_force_manual` or `otp_brute_force_email`.
+
+A correct verify resets the counter to zero, so a doctor who mistypes once and then enters the right code on the second try suffers no consequences. The threshold is `share.share_lockout_after_failed` (default `3`) — raise it if your call-and-read-back workflow regularly produces fat-finger errors, lower it for higher-sensitivity shares.
+
+The lockout applies to **both** manual and email delivery: even a manual share gets killed after three failures, because the verify-otp endpoint cannot tell whether the failures come from a confused doctor on the phone or an attacker brute-forcing the code over the wire.
+
+### Email delivery rate limits
+
+When a share is set to email delivery, three layers stack on top of each other every time the doctor clicks "Request access code":
+
+1. **Per-IP / per-token hourly cap** — the same `share/rate_limit.py` bucket that protects the manual flow (default: 10 requests / hour / IP, 6 / hour / token). Tripping this returns 429.
+2. **Per-share resend cooldown** — minimum gap between two `request-otp` calls on the same share. Default `30` seconds; configurable via `share.email_otp_resend_cooldown_seconds`. Trips return 429 with a `Retry-After` header.
+3. **Per-share daily cap** — maximum number of OTP emails sent for a single share in a rolling 24-hour window. Default `20`; configurable via `share.email_otp_daily_cap`. Trips return 429 and write an `otp_email_rate_limited` audit row with `detail.reason = daily_cap`.
+
+The cooldown and the daily cap exist specifically to defend against a leaked share URL being used to flood the doctor's inbox — the OTP itself is already protected from brute-force by the share-level lockout above.
 
 ## Translation defaults
 
@@ -86,6 +124,47 @@ This is why the Translation defaults are useful: they let you pin a specific OCR
 - Translate is rate-limited per-session (1 request / 30s) and per-share (20 / rolling hour). Configurable via `share.translate_per_session_seconds` and `share.translate_per_share_per_hour`.
 - Watermark on every page is faint vector text with the recipient name + UTC timestamp. Cannot prevent screenshots, but identifies the source if a screenshot ever surfaces externally.
 - All file responses set `Cache-Control: no-store` and `Content-Disposition: inline; filename=""`. The doctor's PDF viewer fetches bytes via XHR into a `Uint8Array` — no Object URL, no `<a download>`, right-click and Ctrl+S/P intercepted.
+- For email-delivery shares, the plaintext OTP is **never persisted** — the `otp_clear` column on the OTP row is `NULL` so a rogue admin (or a DB exfiltration) cannot read back a code they just emailed to the doctor. The admin's `/active-otp` endpoint short-circuits to `null` for these shares as a defence-in-depth check.
+- The recipient address for email shares is the value stored on the share row at creation time; the public `request-otp` endpoint cannot substitute a different address, so an attacker with the share URL cannot redirect the OTP to their own mailbox.
+- SMTP transport rejects plaintext sends except to `localhost` / `127.0.0.1`. STARTTLS (port 587) or implicit TLS (port 465) are the only production options.
+- The email template's Subject and From headers have CR/LF stripped before assignment, blocking header-injection via personalised templates. SMTP server responses are never logged or surfaced to the doctor — only the underlying exception's class name lands in the audit `detail` (so attacker-controlled bytes echoed back by the SMTP server cannot pollute the log buffer).
+- Share-level lockout after three consecutive verify failures (see [above](#share-level-lockout)) caps brute-force at 3 guesses out of 10⁶ possible OTPs (≈ 3 × 10⁻⁶ guess probability per share), regardless of delivery method.
+
+## Email template
+
+The email body and subject for the OTP message live in Settings → Email, under "Email OTP template". Both fields are plain text with literal `{placeholder}` substitution — no Jinja, no expression language, no attribute traversal. The only thing the renderer does is replace these known tokens:
+
+| Placeholder | Replaced with |
+|---|---|
+| `{code}` | The 6-digit OTP |
+| `{recipient_label}` | The recipient name you entered when creating the share |
+| `{expires_minutes}` | `share.otp_ttl_minutes` (default `10`) |
+| `{share_label}` | Reserved for future use; currently empty |
+| `{from_name}` | `smtp.from_name` |
+
+Unknown tokens pass through unchanged — `{not_a_placeholder}` in your template ends up literally `{not_a_placeholder}` in the email.
+
+The default template is intentionally minimal:
+
+```
+Hello {recipient_label},
+
+Your one-time access code is: {code}
+
+This code expires in {expires_minutes} minutes. Enter it on the page
+your contact at {from_name} shared with you.
+
+If you did not expect this email, ignore it — the code is useless
+without the accompanying link.
+```
+
+No patient name, no document titles, no share URL. If the recipient's mailbox is breached, the leaked email cannot identify the patient or be used on its own — the attacker still needs the share link, which you deliver out-of-band.
+
+:::caution[Including the share URL in the template]
+You can paste the share URL into the body if you want a one-click experience for the doctor, but understand the trade-off: the email then becomes a complete credential. Any forward, breach, or shoulder-surf of that message gives full access until the code is consumed (≤ 10 minutes) or the lockout fires. The bundled template deliberately omits the URL.
+:::
+
+Subject and From headers are stripped of `\r` and `\n` before assignment, so pasting hostile content into the template cannot inject extra headers.
 
 ## Publishing the share surface to the internet
 
@@ -142,9 +221,16 @@ In `settings.yaml` under `share:`:
 |---|---|---|
 | `session_ttl_minutes` | 120 | How long a verified doctor session lives before re-OTP |
 | `otp_ttl_minutes` | 10 | OTP code lifetime from request |
-| `otp_max_attempts` | 5 | Wrong-code attempts before the code burns |
+| `otp_max_attempts` | 5 | Wrong-code attempts on a **single** code before it burns. Distinct from `share_lockout_after_failed`, which counts across multiple codes for the same share. |
+| `share_lockout_after_failed` | 3 | Consecutive `verify-otp` failures (across all codes on the share) before the share is auto-revoked. Applies to both manual and email delivery. |
+| `email_otp_resend_cooldown_seconds` | 30 | Minimum gap between two `request-otp` calls on the same email share. Returns 429 + `Retry-After` if violated. |
+| `email_otp_daily_cap` | 20 | Maximum OTP emails per share per rolling 24 h. Returns 429 and audits `otp_email_rate_limited` if violated. |
+| `email_otp_subject` | "Your access code for medical records" | Subject line of the OTP email. Supports `{code}`, `{recipient_label}`, `{expires_minutes}`, `{share_label}`, `{from_name}` (literal substitution, no expressions). |
+| `email_otp_body` | (see [Email template](#email-template) above) | Body of the OTP email. Same placeholder set as the subject. |
 | `default_share_days` | 7 | Default share expiry when admin doesn't override |
 | `translate_per_session_seconds` | 30 | Debounce for the doctor's translate button |
 | `translate_per_share_per_hour` | 20 | Rolling-hour cost cap per share |
 | `watermark_opacity` | 0.20 | Watermark text opacity (0.0–1.0) |
 | `public_base_url` | `""` | Public origin pinned into every share link the admin copies. Override with env var `ASCLEPIUS_SHARE_PUBLIC_URL`. Set this when admin and doctor reach Asclepius on different hostnames; leave empty when they share one. |
+
+SMTP transport (host, port, credentials, TLS mode, from address) lives under a separate `smtp:` section — see [Configuration → SMTP](../../getting-started/configuration/#smtp). The Email tab in the admin UI edits both sections from one place.

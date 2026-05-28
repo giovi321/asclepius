@@ -350,6 +350,7 @@ The `processing` / `processing_step` / `processing_pages` fields are kept popula
 | `POST` | `/api/settings/test-llm-provider` | Yes | Test an LLM provider connection |
 | `POST` | `/api/settings/test-ocr-provider` | Yes | Test an OCR provider connection |
 | `POST` | `/api/settings/test-vision-provider` | Yes | Test a Vision-LLM provider with a tiny image round-trip |
+| `POST` | `/api/settings/smtp/test` | Admin | Send a fixed diagnostic email via current SMTP settings. Body: `{to: "you@example.com"}`. Returns `{"ok": true}` on success, 400 when SMTP is disabled, 502 with `detail: "SMTP test failed: <ExceptionClass>"` on transport failure. The raw SMTP response is **never** returned — only the underlying exception's class name surfaces, so attacker-controlled bytes echoed back by the server cannot pollute logs or UI. Writes `settings.smtp_test` to the audit log with `details.to_domain` (domain only — local-part redacted) and `details.ok`. |
 | `GET` | `/api/settings/logs` | Admin | Recent log lines (tail) |
 | `GET` | `/api/settings/audit-log` | Admin | Structured audit-log entries |
 | `GET` | `/api/settings/sessions` | Admin | List active sessions across all users |
@@ -379,6 +380,12 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 **Auth:** `session_ttl_hours`
 
 **OIDC:** `oidc_enabled`, `oidc_provider_url`, `oidc_client_id`, `oidc_client_secret`, `oidc_scopes`, `oidc_auto_create_user`, `oidc_username_claim`, `oidc_display_name_claim`
+
+**Backup:** `backup_enabled`, `backup_include_database`, `backup_include_vault`, `backup_schedule` (`hourly` / `daily` / `weekly`), `backup_retention_mode` (`count` / `days`), `backup_retention_value`
+
+**SMTP:** `smtp_enabled`, `smtp_host`, `smtp_port`, `smtp_username`, `smtp_password`, `smtp_use_tls`, `smtp_use_starttls`, `smtp_from_address`, `smtp_from_name`, `smtp_timeout_seconds`. The password is write-only: the GET response carries `has_password: bool` instead of the actual value, and an empty `smtp_password` in a PATCH is treated as "do not touch" rather than "clear" (see `useSettingsSave` in the frontend; mirrors the OIDC client-secret pattern). Override the password via the `ASCLEPIUS_SMTP_PASSWORD` env var to keep it out of `settings.yaml` entirely.
+
+**Share — email OTP knobs:** `share_email_otp_subject`, `share_email_otp_body`, `share_lockout_after_failed`, `share_email_otp_daily_cap`, `share_email_otp_resend_cooldown_seconds`. See [Doctor shares → Email template](../../admin-guide/doctor-shares/#email-template) and [Configuration knobs](../../admin-guide/doctor-shares/#configuration-knobs).
 
 For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`) and the shared credential list (`credentials[]`), use the dedicated `PUT /api/settings/{llm|ocr|vision}-providers` and `PUT /api/settings/credentials` endpoints, each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
 
@@ -419,11 +426,11 @@ only shares for patients they own.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/shares` | Admin/owner | Create a share. Body: `{patient_id, document_ids[], recipient_label, recipient_contact, expires_in_days?, default_ocr_provider_id?, default_llm_provider_id?}`. Response: `{share_id, share_url, expires_at}`. The `share_url` honors `share.public_base_url` (env: `ASCLEPIUS_SHARE_PUBLIC_URL`), so split-host setups hand the admin the doctor-facing URL. |
+| `POST` | `/api/shares` | Admin/owner | Create a share. Body: `{patient_id, document_ids[], recipient_label, recipient_contact, expires_in_days?, default_ocr_provider_id?, default_llm_provider_id?, otp_delivery?}`. `otp_delivery` is `"manual"` (default) or `"email"`. When `"email"`, the server requires SMTP to be enabled AND validates `recipient_contact` as an email — 400 on either failure. Response: `{share_id, share_url, expires_at}`. The `share_url` honors `share.public_base_url` (env: `ASCLEPIUS_SHARE_PUBLIC_URL`), so split-host setups hand the admin the doctor-facing URL. |
 | `GET` | `/api/shares` | Yes | List shares the caller can manage. Optional `?patient_id=N` to scope. Each row includes `share_url` decorated the same way. |
 | `DELETE` | `/api/shares/{share_id}` | Admin/owner | Revoke a share. Marks `revoked_at` and immediately invalidates every active doctor session for that share. Idempotent. |
 | `GET` | `/api/shares/{share_id}/audit` | Admin/owner | Full audit trail for a share. With `?include_active_otp=true`, also returns the live OTP code. |
-| `GET` | `/api/shares/{share_id}/active-otp` | Admin/owner | Just the live OTP (`{active_otp: {code, expires_at, attempts} \| null}`). Cheaper than `/audit?include_active_otp=true` when the dashboard only needs the code. |
+| `GET` | `/api/shares/{share_id}/active-otp` | Admin/owner | Just the live OTP (`{active_otp: {code, expires_at, attempts} \| null}`). Cheaper than `/audit?include_active_otp=true` when the dashboard only needs the code. **For email-delivery shares this always returns `{active_otp: null}`** — the plaintext code is never persisted, so the admin cannot read back what was emailed. |
 | `GET` | `/api/shares/{share_id}/documents` | Admin/owner | Preview the documents in this share (same JOIN shape the doctor sees). |
 | `GET` | `/api/shares/{share_id}/sessions` | Admin/owner | Active doctor session(s) and queued waiters. Response: `{active: [...], queued: [...]}`. Each active row carries an `is_idle` flag. The cookie-equivalent session.id is intentionally NOT exposed — the admin handle is SQLite `rowid` so an exfiltrated response cannot be replayed as an auth token. |
 | `DELETE` | `/api/shares/{share_id}/sessions/{rowid}` | Admin/owner | Force-terminate a single active session. Idempotent. |
@@ -434,7 +441,11 @@ only shares for patients they own.
 The audit log records these `action` strings:
 
 - `otp_request` — fresh code issued to the doctor
+- `otp_email_sent` — email-delivery OTP dispatched (`detail.to_masked` carries the first character of the local-part, e.g. `j***@example.com`)
+- `otp_email_failed` — SMTP rejected the send (`detail.cause` carries the exception class name; the raw SMTP response is never logged)
+- `otp_email_rate_limited` — request rejected by the per-share daily cap or the resend cooldown (`detail.reason` is `daily_cap`)
 - `otp_verify_ok` / `otp_verify_fail` — OTP verification outcome
+- `share.locked` — share auto-revoked after `share.share_lockout_after_failed` consecutive verify failures (`detail.reason` is `otp_brute_force_manual` or `otp_brute_force_email`; `detail.failures` carries the counter value at lockout)
 - `view_doc` — doctor opened a document
 - `view_file` — doctor fetched the watermarked PDF bytes
 - `translate` — doctor queued a region or full-page translation
@@ -451,8 +462,8 @@ cookie — share auth and admin auth are entirely isolated.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/share/{token}/request-otp` | Token | Issue a fresh OTP for the share token. Always returns 204 — the body never reveals whether the token is valid, so an attacker cannot enumerate. |
-| `POST` | `/api/share/{token}/verify-otp` | Token + OTP | Body: `{code: "123456"}`. On success either sets the `asclepius_share` cookie and returns 200 `{status: "active"}`, or sets the `asclepius_share_queue` cookie and returns 202 `{status: "queued", queue_expires_at}` when another device already holds the slot. 401 on bad code; 429 when the per-IP rate limit fires. |
+| `POST` | `/api/share/{token}/request-otp` | Token | Issue a fresh OTP for the share token. Returns 204 for a valid token (and for an invalid one — the body never reveals whether the token is valid, so an attacker cannot enumerate). For email-delivery shares this also dispatches the OTP via SMTP to the recipient stored on the share. Possible non-204 responses on email shares: 429 (per-IP cap / per-share resend cooldown / per-share daily cap), 502 (SMTP failed to deliver — the doctor's UI tells them to ask the practice for manual delivery). |
+| `POST` | `/api/share/{token}/verify-otp` | Token + OTP | Body: `{code: "123456"}`. On success either sets the `asclepius_share` cookie and returns 200 `{status: "active"}`, or sets the `asclepius_share_queue` cookie and returns 202 `{status: "queued", queue_expires_at}` when another device already holds the slot. 401 on bad code; 429 when the per-IP rate limit fires. After `share.share_lockout_after_failed` consecutive failures on the same share (default 3) the share itself is revoked — subsequent verifies still return 401 (no token-validity leak), but the share is inert. |
 | `POST` | `/api/share/claim` | Queue cookie | Polled by a queued waiter every 5s. Returns `{status: "active"}` (and sets the session cookie) when the slot freed up, `{status: "queued", queue_expires_at}` while still waiting, or 410 when the queue token expired or the share was revoked. |
 | `DELETE` | `/api/share/queue` | Queue cookie | Explicit cancel from the waiting page. Drops the queue entry and clears the cookie. 204. |
 | `POST` | `/api/share/heartbeat` | Session cookie | Keepalive — bumps `last_seen_at` so the idle clock resets while the doctor is reading. 204. |

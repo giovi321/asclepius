@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 from asclepius.audit.service import get_client_ip
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.email import EmailSendError, send_otp_email
 from asclepius.share import service as share_service
 from asclepius.share.cookies import (
     clear_share_cookie,
@@ -45,6 +46,7 @@ from asclepius.share.cookies import (
 )
 from asclepius.share.dependencies import SHARE_COOKIE_NAME, SHARE_QUEUE_COOKIE_NAME
 from asclepius.share.rate_limit import otp_request_allowed
+from asclepius.share.service import OtpCooldownError
 
 logger = logging.getLogger(__name__)
 
@@ -83,18 +85,98 @@ async def request_otp(
             detail="Too many OTP requests. Try again later.",
         )
 
-    await share_service.issue_otp(
-        db,
-        share_id=share["id"],
-        ttl_minutes=cfg.share.otp_ttl_minutes,
-    )
+    delivery = share.get("otp_delivery") or "manual"
+    user_agent = request.headers.get("user-agent")
+
+    # Email-delivery shares get an extra rate-limit layer: a per-share
+    # daily cap so a leaked URL cannot be used to flood the doctor's
+    # inbox. The 30 s cooldown is enforced inside ``issue_otp`` (raises
+    # ``OtpCooldownError``) which we surface as 429 with Retry-After.
+    if delivery == "email":
+        sent_today = await share_service.count_email_otps_today(db, share["id"])
+        if sent_today >= cfg.share.email_otp_daily_cap:
+            await share_service.write_audit(
+                db,
+                share_id=share["id"],
+                action="otp_email_rate_limited",
+                client_ip=ip,
+                user_agent=user_agent,
+                detail={"reason": "daily_cap", "cap": cfg.share.email_otp_daily_cap},
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Daily email OTP cap reached for this share.",
+            )
+
+    try:
+        code = await share_service.issue_otp(
+            db,
+            share_id=share["id"],
+            ttl_minutes=cfg.share.otp_ttl_minutes,
+            delivery=delivery,
+            cooldown_seconds=(
+                cfg.share.email_otp_resend_cooldown_seconds if delivery == "email" else 0
+            ),
+        )
+    except OtpCooldownError as e:
+        raise HTTPException(
+            status_code=429,
+            detail="Please wait before requesting another code.",
+            headers={"Retry-After": str(e.retry_after_seconds)},
+        )
+
     await share_service.write_audit(
         db,
         share_id=share["id"],
         action="otp_request",
         client_ip=ip,
-        user_agent=request.headers.get("user-agent"),
+        user_agent=user_agent,
     )
+
+    if delivery == "email":
+        try:
+            await send_otp_email(
+                cfg,
+                to=share["recipient_contact"],
+                code=code,
+                recipient_label=share.get("recipient_label") or "",
+                expires_minutes=cfg.share.otp_ttl_minutes,
+            )
+        except EmailSendError as exc:
+            await share_service.write_audit(
+                db,
+                share_id=share["id"],
+                action="otp_email_failed",
+                client_ip=ip,
+                user_agent=user_agent,
+                detail={"cause": exc.cause_class},
+            )
+            # 502: we accepted the request but the upstream (SMTP)
+            # failed. The doctor's UI surfaces this so the practice
+            # can fall back to manual delivery.
+            raise HTTPException(
+                status_code=502,
+                detail="Could not deliver the access code by email. "
+                "Ask your contact to switch this share to manual delivery.",
+            )
+        # Best-effort mask of the recipient address: first character of
+        # the local-part only. Full address is on the share row already;
+        # the audit detail does not need to duplicate it.
+        contact = share.get("recipient_contact") or ""
+        masked = (
+            f"{contact[0]}***@{contact.split('@', 1)[1]}"
+            if "@" in contact and contact
+            else "(masked)"
+        )
+        await share_service.write_audit(
+            db,
+            share_id=share["id"],
+            action="otp_email_sent",
+            client_ip=ip,
+            user_agent=user_agent,
+            detail={"to_masked": masked},
+        )
+
     return Response(status_code=204)
 
 
@@ -144,7 +226,32 @@ async def verify_otp(
             client_ip=ip,
             user_agent=user_agent,
         )
+        # Share-level lockout: after N consecutive failed verifies on
+        # the same share, revoke it. Applies to BOTH manual and email
+        # delivery so a brute-force attempt over the wire kills the
+        # share regardless of how the code was conveyed. The audit
+        # ``reason`` distinguishes the two so the admin can tell at a
+        # glance whether the failure was over the phone or over HTTP.
+        failures = await share_service.bump_consecutive_failures(db, share["id"])
+        if failures >= cfg.share.share_lockout_after_failed:
+            delivery = share.get("otp_delivery") or "manual"
+            await share_service.revoke_share(db, share["id"])
+            await share_service.write_audit(
+                db,
+                share_id=share["id"],
+                action="share.locked",
+                client_ip=ip,
+                user_agent=user_agent,
+                detail={
+                    "reason": f"otp_brute_force_{delivery}",
+                    "failures": failures,
+                },
+            )
         raise HTTPException(status_code=401, detail="Invalid or expired code")
+    # Successful verify resets the per-share counter so a doctor whose
+    # session expires and re-OTPs months later does not inherit old
+    # failed attempts from a previous (legitimate) typo.
+    await share_service.reset_consecutive_failures(db, share["id"])
 
     # Cheap inline GC so the queue table does not grow unboundedly.
     await share_service.purge_expired_queue(db)

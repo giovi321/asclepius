@@ -30,6 +30,7 @@ from .backup_routes import router as backup_router
 from .logs_routes import router as logs_router
 from .prompts_routes import router as prompts_router
 from .provider_routes import router as provider_router
+from .smtp_routes import router as smtp_router
 from .users_routes import router as users_router
 from .view_prefs_routes import router as view_prefs_router
 
@@ -38,6 +39,7 @@ router.include_router(logs_router)
 router.include_router(backup_router)
 router.include_router(prompts_router)
 router.include_router(provider_router)
+router.include_router(smtp_router)
 router.include_router(users_router)
 router.include_router(view_prefs_router)
 
@@ -111,6 +113,27 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "inbox_path": config.vault.inbox_path,
         },
         "backup": _backup_state_block(config),
+        "smtp": {
+            "enabled": config.smtp.enabled,
+            "host": config.smtp.host,
+            "port": config.smtp.port,
+            "username": config.smtp.username,
+            # NEVER return the password; only its presence flag, mirroring
+            # the OIDC client_secret pattern.
+            "has_password": bool(config.smtp.password),
+            "use_tls": config.smtp.use_tls,
+            "use_starttls": config.smtp.use_starttls,
+            "from_address": config.smtp.from_address,
+            "from_name": config.smtp.from_name,
+            "timeout_seconds": config.smtp.timeout_seconds,
+        },
+        "share": {
+            "email_otp_subject": config.share.email_otp_subject,
+            "email_otp_body": config.share.email_otp_body,
+            "share_lockout_after_failed": config.share.share_lockout_after_failed,
+            "email_otp_daily_cap": config.share.email_otp_daily_cap,
+            "email_otp_resend_cooldown_seconds": (config.share.email_otp_resend_cooldown_seconds),
+        },
     }
 
 
@@ -171,6 +194,23 @@ class SettingsUpdate(BaseModel):
     backup_schedule: str | None = None
     backup_retention_mode: str | None = None
     backup_retention_value: int | None = None
+    # SMTP
+    smtp_enabled: bool | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = None
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool | None = None
+    smtp_use_starttls: bool | None = None
+    smtp_from_address: str | None = None
+    smtp_from_name: str | None = None
+    smtp_timeout_seconds: int | None = None
+    # Share — email OTP template + safety limits
+    share_email_otp_subject: str | None = None
+    share_email_otp_body: str | None = None
+    share_lockout_after_failed: int | None = None
+    share_email_otp_daily_cap: int | None = None
+    share_email_otp_resend_cooldown_seconds: int | None = None
 
 
 # Languages the translation flows can target. Kept in sync with the
@@ -273,6 +313,33 @@ _SETTINGS_MAP = {
     "backup_schedule": ("backup", "schedule", "backup.schedule"),
     "backup_retention_mode": ("backup", "retention_mode", "backup.retention_mode"),
     "backup_retention_value": ("backup", "retention_value", "backup.retention_value"),
+    "smtp_enabled": ("smtp", "enabled", "smtp.enabled"),
+    "smtp_host": ("smtp", "host", "smtp.host"),
+    "smtp_port": ("smtp", "port", "smtp.port"),
+    "smtp_username": ("smtp", "username", "smtp.username"),
+    "smtp_password": ("smtp", "password", "smtp.password"),
+    "smtp_use_tls": ("smtp", "use_tls", "smtp.use_tls"),
+    "smtp_use_starttls": ("smtp", "use_starttls", "smtp.use_starttls"),
+    "smtp_from_address": ("smtp", "from_address", "smtp.from_address"),
+    "smtp_from_name": ("smtp", "from_name", "smtp.from_name"),
+    "smtp_timeout_seconds": ("smtp", "timeout_seconds", "smtp.timeout_seconds"),
+    "share_email_otp_subject": ("share", "email_otp_subject", "share.email_otp_subject"),
+    "share_email_otp_body": ("share", "email_otp_body", "share.email_otp_body"),
+    "share_lockout_after_failed": (
+        "share",
+        "share_lockout_after_failed",
+        "share.share_lockout_after_failed",
+    ),
+    "share_email_otp_daily_cap": (
+        "share",
+        "email_otp_daily_cap",
+        "share.email_otp_daily_cap",
+    ),
+    "share_email_otp_resend_cooldown_seconds": (
+        "share",
+        "email_otp_resend_cooldown_seconds",
+        "share.email_otp_resend_cooldown_seconds",
+    ),
 }
 
 

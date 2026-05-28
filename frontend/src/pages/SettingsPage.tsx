@@ -8,6 +8,7 @@ import {
   FileSearch,
   Columns3,
   Languages,
+  Mail,
 } from "lucide-react";
 import DocumentAnalysisTab from "@/components/settings/DocumentAnalysisTab";
 import PipelineTab from "@/components/settings/PipelineTab";
@@ -15,6 +16,7 @@ import AccessTab from "@/components/settings/AccessTab";
 import LanguageTab from "@/components/settings/LanguageTab";
 import BackupTab from "@/components/settings/BackupTab";
 import LogsTab from "@/components/settings/LogsTab";
+import SmtpTab from "@/components/settings/SmtpTab";
 import ViewColumnsTab from "@/components/settings/ViewColumnsTab";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -32,6 +34,7 @@ const TABS = [
   { key: "columns", label: "Table columns", icon: Columns3, adminOnly: false },
   { key: "language", label: "Language", icon: Languages, adminOnly: true },
   { key: "access", label: "Access & Identity", icon: Shield, adminOnly: true },
+  { key: "email", label: "Email", icon: Mail, adminOnly: true },
   { key: "backup", label: "Backup", icon: Download, adminOnly: true },
   { key: "logs", label: "Logs", icon: ScrollText, adminOnly: true },
 ] as const;
@@ -123,6 +126,7 @@ export default function SettingsPage() {
       {activeTab === "columns" && <ViewColumnsTab />}
       {activeTab === "language" && <LanguageTab />}
       {activeTab === "access" && <AccessTab />}
+      {activeTab === "email" && <SmtpTab />}
       {activeTab === "logs" && <LogsTab />}
       {activeTab === "backup" && <BackupTab />}
     </div>

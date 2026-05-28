@@ -11,7 +11,13 @@ import {
 
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
-import { useLlmProviders, useOcrProviders } from "@/hooks/data";
+import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
+
+// Same shape as backend `_EMAIL_RE`; client-side guard so the user
+// gets a hint before the round trip.
+const EMAIL_RE = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+
+type OtpDelivery = "manual" | "email";
 
 interface ShareSummary {
   id: number;
@@ -19,6 +25,7 @@ interface ShareSummary {
   recipient_label: string;
   recipient_contact: string;
   contact_kind: string;
+  otp_delivery?: string;
   expires_at: string;
   revoked_at: string | null;
   created_at: string;
@@ -67,11 +74,14 @@ export default function ShareDialog({
   const { toast } = useToast();
   const [recipientLabel, setRecipientLabel] = useState("");
   const [recipientContact, setRecipientContact] = useState("");
+  const [otpDelivery, setOtpDelivery] = useState<OtpDelivery>("manual");
   const [days, setDays] = useState(7);
   const [ocrProviderId, setOcrProviderId] = useState("");
   const [llmProviderId, setLlmProviderId] = useState("");
   const { data: llmData } = useLlmProviders();
   const { data: ocrData } = useOcrProviders();
+  const { data: settingsData } = useSettings();
+  const smtpEnabled = !!settingsData?.smtp?.enabled;
   const llmOptions = (Array.isArray(llmData) ? llmData : []).filter(
     (p: any) => p.enabled,
   );
@@ -111,6 +121,7 @@ export default function ShareDialog({
       setCreateResult(null);
       setRecipientLabel("");
       setRecipientContact("");
+      setOtpDelivery("manual");
       setTokenCopied(false);
       setOcrProviderId("");
       setLlmProviderId("");
@@ -119,6 +130,15 @@ export default function ShareDialog({
 
   const onCreate = async () => {
     if (!patientId || documentIds.length === 0) return;
+    // Client-side guard so the user gets a clear error before the round
+    // trip. The backend re-validates with the same regex.
+    if (otpDelivery === "email" && !EMAIL_RE.test(recipientContact.trim())) {
+      toast({
+        title: "Email OTP delivery needs a valid email in Contact",
+        variant: "error",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await api.post<CreateResult>("/shares", {
@@ -127,6 +147,7 @@ export default function ShareDialog({
         recipient_label: recipientLabel.trim() || "Outside doctor",
         recipient_contact: recipientContact.trim() || "manual",
         expires_in_days: days,
+        otp_delivery: otpDelivery,
         // Empty string from the <select>'s "Default" option becomes
         // null on the wire; the backend then falls through to the
         // first-enabled provider at translate time.
@@ -234,13 +255,68 @@ export default function ShareDialog({
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">
-                  Contact (free-text, for your records only)
+                  OTP delivery
+                </label>
+                <div className="flex flex-col gap-1.5 rounded-md border bg-background p-2.5">
+                  <label className="flex items-start gap-2 text-xs">
+                    <input
+                      type="radio"
+                      name="otp_delivery"
+                      value="manual"
+                      checked={otpDelivery === "manual"}
+                      onChange={() => setOtpDelivery("manual")}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">
+                        I'll convey the code myself
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        — the OTP appears in this dashboard so you can read it
+                        over the phone.
+                      </span>
+                    </span>
+                  </label>
+                  <label
+                    className={`flex items-start gap-2 text-xs ${!smtpEnabled ? "opacity-60" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="otp_delivery"
+                      value="email"
+                      checked={otpDelivery === "email"}
+                      onChange={() => setOtpDelivery("email")}
+                      disabled={!smtpEnabled}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <span className="font-medium">
+                        Email the code to the recipient
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        {smtpEnabled
+                          ? "— the OTP is sent automatically. You still send the link separately."
+                          : "— configure SMTP in Settings → Email first."}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  {otpDelivery === "email"
+                    ? "Recipient email (OTPs will be sent here)"
+                    : "Contact (free-text, for your records only)"}
                 </label>
                 <input
-                  type="text"
+                  type={otpDelivery === "email" ? "email" : "text"}
                   value={recipientContact}
                   onChange={(e) => setRecipientContact(e.target.value)}
-                  placeholder="phone, email, or other identifier"
+                  placeholder={
+                    otpDelivery === "email"
+                      ? "doctor@example.com"
+                      : "phone, email, or other identifier"
+                  }
                   className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                 />
               </div>
@@ -337,10 +413,23 @@ export default function ShareDialog({
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Send this link to the doctor. When they open it, they will
-                request a 6-digit code which you can read from the list below
-                and convey to them. The doctor will need a fresh code each
-                session.
+                {otpDelivery === "email" ? (
+                  <>
+                    Send this link to the doctor. When they open it and request
+                    a code, it will be emailed automatically to{" "}
+                    <span className="font-mono">
+                      {recipientContact || "(no recipient)"}
+                    </span>
+                    . The doctor will need a fresh code each session.
+                  </>
+                ) : (
+                  <>
+                    Send this link to the doctor. When they open it, they will
+                    request a 6-digit code which you can read from the list
+                    below and convey to them. The doctor will need a fresh code
+                    each session.
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -375,62 +464,75 @@ export default function ShareDialog({
                             {s.document_count !== 1 ? "s" : ""} · expires{" "}
                             {s.expires_at} · {status}
                           </div>
-                          {!isRevoked && !isExpired && (
-                            <div className="mt-1.5">
-                              {revealOtp[s.id] ? (
-                                <div className="font-mono text-base tracking-widest text-primary">
-                                  {loadingOtp[s.id] ? (
-                                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground italic font-sans tracking-normal">
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                      Loading code...
-                                    </span>
-                                  ) : (
-                                    activeOtps[s.id]?.code || (
-                                      <span className="text-xs text-muted-foreground italic font-sans tracking-normal">
-                                        No active code; ask the doctor to
-                                        request one
+                          {!isRevoked &&
+                            !isExpired &&
+                            s.otp_delivery === "email" && (
+                              <div className="mt-1.5 text-xs text-muted-foreground italic">
+                                Code emailed to{" "}
+                                <span className="font-mono">
+                                  {s.recipient_contact}
+                                </span>
+                                . The admin can't read it back.
+                              </div>
+                            )}
+                          {!isRevoked &&
+                            !isExpired &&
+                            s.otp_delivery !== "email" && (
+                              <div className="mt-1.5">
+                                {revealOtp[s.id] ? (
+                                  <div className="font-mono text-base tracking-widest text-primary">
+                                    {loadingOtp[s.id] ? (
+                                      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground italic font-sans tracking-normal">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Loading code...
                                       </span>
-                                    )
-                                  )}
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => onRevealOtp(s.id)}
-                                  className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
-                                >
-                                  <Eye className="h-3 w-3" /> Show active code
-                                </button>
-                              )}
-                              {revealOtp[s.id] && !loadingOtp[s.id] && (
-                                <div className="inline-flex items-center gap-1 ml-2">
-                                  {activeOtps[s.id]?.code && (
-                                    <CopyOtpInlineButton
-                                      code={activeOtps[s.id]!.code}
-                                    />
-                                  )}
+                                    ) : (
+                                      activeOtps[s.id]?.code || (
+                                        <span className="text-xs text-muted-foreground italic font-sans tracking-normal">
+                                          No active code; ask the doctor to
+                                          request one
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+                                ) : (
                                   <button
                                     onClick={() => onRevealOtp(s.id)}
-                                    className="rounded p-0.5 hover:bg-accent"
-                                    title="Refetch"
+                                    className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
                                   >
-                                    <RefreshCw className="h-3 w-3" />
+                                    <Eye className="h-3 w-3" /> Show active code
                                   </button>
-                                  <button
-                                    onClick={() =>
-                                      setRevealOtp((r) => ({
-                                        ...r,
-                                        [s.id]: false,
-                                      }))
-                                    }
-                                    className="rounded p-0.5 hover:bg-accent"
-                                    title="Hide"
-                                  >
-                                    <EyeOff className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                                {revealOtp[s.id] && !loadingOtp[s.id] && (
+                                  <div className="inline-flex items-center gap-1 ml-2">
+                                    {activeOtps[s.id]?.code && (
+                                      <CopyOtpInlineButton
+                                        code={activeOtps[s.id]!.code}
+                                      />
+                                    )}
+                                    <button
+                                      onClick={() => onRevealOtp(s.id)}
+                                      className="rounded p-0.5 hover:bg-accent"
+                                      title="Refetch"
+                                    >
+                                      <RefreshCw className="h-3 w-3" />
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        setRevealOtp((r) => ({
+                                          ...r,
+                                          [s.id]: false,
+                                        }))
+                                      }
+                                      className="rounded p-0.5 hover:bg-accent"
+                                      title="Hide"
+                                    >
+                                      <EyeOff className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                         </div>
                         {!isRevoked && (
                           <button

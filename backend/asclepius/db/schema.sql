@@ -596,6 +596,18 @@ CREATE TABLE IF NOT EXISTS document_shares (
     -- back to the system's first-enabled provider at translate time.
     default_ocr_provider_id TEXT,
     default_llm_provider_id TEXT,
+    -- How the OTP is conveyed to the doctor: 'manual' (admin reads it
+    -- over the phone — see otp_clear on document_share_otps) or 'email'
+    -- (sent automatically to recipient_contact; otp_clear stays NULL so
+    -- not even the admin can read it back). Distinct from contact_kind,
+    -- which historically described how the admin chose to label the
+    -- recipient; this column drives behaviour.
+    otp_delivery TEXT NOT NULL DEFAULT 'manual',
+    -- Rolling counter of consecutive failed OTP verifications across
+    -- successive OTP rows. Distinct from document_share_otps.attempts
+    -- (which is per-code). When this reaches share.share_lockout_after_failed
+    -- the share is revoked. Reset to 0 on any successful verify.
+    consecutive_otp_failures INTEGER NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_document_shares_patient ON document_shares(patient_id);

@@ -10,6 +10,7 @@ the chosen LLM. Persists a thumbnail PNG and a row in
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import uuid
 from pathlib import Path
@@ -35,6 +36,14 @@ from asclepius.pipeline.stage_events import (
 from asclepius.pipeline.state import PIPELINE_STATE
 from asclepius.pipeline.text_utils import strip_chandra_markup
 from asclepius.util.paths import safe_vault_join
+
+# Below this OCR-input length we use the floor instead of the actual
+# length when computing the max-expansion-ratio denominator. Without
+# this, a 5-char OCR input ("Hello") would let the LLM emit at most
+# 50 chars on a 10× ratio — too tight for legitimate short-input
+# translations that include explanatory context.
+_RATIO_INPUT_FLOOR_CHARS = 200
+_TRUNCATION_MARKER = "\n\n[truncated]"
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +107,7 @@ async def translate_region(
     llm_provider_id: str | None = None,
     resolved_providers: dict[str, str | None] | None = None,
     target_language: str | None = None,
+    share_id: int | None = None,
 ) -> dict:
     """Crop, OCR, and translate the region pre-allocated as ``region_row_id``.
 
@@ -263,6 +273,50 @@ async def translate_region(
                 if not translated:
                     raise RuntimeError("LLM returned empty translation")
 
+                # ── Output-size guardrails (prompt-injection defense) ──
+                # The LLM has no tool-use anywhere in this codebase, so
+                # the worst a successful injection can do is emit
+                # nonsense or an oversized payload. These two checks cap
+                # the blast radius:
+                max_chars = max(1, int(config.share.max_translation_chars))
+                ratio = float(config.share.translation_max_expansion_ratio)
+                denominator = max(len(ocr_text), _RATIO_INPUT_FLOOR_CHARS)
+                truncated_flag = False
+                if ratio > 0 and len(translated) > ratio * denominator:
+                    # Catches "OCR is 50 chars, output is 50 KB" cases.
+                    # Reject outright — do NOT persist the translation,
+                    # mark the row failed, surface a useful error.
+                    reason = (
+                        f"translation_too_long ({len(translated)} chars "
+                        f"> {int(ratio)}× {denominator})"
+                    )
+                    await _mark_region_failed(db, region_row_id, reason)
+                    if config.share.translation_audit_enabled and share_id is not None:
+                        await _audit_translation_done(
+                            db,
+                            share_id=share_id,
+                            region_row_id=region_row_id,
+                            ocr_text=ocr_text,
+                            translated_len=len(translated),
+                            llm_model=str(
+                                getattr(llm, "_gate_model", None)
+                                or getattr(llm, "model", None)
+                                or llm_provider_id
+                                or "default"
+                            ),
+                            target_language=resolved_target_language,
+                            truncated=False,
+                            rejected_reason="ratio",
+                        )
+                    raise RuntimeError(reason)
+                if len(translated) > max_chars:
+                    # Past the absolute cap: keep the leading chars and
+                    # append a visible marker so the doctor sees the
+                    # truncation rather than silently shortened output.
+                    keep = max(0, max_chars - len(_TRUNCATION_MARKER))
+                    translated = translated[:keep] + _TRUNCATION_MARKER
+                    truncated_flag = True
+
                 model_label = (
                     getattr(llm, "_gate_model", None)
                     or getattr(llm, "model", None)
@@ -276,6 +330,19 @@ async def translate_region(
                     (translated, model_label, resolved_target_language, region_row_id),
                 )
                 await db.commit()
+
+                if config.share.translation_audit_enabled and share_id is not None:
+                    await _audit_translation_done(
+                        db,
+                        share_id=share_id,
+                        region_row_id=region_row_id,
+                        ocr_text=ocr_text,
+                        translated_len=len(translated),
+                        llm_model=str(model_label),
+                        target_language=resolved_target_language,
+                        truncated=truncated_flag,
+                        rejected_reason=None,
+                    )
 
             logger.info(
                 "Region translation complete for doc=%d region=%d (model=%s)",
@@ -302,6 +369,54 @@ async def translate_region(
             return {"error": error_msg}
         finally:
             unregister_running_task(doc_id, _current_task)
+
+
+async def _audit_translation_done(
+    db: aiosqlite.Connection,
+    *,
+    share_id: int,
+    region_row_id: int,
+    ocr_text: str,
+    translated_len: int,
+    llm_model: str,
+    target_language: str,
+    truncated: bool,
+    rejected_reason: str | None,
+) -> None:
+    """Write a ``translate_region_done`` row to the share audit log so an
+    admin can spot-check what doctors are translating without reading
+    every translation by hand.
+
+    The OCR input itself is already stored in ``region_translations``;
+    we record its SHA-256 here so the admin can verify the audit row
+    refers to a specific translation without having to JOIN.
+
+    Best-effort: a failure here must never break the user-facing path.
+    """
+    try:
+        from asclepius.share.service import write_audit
+
+        ocr_sha = hashlib.sha256((ocr_text or "").encode("utf-8")).hexdigest()
+        detail: dict = {
+            "kind": "region",
+            "region_id": region_row_id,
+            "ocr_sha256": ocr_sha,
+            "ocr_len": len(ocr_text or ""),
+            "translated_len": translated_len,
+            "llm_model": llm_model,
+            "target_language": target_language,
+            "truncated": truncated,
+        }
+        if rejected_reason:
+            detail["rejected"] = rejected_reason
+        await write_audit(
+            db,
+            share_id=share_id,
+            action="translate_region_done",
+            detail=detail,
+        )
+    except Exception:
+        logger.debug("Translation-done audit write failed", exc_info=True)
 
 
 async def _mark_region_failed(db: aiosqlite.Connection, region_row_id: int, reason: str) -> None:

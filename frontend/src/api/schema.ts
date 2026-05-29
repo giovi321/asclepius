@@ -3600,6 +3600,12 @@ export interface components {
       share_email_otp_daily_cap?: number | null;
       /** Share Email Otp Resend Cooldown Seconds */
       share_email_otp_resend_cooldown_seconds?: number | null;
+      /** Share Max Translation Chars */
+      share_max_translation_chars?: number | null;
+      /** Share Translation Max Expansion Ratio */
+      share_translation_max_expansion_ratio?: number | null;
+      /** Share Translation Audit Enabled */
+      share_translation_audit_enabled?: boolean | null;
     };
     /** SetupRequest */
     SetupRequest: {

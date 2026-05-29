@@ -147,6 +147,11 @@ share:
 
     This code expires in {expires_minutes} minutes. Enter it on the page
     your contact at {from_name} shared with you.
+  # Region-translation hardening (caps the blast radius of a successful
+  # prompt-injection via OCR'd content — see admin-guide/doctor-shares).
+  max_translation_chars: 50000               # absolute cap on stored translated_text
+  translation_max_expansion_ratio: 10.0      # reject if len(out) > ratio × max(len(in), 200)
+  translation_audit_enabled: true            # write translate_region_done to share audit log
 ```
 
 ## Providers and processing flows

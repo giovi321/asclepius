@@ -389,6 +389,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                         llm_provider_id=payload.get("llm_provider_id"),
                         resolved_providers=payload.get("resolved_providers"),
                         target_language=payload.get("target_language"),
+                        share_id=payload.get("share_id"),
                     )
                 elif kind == "ai_edit":
                     logger.info(

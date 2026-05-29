@@ -390,6 +390,29 @@ class ShareConfig(BaseModel):
     # share when ``otp_delivery='email'``. Stacks on top of the existing
     # hourly per-token cap.
     email_otp_resend_cooldown_seconds: int = 30
+    # ── Region-translation hardening (defence against prompt-injection
+    # via OCR'd content in the selected region). None of these prevent
+    # injection itself — the LLM has no tool-use anyway, so the worst a
+    # successful injection can do is emit garbage. These knobs bound the
+    # blast radius of "the LLM emits 100 KB of nonsense" or "the LLM
+    # exfiltrates the system prompt 50 times":
+    #
+    # - ``max_translation_chars``: hard absolute cap on
+    #   ``region_translations.translated_text`` length. Past this the
+    #   stored text is truncated (and a ``[truncated]`` marker is
+    #   appended) so a runaway LLM cannot bloat the DB.
+    # - ``translation_max_expansion_ratio``: if the LLM output is more
+    #   than this many times the OCR input length (with a small floor
+    #   so short inputs are not flagged), the translation is rejected
+    #   outright. Catches "OCR is 50 chars, output is 50 KB" cases.
+    # - ``translation_audit_enabled``: when True, the worker emits a
+    #   ``translate_region_done`` row to the share audit log with the
+    #   SHA-256 of the OCR input + input/output lengths, so an admin
+    #   can spot-check what doctors are translating without reading
+    #   every translation by hand.
+    max_translation_chars: int = 50_000
+    translation_max_expansion_ratio: float = 10.0
+    translation_audit_enabled: bool = True
 
 
 class SmtpConfig(BaseModel):

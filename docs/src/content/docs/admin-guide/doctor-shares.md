@@ -68,6 +68,7 @@ Every interaction the doctor (or anyone with the URL) makes is recorded:
 - `otp_email_rate_limited` — request rejected because the daily email cap or the resend cooldown fired
 - `otp_verify_ok` / `otp_verify_fail`
 - `share.locked` — share auto-revoked after the consecutive-failure threshold; `detail.reason` is `otp_brute_force_manual` or `otp_brute_force_email` so you can tell at a glance whether the failures came over the phone or over HTTP
+- `translate_region_done` — written by the worker when a region translation finishes. `detail` carries `{kind: "region", region_id, ocr_sha256, ocr_len, translated_len, llm_model, target_language, truncated}` and a `rejected` field (`"ratio"`) when the translation tripped the expansion-ratio guard. Lets the admin verify what the doctor sent to the LLM without reading every translation by hand. Toggle with `share.translation_audit_enabled` (default `true`).
 - `view_doc` — opened a document
 - `view_file` — fetched the PDF bytes
 - `translate` — queued a translation
@@ -227,6 +228,9 @@ In `settings.yaml` under `share:`:
 | `email_otp_daily_cap` | 20 | Maximum OTP emails per share per rolling 24 h. Returns 429 and audits `otp_email_rate_limited` if violated. |
 | `email_otp_subject` | "Your access code for medical records" | Subject line of the OTP email. Supports `{code}`, `{recipient_label}`, `{expires_minutes}`, `{share_label}`, `{from_name}` (literal substitution, no expressions). |
 | `email_otp_body` | (see [Email template](#email-template) above) | Body of the OTP email. Same placeholder set as the subject. |
+| `max_translation_chars` | 50000 | Absolute hard cap on `region_translations.translated_text`. Output past this is truncated with a visible `[truncated]` marker so a runaway LLM cannot bloat the database. |
+| `translation_max_expansion_ratio` | 10.0 | Reject the translation if the LLM output is more than this many times the OCR input length (with a 200-char floor on the denominator so short legitimate inputs aren't flagged). Catches "OCR is 50 chars, output is 50 KB" prompt-injection successes. The row is marked `[failed: translation_too_long ...]` and not stored. |
+| `translation_audit_enabled` | `true` | When on, the worker writes a `translate_region_done` row to the share audit log on every completion (success, truncation, or ratio rejection). The detail carries `{ocr_sha256, ocr_len, translated_len, truncated, rejected?}` so an admin can spot-check what doctors are translating. |
 | `default_share_days` | 7 | Default share expiry when admin doesn't override |
 | `translate_per_session_seconds` | 30 | Debounce for the doctor's translate button |
 | `translate_per_share_per_hour` | 20 | Rolling-hour cost cap per share |

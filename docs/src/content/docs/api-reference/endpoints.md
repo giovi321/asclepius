@@ -387,6 +387,8 @@ Sent to `PATCH /api/settings`. Any subset of these may be included in a single r
 
 **Share — email OTP knobs:** `share_email_otp_subject`, `share_email_otp_body`, `share_lockout_after_failed`, `share_email_otp_daily_cap`, `share_email_otp_resend_cooldown_seconds`. See [Doctor shares → Email template](../../admin-guide/doctor-shares/#email-template) and [Configuration knobs](../../admin-guide/doctor-shares/#configuration-knobs).
 
+**Share — region-translation hardening:** `share_max_translation_chars` (default `50000`), `share_translation_max_expansion_ratio` (default `10.0`), `share_translation_audit_enabled` (default `true`). Bound the blast radius of a successful prompt-injection: oversized output is truncated, runaway-expansion output is rejected, and every completion writes a `translate_region_done` audit row with the OCR-input SHA-256 + length stats for admin spot-checking.
+
 For the provider lists themselves (`llm.providers`, `ocr.providers`, `vision.providers`) and the shared credential list (`credentials[]`), use the dedicated `PUT /api/settings/{llm|ocr|vision}-providers` and `PUT /api/settings/credentials` endpoints, each accepts the full ordered array and replaces the existing list. Fields with empty `api_key` are preserved from the previous value, so you never need to re-enter secrets when reordering.
 
 ## Prompts
@@ -446,6 +448,7 @@ The audit log records these `action` strings:
 - `otp_email_rate_limited` — request rejected by the per-share daily cap or the resend cooldown (`detail.reason` is `daily_cap`)
 - `otp_verify_ok` / `otp_verify_fail` — OTP verification outcome
 - `share.locked` — share auto-revoked after `share.share_lockout_after_failed` consecutive verify failures (`detail.reason` is `otp_brute_force_manual` or `otp_brute_force_email`; `detail.failures` carries the counter value at lockout)
+- `translate_region_done` — region translation finished (worker-emitted). `detail` carries `{kind: "region", region_id, ocr_sha256, ocr_len, translated_len, llm_model, target_language, truncated, rejected?}`. The `rejected` field is `"ratio"` when the expansion-ratio guard fired. Disable with `share.translation_audit_enabled=false`.
 - `view_doc` — doctor opened a document
 - `view_file` — doctor fetched the watermarked PDF bytes
 - `translate` — doctor queued a region or full-page translation

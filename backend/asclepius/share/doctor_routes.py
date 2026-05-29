@@ -669,6 +669,12 @@ async def share_translate_region(
             "llm_provider_id": llm_id,
             "resolved_providers": queued_providers,
             "target_language": target_language,
+            # Lets the worker emit a ``translate_region_done`` share-audit
+            # row on completion (OCR-input SHA-256, lengths, truncated /
+            # rejected flags) so the admin can spot-check what the doctor
+            # is sending to the LLM without reading every translation.
+            # Admin-originated translates leave this unset.
+            "share_id": session["share_id"],
         },
         priority=0,
         queued_doc_id=doc_id,

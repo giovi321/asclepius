@@ -133,6 +133,9 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
             "share_lockout_after_failed": config.share.share_lockout_after_failed,
             "email_otp_daily_cap": config.share.email_otp_daily_cap,
             "email_otp_resend_cooldown_seconds": (config.share.email_otp_resend_cooldown_seconds),
+            "max_translation_chars": config.share.max_translation_chars,
+            "translation_max_expansion_ratio": (config.share.translation_max_expansion_ratio),
+            "translation_audit_enabled": config.share.translation_audit_enabled,
         },
     }
 
@@ -211,6 +214,10 @@ class SettingsUpdate(BaseModel):
     share_lockout_after_failed: int | None = None
     share_email_otp_daily_cap: int | None = None
     share_email_otp_resend_cooldown_seconds: int | None = None
+    # Share — region-translation hardening
+    share_max_translation_chars: int | None = None
+    share_translation_max_expansion_ratio: float | None = None
+    share_translation_audit_enabled: bool | None = None
 
 
 # Languages the translation flows can target. Kept in sync with the
@@ -339,6 +346,21 @@ _SETTINGS_MAP = {
         "share",
         "email_otp_resend_cooldown_seconds",
         "share.email_otp_resend_cooldown_seconds",
+    ),
+    "share_max_translation_chars": (
+        "share",
+        "max_translation_chars",
+        "share.max_translation_chars",
+    ),
+    "share_translation_max_expansion_ratio": (
+        "share",
+        "translation_max_expansion_ratio",
+        "share.translation_max_expansion_ratio",
+    ),
+    "share_translation_audit_enabled": (
+        "share",
+        "translation_audit_enabled",
+        "share.translation_audit_enabled",
     ),
 }
 

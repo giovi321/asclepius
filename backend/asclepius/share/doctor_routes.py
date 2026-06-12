@@ -63,11 +63,50 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Document columns the doctor share surface is allowed to return on the
+# detail endpoint. Mirrors the allow-list approach already used by
+# ``share_me`` for the document list. Deliberately excludes:
+#   - file_path / file_hash      (vault internals)
+#   - ocr_text / ocr_text_en     (full text would bypass the watermark)
+#   - insurance_* / cost_*       (patient billing / insurance PII)
+#   - tags / notes-adjacent meta the outside clinician has no need for
+#   - raw_extraction, llm_provider, ocr_engine, *_model (infra/internal)
+#   - patient_id / patient_slug / *_id FKs, uploaded_by_user_id, retry_*,
+#     process_at, error_message, status timestamps
+# ``notes`` IS included: it is admin-authored context attached to this
+# specific shared document and the doctor UI renders it.
+_DOCTOR_DOC_FIELDS = frozenset(
+    {
+        "id",
+        "doc_type",
+        "original_filename",
+        "event_date",
+        "issued_date",
+        "date_received",
+        "doctor_name",
+        "facility_name",
+        "specialty_display",
+        "specialty_canonical_display",
+        "summary_en",
+        "summary_original",
+        "notes",
+        "language_source",
+        "page_count",
+    }
+)
+
+
 # ── Schemas ──────────────────────────────────────────────────────
 
 
 class ShareTranslateRequest(BaseModel):
-    llm_provider_id: str | None = None
+    # No provider fields: the doctor must not be able to choose which
+    # OCR/LLM provider handles their request. Provider selection is the
+    # admin's call (per-share default → system default) so a doctor
+    # cannot route a patient's PHI to a provider the admin didn't intend
+    # (e.g. forcing a cloud LLM when the admin pinned a local one). Any
+    # provider keys an old/hand-crafted client sends are ignored — they
+    # are simply not part of this schema.
     target_language: str | None = None
 
 
@@ -81,8 +120,11 @@ class RegionBbox(BaseModel):
 class ShareTranslateRegionRequest(BaseModel):
     page: int = Field(ge=1)
     bbox: RegionBbox
-    ocr_provider_id: str | None = None
-    llm_provider_id: str | None = None
+    # Deliberately NO ocr_provider_id / llm_provider_id here — see
+    # ShareTranslateRequest above. The doctor frames a rectangle and
+    # picks a target language; everything else (which provider runs the
+    # OCR and the translation) is resolved server-side from the admin's
+    # configuration only.
     target_language: str | None = None
 
 
@@ -248,24 +290,16 @@ async def share_document_detail(
         user_agent=request.headers.get("user-agent"),
     )
 
-    # Strip storage-internal fields before returning. We expose a
-    # boolean ``has_file`` in their place so the doctor UI can decide
-    # whether to enable translate / fetch the file without ever seeing
-    # the vault path.
-    public_doc = {
-        k: v
-        for k, v in doc.items()
-        if k
-        not in {
-            "file_path",
-            "file_hash",
-            "raw_extraction",
-            "uploaded_by_user_id",
-            "process_at",
-            "retry_count",
-            "error_message",
-        }
-    }
+    # Allow-list the document fields the doctor surface may see, rather
+    # than denying a fixed set. A denylist silently leaks any column added
+    # to ``documents`` later; this list is the explicit contract for what
+    # an outside clinician is entitled to. Everything not named here —
+    # insurance details, billing, internal tags, raw OCR text (which would
+    # bypass the watermark), vault path, infra/model identifiers, the
+    # uploader id and other internal columns — stays server-side. A
+    # boolean ``has_file`` replaces the vault path so the UI can still
+    # gate the translate / fetch affordances.
+    public_doc = {k: doc[k] for k in _DOCTOR_DOC_FIELDS if k in doc}
     public_doc["has_file"] = bool(doc.get("file_path"))
 
     return {
@@ -502,8 +536,13 @@ async def share_translate(
             return min(enabled, key=lambda p: getattr(p, "priority", 0))
         return items[0] if items else None
 
+    # Provider resolution is admin-only: per-share default → system
+    # translation default → first-enabled. The doctor cannot influence it.
+    share_row = await share_service.get_share_by_id(db, session["share_id"])
+    share_default_llm = (share_row or {}).get("default_llm_provider_id") or None
+
     queued_providers: dict[str, str | None] = {}
-    llm_id = body.llm_provider_id
+    llm_id = share_default_llm or (cfg.llm.translation_provider_id or None)
     if not llm_id:
         p = _first_enabled(cfg.llm.providers)
         llm_id = p.id if p else None
@@ -523,7 +562,7 @@ async def share_translate(
         "translate",
         {
             "doc_id": doc_id,
-            "llm_provider_id": body.llm_provider_id,
+            "llm_provider_id": llm_id,
             "resolved_providers": queued_providers,
             "target_language": target_language,
         },
@@ -602,20 +641,21 @@ async def share_translate_region(
             return min(enabled, key=lambda p: getattr(p, "priority", 0))
         return items[0] if items else None
 
-    # Provider resolution ladder:
-    #   1. body override (the doctor's UI does not expose this; reserved
-    #      for the admin-side region translate)
-    #   2. per-share default the admin set when creating the share
-    #   3. system-wide translation default (settings page)
-    #   4. first-enabled provider in the system
+    # Provider resolution ladder — admin-controlled only. The doctor
+    # surface intentionally offers no provider override (see the request
+    # models above): a doctor must not be able to steer a patient's PHI
+    # to a different provider than the admin configured.
+    #   1. per-share default the admin set when creating the share
+    #   2. system-wide translation default (settings page)
+    #   3. first-enabled provider in the system
     queued_providers: dict[str, str | None] = {}
-    ocr_id = body.ocr_provider_id or share_default_ocr or (cfg.ocr.translation_provider_id or None)
+    ocr_id = share_default_ocr or (cfg.ocr.translation_provider_id or None)
     if not ocr_id:
         p = _first_enabled(cfg.ocr.providers)
         ocr_id = p.id if p else None
     if ocr_id:
         queued_providers["ocr"] = ocr_id
-    llm_id = body.llm_provider_id or share_default_llm or (cfg.llm.translation_provider_id or None)
+    llm_id = share_default_llm or (cfg.llm.translation_provider_id or None)
     if not llm_id:
         p = _first_enabled(cfg.llm.providers)
         llm_id = p.id if p else None

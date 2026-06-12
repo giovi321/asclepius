@@ -229,6 +229,201 @@ def _run_share_flow(client, seed):
     assert res.status_code == 204
 
 
+def _insert_doc(db_path, *, patient_id, filename, rel_path="x/y.pdf"):
+    """Insert a minimal extra document row for the given patient."""
+    import sqlite3
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        cur = conn.execute(
+            """INSERT INTO documents
+                  (patient_id, file_path, original_filename, doc_type,
+                   ocr_text, status)
+               VALUES (?, ?, ?, 'lab_test', 'Hello', 'done')""",
+            (patient_id, rel_path, filename),
+        )
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def test_add_documents_to_existing_share(share_app):
+    """Admin can append documents to a share after creation, the count
+    reflects only newly-added rows, cross-patient docs are rejected, and
+    a re-add of the same set is a no-op."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed(db_path, vault)
+        admin_cookies = {"asclepius_session": seed["admin_cookie"]}
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        # A second document for the SAME patient, and one for a DIFFERENT patient.
+        doc2 = _insert_doc(db_path, patient_id=seed["patient_id"], filename="b.pdf")
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            cur = conn.execute(
+                "INSERT INTO patients (slug, display_name) VALUES ('other', 'Other')"
+            )
+            other_patient = cur.lastrowid
+            conn.commit()
+        finally:
+            conn.close()
+        foreign_doc = _insert_doc(db_path, patient_id=other_patient, filename="c.pdf")
+
+        # Create the share with just doc 1.
+        res = client.post(
+            "/api/shares",
+            json={
+                "patient_id": seed["patient_id"],
+                "document_ids": [seed["doc_id"]],
+                "recipient_label": "Dr. Add",
+                "recipient_contact": "phone",
+                "expires_in_days": 7,
+            },
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        assert res.status_code == 200, res.text
+        share_id = res.json()["share_id"]
+
+        # Add doc 2 — one newly added.
+        res = client.post(
+            f"/api/shares/{share_id}/documents",
+            json={"document_ids": [doc2]},
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["added"] == 1
+        assert res.json()["already_present"] == 0
+
+        # Re-add both — nothing new.
+        res = client.post(
+            f"/api/shares/{share_id}/documents",
+            json={"document_ids": [seed["doc_id"], doc2]},
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["added"] == 0
+        assert res.json()["already_present"] == 2
+
+        # A document from another patient is refused.
+        res = client.post(
+            f"/api/shares/{share_id}/documents",
+            json={"document_ids": [foreign_doc]},
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        assert res.status_code == 400, res.text
+
+        # The share now reports two documents.
+        res = client.get("/api/shares", cookies=admin_cookies, headers=csrf)
+        assert res.status_code == 200, res.text
+        row = next(r for r in res.json() if r["id"] == share_id)
+        assert row["document_count"] == 2
+
+
+def test_cannot_add_documents_to_revoked_share(share_app):
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed(db_path, vault)
+        admin_cookies = {"asclepius_session": seed["admin_cookie"]}
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+        doc2 = _insert_doc(db_path, patient_id=seed["patient_id"], filename="b.pdf")
+
+        res = client.post(
+            "/api/shares",
+            json={
+                "patient_id": seed["patient_id"],
+                "document_ids": [seed["doc_id"]],
+                "recipient_label": "Dr. Gone",
+                "recipient_contact": "phone",
+                "expires_in_days": 7,
+            },
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        share_id = res.json()["share_id"]
+        client.delete(f"/api/shares/{share_id}", cookies=admin_cookies, headers=csrf)
+
+        res = client.post(
+            f"/api/shares/{share_id}/documents",
+            json={"document_ids": [doc2]},
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        assert res.status_code == 400, res.text
+
+
+def test_purge_share_hard_deletes_everything(share_app):
+    """Purging a share removes the row plus its OTP and audit children;
+    the dashboard list no longer shows it."""
+    import sqlite3
+
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed(db_path, vault)
+        admin_cookies = {"asclepius_session": seed["admin_cookie"]}
+        csrf = {"X-Requested-With": "XMLHttpRequest"}
+
+        res = client.post(
+            "/api/shares",
+            json={
+                "patient_id": seed["patient_id"],
+                "document_ids": [seed["doc_id"]],
+                "recipient_label": "Dr. Temp",
+                "recipient_contact": "phone",
+                "expires_in_days": 7,
+            },
+            cookies=admin_cookies,
+            headers=csrf,
+        )
+        share_id = res.json()["share_id"]
+        token = res.json()["share_url"].rsplit("/", 1)[-1]
+
+        # Generate an OTP + audit rows so we can prove the cascade.
+        client.post(f"/api/share/{token}/request-otp", headers=csrf)
+
+        # Purge it.
+        res = client.delete(
+            f"/api/shares/{share_id}/purge", cookies=admin_cookies, headers=csrf
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["deleted"] is True
+
+        # Gone from the list.
+        res = client.get("/api/shares", cookies=admin_cookies, headers=csrf)
+        assert all(r["id"] != share_id for r in res.json())
+
+        # Child rows are gone too.
+        conn = sqlite3.connect(str(db_path))
+        try:
+            for table in (
+                "document_shares",
+                "document_share_documents",
+                "document_share_otps",
+                "document_share_audit",
+            ):
+                n = conn.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE "
+                    + ("id = ?" if table == "document_shares" else "share_id = ?"),
+                    (share_id,),
+                ).fetchone()[0]
+                assert n == 0, f"{table} still has rows for purged share"
+        finally:
+            conn.close()
+
+
 # ── Email-OTP delivery ───────────────────────────────────────────
 
 

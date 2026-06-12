@@ -251,6 +251,58 @@ async def revoke_share(db: aiosqlite.Connection, share_id: int) -> None:
     await db.commit()
 
 
+async def add_share_documents(
+    db: aiosqlite.Connection, share_id: int, document_ids: list[int]
+) -> dict:
+    """Add documents to an existing share, skipping any already present.
+
+    The caller is responsible for confirming each id belongs to the
+    share's patient (the admin route does this, mirroring share
+    creation). Returns ``{added, already_present}`` so the UI can give an
+    honest count — useful when the admin re-adds a selection that
+    overlaps what's already shared.
+    """
+    cursor = await db.execute(
+        "SELECT document_id FROM document_share_documents WHERE share_id = ?",
+        (share_id,),
+    )
+    existing = {row[0] for row in await cursor.fetchall()}
+    to_add = [d for d in document_ids if d not in existing]
+    if to_add:
+        await db.executemany(
+            """INSERT OR IGNORE INTO document_share_documents
+                  (share_id, document_id) VALUES (?, ?)""",
+            [(share_id, doc_id) for doc_id in to_add],
+        )
+        await db.commit()
+    return {"added": len(to_add), "already_present": len(document_ids) - len(to_add)}
+
+
+async def delete_share(db: aiosqlite.Connection, share_id: int) -> None:
+    """Hard-delete a share and everything that hangs off it.
+
+    The membership / OTP / session / queue child tables all declare
+    ``ON DELETE CASCADE`` against ``document_shares(id)``, so deleting the
+    parent row removes them too (``get_db`` opens connections with
+    ``PRAGMA foreign_keys=ON``). The audit table is intentionally
+    FK-less — audit rows must survive their subject in general — so we
+    clear this share's audit rows explicitly before dropping the row.
+
+    Distinct from :func:`revoke_share`, which only flips ``revoked_at``
+    and keeps the row for the dashboard. This is the "remove it from the
+    database entirely" path the admin reaches via the purge endpoint.
+    """
+    await db.execute(
+        "DELETE FROM document_share_audit WHERE share_id = ?",
+        (share_id,),
+    )
+    await db.execute(
+        "DELETE FROM document_shares WHERE id = ?",
+        (share_id,),
+    )
+    await db.commit()
+
+
 # ── OTP ──────────────────────────────────────────────────────────
 
 
@@ -817,8 +869,14 @@ _SHARE_LIST_COLUMNS = """sh.id, sh.patient_id, sh.token_clear,
                           COALESCE(ac.cnt, 0) AS access_count,
                           ac.last_at AS last_accessed_at"""
 
-_SHARE_LIST_JOINS = """JOIN users u ON u.id = sh.created_by_user_id
-                        JOIN patients p ON p.id = sh.patient_id
+# LEFT JOIN users/patients (not INNER): a share whose creating user was
+# deleted while FK enforcement was off — common for rows predating the
+# revoke feature — would otherwise drop out of the listing entirely,
+# leaving the admin unable to see or delete it. With LEFT JOIN the row
+# still appears (``created_by_username`` / ``patient_name`` simply come
+# back NULL) so it can be purged from the dashboard.
+_SHARE_LIST_JOINS = """LEFT JOIN users u ON u.id = sh.created_by_user_id
+                        LEFT JOIN patients p ON p.id = sh.patient_id
                         LEFT JOIN (
                           SELECT share_id, COUNT(*) AS cnt
                           FROM document_share_documents

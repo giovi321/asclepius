@@ -61,6 +61,10 @@ class ShareCreateResponse(BaseModel):
     expires_at: str
 
 
+class ShareAddDocumentsRequest(BaseModel):
+    document_ids: list[int] = Field(min_length=1, max_length=200)
+
+
 # ── Helpers ──────────────────────────────────────────────────────
 
 
@@ -231,6 +235,73 @@ async def list_shares(
     return rows
 
 
+@router.post("/{share_id}/documents")
+async def add_share_documents(
+    share_id: int,
+    body: ShareAddDocumentsRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Add documents to an existing share.
+
+    Lets the admin build a share across several filter/search views: pick
+    a subset, add it here, change the filter, add the next subset to the
+    same share — without having to get every document into one filtered
+    list at once.
+
+    Same guard rails as creation: admin or patient-owner only, and every
+    document must belong to the share's patient. Adding to a revoked share
+    is refused (revive by creating a fresh one). Documents already on the
+    share are silently skipped.
+    """
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+
+    if share.get("revoked_at"):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot add documents to a revoked share. Create a new share instead.",
+        )
+
+    # Every requested document must belong to the share's patient — same
+    # invariant enforced at creation time.
+    placeholders = ",".join(["?"] * len(body.document_ids))
+    cursor = await db.execute(
+        f"""SELECT id FROM documents
+             WHERE id IN ({placeholders})
+               AND patient_id = ?""",
+        (*body.document_ids, share["patient_id"]),
+    )
+    valid_ids = {row[0] for row in await cursor.fetchall()}
+    invalid = [i for i in body.document_ids if i not in valid_ids]
+    if invalid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Documents do not belong to patient {share['patient_id']}: {invalid}",
+        )
+
+    result = await share_service.add_share_documents(db, share_id, body.document_ids)
+
+    await audit_log(
+        db,
+        current_user["id"],
+        "share.documents.add",
+        resource_type="share",
+        resource_id=share_id,
+        details={
+            "patient_id": share["patient_id"],
+            "requested": len(body.document_ids),
+            "added": result["added"],
+            "already_present": result["already_present"],
+        },
+        ip_address=get_client_ip(request),
+    )
+    return {"share_id": share_id, **result}
+
+
 @router.delete("/{share_id}")
 async def revoke_share(
     share_id: int,
@@ -252,6 +323,42 @@ async def revoke_share(
         ip_address=get_client_ip(request),
     )
     return {"ok": True}
+
+
+@router.delete("/{share_id}/purge")
+async def purge_share(
+    share_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Permanently delete a share and its dependent rows from the DB.
+
+    Unlike :func:`revoke_share` (which keeps the row, flagged revoked, so
+    it still shows on the dashboard), this removes the share, its
+    document membership, OTPs, sessions, queue entries, and audit trail
+    entirely. Used to clean up old/stale shares — including legacy rows
+    that predate the revoke feature. Any live doctor session dies with
+    the cascade on the next request.
+    """
+    share = await share_service.get_share_by_id(db, share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    # ``patient_id`` is NOT NULL and cascades on patient delete, so a live
+    # share always has a resolvable patient for the ownership check even
+    # when ``created_by_user_id`` points at a deleted user.
+    await _require_admin_or_owner(db, current_user, share["patient_id"])
+    await share_service.delete_share(db, share_id)
+    await audit_log(
+        db,
+        current_user["id"],
+        "share.delete",
+        resource_type="share",
+        resource_id=share_id,
+        details={"patient_id": share["patient_id"]},
+        ip_address=get_client_ip(request),
+    )
+    return {"deleted": True}
 
 
 @router.get("/{share_id}/audit")

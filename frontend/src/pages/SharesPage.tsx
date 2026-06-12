@@ -163,10 +163,12 @@ export default function SharesPage() {
       if (!statusFilter.has(status)) return false;
       if (search) {
         const q = search.toLowerCase();
+        // patient_name can be null for orphaned legacy rows (the list
+        // query LEFT JOINs patients), so coalesce before lowercasing.
         if (
-          !s.recipient_label.toLowerCase().includes(q) &&
-          !s.patient_name.toLowerCase().includes(q) &&
-          !s.recipient_contact.toLowerCase().includes(q)
+          !(s.recipient_label || "").toLowerCase().includes(q) &&
+          !(s.patient_name || "").toLowerCase().includes(q) &&
+          !(s.recipient_contact || "").toLowerCase().includes(q)
         ) {
           return false;
         }
@@ -198,6 +200,29 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Revoke failed",
+        description: err?.response?.data?.detail || err.message,
+        variant: "error",
+      });
+    }
+  };
+
+  const onDelete = async (id: number) => {
+    if (
+      !confirm(
+        "Permanently delete this share? It will be removed from the database " +
+          "along with its OTPs, sessions, and audit history. Any live doctor " +
+          "session is killed. This cannot be undone.",
+      )
+    )
+      return;
+    try {
+      await api.delete(`/shares/${id}/purge`);
+      toast({ title: "Share deleted", variant: "success" });
+      if (expandedId === id) setExpandedId(null);
+      refresh();
+    } catch (err: any) {
+      toast({
+        title: "Delete failed",
         description: err?.response?.data?.detail || err.message,
         variant: "error",
       });
@@ -511,11 +536,21 @@ export default function SharesPage() {
                             <button
                               onClick={() => onRevoke(s.id)}
                               className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                              title="Revoke share"
+                              title="Revoke share (keeps the row, kills the session)"
                             >
                               <Trash2 className="h-3 w-3" /> Revoke
                             </button>
                           )}
+                          {/* Permanent delete — removes the row and all
+                              its history. Offered for every status so old
+                              and legacy shares can be cleaned out. */}
+                          <button
+                            onClick={() => onDelete(s.id)}
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-red-600"
+                            title="Permanently delete this share from the database"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
                         </div>
                       </td>
                     </tr>

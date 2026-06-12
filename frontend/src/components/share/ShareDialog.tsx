@@ -7,6 +7,7 @@ import {
   EyeOff,
   Check,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 
 import api from "@/api/client";
@@ -178,6 +179,44 @@ export default function ShareDialog({
         description: err?.response?.data?.detail || err.message,
         variant: "error",
       });
+    }
+  };
+
+  // Add the current selection to an existing share for this patient.
+  // This is how you build a share across several filter/search views:
+  // select a subset, add it here, change the filter, open this dialog
+  // again and add the next subset to the same share — the selection
+  // never has to survive a filter change.
+  const [addingTo, setAddingTo] = useState<number | null>(null);
+  const onAddToShare = async (shareId: number) => {
+    if (documentIds.length === 0 || addingTo !== null) return;
+    setAddingTo(shareId);
+    try {
+      const res = await api.post(`/shares/${shareId}/documents`, {
+        document_ids: documentIds,
+      });
+      const added = res.data?.added ?? 0;
+      const already = res.data?.already_present ?? 0;
+      toast({
+        title:
+          added > 0
+            ? `Added ${added} document${added === 1 ? "" : "s"} to the share`
+            : "Those documents are already in this share",
+        description:
+          added > 0 && already > 0
+            ? `${already} were already shared`
+            : undefined,
+        variant: "success",
+      });
+      refresh();
+    } catch (err: any) {
+      toast({
+        title: "Could not add documents",
+        description: err?.response?.data?.detail || err.message,
+        variant: "error",
+      });
+    } finally {
+      setAddingTo(null);
     }
   };
 
@@ -534,15 +573,32 @@ export default function ShareDialog({
                               </div>
                             )}
                         </div>
-                        {!isRevoked && (
-                          <button
-                            onClick={() => onRevoke(s.id)}
-                            className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                            title="Revoke share"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {!isRevoked && !isExpired && documentIds.length > 0 && (
+                            <button
+                              onClick={() => onAddToShare(s.id)}
+                              disabled={addingTo !== null}
+                              className="inline-flex items-center gap-1 rounded-md border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/5 disabled:opacity-50"
+                              title={`Add the ${docCountLabel} to this share`}
+                            >
+                              {addingTo === s.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                              Add these
+                            </button>
+                          )}
+                          {!isRevoked && (
+                            <button
+                              onClick={() => onRevoke(s.id)}
+                              className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                              title="Revoke share"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </li>
                     );
                   })}

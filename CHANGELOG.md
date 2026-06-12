@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-12
+
+### Security
+- Doctor-share surface: the doctor can no longer influence which OCR/LLM provider runs a translation. The `translate-region` (and deprecated `translate`) endpoints previously accepted `ocr_provider_id`/`llm_provider_id` in the request body; a hand-crafted request could route a patient's OCR'd region to any admin-enabled provider (e.g. a cloud LLM when the admin pinned a local one). Those fields are removed from the doctor request models — provider resolution is admin-only (per-share default → system default → first-enabled).
+- Doctor document-detail endpoint now returns an explicit allow-list of fields instead of `doc.*` minus a denylist. The old shape leaked `insurance_company`, `insurance_policy`, billing, internal `tags`, the full un-watermarked `ocr_text`/`ocr_text_en` (a watermark bypass), `patient_slug`, and infra/model identifiers — and any future column would have leaked by default.
+
+### Added
+- Doctor shares: **add documents to an existing share** (`POST /api/shares/{id}/documents`). Build a share across several filter/search views — select a subset, click "Add these" on a share in the Share dialog, change the filter, and add the next subset to the same share. Same guard rails as creation (admin/owner only, every document must belong to the share's patient); revoked shares refuse additions and already-shared documents are skipped.
+- Doctor shares: **permanently delete a share** (`DELETE /api/shares/{id}/purge`) via a new "Delete" action on the Shares dashboard. Removes the row plus its OTPs, sessions, queue entries, and audit history. Distinct from Revoke, which keeps the row flagged for the dashboard.
+
+### Fixed
+- Shares dashboard now LEFT JOINs users/patients when listing, so legacy/orphaned shares (whose creating user was deleted while FK enforcement was off — common for rows created before the revoke feature) appear in the list and can be purged instead of being silently invisible.
+
 ## [1.1.2] - 2026-05-09
 
 ### Added

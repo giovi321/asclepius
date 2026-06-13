@@ -6,12 +6,20 @@ in :mod:`entity_matching` (patient / doctor / facility) and
 :mod:`extractor_db` (normalized reference tables). Those modules are
 re-exported below so the existing ``from asclepius.pipeline.extractor
 import _upsert_doctor, _match_patient, …`` call sites keep working.
+
+The supporting vocabulary and heuristics were split into focused leaf
+modules and re-exported here so existing importers (``chunked_extraction``,
+``section_processor``, ``reprocessor``, ``processor``, …) keep working
+against the historic ``asclepius.pipeline.extractor`` paths:
+
+* :mod:`doc_types` — ``VALID_DOC_TYPES``, the alias table, ``_normalize_doc_type``.
+* :mod:`extraction_sanitize` — the LLM-output salvage/coercion helpers.
+* :mod:`extractor_writers` — the per-child-table DB-write helpers that
+  ``extract_and_store`` orchestrates.
 """
 
 import json
 import logging
-import re
-from datetime import date
 
 import aiosqlite
 
@@ -19,6 +27,12 @@ from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
 from asclepius.llm.prompts import canonical_language_directive as _canonical_language_directive
 
+from . import extractor_writers
+from .doc_types import (
+    VALID_DOC_TYPES,
+    _DOC_TYPE_ALIASES,
+    _normalize_doc_type,
+)
 from .entity_matching import (
     _match_patient,
     _resolve_specialty_from_doctor,
@@ -27,36 +41,24 @@ from .entity_matching import (
     normalize_name,
     strip_doctor_title,
 )
+from .extraction_sanitize import (
+    _ARRAY_KEY_ALIASES,
+    _ISO_DATE_RE,
+    _PLACEHOLDER_SENTINELS,
+    _clean,
+    _coerce_iso_date,
+    _is_missing,
+    _normalize_lab_row,
+    _parse_reference_range,
+    _salvage_array_keys,
+    _salvage_classification,
+)
 from .extractor_db import (
     _resolve_diagnosis,
     _resolve_lab_test,
     _resolve_medication,
     _resolve_specialty_from_data,
 )
-
-_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-
-def _coerce_iso_date(value) -> str | None:
-    """Return ``value`` as an ISO ``YYYY-MM-DD`` string, or None if unparseable.
-
-    The LLM occasionally emits placeholders like ``"unknown"``, ``"n/a"``, or
-    a malformed date such as ``"2024-13-40"``. We accept only strict ISO so
-    the document's ``event_date`` fallback can fire downstream.
-    """
-    if value is None:
-        return None
-    if isinstance(value, date):
-        return value.isoformat()
-    s = str(value).strip()
-    if not s or not _ISO_DATE_RE.match(s):
-        return None
-    try:
-        date.fromisoformat(s)
-    except ValueError:
-        return None
-    return s
-
 
 __all__ = [
     "build_extraction_context",
@@ -72,6 +74,21 @@ __all__ = [
     "_resolve_lab_test",
     "_resolve_diagnosis",
     "_resolve_medication",
+    # Re-exported from doc_types / extraction_sanitize so importers that
+    # reference them via ``asclepius.pipeline.extractor`` keep working.
+    "VALID_DOC_TYPES",
+    "_DOC_TYPE_ALIASES",
+    "_normalize_doc_type",
+    "_salvage_classification",
+    "_salvage_array_keys",
+    "_ARRAY_KEY_ALIASES",
+    "_PLACEHOLDER_SENTINELS",
+    "_is_missing",
+    "_clean",
+    "_parse_reference_range",
+    "_normalize_lab_row",
+    "_ISO_DATE_RE",
+    "_coerce_iso_date",
 ]
 
 logger = logging.getLogger(__name__)
@@ -193,406 +210,6 @@ async def _extract_type_specific(
         return {}
 
 
-VALID_DOC_TYPES = {
-    "invoice",
-    "prescription",
-    "specialist_report",
-    "surgical_report",
-    "discharge",
-    "lab_test",
-    "vaccination",
-    "medical_certificate",
-    "imaging_report",
-    "other",
-}
-
-# Fuzzy mapping for common LLM mistakes and legacy values. Maps any
-# old/aliased value to one of the canonical 10 codes in VALID_DOC_TYPES.
-_DOC_TYPE_ALIASES = {
-    # Lab tests
-    "bloodtest": "lab_test",
-    "blood test": "lab_test",
-    "blood_test": "lab_test",
-    "labtest_other": "lab_test",
-    "lab": "lab_test",
-    "laboratory": "lab_test",
-    "labtest": "lab_test",
-    # Specialist reports (catch-all for visits, consults, retired specialty types)
-    "report": "specialist_report",
-    "visit": "specialist_report",
-    "consultation": "specialist_report",
-    "checkup": "specialist_report",
-    "follow-up": "specialist_report",
-    "follow_up_report": "specialist_report",
-    "specialist": "specialist_report",
-    "visit_report": "specialist_report",
-    "medical_report": "specialist_report",
-    "clinical_report": "specialist_report",
-    "referto": "specialist_report",
-    "befund": "specialist_report",
-    "visita": "specialist_report",
-    "controllo": "specialist_report",
-    "pathology": "specialist_report",
-    "pathology_report": "specialist_report",
-    "histology": "specialist_report",
-    "er_report": "specialist_report",
-    "emergency": "specialist_report",
-    "er": "specialist_report",
-    "physio_report": "specialist_report",
-    "physiotherapy": "specialist_report",
-    "dental": "specialist_report",
-    "dentistry": "specialist_report",
-    "ophthalmology": "specialist_report",
-    "mental_health": "specialist_report",
-    "psychiatry": "specialist_report",
-    "psychology": "specialist_report",
-    # Surgical
-    "surgery": "surgical_report",
-    "operation": "surgical_report",
-    "operative_notes": "surgical_report",
-    "op_bericht": "surgical_report",
-    # Imaging (consolidated to imaging_report)
-    "radiology": "imaging_report",
-    "radiology_report": "imaging_report",
-    "xray": "imaging_report",
-    "x-ray": "imaging_report",
-    "imaging_dicom": "imaging_report",
-    "imaging_other": "imaging_report",
-    "imaging": "imaging_report",
-    # Invoices (incl. receipts)
-    "bill": "invoice",
-    "fattura": "invoice",
-    "rechnung": "invoice",
-    "billing": "invoice",
-    "nota": "invoice",
-    "conto": "invoice",
-    "tarmed": "invoice",
-    "honorarnote": "invoice",
-    "receipt": "invoice",
-    "receipt_payment": "invoice",
-    "payment": "invoice",
-    "ricevuta": "invoice",
-    "quittung": "invoice",
-    # Prescriptions (incl. referrals)
-    "ricetta": "prescription",
-    "rezept": "prescription",
-    "referral": "prescription",
-    "referral_letter": "prescription",
-    "ueberweisung": "prescription",
-    "uberweisung": "prescription",
-    # Discharge
-    "discharge_letter": "discharge",
-    "discharge_summary": "discharge",
-    # Vaccinations
-    "vaccine": "vaccination",
-    "immunization": "vaccination",
-    "impfung": "vaccination",
-    # Medical certificates (incl. sick leave)
-    "medical_cert": "medical_certificate",
-    "certificate": "medical_certificate",
-    "sick_leave": "medical_certificate",
-    "sick_note": "medical_certificate",
-    "zeugnis": "medical_certificate",
-    "arbeitsunfaehigkeit": "medical_certificate",
-    # Catch-all for retired types
-    "allergy": "other",
-    "insurance_claim": "other",
-    "insurance_doc": "other",
-    "consent": "other",
-    "advance_directive": "other",
-    "correspondence": "other",
-    "letter": "other",
-}
-
-
-def _normalize_doc_type(raw: str | None) -> str:
-    """Normalize a doc_type from LLM output to a valid code."""
-    if not raw:
-        return "other"
-    cleaned = raw.strip().lower().replace(" ", "_").replace("-", "_")
-    if cleaned in VALID_DOC_TYPES:
-        return cleaned
-    if cleaned in _DOC_TYPE_ALIASES:
-        return _DOC_TYPE_ALIASES[cleaned]
-    # Partial match
-    for alias, code in _DOC_TYPE_ALIASES.items():
-        if alias in cleaned or cleaned in alias:
-            return code
-    logger.warning("Unknown doc_type '%s', defaulting to 'other'", raw)
-    return "other"
-
-
-def _salvage_classification(c: dict) -> None:
-    """Try to map non-standard LLM keys to the expected classification schema.
-
-    Small models (e.g. qwen2.5:7b) often ignore the requested JSON schema and
-    return their own key names. This attempts to rescue useful data.
-    """
-    # Doctor name — LLM might use "responsible", "signing_doctor", "medico", etc.
-    if not c.get("doctor") or (isinstance(c.get("doctor"), dict) and not c["doctor"].get("name")):
-        for alt_key in ("responsible", "signing_doctor", "medico", "physician", "arzt"):
-            val = c.get(alt_key)
-            if val and isinstance(val, str):
-                c["doctor"] = {"name": val}
-                break
-            elif val and isinstance(val, dict) and val.get("name"):
-                c["doctor"] = val
-                break
-
-    # Facility — LLM might use "department", "hospital", "clinic", "struttura"
-    if not c.get("facility") or (
-        isinstance(c.get("facility"), dict) and not c["facility"].get("name")
-    ):
-        for alt_key in ("department", "hospital", "clinic", "struttura", "krankenhaus"):
-            val = c.get(alt_key)
-            if val and isinstance(val, str):
-                c["facility"] = {"name": val.split("\n")[0].strip()}
-                break
-            elif val and isinstance(val, dict) and val.get("name"):
-                c["facility"] = val
-                break
-
-    # Summary — LLM might use "conclusions", "summary", "riassunto", "zusammenfassung"
-    if not c.get("summary_en"):
-        for alt_key in ("conclusions", "summary", "riassunto", "zusammenfassung", "description"):
-            val = c.get(alt_key)
-            if val and isinstance(val, str):
-                c["summary_en"] = val[:500]
-                break
-            elif val and isinstance(val, list):
-                c["summary_en"] = "; ".join(str(x) for x in val[:5])[:500]
-                break
-
-    # Date — LLM might use "date", "visit_date", "data", "datum". We write
-    # the salvaged value back into the legacy doc_date key; the caller
-    # collapses doc_date/date_visit/date_issued/event_date into event_date
-    # before the DB write.
-    if not c.get("event_date") and not c.get("doc_date") and not c.get("date_visit"):
-        for alt_key in ("date", "visit_date", "data", "datum", "consultation_date"):
-            val = c.get(alt_key)
-            if val and isinstance(val, str) and len(val) >= 8:
-                c["doc_date"] = val
-                break
-
-    # Visit type → doc_type mapping
-    if not c.get("doc_type"):
-        visit_type = c.get("visit_type") or c.get("type") or c.get("document_type")
-        if visit_type and isinstance(visit_type, str):
-            c["doc_type"] = visit_type
-
-    # Patient name
-    if not c.get("patient_name"):
-        patient = c.get("patient")
-        if isinstance(patient, dict):
-            c["patient_name"] = patient.get("name") or patient.get("full_name")
-        elif isinstance(patient, str):
-            c["patient_name"] = patient
-
-
-# Aliases for extraction array keys. Small models (qwen2.5:14b and below)
-# frequently drop the "lab_" / "-es" prefixes/suffixes from the requested
-# schema. We remap anything list-shaped under a known alias into the
-# canonical key, but only if the canonical key is absent or empty.
-_ARRAY_KEY_ALIASES: dict[str, tuple[str, ...]] = {
-    "lab_results": ("results", "tests", "lab_tests", "test_results", "labResults", "blood_tests"),
-    "diagnoses": ("diagnosis", "diagnoses_list", "findings"),
-    "medications": ("medication", "drugs", "prescriptions"),
-    "vaccinations": ("vaccination", "vaccines", "immunizations"),
-    "encounters": ("encounter", "visits"),
-    "invoice_items": ("items", "line_items", "invoice_lines"),
-}
-
-
-def _salvage_array_keys(extraction: dict) -> None:
-    """Remap common LLM key-naming drift back onto the canonical keys."""
-    for canonical, aliases in _ARRAY_KEY_ALIASES.items():
-        existing = extraction.get(canonical)
-        if isinstance(existing, list) and existing:
-            continue
-        for alt in aliases:
-            val = extraction.get(alt)
-            if isinstance(val, list) and val:
-                extraction[canonical] = val
-                extraction.pop(alt, None)
-                logger.info("Salvaged LLM key '%s' → '%s' (%d items)", alt, canonical, len(val))
-                break
-
-
-# Strings the LLM emits when it could not find a real value. We treat
-# them as "no value" everywhere we read string fields, instead of letting
-# them bleed into the DB and the UI as if they were real content.
-_PLACEHOLDER_SENTINELS = {
-    "",
-    "*",
-    "-",
-    "—",
-    "–",
-    "_",
-    ".",
-    "..",
-    "...",
-    "n/a",
-    "n/a.",
-    "na",
-    "n.a.",
-    "n.a",
-    "n/d",
-    "nd",
-    "null",
-    "none",
-    "nil",
-    "nan",
-    "*/*",
-    "unknown",
-    "unspecified",
-    "not specified",
-    "not available",
-    "not provided",
-    "not applicable",
-    "no value",
-    "missing",
-    "illegible",
-    "unreadable",
-    "indecipherable",
-    "(empty)",
-    "(none)",
-    "(null)",
-    "(unknown)",
-    "(blank)",
-    "tbd",
-    "to be determined",
-}
-
-
-def _is_missing(val) -> bool:
-    """True if the LLM emitted a placeholder meaning 'no value'."""
-    if val is None:
-        return True
-    if isinstance(val, str):
-        return val.strip().lower() in _PLACEHOLDER_SENTINELS
-    return False
-
-
-def _clean(val):
-    """Normalize an LLM-extracted string field for DB insert.
-
-    Returns ``None`` for ``None``, empty strings, and any of the
-    ``_PLACEHOLDER_SENTINELS`` markers (case- and whitespace-insensitive).
-    Otherwise returns the value with surrounding whitespace stripped.
-    Non-string values pass through unchanged so numeric / boolean / date
-    fields aren't mangled.
-    """
-    if val is None:
-        return None
-    if not isinstance(val, str):
-        return val
-    stripped = val.strip()
-    if not stripped:
-        return None
-    if stripped.lower() in _PLACEHOLDER_SENTINELS:
-        return None
-    return stripped
-
-
-def _parse_reference_range(raw: str) -> tuple[float | None, float | None]:
-    """Parse strings like '[12 - 43]', '0.5–2.1', '< 5', '* - *' → (low, high).
-
-    Returns (None, None) when neither bound is a real number.
-    """
-    if not isinstance(raw, str):
-        return None, None
-    s = raw.strip().strip("[]()").strip()
-    if not s:
-        return None, None
-    # Normalize dash variants (en/em/minus) into ASCII "-"
-    for ch in ("–", "—", "−"):
-        s = s.replace(ch, "-")
-    low_s, high_s = None, None
-    if s.startswith("<"):
-        high_s = s[1:].strip().lstrip("=").strip()
-    elif s.startswith(">"):
-        low_s = s[1:].strip().lstrip("=").strip()
-    elif "-" in s:
-        parts = s.split("-", 1)
-        low_s, high_s = parts[0].strip(), parts[1].strip()
-
-    def _coerce(x):
-        if x is None or _is_missing(x):
-            return None
-        try:
-            return float(x.replace(",", "."))
-        except (ValueError, AttributeError):
-            return None
-
-    return _coerce(low_s), _coerce(high_s)
-
-
-def _normalize_lab_row(lab: dict) -> None:
-    """Make a single LLM-produced lab_results item match our schema.
-
-    Small models drift on key names (``analysis`` instead of ``test_name_original``,
-    ``result`` instead of ``value``) and embed abnormal markers like ``*`` into
-    the unit field. Rewrite the row in place so the caller doesn't have to
-    duplicate the logic.
-    """
-    # 1. Test name — support more aliases including 'analysis' / 'exam' / 'item'.
-    if not lab.get("test_name_original"):
-        for alt in (
-            "test_name",
-            "name",
-            "test",
-            "test_name_canonical",
-            "analyte",
-            "parameter",
-            "analysis",
-            "exam",
-            "item",
-            "label",
-        ):
-            v = lab.get(alt)
-            if isinstance(v, str) and v.strip():
-                lab["test_name_original"] = v.strip()
-                break
-
-    # 2. Value — 'result' / 'measurement' / 'observed_value' etc.
-    if lab.get("value") is None and not lab.get("value_text"):
-        raw_val = None
-        for alt in ("result", "measurement", "observed_value", "observed", "reading", "quantity"):
-            if alt in lab:
-                raw_val = lab[alt]
-                break
-        if not _is_missing(raw_val):
-            if isinstance(raw_val, (int, float)):
-                lab["value"] = float(raw_val)
-            elif isinstance(raw_val, str):
-                s = raw_val.strip().replace(",", ".")
-                try:
-                    lab["value"] = float(s)
-                except ValueError:
-                    lab["value_text"] = raw_val.strip()
-
-    # 3. Reference range — accept a single 'reference_range' string.
-    if lab.get("reference_range_low") is None and lab.get("reference_range_high") is None:
-        raw_range = lab.get("reference_range") or lab.get("range") or lab.get("ref_range")
-        low, high = _parse_reference_range(raw_range) if raw_range else (None, None)
-        if low is not None:
-            lab["reference_range_low"] = low
-        if high is not None:
-            lab["reference_range_high"] = high
-
-    # 4. Unit — some models prepend '*' as an abnormal marker (e.g. '* U/L').
-    #    Strip it and treat it as an abnormal hint if is_abnormal wasn't set.
-    unit = lab.get("unit")
-    if isinstance(unit, str):
-        stripped = unit.strip()
-        if stripped.startswith("*"):
-            lab["unit"] = stripped.lstrip("*").strip() or None
-            if lab.get("is_abnormal") is None:
-                lab["is_abnormal"] = True
-        elif _is_missing(stripped):
-            lab["unit"] = None
-
-
 async def classify_and_extract(
     db: aiosqlite.Connection,
     llm: LLMProvider,
@@ -700,6 +317,10 @@ async def extract_and_store(
     untouched in scoped mode. Used by the AI editor to "only overwrite
     lab tests" (or any subset) without disturbing the rest of the
     document. ``None`` keeps the original whole-document behaviour.
+
+    The per-child-table INSERTs live in :mod:`extractor_writers`; this
+    function is the orchestrator that prepares document-level state and
+    invokes each writer in the historic order.
     """
     _all_children = {"lab_results", "encounters", "medications", "vaccinations", "invoice_items"}
     _scope = scope if scope is not None else _all_children
@@ -918,176 +539,29 @@ async def extract_and_store(
         doc_best_date = drow[0] if drow else None
 
     if patient_id and "lab_results" in _scope:
-        for lab in extraction.get("lab_results", []):
-            if not isinstance(lab, dict):
-                continue
-            # Per-item schema drift salvage — promote aliases, parse combined
-            # reference-range strings, unwrap '*' placeholders. See
-            # _normalize_lab_row for the full list of heuristics.
-            _normalize_lab_row(lab)
-            if not lab.get("test_name_original"):
-                logger.warning("Doc %d: skipping lab result with no test name: %s", doc_id, lab)
-                continue
-            # Pre-populated by resolve_extraction above. Fall back to the
-            # legacy LLM-driven resolver for the edge case where
-            # resolve_extraction wasn't called (error path / override).
-            norm_id = lab.get("norm_lab_test_id")
-            if norm_id is None:
-                norm_id = await _resolve_lab_test(db, lab)
-            # Strict ISO parse: garbage strings ("unknown", "n/a", malformed
-            # dates) are dropped so the parent's event_date fallback fires.
-            lab_test_date = _coerce_iso_date(lab.get("test_date")) or doc_best_date
-            await db.execute(
-                """INSERT INTO lab_results
-                   (document_id, patient_id, test_name_original, norm_lab_test_id,
-                    value, value_text, unit, reference_range_low, reference_range_high,
-                    is_abnormal, sample_type, panel_name, test_date)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    doc_id,
-                    patient_id,
-                    _clean(lab.get("test_name_original")),
-                    norm_id,
-                    lab.get("value"),
-                    _clean(lab.get("value_text")),
-                    _clean(lab.get("unit")),
-                    lab.get("reference_range_low"),
-                    lab.get("reference_range_high"),
-                    lab.get("is_abnormal"),
-                    _clean(lab.get("sample_type")),
-                    _clean(lab.get("panel_name")),
-                    lab_test_date,
-                ),
-            )
-
-        # Belt-and-braces: if any lab rows still have NULL test_date but the
-        # parent document carries an event_date, copy it across. Covers the
-        # edge case where event_date is stamped after the lab loop runs (some
-        # extraction paths reorder).
-        await db.execute(
-            """UPDATE lab_results SET test_date = (
-                   SELECT event_date FROM documents WHERE id = ?
-               )
-               WHERE document_id = ? AND test_date IS NULL
-                 AND (SELECT event_date FROM documents WHERE id = ?) IS NOT NULL""",
-            (doc_id, doc_id, doc_id),
+        await extractor_writers.write_lab_results(
+            db, doc_id, patient_id, extraction, doc_best_date, logger
         )
 
     if patient_id and "encounters" in _scope:
-        # Insert encounters/diagnoses
-        encounter = extraction.get("encounter", {})
-        if not isinstance(encounter, dict):
-            encounter = {}
-        for diag in extraction.get("diagnoses", []):
-            if not isinstance(diag, dict):
-                continue
-            norm_diag_id = diag.get("norm_diagnosis_id")
-            if norm_diag_id is None:
-                norm_diag_id = await _resolve_diagnosis(db, diag)
-            # Specialty resolution now populates doctor["norm_specialty_id"]
-            # and encounter["norm_specialty_id"] directly. Prefer those, fall
-            # back to the legacy doctor-specialty-canonical path.
-            norm_spec_id = encounter.get("norm_specialty_id") or doctor_data.get(
-                "norm_specialty_id"
-            )
-            if norm_spec_id is None and doctor_data.get("specialty_canonical"):
-                norm_spec_id = await _resolve_specialty_from_doctor(db, doctor_data)
-
-            await db.execute(
-                """INSERT INTO encounters
-                   (document_id, patient_id, doctor_id, facility_id, encounter_date,
-                    admission_date, discharge_date, norm_diagnosis_id,
-                    diagnosis_original, diagnosis_code, norm_specialty_id,
-                    notes, findings, follow_up_date, follow_up_instructions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    doc_id,
-                    patient_id,
-                    doctor_id,
-                    facility_id,
-                    encounter.get("encounter_date") or event_date_val,
-                    encounter.get("admission_date"),
-                    encounter.get("discharge_date"),
-                    norm_diag_id,
-                    _clean(diag.get("diagnosis_original")),
-                    _clean(diag.get("icd10_code")),
-                    norm_spec_id,
-                    _clean(extraction.get("summary_en")),
-                    _clean(encounter.get("findings")),
-                    encounter.get("follow_up_date"),
-                    _clean(encounter.get("follow_up_instructions")),
-                ),
-            )
-
-        # If no diagnoses but encounter data exists, still create encounter
-        if not extraction.get("diagnoses") and encounter.get("encounter_date"):
-            await db.execute(
-                """INSERT INTO encounters
-                   (document_id, patient_id, doctor_id, facility_id, encounter_date,
-                    notes, findings, follow_up_date, follow_up_instructions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    doc_id,
-                    patient_id,
-                    doctor_id,
-                    facility_id,
-                    encounter.get("encounter_date"),
-                    _clean(extraction.get("summary_en")),
-                    _clean(encounter.get("findings")),
-                    encounter.get("follow_up_date"),
-                    _clean(encounter.get("follow_up_instructions")),
-                ),
-            )
+        await extractor_writers.write_encounters(
+            db,
+            doc_id,
+            patient_id,
+            extraction,
+            doctor_id,
+            facility_id,
+            doctor_data,
+            event_date_val,
+        )
 
     if patient_id and "medications" in _scope:
-        # Insert medications
-        for med in extraction.get("medications", []):
-            if not isinstance(med, dict):
-                continue
-            norm_med_id = med.get("norm_medication_id")
-            if norm_med_id is None:
-                norm_med_id = await _resolve_medication(db, med)
-            await db.execute(
-                """INSERT INTO medications
-                   (document_id, patient_id, norm_medication_id, brand_name,
-                    active_ingredient_original, dosage, form, frequency,
-                    duration, quantity, prescribed_date)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    doc_id,
-                    patient_id,
-                    norm_med_id,
-                    _clean(med.get("brand_name")),
-                    _clean(med.get("active_ingredient_original")),
-                    _clean(med.get("dosage")),
-                    _clean(med.get("form")),
-                    _clean(med.get("frequency")),
-                    _clean(med.get("duration")),
-                    _clean(med.get("quantity")),
-                    event_date_val,
-                ),
-            )
+        await extractor_writers.write_medications(
+            db, doc_id, patient_id, extraction, event_date_val
+        )
 
     if patient_id and "vaccinations" in _scope:
-        # Insert vaccinations
-        for vax in extraction.get("vaccinations", []):
-            if not isinstance(vax, dict):
-                continue
-            await db.execute(
-                """INSERT INTO vaccinations
-                   (document_id, patient_id, vaccine_name, manufacturer,
-                    lot_number, dose_number, date_administered)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    doc_id,
-                    patient_id,
-                    _clean(vax.get("vaccine_name")),
-                    _clean(vax.get("manufacturer")),
-                    _clean(vax.get("lot_number")),
-                    _clean(vax.get("dose_number")),
-                    vax.get("date_administered"),
-                ),
-            )
+        await extractor_writers.write_vaccinations(db, doc_id, patient_id, extraction)
 
     # Insert invoice line items (not gated on patient_id — invoices may not
     # have a patient). Skipped when ``invoice_items`` is outside the scope.
@@ -1096,27 +570,7 @@ async def extract_and_store(
         cost_data = {}
     if "invoice_items" not in _scope:
         cost_data = {}
-    for item in cost_data.get("line_items", []):
-        if not isinstance(item, dict) or not item.get("description"):
-            continue
-        await db.execute(
-            """INSERT INTO invoice_items
-               (document_id, patient_id, description, quantity, unit_price,
-                amount, currency, tariff_code, tax_rate, category)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                doc_id,
-                patient_id,
-                _clean(item["description"]),
-                item.get("quantity", 1),
-                item.get("unit_price"),
-                item.get("amount"),
-                cost_data.get("currency", "CHF"),
-                _clean(item.get("tariff_code")),
-                cost_data.get("tax_rate"),
-                _clean(item.get("category")),
-            ),
-        )
+    await extractor_writers.write_invoice_items(db, doc_id, patient_id, cost_data)
 
     await db.commit()
     return extraction

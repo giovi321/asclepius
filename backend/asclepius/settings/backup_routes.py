@@ -1,5 +1,6 @@
 """Audit log, on-demand backup download, and scheduled-backup endpoints."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from asclepius.auth.session import require_role
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -151,8 +153,9 @@ async def delete_scheduled_backup(
 
     try:
         target.unlink()
-    except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
+    except OSError:
+        logger.exception("Scheduled-backup delete failed for %s", safe)
+        raise HTTPException(status_code=500, detail="Delete failed")
 
     await audit_log(
         db,
@@ -183,8 +186,9 @@ async def run_scheduled_backup(
 
     try:
         path = await run_current_job(config)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Backup failed: {type(e).__name__}: {e}")
+    except Exception:
+        logger.exception("On-demand backup run failed")
+        raise HTTPException(status_code=500, detail="Backup failed")
 
     await audit_log(
         db,

@@ -391,8 +391,9 @@ async def link_document_to_event(
         )
         await db.commit()
         return {"ok": True}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Failed to link document %s to event %d", body.document_id, event_id)
+        raise HTTPException(status_code=400, detail="Failed to link document")
 
 
 @router.delete("/{event_id}/link/{document_id}", response_model=EventOkResponse)

@@ -324,11 +324,39 @@ def resolve_credential(config: AppConfig, credential_id: str) -> CredentialEntry
     return None
 
 
+def _enabled_by_priority(providers):
+    """Enabled providers sorted ascending by ``priority`` (stable)."""
+    return sorted((p for p in providers if p.enabled), key=lambda p: p.priority)
+
+
+def first_enabled_provider(providers, requested_id=None):
+    """Pick a provider from a provider list by the canonical selection rule.
+
+    - If ``requested_id`` is given and names an *enabled* provider in the
+      list, return that provider.
+    - Otherwise return the enabled provider with the lowest ``priority``
+      (ties broken by list order, like ``min``/``sorted``).
+    - Return ``None`` when no provider is enabled.
+
+    This is the single home for the "first enabled provider by priority"
+    rule that used to be copy-pasted as a local ``_first_enabled`` across the
+    document, share, and pipeline modules. It deliberately does *not* fall
+    back to a disabled provider — callers that need the legacy
+    "else first-overall" behaviour express it explicitly with
+    ``first_enabled_provider(items) or (items[0] if items else None)``.
+    """
+    if requested_id:
+        for p in providers:
+            if p.id == requested_id and p.enabled:
+                return p
+    enabled = _enabled_by_priority(providers)
+    return enabled[0] if enabled else None
+
+
 def _first_enabled_llm(config: AppConfig) -> LlmProviderEntry | None:
-    enabled = [p for p in config.llm.providers if p.enabled]
-    if enabled:
-        return min(enabled, key=lambda p: p.priority)
-    return config.llm.providers[0] if config.llm.providers else None
+    return first_enabled_provider(config.llm.providers) or (
+        config.llm.providers[0] if config.llm.providers else None
+    )
 
 
 def _apply_env_ollama_url(config: AppConfig, url: str) -> None:
@@ -518,10 +546,7 @@ def load_config() -> AppConfig:
 
 def get_active_llm_provider_config(config: AppConfig, priority: int = 1) -> LlmProviderEntry | None:
     """Get the enabled LLM provider at the given priority rank (1-based)."""
-    enabled = sorted(
-        [p for p in config.llm.providers if p.enabled],
-        key=lambda p: p.priority,
-    )
+    enabled = _enabled_by_priority(config.llm.providers)
     if 0 < priority <= len(enabled):
         return enabled[priority - 1]
     return None
@@ -531,10 +556,7 @@ def get_active_vision_provider_config(
     config: AppConfig, priority: int = 1
 ) -> VisionLlmProviderEntry | None:
     """Get the enabled Vision-LLM provider at the given priority rank (1-based)."""
-    enabled = sorted(
-        [p for p in config.vision.providers if p.enabled],
-        key=lambda p: p.priority,
-    )
+    enabled = _enabled_by_priority(config.vision.providers)
     if 0 < priority <= len(enabled):
         return enabled[priority - 1]
     return None
@@ -542,10 +564,7 @@ def get_active_vision_provider_config(
 
 def get_active_ocr_provider_config(config: AppConfig, priority: int = 1) -> OcrProviderEntry | None:
     """Get the enabled OCR provider at the given priority rank (1-based)."""
-    enabled = sorted(
-        [p for p in config.ocr.providers if p.enabled],
-        key=lambda p: p.priority,
-    )
+    enabled = _enabled_by_priority(config.ocr.providers)
     if 0 < priority <= len(enabled):
         return enabled[priority - 1]
     return None

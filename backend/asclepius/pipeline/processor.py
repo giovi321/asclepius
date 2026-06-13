@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 
-from asclepius.config import AppConfig
+from asclepius.config import AppConfig, first_enabled_provider
 from asclepius.db.connection import open_db
 from asclepius.documents.service import compute_file_hash, migrate_document_links
 from asclepius.pipeline.ocr import extract_text
@@ -325,10 +325,8 @@ async def process_file(file_path: str, config: AppConfig) -> None:
             # same selection logic the upload flow itself uses, so the badge
             # matches reality even when no explicit override is in play.
             def _first_enabled_id(items):
-                enabled = [p for p in items if getattr(p, "enabled", False)]
-                if enabled:
-                    return min(enabled, key=lambda p: getattr(p, "priority", 0)).id
-                return items[0].id if items else None
+                p = first_enabled_provider(items) or (items[0] if items else None)
+                return p.id if p else None
 
             upload_providers: dict[str, str | None] = {}
             if flow == "vision_llm":
@@ -703,11 +701,9 @@ async def process_file(file_path: str, config: AppConfig) -> None:
                     )
                 # Fallback to summary slug if AI failed
                 if not summary_slug and doc["summary_en"]:
-                    import re as _re
+                    from asclepius.util.text import slugify_loose
 
-                    summary_slug = doc["summary_en"][:60].lower()
-                    summary_slug = _re.sub(r"[^a-z0-9]+", "-", summary_slug)
-                    summary_slug = _re.sub(r"-+", "-", summary_slug).strip("-")
+                    summary_slug = slugify_loose(doc["summary_en"][:60])
 
             best_date = best_date_with_received(doc) if doc else None
 

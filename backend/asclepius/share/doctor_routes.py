@@ -23,7 +23,7 @@ from fastapi.responses import Response as FastAPIResponse
 from pydantic import BaseModel, Field
 
 from asclepius.audit.service import get_client_ip
-from asclepius.config import get_config
+from asclepius.config import first_enabled_provider, get_config
 from asclepius.db.connection import get_db
 from asclepius.documents.service import (
     get_document,
@@ -530,10 +530,11 @@ async def share_translate(
     from asclepius.pipeline.watcher import enqueue_job
 
     def _first_enabled(items):
-        enabled = [p for p in items if getattr(p, "enabled", False)]
-        if enabled:
-            return min(enabled, key=lambda p: getattr(p, "priority", 0))
-        return items[0] if items else None
+        # SHARE TRUST BOUNDARY: this is fed the system config provider list
+        # only (cfg.llm/ocr.providers) and is NEVER passed a request-derived
+        # ``requested_id`` — the doctor side cannot steer which provider runs.
+        # Falls back to the first provider overall so a model badge is shown.
+        return first_enabled_provider(items) or (items[0] if items else None)
 
     # Provider resolution is admin-only: per-share default → system
     # translation default → first-enabled. The doctor cannot influence it.
@@ -634,10 +635,11 @@ async def share_translate_region(
     from asclepius.pipeline.watcher import enqueue_job
 
     def _first_enabled(items):
-        enabled = [p for p in items if getattr(p, "enabled", False)]
-        if enabled:
-            return min(enabled, key=lambda p: getattr(p, "priority", 0))
-        return items[0] if items else None
+        # SHARE TRUST BOUNDARY: this is fed the system config provider list
+        # only (cfg.llm/ocr.providers) and is NEVER passed a request-derived
+        # ``requested_id`` — the doctor side cannot steer which provider runs.
+        # Falls back to the first provider overall so a model badge is shown.
+        return first_enabled_provider(items) or (items[0] if items else None)
 
     # Provider resolution ladder — admin-controlled only. The doctor
     # surface intentionally offers no provider override (see the request

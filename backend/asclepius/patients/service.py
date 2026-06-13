@@ -1,17 +1,12 @@
 """Patient business logic."""
 
-import re
-
 import aiosqlite
 
+from asclepius.util.text import slugify as slugify
 
-def slugify(name: str) -> str:
-    """Convert a display name to a slug for folder naming."""
-    slug = name.lower().strip()
-    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
-    slug = re.sub(r"[\s]+", "-", slug)
-    slug = re.sub(r"-+", "-", slug)
-    return slug.strip("-")
+# ``slugify`` is re-exported from ``asclepius.util.text`` (the shared home for
+# the display-name slug). Kept importable here for the existing
+# ``from asclepius.patients.service import slugify`` call sites and tests.
 
 
 async def unique_patient_slug(

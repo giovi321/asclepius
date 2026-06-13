@@ -27,6 +27,7 @@ from .models import (
     VisionLlmProviderEntry,
 )
 from .resolver import (
+    first_enabled_provider,
     generate_secret_key,
     get_active_llm_provider_config,
     get_active_ocr_provider_config,
@@ -59,6 +60,7 @@ __all__ = [
     "VaultConfig",
     "VisionConfig",
     "VisionLlmProviderEntry",
+    "first_enabled_provider",
     "generate_secret_key",
     "get_active_llm_provider_config",
     "get_active_ocr_provider_config",

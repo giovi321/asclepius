@@ -20,7 +20,7 @@ import fitz  # pymupdf
 import pytesseract
 from PIL import Image
 
-from asclepius.config import AppConfig, OcrProviderEntry
+from asclepius.config import AppConfig, OcrProviderEntry, first_enabled_provider
 from asclepius.db.connection import open_db
 from asclepius.llm.prompt_manager import get_prompt
 from asclepius.pipeline.ocr import _llm_vision_page_with_retry
@@ -56,15 +56,7 @@ def _is_cancelled(doc_id: int) -> bool:
 def _resolve_ocr_provider(
     config: AppConfig, ocr_provider_id: str | None
 ) -> OcrProviderEntry | None:
-    if ocr_provider_id:
-        for p in config.ocr.providers:
-            if p.id == ocr_provider_id and p.enabled:
-                return p
-    enabled = sorted(
-        (p for p in config.ocr.providers if p.enabled),
-        key=lambda p: p.priority,
-    )
-    return enabled[0] if enabled else None
+    return first_enabled_provider(config.ocr.providers, ocr_provider_id)
 
 
 async def _ocr_pil_image(

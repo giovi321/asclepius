@@ -16,7 +16,7 @@ import aiosqlite
 from asclepius.auth.session import get_current_user, require_role
 from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.authz import require_document_access
-from asclepius.config import get_config
+from asclepius.config import first_enabled_provider, get_config
 from asclepius.db.connection import get_db
 from asclepius.util.dates import best_date_with_received
 from asclepius.documents.service import (
@@ -760,10 +760,9 @@ async def reprocess_doc(
     cfg = _get_config()
 
     def _first_enabled(items):
-        enabled = [p for p in items if getattr(p, "enabled", False)]
-        if enabled:
-            return min(enabled, key=lambda p: getattr(p, "priority", 0))
-        return items[0] if items else None
+        # First enabled by priority; fall back to the first provider overall
+        # (even if disabled) so the dashboard always shows a concrete model.
+        return first_enabled_provider(items) or (items[0] if items else None)
 
     queued_providers: dict[str, str | None] = {}
     if body.mode in ("ocr", "both", "llm"):
@@ -845,10 +844,9 @@ async def translate_doc(
     cfg = get_config()
 
     def _first_enabled(items):
-        enabled = [p for p in items if getattr(p, "enabled", False)]
-        if enabled:
-            return min(enabled, key=lambda p: getattr(p, "priority", 0))
-        return items[0] if items else None
+        # First enabled by priority; fall back to the first provider overall
+        # (even if disabled) so the dashboard always shows a concrete model.
+        return first_enabled_provider(items) or (items[0] if items else None)
 
     queued_providers: dict[str, str | None] = {}
     llm_id = body.llm_provider_id
@@ -912,10 +910,9 @@ async def translate_region_endpoint(
     cfg = get_config()
 
     def _first_enabled(items):
-        enabled = [p for p in items if getattr(p, "enabled", False)]
-        if enabled:
-            return min(enabled, key=lambda p: getattr(p, "priority", 0))
-        return items[0] if items else None
+        # First enabled by priority; fall back to the first provider overall
+        # (even if disabled) so the dashboard always shows a concrete model.
+        return first_enabled_provider(items) or (items[0] if items else None)
 
     queued_providers: dict[str, str | None] = {}
     ocr_id = body.ocr_provider_id

@@ -12,6 +12,87 @@ import aiosqlite
 from asclepius.pipeline.entity_matching import canonicalize_code
 
 
+async def _resolve_norm(
+    db: aiosqlite.Connection,
+    *,
+    main_table: str,
+    alias_table: str,
+    fk_col: str,
+    canonical: str,
+    original: str,
+    extra_cols: dict[str, object] | None = None,
+    lookup_by_canonical: bool = True,
+    reselect_on_conflict: bool = False,
+) -> int | None:
+    """Shared resolver for the ``norm_*`` reference tables.
+
+    Behaviour (identical to the per-entity resolvers it replaces):
+
+    1. If ``canonical`` is set *and* ``lookup_by_canonical`` is True, look it
+       up in ``main_table`` by ``canonical_code`` and return the existing id
+       on a hit. (Lab tests pass ``lookup_by_canonical=False`` when the LLM
+       did not flag the row as mapped — mirroring the old ``mapped and
+       canonical`` gate, which only ever guarded this first lookup.)
+    2. Otherwise (or on miss), look the ``original`` text up against
+       ``alias_table`` by ``alias = ? COLLATE NOCASE`` and return that id.
+    3. If ``canonical`` is set and still unmatched, create the canonical row
+       (carrying any ``extra_cols``), insert the original as an
+       ``auto_mapped=1`` alias, and return the new id. On an
+       ``INSERT OR IGNORE`` that hit an existing row (no lastrowid), re-select
+       by ``canonical_code``.
+
+    Callers extract the canonical/original fields themselves because the
+    source dict keys differ per entity.
+    """
+    if canonical and lookup_by_canonical:
+        cursor = await db.execute(
+            f"SELECT id FROM {main_table} WHERE canonical_code = ?", (canonical,)
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+
+    cursor = await db.execute(
+        f"SELECT {fk_col} FROM {alias_table} WHERE alias = ? COLLATE NOCASE",
+        (original,),
+    )
+    row = await cursor.fetchone()
+    if row:
+        return row[0]
+
+    if canonical:
+        display = canonical.replace("-", " ").replace("_", " ").title()
+        extra_cols = extra_cols or {}
+        col_names = ["canonical_code", "canonical_display", *extra_cols.keys()]
+        placeholders = ", ".join(["?"] * len(col_names))
+        params = [canonical, display, *extra_cols.values()]
+        cursor = await db.execute(
+            f"INSERT OR IGNORE INTO {main_table} "
+            f"({', '.join(col_names)}) VALUES ({placeholders})",
+            params,
+        )
+        if cursor.lastrowid:
+            new_id = cursor.lastrowid
+            await db.execute(
+                f"INSERT OR IGNORE INTO {alias_table} "
+                f"({fk_col}, alias, auto_mapped) VALUES (?, ?, 1)",
+                (new_id, original),
+            )
+            return new_id
+        # The INSERT was ignored (canonical_code already exists). Lab tests
+        # re-select to recover the id; diagnosis/medication historically fell
+        # through to ``None`` here, so they leave ``reselect_on_conflict``
+        # False to preserve that.
+        if reselect_on_conflict:
+            cursor = await db.execute(
+                f"SELECT id FROM {main_table} WHERE canonical_code = ?", (canonical,)
+            )
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    return None
+
+
 async def _resolve_specialty_from_data(
     db: aiosqlite.Connection, specialty_data: dict
 ) -> int | None:
@@ -35,42 +116,19 @@ async def _resolve_lab_test(db: aiosqlite.Connection, lab: dict) -> int | None:
     original = lab.get("test_name_original", "")
     mapped = lab.get("test_mapped", False)
 
-    if mapped and canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    cursor = await db.execute(
-        "SELECT norm_lab_test_id FROM norm_lab_test_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
+    # Lab tests only trust the canonical *lookup* when the LLM flagged the row
+    # as mapped; the auto-create path still uses ``canonical`` if present,
+    # matching the original ``mapped and canonical`` / ``if canonical`` split.
+    return await _resolve_norm(
+        db,
+        main_table="norm_lab_tests",
+        alias_table="norm_lab_test_aliases",
+        fk_col="norm_lab_test_id",
+        canonical=canonical,
+        original=original,
+        lookup_by_canonical=mapped,
+        reselect_on_conflict=True,
     )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    if canonical:
-        display = canonical.replace("-", " ").replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_lab_tests (canonical_code, canonical_display) VALUES (?, ?)",
-            (canonical, display),
-        )
-        if cursor.lastrowid:
-            test_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_lab_test_aliases (norm_lab_test_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (test_id, original),
-            )
-            return test_id
-        cursor = await db.execute(
-            "SELECT id FROM norm_lab_tests WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        return row[0] if row else None
-
-    return None
 
 
 async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None:
@@ -78,37 +136,15 @@ async def _resolve_diagnosis(db: aiosqlite.Connection, diag: dict) -> int | None
     canonical = canonicalize_code(diag.get("diagnosis_canonical", "")) or ""
     original = diag.get("diagnosis_original", "")
 
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_diagnoses WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    cursor = await db.execute(
-        "SELECT norm_diagnosis_id FROM norm_diagnosis_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
+    return await _resolve_norm(
+        db,
+        main_table="norm_diagnoses",
+        alias_table="norm_diagnosis_aliases",
+        fk_col="norm_diagnosis_id",
+        canonical=canonical,
+        original=original,
+        extra_cols={"icd10_code": diag.get("icd10_code")},
     )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    if canonical:
-        display = canonical.replace("-", " ").replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_diagnoses (canonical_code, canonical_display, icd10_code) VALUES (?, ?, ?)",
-            (canonical, display, diag.get("icd10_code")),
-        )
-        if cursor.lastrowid:
-            diag_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_diagnosis_aliases (norm_diagnosis_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (diag_id, original),
-            )
-            return diag_id
-
-    return None
 
 
 async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None:
@@ -116,34 +152,11 @@ async def _resolve_medication(db: aiosqlite.Connection, med: dict) -> int | None
     canonical = canonicalize_code(med.get("active_ingredient_canonical", "")) or ""
     original = med.get("active_ingredient_original", "")
 
-    if canonical:
-        cursor = await db.execute(
-            "SELECT id FROM norm_medications WHERE canonical_code = ?", (canonical,)
-        )
-        row = await cursor.fetchone()
-        if row:
-            return row[0]
-
-    cursor = await db.execute(
-        "SELECT norm_medication_id FROM norm_medication_aliases WHERE alias = ? COLLATE NOCASE",
-        (original,),
+    return await _resolve_norm(
+        db,
+        main_table="norm_medications",
+        alias_table="norm_medication_aliases",
+        fk_col="norm_medication_id",
+        canonical=canonical,
+        original=original,
     )
-    row = await cursor.fetchone()
-    if row:
-        return row[0]
-
-    if canonical:
-        display = canonical.replace("-", " ").replace("_", " ").title()
-        cursor = await db.execute(
-            "INSERT OR IGNORE INTO norm_medications (canonical_code, canonical_display) VALUES (?, ?)",
-            (canonical, display),
-        )
-        if cursor.lastrowid:
-            med_id = cursor.lastrowid
-            await db.execute(
-                "INSERT OR IGNORE INTO norm_medication_aliases (norm_medication_id, alias, auto_mapped) VALUES (?, ?, 1)",
-                (med_id, original),
-            )
-            return med_id
-
-    return None

@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 
 from asclepius.config import AppConfig
+from asclepius.util.text import slugify, slugify_loose
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,7 @@ async def generate_ai_filename(llm, doc_metadata: dict) -> str | None:
         # Remove any extension the LLM might have added
         name = re.sub(r"\.[a-z]{2,4}$", "", name)
         # Sanitize to slug
-        name = name.lower()
-        name = re.sub(r"[^a-z0-9]+", "-", name)
-        name = re.sub(r"-+", "-", name).strip("-")
+        name = slugify_loose(name)
         # Enforce reasonable length (3-60 chars)
         if len(name) < 3:
             return None
@@ -74,10 +73,7 @@ def build_organized_path(
 
     name_part = summary_slug or doc_type or "document"
     # Ensure max 60 chars, lowercase, alphanumeric + hyphens only
-    name_part = name_part.lower()
-    name_part = re.sub(r"[^a-z0-9]+", "-", name_part)
-    name_part = re.sub(r"-+", "-", name_part).strip("-")
-    name_part = name_part[:60]
+    name_part = slugify_loose(name_part)[:60]
 
     filename = f"{date_prefix}_{name_part}{ext}"
     # Sanitize
@@ -95,12 +91,8 @@ def build_organized_path(
 
 
 def slugify_event(title: str) -> str:
-    """Convert an event title to a folder-safe slug."""
-    slug = title.lower().strip()
-    slug = re.sub(r"[^a-z0-9\s-]", "", slug)
-    slug = re.sub(r"[\s]+", "-", slug)
-    slug = re.sub(r"-+", "-", slug)
-    return slug.strip("-")[:60]  # limit length
+    """Convert an event title to a folder-safe slug (max 60 chars)."""
+    return slugify(title, max_length=60)
 
 
 def move_file(

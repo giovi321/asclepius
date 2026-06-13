@@ -9,7 +9,7 @@ import pytesseract
 from PIL import Image
 
 from asclepius.config import AppConfig, OcrProviderEntry, resolve_credential
-from asclepius.config.resolver import _first_enabled_llm
+from asclepius.config.resolver import _first_enabled_llm, first_enabled_provider
 from asclepius.llm.gate import credential_slot, register_credential
 from asclepius.pipeline.vision_io import (
     MAX_IMAGE_BYTES as MAX_IMAGE_BYTES,  # re-export for callers/tests
@@ -239,18 +239,9 @@ async def extract_text_for_pages(
 
     # Resolve the provider to use. We mirror the priority logic from
     # ``extract_text`` (chosen id wins, otherwise highest-priority enabled).
-    provider: OcrProviderEntry | None = None
-    if ocr_provider_id:
-        for p in config.ocr.providers:
-            if p.id == ocr_provider_id and p.enabled:
-                provider = p
-                break
-    if provider is None:
-        enabled = sorted(
-            [p for p in config.ocr.providers if p.enabled],
-            key=lambda p: p.priority,
-        )
-        provider = enabled[0] if enabled else None
+    provider: OcrProviderEntry | None = first_enabled_provider(
+        config.ocr.providers, ocr_provider_id
+    )
 
     requested = sorted({int(n) for n in page_numbers if int(n) >= 1})
     if not requested:

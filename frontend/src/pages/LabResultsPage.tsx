@@ -5,6 +5,8 @@ import { getErrorMessage } from "@/lib/errors";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 import {
   AlertTriangle,
   Check,
@@ -586,15 +588,12 @@ export default function LabResultsPage() {
       )}
 
       {/* Orphan review modal */}
-      {showOrphans && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowOrphans(false)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-4 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+      <Modal
+        open={showOrphans}
+        onClose={() => setShowOrphans(false)}
+        zIndexClassName="z-[80]"
+        panelClassName="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-4 shadow-xl"
+      >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-semibold">
                 Orphan lab results ({orphans.length})
@@ -637,23 +636,18 @@ export default function LabResultsPage() {
               ))}
             </div>
             <div className="mt-3 flex justify-end gap-2">
-              <button
-                onClick={() => setShowOrphans(false)}
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-              >
+              <Button variant="secondary" onClick={() => setShowOrphans(false)}>
                 Close
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
                 onClick={deleteAllOrphans}
                 disabled={orphanBusy === "all"}
-                className="rounded-md bg-destructive px-3 py-1.5 text-sm text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               >
                 {orphanBusy === "all" ? "Deleting..." : "Delete all"}
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

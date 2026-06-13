@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Save, X } from "lucide-react";
 import type { Credential } from "@/types";
 import { getErrorMessage } from "@/lib/errors";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 import { CREDENTIAL_TYPES } from "./types";
 
 export interface CredentialDialogProps {
@@ -82,24 +84,21 @@ export default function CredentialDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      panelClassName="w-full max-w-md rounded-lg border bg-background p-5 shadow-xl space-y-3 max-h-[90vh] overflow-y-auto"
     >
-      <div
-        className="w-full max-w-md rounded-lg border bg-background p-5 shadow-xl space-y-3 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">
-            {initial.id ? "Edit provider" : "New provider"}
-          </h3>
-          <button onClick={onClose} className="rounded-md p-1 hover:bg-accent">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold">
+          {initial.id ? "Edit provider" : "New provider"}
+        </h3>
+        <button onClick={onClose} className="rounded-md p-1 hover:bg-accent">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
-        <label className="space-y-1 block">
+      <label className="space-y-1 block">
           <span className="text-sm font-medium">Name</span>
           <input
             type="text"
@@ -224,22 +223,14 @@ export default function CredentialDialog({
         )}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            onClick={onClose}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={saving} className="px-4 py-1.5">
             <Save className="h-3.5 w-3.5" />
             {saving ? "Saving..." : "Save"}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

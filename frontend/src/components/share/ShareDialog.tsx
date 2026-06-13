@@ -14,6 +14,8 @@ import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
+import Modal from "@/components/ui/Modal";
+import ProviderSelect from "@/components/ui/ProviderSelect";
 
 // Same shape as backend `_EMAIL_RE`; client-side guard so the user
 // gets a hint before the round trip.
@@ -259,8 +261,13 @@ export default function ShareDialog({
       : `${documentIds.length} documents`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-lg bg-card border shadow-lg max-h-[90vh] overflow-y-auto">
+    <Modal
+      open
+      onClose={onClose}
+      closeOnBackdropClick={false}
+      closeOnEscape={false}
+      panelClassName="w-full max-w-2xl rounded-lg bg-card border shadow-lg max-h-[90vh] overflow-y-auto"
+    >
         <div className="flex items-center justify-between border-b px-5 py-3">
           <h2 className="font-semibold">Share with doctor</h2>
           <button onClick={onClose} className="rounded p-1.5 hover:bg-accent">
@@ -383,35 +390,23 @@ export default function ShareDialog({
                   <label className="block text-xs font-medium mb-1">
                     OCR provider for translation
                   </label>
-                  <select
+                  <ProviderSelect
+                    kind="ocr"
                     value={ocrProviderId}
-                    onChange={(e) => setOcrProviderId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {ocrOptions.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setOcrProviderId}
+                    options={ocrOptions}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">
                     LLM provider for translation
                   </label>
-                  <select
+                  <ProviderSelect
+                    kind="llm"
                     value={llmProviderId}
-                    onChange={(e) => setLlmProviderId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {llmOptions.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setLlmProviderId}
+                    options={llmOptions}
+                  />
                 </div>
               </div>
               <div className="flex justify-end">
@@ -608,8 +603,7 @@ export default function ShareDialog({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

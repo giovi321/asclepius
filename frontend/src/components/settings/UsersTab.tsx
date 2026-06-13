@@ -5,6 +5,8 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { Plus, Trash2, ScrollText, UserCog, X, Check } from "lucide-react";
 import { usePatients } from "@/hooks/data";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 
 interface Patient {
   id: number;
@@ -552,14 +554,30 @@ function AccessModal({
   if (!user) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
+    <Modal
+      open
+      onClose={onClose}
+      zIndexClassName="z-[80]"
+      panelClassName="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border bg-background shadow-xl flex flex-col"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={save}
+            disabled={saving || changeCount === 0}
+            className="px-4 py-1.5 disabled:opacity-50"
+          >
+            {saving
+              ? "Saving..."
+              : changeCount === 0
+                ? "No changes"
+                : `Apply ${changeCount} change${changeCount === 1 ? "" : "s"}`}
+          </Button>
+        </>
+      }
     >
-      <div
-        className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border bg-background shadow-xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
             <h3 className="text-base font-semibold">Patient access</h3>
@@ -653,27 +671,6 @@ function AccessModal({
             </ul>
           )}
         </div>
-
-        <div className="flex items-center justify-end gap-2 border-t p-3">
-          <button
-            onClick={onClose}
-            className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving || changeCount === 0}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {saving
-              ? "Saving..."
-              : changeCount === 0
-                ? "No changes"
-                : `Apply ${changeCount} change${changeCount === 1 ? "" : "s"}`}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

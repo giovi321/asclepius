@@ -3,6 +3,7 @@ import { ChevronDown, Crop, FileText, Languages } from "lucide-react";
 import api from "@/api/client";
 import { useLlmProviders, useOcrProviders } from "@/hooks/data";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import ProviderSelect, { type Provider } from "@/components/ui/ProviderSelect";
 
 export interface TranslateMenuProps {
   docId: number | string;
@@ -19,12 +20,6 @@ export interface TranslateMenuProps {
     ocrProviderId: string | null;
     llmProviderId: string | null;
   }) => void;
-}
-
-interface Provider {
-  id: string;
-  name?: string | null;
-  enabled: boolean;
 }
 
 type Tab = "doc" | "region";
@@ -155,18 +150,12 @@ export default function TranslateMenu({
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     LLM Provider
                   </p>
-                  <select
+                  <ProviderSelect
+                    kind="llm"
                     value={llmId}
-                    onChange={(e) => setLlmId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {llmProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setLlmId}
+                    options={llmProviders}
+                  />
                 </div>
               )}
               <button
@@ -192,18 +181,12 @@ export default function TranslateMenu({
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     OCR Engine
                   </p>
-                  <select
+                  <ProviderSelect
+                    kind="ocr"
                     value={ocrId}
-                    onChange={(e) => setOcrId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {ocrProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setOcrId}
+                    options={ocrProviders}
+                  />
                 </div>
               )}
               {llmProviders.length === 0 ? (
@@ -215,18 +198,12 @@ export default function TranslateMenu({
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     LLM Provider
                   </p>
-                  <select
+                  <ProviderSelect
+                    kind="llm"
                     value={llmId}
-                    onChange={(e) => setLlmId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {llmProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setLlmId}
+                    options={llmProviders}
+                  />
                 </div>
               )}
               <button

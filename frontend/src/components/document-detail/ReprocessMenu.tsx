@@ -7,18 +7,13 @@ import {
   useVisionProviders,
 } from "@/hooks/data";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import ProviderSelect, { type Provider } from "@/components/ui/ProviderSelect";
 
 export interface ReprocessMenuProps {
   docId: number | string;
   /** Optional gate: return false to cancel the reprocess (e.g. after a confirm dialog). */
   onBeforeReprocess?: () => Promise<boolean> | boolean;
   onReprocessed: () => Promise<void> | void;
-}
-
-interface Provider {
-  id: string;
-  name?: string | null;
-  enabled: boolean;
 }
 
 /**
@@ -120,18 +115,12 @@ export default function ReprocessMenu({
                   Document Analysis → Vision-LLM Providers.
                 </p>
               ) : (
-                <select
+                <ProviderSelect
+                  kind="vision"
                   value={visionId}
-                  onChange={(e) => setVisionId(e.target.value)}
-                  className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                >
-                  <option value="">Default (highest priority)</option>
-                  {visionProviders.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name || p.id}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setVisionId}
+                  options={visionProviders}
+                />
               )}
             </div>
           ) : (
@@ -141,18 +130,12 @@ export default function ReprocessMenu({
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     OCR Provider
                   </p>
-                  <select
+                  <ProviderSelect
+                    kind="ocr"
                     value={ocrId}
-                    onChange={(e) => setOcrId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {ocrProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setOcrId}
+                    options={ocrProviders}
+                  />
                 </div>
               )}
               {mode !== "ocr" && llmProviders.length > 0 && (
@@ -160,18 +143,12 @@ export default function ReprocessMenu({
                   <p className="text-xs font-medium text-muted-foreground mb-1">
                     LLM Provider
                   </p>
-                  <select
+                  <ProviderSelect
+                    kind="llm"
                     value={llmId}
-                    onChange={(e) => setLlmId(e.target.value)}
-                    className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Default (highest priority)</option>
-                    {llmProviders.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name || p.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setLlmId}
+                    options={llmProviders}
+                  />
                 </div>
               )}
             </>

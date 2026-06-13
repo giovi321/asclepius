@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 import aiosqlite
-from asclepius.auth.session import get_current_user
+from asclepius.auth.session import get_current_user, require_role
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.normalization.auto_merge import suggest_merges
@@ -159,7 +159,9 @@ async def get_norm(
     return result
 
 
-@router.patch("/{norm_type}/{norm_id}")
+@router.patch(
+    "/{norm_type}/{norm_id}", dependencies=[Depends(require_role("admin", "editor"))]
+)
 async def update_norm(
     norm_type: str,
     norm_id: int,
@@ -190,7 +192,10 @@ async def update_norm(
         raise HTTPException(status_code=500, detail=f"Update failed: {e}") from e
 
 
-@router.post("/{norm_type}/{norm_id}/aliases")
+@router.post(
+    "/{norm_type}/{norm_id}/aliases",
+    dependencies=[Depends(require_role("admin", "editor"))],
+)
 async def add_alias(
     norm_type: str,
     norm_id: int,
@@ -203,7 +208,10 @@ async def add_alias(
     return await svc.add_alias(norm_id, body.alias, body.language)
 
 
-@router.delete("/{norm_type}/aliases/{alias_id}")
+@router.delete(
+    "/{norm_type}/aliases/{alias_id}",
+    dependencies=[Depends(require_role("admin", "editor"))],
+)
 async def remove_alias(
     norm_type: str,
     alias_id: int,
@@ -216,7 +224,10 @@ async def remove_alias(
     return {"ok": True}
 
 
-@router.post("/{norm_type}/{norm_id}/confirm")
+@router.post(
+    "/{norm_type}/{norm_id}/confirm",
+    dependencies=[Depends(require_role("admin", "editor"))],
+)
 async def confirm_aliases(
     norm_type: str,
     norm_id: int,
@@ -229,7 +240,9 @@ async def confirm_aliases(
     return {"ok": True}
 
 
-@router.post("/{norm_type}/merge")
+@router.post(
+    "/{norm_type}/merge", dependencies=[Depends(require_role("admin", "editor"))]
+)
 async def merge_norms(
     norm_type: str,
     body: MergeRequest,
@@ -242,7 +255,10 @@ async def merge_norms(
     return {"ok": True}
 
 
-@router.post("/{norm_type}/merge-batch")
+@router.post(
+    "/{norm_type}/merge-batch",
+    dependencies=[Depends(require_role("admin", "editor"))],
+)
 async def merge_norms_batch(
     norm_type: str,
     body: MergeBatchRequest,
@@ -282,7 +298,9 @@ async def merge_norms_batch(
     }
 
 
-@router.delete("/{norm_type}/{norm_id}")
+@router.delete(
+    "/{norm_type}/{norm_id}", dependencies=[Depends(require_role("admin", "editor"))]
+)
 async def delete_norm(
     norm_type: str,
     norm_id: int,
@@ -308,10 +326,22 @@ async def list_linked_documents(
 ):
     tables = _validate_type(norm_type)
     svc = NormService(db, tables)
-    return await svc.list_documents(norm_id)
+    # A norm entry is shared across every patient, so non-admins must only see
+    # documents on patients they have access to — otherwise this leaks other
+    # patients' filenames and display names.
+    accessible: set[int] | None = None
+    if current_user.get("role") != "admin":
+        cursor = await db.execute(
+            "SELECT patient_id FROM user_patient_access WHERE user_id = ?",
+            (current_user["id"],),
+        )
+        accessible = {row[0] for row in await cursor.fetchall()}
+    return await svc.list_documents(norm_id, accessible)
 
 
-@router.post("/{norm_type}/auto-merge")
+@router.post(
+    "/{norm_type}/auto-merge", dependencies=[Depends(require_role("admin", "editor"))]
+)
 async def auto_merge_proposals(
     norm_type: str,
     current_user: dict = Depends(get_current_user),

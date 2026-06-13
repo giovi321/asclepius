@@ -55,6 +55,25 @@ async def _require_patient_access(
             raise HTTPException(status_code=403, detail="No access to this patient")
 
 
+async def _require_document_in_event_patient(
+    db: aiosqlite.Connection, document_id: int, event: dict
+) -> None:
+    """Ensure ``document_id`` belongs to the same patient as ``event``.
+
+    Linking/unlinking is already gated on access to the event; this stops a
+    user from attaching (or clearing the primary-event pointer on) a document
+    that lives on a different patient's chart — without it, a linked document's
+    metadata leaks back through ``GET /events/{id}`` and a cascade delete could
+    remove another patient's file.
+    """
+    cursor = await db.execute("SELECT patient_id FROM documents WHERE id = ?", (document_id,))
+    row = await cursor.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if row["patient_id"] != event["patient_id"]:
+        raise HTTPException(status_code=403, detail="Document belongs to a different patient")
+
+
 EVENT_TYPES = [
     "symptom",
     "diagnosis",
@@ -362,7 +381,8 @@ async def link_document_to_event(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Link a document to a medical event."""
-    await _event_with_access(db, event_id, current_user)
+    event = await _event_with_access(db, event_id, current_user)
+    await _require_document_in_event_patient(db, body.document_id, event)
     try:
         await db.execute(
             """INSERT OR IGNORE INTO document_event_links (document_id, event_id, relevance, auto_linked)
@@ -387,7 +407,8 @@ async def unlink_document_from_event(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    await _event_with_access(db, event_id, current_user)
+    event = await _event_with_access(db, event_id, current_user)
+    await _require_document_in_event_patient(db, document_id, event)
     await db.execute(
         "DELETE FROM document_event_links WHERE event_id = ? AND document_id = ?",
         (event_id, document_id),

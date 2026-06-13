@@ -9,7 +9,11 @@ from pydantic import BaseModel
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
-from asclepius.documents.service import get_document, get_document_links
+from asclepius.documents.service import (
+    get_document,
+    get_document_links,
+    require_document_access,
+)
 from asclepius.patients.service import check_patient_access
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,12 @@ async def link_documents(
     target = await get_document(db, body.target_document_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target document not found")
+
+    # The caller must be able to see BOTH documents, otherwise linking would
+    # leak the existence (and, via GET /links, the metadata) of a document on
+    # another patient's chart.
+    await require_document_access(db, source, current_user)
+    await require_document_access(db, target, current_user)
 
     # Check for existing link in either direction
     existing = await db.execute(
@@ -85,6 +95,8 @@ async def get_links(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    await require_document_access(db, doc, current_user)
+
     return await get_document_links(db, doc_id)
 
 
@@ -96,6 +108,11 @@ async def delete_link(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Remove a document link."""
+    doc = await get_document(db, doc_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await require_document_access(db, doc, current_user)
+
     cursor = await db.execute(
         "SELECT id FROM document_links WHERE id = ? AND (source_document_id = ? OR target_document_id = ?)",
         (link_id, doc_id, doc_id),

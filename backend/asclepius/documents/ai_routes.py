@@ -11,7 +11,11 @@ from pydantic import BaseModel
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
-from asclepius.documents.service import get_document, update_document_fields
+from asclepius.documents.service import (
+    get_document,
+    require_document_access,
+    update_document_fields,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +107,8 @@ async def edit_document_with_ai(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_document_access(db, doc, current_user, write=True)
 
     config = get_config()
 
@@ -462,6 +468,8 @@ async def generate_filename(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    await require_document_access(db, doc, current_user)
 
     # Mirror whatever extension (or lack of one) the original has. Imaging
     # placeholders carry names like "MR Brain (report pending)" with no

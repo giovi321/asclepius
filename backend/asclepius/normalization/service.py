@@ -229,12 +229,19 @@ class NormService:
         await self.db.execute(f"DELETE FROM {self.main_table} WHERE id = ?", (norm_id,))
         await self.db.commit()
 
-    async def list_documents(self, norm_id: int) -> list[dict]:
+    async def list_documents(
+        self, norm_id: int, accessible_patient_ids: set[int] | None = None
+    ) -> list[dict]:
         """Return all documents that reference this norm entry.
 
         Walks self.doc_sources — each entry is (table, fk_col). For `documents`
         the fk_col is on documents itself; for other tables (lab_results,
         encounters, medications, imaging_studies) it's a join via document_id.
+
+        When ``accessible_patient_ids`` is provided (a non-admin caller), the
+        result is restricted to documents on those patients. A norm entry is
+        shared across every patient, so an unscoped list leaks other patients'
+        filenames and display names.
         """
         doc_ids: set[int] = set()
         for table, fk_col in self.doc_sources:
@@ -250,15 +257,22 @@ class NormService:
         if not doc_ids:
             return []
 
-        placeholders = ",".join("?" * len(doc_ids))
+        params: list = list(doc_ids)
+        where = f"d.id IN ({','.join('?' * len(doc_ids))})"
+        if accessible_patient_ids is not None:
+            if not accessible_patient_ids:
+                return []
+            where += f" AND d.patient_id IN ({','.join('?' * len(accessible_patient_ids))})"
+            params.extend(accessible_patient_ids)
+
         cursor = await self.db.execute(
             f"""SELECT d.id, d.original_filename, d.doc_type, d.event_date,
                        d.patient_id, p.display_name AS patient_name
                 FROM documents d
                 LEFT JOIN patients p ON p.id = d.patient_id
-                WHERE d.id IN ({placeholders})
+                WHERE {where}
                 ORDER BY d.event_date DESC, d.id DESC""",
-            list(doc_ids),
+            params,
         )
         return [dict(r) for r in await cursor.fetchall()]
 

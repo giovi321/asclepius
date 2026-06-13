@@ -142,6 +142,11 @@ def _build_llm_provider(entry):
         )
 
     provider.provider_label = label
+    # DB path so the provider can resolve UI-customized prompt overrides
+    # (classification / sql_generation) at call time.
+    from asclepius.db.connection import get_db_path
+
+    provider._db_path = get_db_path()
     # Gate state. Key by credential_id (one queue per physical connection).
     provider._gate_credential_id = getattr(entry, "credential_id", "") or eff_type
     provider._gate_credential_name = cred_name or entry.name or eff_type

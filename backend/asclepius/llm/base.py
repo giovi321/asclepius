@@ -69,6 +69,37 @@ class LLMProvider(ABC):
     _retry_max: int = 2
     _retry_backoff: list[int] = _DEFAULT_RETRY_BACKOFF
 
+    # DB path used to resolve UI-customized prompt overrides. Set by the
+    # provider factory; when unset (e.g. a provider built directly in a unit
+    # test) the hard-coded default prompt is used.
+    _db_path: str | None = None
+
+    async def _format_prompt(self, key: str, default: str, **kwargs) -> str:
+        """Resolve and format a prompt template.
+
+        Returns the UI/DB override registered under ``key`` if one exists,
+        otherwise ``default`` — so editing a prompt in Settings takes effect
+        everywhere a provider method runs (classification, SQL), not just the
+        one call site that happened to wire it up by hand. Falls back to the
+        default template if the customized one fails to format, so a bad
+        placeholder edited in the UI can't break extraction.
+        """
+        template = default
+        db_path = getattr(self, "_db_path", None)
+        if db_path:
+            try:
+                from asclepius.llm.prompt_manager import get_prompt
+
+                template = (await get_prompt(db_path, key)) or default
+            except Exception:
+                logger.debug("prompt lookup for %r failed; using default", key, exc_info=True)
+                template = default
+        try:
+            return template.format(**kwargs)
+        except (KeyError, IndexError, ValueError):
+            logger.warning("custom prompt %r failed to format; using default", key)
+            return default.format(**kwargs)
+
     async def classify(self, ocr_text: str, context: dict) -> dict:
         """Classify document and extract basic metadata.
 
@@ -86,7 +117,9 @@ class LLMProvider(ABC):
             getattr(self, "model", "?"),
             len(ocr_text),
         )
-        prompt = CLASSIFICATION_PROMPT.format(
+        prompt = await self._format_prompt(
+            "classification",
+            CLASSIFICATION_PROMPT,
             patient_list=json.dumps(context.get("patient_list", []), indent=2),
             facility_list=json.dumps(context.get("facility_list", []), indent=2),
             doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
@@ -141,7 +174,13 @@ class LLMProvider(ABC):
         Returns:
             SQL SELECT query string.
         """
-        prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
+        prompt = await self._format_prompt(
+            "sql_generation",
+            SQL_GENERATION_PROMPT,
+            schema=schema,
+            context=context,
+            question=question,
+        )
         # SQL output is a ```sql``` code block, not JSON — force_json=False so
         # JSON-mode backends don't coerce the reply into an empty ``{}`` and
         # make the sanitizer reject every chat question.

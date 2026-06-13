@@ -628,47 +628,12 @@ async def classify_and_extract(
         # Add few-shot examples to context so provider .classify() methods can use them
         context["few_shot_examples"] = few_shot_str
 
-        # Phase 1: Classify (use custom prompt if configured)
+        # Phase 1: Classify. The provider resolves the UI-customized
+        # "classification" prompt itself (falling back to the default), so the
+        # main, chunked, and section paths all honor a prompt override through
+        # the same code path instead of this one wiring it up by hand.
         logger.info("Phase 1 — classifying doc %d", doc_id)
-        from asclepius.llm.prompt_manager import get_prompt
-
-        custom_classification = await get_prompt(config.database.path, "classification")
-        if custom_classification and hasattr(llm, "_generate"):
-            try:
-                formatted = custom_classification.format(
-                    patient_list=json.dumps(context.get("patient_list", []), indent=2),
-                    facility_list=json.dumps(context.get("facility_list", []), indent=2),
-                    doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
-                    ocr_text=ocr_text,
-                    few_shot_examples=few_shot_str,
-                )
-                formatted = (
-                    _canonical_language_directive(context.get("canonical_language", "English"))
-                    + formatted
-                )
-                response_text = await llm._generate(formatted)
-                classification = llm._parse_json(response_text)
-                logger.info(
-                    "Classification result for doc %d: doc_type=%s, summary=%s, event=%s, issued=%s, doctor=%s",
-                    doc_id,
-                    classification.get("doc_type"),
-                    repr(classification.get("summary_en", ""))[:60],
-                    classification.get("event_date")
-                    or classification.get("date_visit")
-                    or classification.get("date_issued")
-                    or classification.get("doc_date"),
-                    classification.get("issued_date") or classification.get("date_issued"),
-                    classification.get("doctor", {}).get("name")
-                    if isinstance(classification.get("doctor"), dict)
-                    else classification.get("doctor"),
-                )
-            except Exception as e:
-                logger.warning(
-                    "Classification prompt failed for doc %d: %s, using default", doc_id, e
-                )
-                classification = await llm.classify(ocr_text, context)
-        else:
-            classification = await llm.classify(ocr_text, context)
+        classification = await llm.classify(ocr_text, context)
 
         if "error" in classification:
             logger.error(

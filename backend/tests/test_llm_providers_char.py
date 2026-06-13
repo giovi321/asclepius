@@ -359,11 +359,14 @@ async def test_openai_generate_force_json_toggles_response_format():
 
 
 @pytest.mark.asyncio
-async def test_claude_generate_makes_exactly_one_call_no_retry():
-    """Claude's ``_generate`` does NOT retry: the first transient error
-    propagates immediately after a single call. This is the before-state the
-    refactor will change."""
+async def test_claude_generate_retries_then_raises():
+    # Phase 3: Claude now uses the shared _generate retry/force_json policy
+    # (was: no retry, ignored flags). With _retry_max=2 it makes exactly 3
+    # attempts (max_retries + 1) on a transient ConnectError, then re-raises —
+    # identical to Ollama/OpenAI.
     provider = ClaudeProvider(api_key="k", model="claude-x", timeout=5)
+    provider._retry_max = 2
+    provider._retry_backoff = [0, 0]  # no real backoff sleep
     calls = {"n": 0}
 
     async def boom(**kwargs):
@@ -374,14 +377,16 @@ async def test_claude_generate_makes_exactly_one_call_no_retry():
         with pytest.raises(httpx.ConnectError):
             await provider._generate("prompt")
 
-    assert calls["n"] == 1  # no retry loop in ClaudeProvider._generate
+    assert calls["n"] == 3  # 2 retries + 1 initial = 3 calls (shared policy)
 
 
 @pytest.mark.asyncio
-async def test_claude_generate_ignores_force_json_and_timeout_override():
-    """Claude's ``_generate`` accepts ``force_json`` and ``timeout_override``
-    for interface parity but feeds NEITHER into the Anthropic call. The call
-    kwargs are identical regardless of the flags."""
+async def test_claude_generate_honors_force_json_and_timeout_override():
+    # Phase 3: Claude now uses the shared _generate retry/force_json policy
+    # (was: no retry, ignored flags). Anthropic has no ``response_format``
+    # toggle, so ``force_json`` is applied as a JSON-only ``system``
+    # instruction that reaches the SDK; ``timeout_override`` is forwarded as
+    # the per-request ``timeout`` kwarg.
     provider = ClaudeProvider(api_key="k", model="claude-x", timeout=5)
 
     create_a, cap_a = _claude_create_returning("{}")
@@ -394,13 +399,15 @@ async def test_claude_generate_ignores_force_json_and_timeout_override():
         await provider._generate("p", force_json=False, timeout_override=None)
     kw_b = cap_b["kwargs"][0]
 
-    # No json/format/response_format key reaches the SDK in either case.
-    for kw in (kw_a, kw_b):
-        assert "response_format" not in kw
-        assert "format" not in kw
-        assert "timeout" not in kw
-    # And the flags make no difference to the emitted kwargs.
-    assert set(kw_a.keys()) == set(kw_b.keys())
+    # force_json=True reaches the SDK as a JSON-only system instruction;
+    # force_json=False omits it. The flag now changes the emitted kwargs.
+    assert "system" in kw_a
+    assert "json" in kw_a["system"].lower()
+    assert "system" not in kw_b
+
+    # timeout_override is forwarded as the SDK ``timeout`` kwarg.
+    assert kw_a["timeout"] == 999.0
+    assert kw_b["timeout"] == float(provider.timeout)  # falls back to self.timeout
 
 
 @pytest.mark.asyncio

@@ -1,21 +1,20 @@
 """Claude (Anthropic) LLM provider implementation."""
 
-import json
 import logging
-import re
 
 from anthropic import AsyncAnthropic
 
-from asclepius.llm.base import LLMProvider
-from asclepius.llm.json_utils import get_output_token_caps, parse_llm_json
-from asclepius.llm.prompts import (
-    CLASSIFICATION_PROMPT,
-    EXTRACTION_PROMPT,
-    SQL_GENERATION_PROMPT,
-    canonical_language_directive,
+from asclepius.llm.base import (
+    _DEFAULT_RETRY_BACKOFF,
+    LLMProvider,
 )
+from asclepius.llm.json_utils import get_output_token_caps
 
 logger = logging.getLogger(__name__)
+
+# Anthropic has no API-level JSON toggle (no ``response_format``); the
+# canonical way to force a JSON-only reply is a system instruction.
+_JSON_SYSTEM = "Respond with only a single JSON object. Do not include any prose, explanation, or markdown fences."
 
 
 class ClaudeProvider(LLMProvider):
@@ -23,50 +22,9 @@ class ClaudeProvider(LLMProvider):
         self.client = AsyncAnthropic(api_key=api_key)
         self.model = model
         self.timeout = timeout
-
-    async def classify(self, ocr_text: str, context: dict) -> dict:
-        logger.info("Claude classify: model=%s, text_len=%d", self.model, len(ocr_text))
-        prompt = CLASSIFICATION_PROMPT.format(
-            patient_list=json.dumps(context.get("patient_list", []), indent=2),
-            facility_list=json.dumps(context.get("facility_list", []), indent=2),
-            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
-            ocr_text=ocr_text,
-            few_shot_examples=context.get("few_shot_examples", ""),
-        )
-        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-
-        _, classification_cap = get_output_token_caps()
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=classification_cap,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        response_text = response.content[0].text
-        result = parse_llm_json(response_text, max_output_tokens=classification_cap)
-        logger.info(
-            "Claude classify result: doc_type=%s, patient=%s",
-            result.get("doc_type"),
-            result.get("patient_name"),
-        )
-        return result
-
-    async def extract(self, ocr_text: str, context: dict) -> dict:
-        prompt = EXTRACTION_PROMPT.format(
-            patient_list=json.dumps(context.get("patient_list", []), indent=2),
-            facility_list=json.dumps(context.get("facility_list", []), indent=2),
-            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
-            ocr_text=ocr_text,
-        )
-        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-
-        extraction_cap, _ = get_output_token_caps()
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=extraction_cap,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        response_text = response.content[0].text
-        return parse_llm_json(response_text, max_output_tokens=extraction_cap)
+        # Retry policy (overridden by the factory from the credential).
+        self._retry_max = 2
+        self._retry_backoff = list(_DEFAULT_RETRY_BACKOFF)
 
     async def chat(
         self,
@@ -91,40 +49,24 @@ class ClaudeProvider(LLMProvider):
         )
         return response.content[0].text
 
-    async def generate_sql(self, question: str, schema: str, context: str) -> str:
-        prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        response_text = response.content[0].text
-
-        sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
-        if sql_match:
-            return sql_match.group(1).strip()
-        select_match = re.search(
-            r"((?:WITH|SELECT)\s+.*?)(?:;|```|$)",
-            response_text,
-            re.DOTALL | re.IGNORECASE,
-        )
-        if select_match:
-            return select_match.group(1).strip()
-        return response_text.strip()
-
-    async def _generate(
-        self, prompt: str, force_json: bool = True, timeout_override: float | None = None
+    async def _raw_generate(
+        self,
+        prompt: str,
+        *,
+        force_json: bool,
+        timeout: float,
+        max_output_tokens: int,
     ) -> str:
-        """Generate raw text response from a prompt."""
-        extraction_cap, _ = get_output_token_caps()
-        response = await self.client.messages.create(
-            model=self.model,
-            max_tokens=extraction_cap,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        """Single Anthropic call. ``force_json`` is applied via a system
+        instruction (Anthropic has no ``response_format`` toggle); ``timeout``
+        is forwarded as the per-request SDK timeout."""
+        kwargs: dict = {
+            "model": self.model,
+            "max_tokens": int(max_output_tokens),
+            "messages": [{"role": "user", "content": prompt}],
+            "timeout": timeout,
+        }
+        if force_json:
+            kwargs["system"] = _JSON_SYSTEM
+        response = await self.client.messages.create(**kwargs)
         return response.content[0].text
-
-    @staticmethod
-    def _parse_json(text: str) -> dict:
-        """Kept for backward compatibility; delegates to the shared parser."""
-        return parse_llm_json(text)

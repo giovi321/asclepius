@@ -1,57 +1,18 @@
 """Ollama LLM provider implementation."""
 
 import asyncio
-import json
 import logging
-import re
 
 import httpx
 
-from asclepius.llm.base import LLMProvider
-from asclepius.llm.json_utils import get_output_token_caps, parse_llm_json
-from asclepius.llm.prompts import (
-    CLASSIFICATION_PROMPT,
-    EXTRACTION_PROMPT,
-    SQL_GENERATION_PROMPT,
-    canonical_language_directive,
-)
+from asclepius.llm.base import _DEFAULT_RETRY_BACKOFF, LLMProvider
+from asclepius.llm.json_utils import get_output_token_caps
 
 logger = logging.getLogger(__name__)
-
-# Fallback retry settings used only if config lookup fails.
-_DEFAULT_MAX_RETRIES = 3
-_DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 
 # Concurrency is handled by the per-model gate in asclepius.llm.gate
 # (wrapped at provider-build time in pipeline.provider_factory). This module
 # does not need its own semaphore.
-
-
-def _get_retry_config(provider=None) -> tuple[int, list[int]]:
-    """Return (max_retries, backoff_seconds) for this request.
-
-    Prefer the per-provider policy set at build time in
-    ``pipeline.provider_factory._build_llm_provider``; fall back to the
-    legacy global LLM config; fall back again to the hard-coded defaults.
-    """
-    if provider is not None:
-        retries = getattr(provider, "_retry_max", None)
-        backoff = getattr(provider, "_retry_backoff", None)
-        if retries is not None and backoff:
-            return max(0, int(retries)), [
-                int(x) for x in backoff if int(x) >= 0
-            ] or _DEFAULT_RETRY_BACKOFF
-    try:
-        from asclepius.config import get_config
-
-        cfg = get_config().llm
-        retries = max(0, int(cfg.max_retries))
-        backoff = [int(x) for x in (cfg.retry_backoff_seconds or []) if int(x) >= 0]
-        if not backoff:
-            backoff = _DEFAULT_RETRY_BACKOFF
-        return retries, backoff
-    except Exception:
-        return _DEFAULT_MAX_RETRIES, _DEFAULT_RETRY_BACKOFF
 
 
 class OllamaProvider(LLMProvider):
@@ -59,40 +20,9 @@ class OllamaProvider(LLMProvider):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
-
-    async def classify(self, ocr_text: str, context: dict) -> dict:
-        logger.info("Ollama classify: model=%s, text_len=%d", self.model, len(ocr_text))
-        prompt = CLASSIFICATION_PROMPT.format(
-            patient_list=json.dumps(context.get("patient_list", []), indent=2),
-            facility_list=json.dumps(context.get("facility_list", []), indent=2),
-            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
-            ocr_text=ocr_text,
-            few_shot_examples=context.get("few_shot_examples", ""),
-        )
-        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-
-        _, classification_cap = get_output_token_caps()
-        response_text = await self._generate(prompt, max_output_tokens=classification_cap)
-        result = parse_llm_json(response_text, max_output_tokens=classification_cap)
-        logger.info(
-            "Ollama classify result: doc_type=%s, patient=%s",
-            result.get("doc_type"),
-            result.get("patient_name"),
-        )
-        return result
-
-    async def extract(self, ocr_text: str, context: dict) -> dict:
-        prompt = EXTRACTION_PROMPT.format(
-            patient_list=json.dumps(context.get("patient_list", []), indent=2),
-            facility_list=json.dumps(context.get("facility_list", []), indent=2),
-            doctor_list=json.dumps(context.get("doctor_list", []), indent=2),
-            ocr_text=ocr_text,
-        )
-        prompt = canonical_language_directive(context.get("canonical_language")) + prompt
-
-        extraction_cap, _ = get_output_token_caps()
-        response_text = await self._generate(prompt, max_output_tokens=extraction_cap)
-        return parse_llm_json(response_text, max_output_tokens=extraction_cap)
+        # Retry policy (overridden by the factory from the credential).
+        self._retry_max = 2
+        self._retry_backoff = list(_DEFAULT_RETRY_BACKOFF)
 
     async def chat(
         self,
@@ -132,48 +62,29 @@ class OllamaProvider(LLMProvider):
             data = resp.json()
             return data.get("message", {}).get("content", "")
 
-    async def generate_sql(self, question: str, schema: str, context: str) -> str:
-        prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
-        # SQL output is a ```sql``` code block, not JSON — Ollama's
-        # ``format=json`` mode would coerce the reply into an empty ``{}``
-        # and the sanitizer would reject every chat question.
-        response_text = await self._generate(prompt, force_json=False, max_output_tokens=1024)
-        # Extract SQL from response
-        sql_match = re.search(r"```sql\s*(.*?)\s*```", response_text, re.DOTALL)
-        if sql_match:
-            return sql_match.group(1).strip()
-        # Try to find a SELECT statement; ``;`` is optional because the
-        # sanitizer strips it and the model sometimes omits it.
-        select_match = re.search(
-            r"((?:WITH|SELECT)\s+.*?)(?:;|```|$)",
-            response_text,
-            re.DOTALL | re.IGNORECASE,
-        )
-        if select_match:
-            return select_match.group(1).strip()
-        return response_text.strip()
-
-    async def _generate(
+    async def _raw_generate(
         self,
         prompt: str,
-        force_json: bool = True,
-        timeout_override: float | None = None,
-        max_output_tokens: int | None = None,
+        *,
+        force_json: bool,
+        timeout: float,
+        max_output_tokens: int,
     ) -> str:
-        read_timeout = timeout_override or float(self.timeout)
+        """Single Ollama ``/api/generate`` call (no retry — the base owns
+        that). ``force_json`` sets ``format=json``; the POST is wrapped in a
+        total-elapsed budget."""
+        read_timeout = float(timeout)
         logger.debug(
-            "Ollama _generate: model=%s, prompt_len=%d, url=%s, timeout=%.0fs",
+            "Ollama _raw_generate: model=%s, prompt_len=%d, url=%s, timeout=%.0fs",
             self.model,
             len(prompt),
             self.base_url,
             read_timeout,
         )
-        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
+        client_timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
         payload = {"model": self.model, "prompt": prompt, "stream": False}
         if force_json:
             payload["format"] = "json"
-        if max_output_tokens is None:
-            max_output_tokens, _ = get_output_token_caps()
         payload["options"] = {"num_predict": int(max_output_tokens)}
 
         # Total-elapsed budget wrapping the POST. httpx's read-timeout is
@@ -183,56 +94,16 @@ class OllamaProvider(LLMProvider):
         # Budget = configured read timeout + 30s slack for connect/write.
         total_budget = read_timeout + 30.0
 
-        max_retries, retry_backoff = _get_retry_config(self)
-        total_attempts = max_retries + 1
-        last_err = None
-        for attempt in range(total_attempts):
-            try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    resp = await asyncio.wait_for(
-                        client.post(
-                            f"{self.base_url}/api/generate",
-                            json=payload,
-                        ),
-                        timeout=total_budget,
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    response = data.get("response", "")
-                    logger.info(
-                        "Ollama response: %d chars, model=%s", len(response), self.model
-                    )
-                    return response
-            except (
-                httpx.ReadTimeout,
-                httpx.ConnectTimeout,
-                httpx.ConnectError,
-                asyncio.TimeoutError,
-            ) as e:
-                last_err = e
-                if attempt < total_attempts - 1:
-                    wait = retry_backoff[min(attempt, len(retry_backoff) - 1)]
-                    logger.warning(
-                        "Ollama %s (attempt %d/%d, prompt_len=%d, budget=%.0fs), retrying in %ds...",
-                        type(e).__name__,
-                        attempt + 1,
-                        total_attempts,
-                        len(prompt),
-                        total_budget,
-                        wait,
-                    )
-                    await asyncio.sleep(wait)
-                else:
-                    logger.error(
-                        "Ollama %s after %d attempts (prompt_len=%d, budget=%.0fs)",
-                        type(e).__name__,
-                        total_attempts,
-                        len(prompt),
-                        total_budget,
-                    )
-        raise last_err  # type: ignore[misc]
-
-    @staticmethod
-    def _parse_json(text: str) -> dict:
-        """Kept for backward compatibility; delegates to the shared parser."""
-        return parse_llm_json(text)
+        async with httpx.AsyncClient(timeout=client_timeout) as client:
+            resp = await asyncio.wait_for(
+                client.post(
+                    f"{self.base_url}/api/generate",
+                    json=payload,
+                ),
+                timeout=total_budget,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            response = data.get("response", "")
+            logger.info("Ollama response: %d chars, model=%s", len(response), self.model)
+            return response

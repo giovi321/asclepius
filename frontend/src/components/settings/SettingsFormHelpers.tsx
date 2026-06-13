@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { Check, Save } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 
@@ -180,7 +181,7 @@ export function useSettingsSave() {
     } catch (e: any) {
       toast({
         title: "Failed to save settings",
-        description: e?.response?.data?.detail || e?.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }

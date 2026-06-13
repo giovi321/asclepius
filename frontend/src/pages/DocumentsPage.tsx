@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import FileUpload from "@/components/FileUpload";
@@ -156,7 +157,7 @@ export default function DocumentsPage() {
         await perDoc(id);
         ok += 1;
       } catch (err: any) {
-        const d = err?.response?.data?.detail || err?.message || "failed";
+        const d = getErrorMessage(err, "failed");
         failures.push(
           `#${id}: ${typeof d === "string" ? d : JSON.stringify(d)}`,
         );

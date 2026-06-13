@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { FileText, Trash2, X, Image as ImageIcon, Unlink } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
@@ -112,7 +113,7 @@ export default function DocumentDetailPage() {
     } catch (e: any) {
       toast({
         title: "Rotation failed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
       throw e;
@@ -180,7 +181,7 @@ export default function DocumentDetailPage() {
     } catch (e: any) {
       toast({
         title: "Region translate failed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }
@@ -208,7 +209,7 @@ export default function DocumentDetailPage() {
     } catch (e: any) {
       toast({
         title: "Unlink failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }

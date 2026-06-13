@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
@@ -103,7 +104,7 @@ export function EditableCombobox({
       setQuery("");
       setPendingChange(null);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Failed to save";
+      const d = getErrorMessage(err, "Failed to save");
       toast({
         title: typeof d === "string" ? d : "Failed to save",
         variant: "error",
@@ -183,8 +184,7 @@ export function EditableCombobox({
       setQuery("");
       setPendingChange(null);
     } catch (err: any) {
-      const d =
-        err?.response?.data?.detail || err?.message || "Failed to apply";
+      const d = getErrorMessage(err, "Failed to apply");
       toast({
         title: typeof d === "string" ? d : "Failed to apply",
         variant: "error",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Save, X } from "lucide-react";
 import type { Credential } from "@/types";
+import { getErrorMessage } from "@/lib/errors";
 import { CREDENTIAL_TYPES } from "./types";
 
 export interface CredentialDialogProps {
@@ -74,7 +75,7 @@ export default function CredentialDialog({
       });
       onClose();
     } catch (e: any) {
-      setErr(e?.response?.data?.detail || e?.message || "Failed to save");
+      setErr(getErrorMessage(e, "Failed to save"));
     } finally {
       setSaving(false);
     }

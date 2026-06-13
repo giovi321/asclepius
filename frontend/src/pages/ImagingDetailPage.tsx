@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { ArrowLeft, FileText, Trash2 } from "lucide-react";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import EventSelector from "@/components/document-detail/EventSelector";
@@ -108,7 +109,7 @@ export default function ImagingDetailPage() {
     } catch (e: any) {
       toast({
         title: "Delete failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }

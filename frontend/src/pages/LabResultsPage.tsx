@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -232,7 +233,7 @@ export default function LabResultsPage() {
       setEditVals({});
       await load();
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Save failed";
+      const d = getErrorMessage(err, "Save failed");
       toast({
         title: "Save failed",
         description: typeof d === "string" ? d : JSON.stringify(d),
@@ -253,7 +254,7 @@ export default function LabResultsPage() {
       await api.delete(`/lab-results/${row.id}`);
       await load();
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Delete failed";
+      const d = getErrorMessage(err, "Delete failed");
       toast({
         title: "Delete failed",
         description: typeof d === "string" ? d : JSON.stringify(d),
@@ -268,7 +269,7 @@ export default function LabResultsPage() {
       await api.delete(`/lab-results/${row.id}`);
       setOrphans((prev) => prev.filter((o) => o.id !== row.id));
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Delete failed";
+      const d = getErrorMessage(err, "Delete failed");
       toast({
         title: "Delete failed",
         description: typeof d === "string" ? d : JSON.stringify(d),

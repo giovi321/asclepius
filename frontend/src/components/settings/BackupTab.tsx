@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { Download, Play, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -149,7 +150,7 @@ export default function BackupTab() {
       await loadSettings();
     } catch (e: any) {
       toast({
-        title: `Backup failed: ${e?.response?.data?.detail ?? e?.message ?? "unknown"}`,
+        title: `Backup failed: ${getErrorMessage(e, "unknown")}`,
         variant: "error",
       });
     }

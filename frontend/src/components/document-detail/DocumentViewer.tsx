@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import PdfViewer, { type NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { isHiddenVaultPath } from "@/lib/vaultHidden";
@@ -122,7 +123,7 @@ export default function DocumentViewer({
     } catch (e: any) {
       toast({
         title: "Relink failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     } finally {
@@ -184,7 +185,7 @@ export default function DocumentViewer({
     } catch (e: any) {
       toast({
         title: "Upload failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     } finally {

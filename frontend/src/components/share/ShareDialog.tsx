@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
 
@@ -160,7 +161,7 @@ export default function ShareDialog({
     } catch (err: any) {
       toast({
         title: "Could not create share",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {
@@ -176,7 +177,7 @@ export default function ShareDialog({
     } catch (err: any) {
       toast({
         title: "Revoke failed",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     }
@@ -212,7 +213,7 @@ export default function ShareDialog({
     } catch (err: any) {
       toast({
         title: "Could not add documents",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {
@@ -230,7 +231,7 @@ export default function ShareDialog({
     } catch (err: any) {
       toast({
         title: "Could not load OTP",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
       setRevealOtp((s) => ({ ...s, [shareId]: false }));

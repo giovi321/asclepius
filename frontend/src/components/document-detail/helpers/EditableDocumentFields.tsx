@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, Pencil, RefreshCw, X } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useCollapseState } from "./useCollapseState";
 import { ActionButton, IconButton } from "./inlineEditPrimitives";
@@ -164,7 +165,7 @@ export function EditableFilename({
     } catch (e: any) {
       toast({
         title: "Rename failed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }
@@ -183,7 +184,7 @@ export function EditableFilename({
     } catch (e: any) {
       toast({
         title: "Failed to generate filename",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }

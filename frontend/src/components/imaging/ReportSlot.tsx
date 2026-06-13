@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import {
   FileText,
   FileX2,
@@ -92,7 +93,7 @@ export default function ReportSlot({
     } catch (e: any) {
       toast({
         title: pickerMode === "replace" ? "Replace failed" : "Attach failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }
@@ -114,7 +115,7 @@ export default function ReportSlot({
     } catch (e: any) {
       toast({
         title: "Detach failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }
@@ -156,7 +157,7 @@ export default function ReportSlot({
     } catch (e: any) {
       toast({
         title: "Upload failed",
-        description: e?.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     } finally {
@@ -219,7 +220,7 @@ export default function ReportSlot({
               } catch (e: any) {
                 toast({
                   title: "Rotate failed",
-                  description: e?.response?.data?.detail || e.message,
+                  description: getErrorMessage(e),
                   variant: "error",
                 });
               }

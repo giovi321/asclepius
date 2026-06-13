@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import {
   FolderOpen,
   File,
@@ -195,7 +196,7 @@ export default function FileBrowserPage() {
         setBreadcrumb([]);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load vault tree");
+      setError(getErrorMessage(err, "Failed to load vault tree"));
     } finally {
       setLoading(false);
     }
@@ -216,7 +217,7 @@ export default function FileBrowserPage() {
         breadcrumb.length > 0 ? breadcrumb.join("/") : undefined;
       fetchTree(currentPath);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to delete file");
+      setError(getErrorMessage(err, "Failed to delete file"));
     } finally {
       setDeleting(false);
     }
@@ -242,7 +243,7 @@ export default function FileBrowserPage() {
         breadcrumb.length > 0 ? breadcrumb.join("/") : undefined;
       fetchTree(currentPath);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Move failed");
+      setError(getErrorMessage(err, "Move failed"));
     } finally {
       setMoving(false);
     }

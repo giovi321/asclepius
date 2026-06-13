@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Send, Loader2 } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import {
   SettingsForm,
@@ -153,7 +154,7 @@ export default function SmtpTab() {
     } catch (err: any) {
       toast({
         title: "Test send failed",
-        description: err?.response?.data?.detail || err?.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {

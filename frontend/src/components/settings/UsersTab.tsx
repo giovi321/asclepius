@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { Plus, Trash2, ScrollText, UserCog, X, Check } from "lucide-react";
@@ -529,7 +530,7 @@ function AccessModal({
     } catch (err: any) {
       toast({
         title: "Save failed",
-        description: err?.response?.data?.detail || err?.message || "",
+        description: getErrorMessage(err, ""),
         variant: "error",
       });
     }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import {
   Brain,
   Eye,
@@ -185,7 +186,7 @@ function GeneralLlmCard({
     } catch (e: any) {
       toast({
         title: "Failed to save General LLM",
-        description: e?.response?.data?.detail || e?.message || "",
+        description: getErrorMessage(e, ""),
         variant: "error",
       });
     }
@@ -350,7 +351,7 @@ function TranslationDefaultsCard({
     } catch (e: any) {
       toast({
         title: "Failed to save translation defaults",
-        description: e?.response?.data?.detail || e?.message || "",
+        description: getErrorMessage(e, ""),
         variant: "error",
       });
     }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import {
   Section,
@@ -63,7 +64,7 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
     } catch (e: any) {
       toast({
         title: "Failed to mark as reviewed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     } finally {

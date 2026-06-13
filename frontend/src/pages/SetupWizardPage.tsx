@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { User, Heart, ChevronRight, ChevronLeft, Check } from "lucide-react";
 
 type Step = "welcome" | "account" | "patient" | "done";
@@ -62,7 +63,7 @@ export default function SetupWizardPage() {
       });
       setStep("done");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Setup failed");
+      setError(getErrorMessage(err, "Setup failed"));
     } finally {
       setLoading(false);
     }

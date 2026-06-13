@@ -21,6 +21,7 @@ import type {
   PipelineProviders,
 } from "@/types";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useToast } from "@/contexts/ToastContext";
@@ -796,7 +797,7 @@ function CancelJobButton({
     } catch (err: any) {
       toast({
         title: "Failed to cancel",
-        description: err?.response?.data?.detail || err?.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {

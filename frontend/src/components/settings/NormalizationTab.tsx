@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { buildBulkConfirm, shouldConfirmBulk } from "@/lib/confirmBulk";
 import { useToast } from "@/contexts/ToastContext";
@@ -149,7 +150,7 @@ export default function NormalizationTab() {
     try {
       await api.post(`/normalization/${normType}/merge-batch`, payload);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Merge failed";
+      const d = getErrorMessage(err, "Merge failed");
       toast({
         title: "Merge failed",
         description: typeof d === "string" ? d : JSON.stringify(d),
@@ -195,7 +196,7 @@ export default function NormalizationTab() {
       setDetail(res.data);
       loadList();
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Save failed";
+      const d = getErrorMessage(err, "Save failed");
       setSaveError(typeof d === "string" ? d : JSON.stringify(d));
     }
   };
@@ -231,10 +232,7 @@ export default function NormalizationTab() {
         Array.isArray(res.data?.entries) ? res.data.entries : [],
       );
     } catch (err: any) {
-      const d =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Auto-merge request failed";
+      const d = getErrorMessage(err, "Auto-merge request failed");
       toast({
         title: "Auto-merge failed",
         description: typeof d === "string" ? d : JSON.stringify(d),
@@ -256,7 +254,7 @@ export default function NormalizationTab() {
     try {
       await api.delete(`/normalization/${normType}/${id}`);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Delete failed";
+      const d = getErrorMessage(err, "Delete failed");
       toast({
         title: "Delete failed",
         description: typeof d === "string" ? d : JSON.stringify(d),
@@ -410,7 +408,7 @@ export default function NormalizationTab() {
     try {
       await api.post(`/normalization/${normType}/merge-batch`, payload);
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Merge failed";
+      const d = getErrorMessage(err, "Merge failed");
       toast({
         title: "Merge failed",
         description: typeof d === "string" ? d : JSON.stringify(d),

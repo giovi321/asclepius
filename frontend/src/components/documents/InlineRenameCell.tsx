@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, FileText, Pencil, X } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 
 export interface InlineRenameCellProps {
@@ -33,7 +34,7 @@ export default function InlineRenameCell({
     } catch (e: any) {
       toast({
         title: "Rename failed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     }

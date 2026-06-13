@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { RefreshCw, Trash2, Monitor, Smartphone, Globe } from "lucide-react";
@@ -107,7 +108,7 @@ export default function SessionsTab() {
     } catch (err: any) {
       toast({
         title: "Failed to load sessions",
-        description: err?.response?.data?.detail || err?.message || "",
+        description: getErrorMessage(err, ""),
         variant: "error",
       });
       setSessions([]);
@@ -165,7 +166,7 @@ export default function SessionsTab() {
     } catch (err: any) {
       toast({
         title: "Revoke failed",
-        description: err?.response?.data?.detail || err?.message || "",
+        description: getErrorMessage(err, ""),
         variant: "error",
       });
     }

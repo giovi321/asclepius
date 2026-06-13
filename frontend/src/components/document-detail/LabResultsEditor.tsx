@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { TestTube, Pencil, Trash2, Plus, Search } from "lucide-react";
 import { Section } from "./DocumentDetailHelpers";
 import { useToast } from "@/contexts/ToastContext";
@@ -212,7 +213,7 @@ function EditorRow({
       }
       onSaved();
     } catch (err: any) {
-      const d = err?.response?.data?.detail || err?.message || "Failed to save";
+      const d = getErrorMessage(err, "Failed to save");
       toast({
         title: typeof d === "string" ? d : "Failed to save",
         variant: "error",
@@ -415,7 +416,7 @@ export default function LabResultsEditor({
       await api.delete(`/lab-results/${id}`);
       onChange();
     } catch (err: any) {
-      const d = err?.response?.data?.detail || "Failed to delete";
+      const d = getErrorMessage(err, "Failed to delete");
       toast({
         title: typeof d === "string" ? d : "Failed to delete",
         variant: "error",

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Credential } from "@/types";
+import { getErrorMessage } from "@/lib/errors";
 import { allowedKindsFor, type AttachedModel, type ModelKind } from "./types";
 
 export interface ModelFormProps {
@@ -54,7 +55,7 @@ export default function ModelForm({
         timeout,
       );
     } catch (e: any) {
-      setErr(e?.response?.data?.detail || e?.message || "Failed to save model");
+      setErr(getErrorMessage(e, "Failed to save model"));
     } finally {
       setSaving(false);
     }

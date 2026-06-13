@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 
 interface ShareSummary {
@@ -138,7 +139,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not load shares",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {
@@ -200,7 +201,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Revoke failed",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     }
@@ -223,7 +224,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Delete failed",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     }
@@ -242,7 +243,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not load code",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
       setOtpVisible((s) => ({ ...s, [id]: false }));
@@ -262,7 +263,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not load sessions",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {
@@ -287,7 +288,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not load audit log",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     } finally {
@@ -310,7 +311,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not terminate session",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     }
@@ -324,7 +325,7 @@ export default function SharesPage() {
     } catch (err: any) {
       toast({
         title: "Could not drop queue entry",
-        description: err?.response?.data?.detail || err.message,
+        description: getErrorMessage(err),
         variant: "error",
       });
     }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Stethoscope } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
 
@@ -117,7 +118,7 @@ export default function AiEditForm({ docId, onApplied }: AiEditFormProps) {
     } catch (e: any) {
       toast({
         title: "AI edit failed",
-        description: e.response?.data?.detail || e.message,
+        description: getErrorMessage(e),
         variant: "error",
       });
     } finally {

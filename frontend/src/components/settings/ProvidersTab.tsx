@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import type {
   Credential,
@@ -145,7 +146,7 @@ export default function ProvidersTab() {
     } catch (e: any) {
       toast({
         title: "Failed to delete provider",
-        description: e?.response?.data?.detail || e?.message || "",
+        description: getErrorMessage(e, ""),
         variant: "error",
       });
     } finally {

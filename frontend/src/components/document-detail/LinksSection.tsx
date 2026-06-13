@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "@/api/client";
+import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
 import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
@@ -167,7 +168,7 @@ export default function LinksSection({
       } else {
         toast({
           title: "Failed to link",
-          description: e.response?.data?.detail || e.message,
+          description: getErrorMessage(e),
           variant: "error",
         });
       }

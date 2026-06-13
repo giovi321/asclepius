@@ -154,6 +154,57 @@ async def unauthed_client(app):
         yield ac
 
 
+@pytest_asyncio.fixture
+async def make_user_client(app, db_path):
+    """Factory fixture: create a user with a given global role (and optional
+    per-patient grants) and return an authenticated client logged in as them.
+
+    Usage::
+
+        viewer, uid = await make_user_client(
+            "viewer1", role="viewer", patient_grants={patient_id: "viewer"}
+        )
+
+    Non-admin users only reach a patient's data through an explicit
+    ``user_patient_access`` grant, so most authorization tests need a second
+    (non-admin) client alongside the default admin ``client`` fixture.
+    """
+    from asclepius.auth.session import hash_password
+
+    created: list[AsyncClient] = []
+
+    async def _make(username, role="viewer", password="pw-at-least-8", patient_grants=None):
+        async with aiosqlite.connect(db_path) as conn:
+            await conn.execute("PRAGMA foreign_keys=ON")
+            cur = await conn.execute(
+                "INSERT INTO users (username, password_hash, display_name, role) "
+                "VALUES (?, ?, ?, ?)",
+                (username, hash_password(password), username, role),
+            )
+            uid = cur.lastrowid
+            for pid, prole in (patient_grants or {}).items():
+                await conn.execute(
+                    "INSERT INTO user_patient_access (user_id, patient_id, role) "
+                    "VALUES (?, ?, ?)",
+                    (uid, pid, prole),
+                )
+            await conn.commit()
+
+        transport = ASGITransport(app=app)
+        ac = AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS)
+        resp = await ac.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
+        assert resp.status_code == 200, resp.text
+        created.append(ac)
+        return ac, uid
+
+    yield _make
+
+    for ac in created:
+        await ac.aclose()
+
+
 @pytest.fixture
 def share_app(tmp_path, monkeypatch):
     """Build a fresh FastAPI app pointed at a throwaway sqlite + vault.

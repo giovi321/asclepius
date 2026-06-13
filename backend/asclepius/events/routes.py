@@ -9,10 +9,50 @@ import aiosqlite
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.patients.service import check_patient_access
 from asclepius.util.dates import BEST_DATE_SQL, best_date
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _event_with_access(
+    db: aiosqlite.Connection,
+    event_id: int,
+    current_user: dict,
+    *,
+    require_delete: bool = False,
+) -> dict:
+    """Load an event and enforce access, or raise 404/403.
+
+    Admins see everything. Non-admins need an explicit ``user_patient_access``
+    grant on the event's patient. ``require_delete`` additionally rejects the
+    viewer role, mirroring the ``/api/documents`` DELETE rule.
+    """
+    cursor = await db.execute("SELECT * FROM medical_events WHERE id = ?", (event_id,))
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Event not found")
+    event = dict(row)
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], event["patient_id"])
+        if not role:
+            raise HTTPException(status_code=403, detail="No access")
+        if require_delete and role == "viewer":
+            raise HTTPException(
+                status_code=403, detail="Insufficient permissions to delete this event"
+            )
+    return event
+
+
+async def _require_patient_access(
+    db: aiosqlite.Connection, patient_id: int, current_user: dict
+) -> None:
+    """Enforce that the caller may act on ``patient_id`` (admin or any grant)."""
+    if current_user.get("role") != "admin":
+        role = await check_patient_access(db, current_user["id"], patient_id)
+        if not role:
+            raise HTTPException(status_code=403, detail="No access to this patient")
 
 
 EVENT_TYPES = [
@@ -138,13 +178,27 @@ async def list_events(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """List medical events, optionally filtered by patient and type."""
+    """List medical events, optionally filtered by patient and type.
+
+    Results are scoped to the caller's accessible patients: admins see all,
+    non-admins see only patients they hold a ``user_patient_access`` grant for.
+    """
     conditions = []
     params: list = []
 
     if patient_id:
+        if current_user.get("role") != "admin":
+            role = await check_patient_access(db, current_user["id"], patient_id)
+            if not role:
+                raise HTTPException(status_code=403, detail="No access")
         conditions.append("e.patient_id = ?")
         params.append(patient_id)
+    elif current_user.get("role") != "admin":
+        conditions.append(
+            "e.patient_id IN (SELECT patient_id FROM user_patient_access WHERE user_id = ?)"
+        )
+        params.append(current_user["id"])
+
     if event_type:
         conditions.append("e.event_type = ?")
         params.append(event_type)
@@ -170,6 +224,8 @@ async def get_event(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Get a single event with its linked documents."""
+    await _event_with_access(db, event_id, current_user)
+
     cursor = await db.execute(
         """SELECT e.*, p.display_name as patient_name
            FROM medical_events e
@@ -208,6 +264,7 @@ async def create_event(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await _require_patient_access(db, body.patient_id, current_user)
     cursor = await db.execute(
         """INSERT INTO medical_events
            (patient_id, title, event_type, description, date_start, date_end,
@@ -241,6 +298,7 @@ async def update_event(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await _event_with_access(db, event_id, current_user)
     updates = {}
     for field in body.model_fields_set:
         value = getattr(body, field)
@@ -267,6 +325,7 @@ async def delete_event(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await _event_with_access(db, event_id, current_user, require_delete=True)
     if delete_documents:
         # Delete all linked documents from disk and DB
         cursor = await db.execute(
@@ -303,6 +362,7 @@ async def link_document_to_event(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Link a document to a medical event."""
+    await _event_with_access(db, event_id, current_user)
     try:
         await db.execute(
             """INSERT OR IGNORE INTO document_event_links (document_id, event_id, relevance, auto_linked)
@@ -327,6 +387,7 @@ async def unlink_document_from_event(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await _event_with_access(db, event_id, current_user)
     await db.execute(
         "DELETE FROM document_event_links WHERE event_id = ? AND document_id = ?",
         (event_id, document_id),
@@ -358,6 +419,8 @@ async def suggest_events_for_document(
 
     if not doc.get("patient_id"):
         raise HTTPException(status_code=400, detail="Document has no patient assigned")
+
+    await _require_patient_access(db, doc["patient_id"], current_user)
 
     # Get existing events for this patient
     cursor = await db.execute(

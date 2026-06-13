@@ -1,31 +1,39 @@
 """Characterization tests for the extraction-merge strategies.
 
-Asclepius has THREE different merge paths that combine per-chunk / per-section
-/ per-page extractions into one result, and they currently use DIFFERENT dedup
-semantics:
+Asclepius historically had THREE different merge paths that combine per-chunk
+/ per-section / per-page extractions into one result, each with DIFFERENT
+dedup semantics. Phase 4 unified all three onto the single canonical merger in
+``asclepius.pipeline.extraction_merge`` (``merge_pair`` / ``merge_section_
+extractions`` / ``merge_extraction_dicts``). The canonical contract is:
 
-    1. ``chunked_extraction.merge_extractions(base, additional)``
-       — pairwise, in-place merge of two dicts. Deduplicates by composite keys
-         (lab: test_name_original; medication: brand_name+active_ingredient;
-         diagnosis: diagnosis_original; vaccination: name+date; cost line item:
-         description+amount). Uses ``encounter`` via the classification blob
-         (it does NOT merge an ``encounter`` key itself).
+    * ARRAY fields (lab_results, diagnoses, medications, vaccinations,
+      encounters, invoice_items, and the nested cost.line_items) →
+      CONCATENATE across all inputs, then DEDUP by an explicit per-array
+      composite key (``extraction_merge.ARRAY_DEDUP_KEYS``):
+        lab: test_name_original; medication: brand_name+active_ingredient;
+        diagnosis: diagnosis_original; vaccination: name+date; cost line item:
+        description+amount. First row per key wins.
+    * SCALAR / metadata fields → first non-empty value wins.
 
-    2. ``section_processor._merge_section_extractions(list_of_dicts)``
-       — folds a LIST of section dicts. Does NO dedup: every lab/diagnosis/
-         medication/vaccination is ``extend``-ed verbatim. Keeps the FIRST
-         ``encounter`` that has an ``encounter_date``. Always returns the full
-         fixed key set (lab_results/diagnoses/medications/vaccinations/
-         encounter/cost) even for empty input.
+The three paths now differ only in two intentional knobs:
 
-    3. Vision merge (inline in ``vision_extractor.extract_with_vision``)
-       — first-non-empty value per top-level key wins; no list concatenation
-         and no row-level dedup. It is not a standalone function, so it is
-         characterized indirectly via a tiny re-implementation note below
-         rather than a direct call (see ``test_vision_merge_semantics_note``).
+    1. ``chunked_extraction.merge_extractions(base, additional)`` →
+       ``merge_pair``. Still a pairwise, in-place merge that only touches the
+       array fields and leaves every scalar/metadata field (including the
+       singular ``encounter``) exactly as ``base`` had it. Behaviour is
+       unchanged from before unification — the canonical keys were DERIVED from
+       this implementation.
 
-The planned unification will collapse these into one strategy. Pinning each
-one's CURRENT output makes that collapse a visible, intentional diff.
+    2. ``section_processor._merge_section_extractions(list_of_dicts)`` →
+       ``merge_section_extractions``. Folds a LIST of section dicts. Phase 4:
+       arrays are now concatenated AND deduped (they used to be ``extend``-ed
+       verbatim). Still keeps the FIRST ``encounter`` bearing an
+       ``encounter_date`` and always returns the full fixed key skeleton.
+
+    3. Vision merge (inline in ``vision_extractor.extract_with_vision``) →
+       ``merge_extraction_dicts(..., fill_scalars=True)``. Phase 4: arrays now
+       concatenate+dedup across pages (they used to be first-page-list-wins).
+       Scalar/metadata fields still take the first non-empty value per key.
 
 These are pure-function tests — no DB, no network.
 """
@@ -35,6 +43,7 @@ from __future__ import annotations
 import copy
 
 from asclepius.pipeline.chunked_extraction import merge_extractions
+from asclepius.pipeline.extraction_merge import merge_extraction_dicts
 from asclepius.pipeline.section_processor import _merge_section_extractions
 
 
@@ -202,31 +211,43 @@ def test_chunked_merge_dedup_treats_missing_key_as_none():
 # ==========================================================================
 
 
-def test_section_merge_extends_all_rows_without_dedup():
-    """_merge_section_extractions concatenates every list verbatim — the
-    overlapping WBC / Lisinopril / Hypertension rows are NOT deduplicated, so
-    duplicates survive (contrast with the chunked merge)."""
+def test_section_merge_concatenates_and_dedups_rows():
+    """Phase 4: unified merge — was extend-all (duplicates survive), now
+    concatenate+dedup. The page-boundary-overlap WBC / Lisinopril /
+    Hypertension rows collapse to a single occurrence each, identical to what
+    the chunked merge produces for the same input."""
     merged = _merge_section_extractions([copy.deepcopy(CHUNK_A), copy.deepcopy(CHUNK_B)])
 
-    # All 4 lab rows (2 + 2) survive, including the duplicate WBC.
+    # Phase 4: unified merge — was ["WBC","RBC","WBC","Glucose"] (dup WBC),
+    # now concatenate+dedup → the second WBC is dropped.
     lab_names = [r["test_name_original"] for r in merged["lab_results"]]
-    assert lab_names == ["WBC", "RBC", "WBC", "Glucose"]
+    assert lab_names == ["WBC", "RBC", "Glucose"]
+    # First-occurrence wins: chunk-A's WBC value is kept, chunk-B's 5.1 dropped.
+    wbc = next(r for r in merged["lab_results"] if r["test_name_original"] == "WBC")
+    assert wbc["value"] == "5.0"
 
-    # All 3 medications (1 + 2), including the duplicate Lisinopril.
+    # Phase 4: unified merge — was [Zestril/Lisinopril, Zestril/Lisinopril,
+    # Bayer/Aspirin] (dup Lisinopril), now concatenate+dedup → one Lisinopril.
     med_keys = [
         (m["brand_name"], m["active_ingredient_original"]) for m in merged["medications"]
     ]
     assert med_keys == [
         ("Zestril", "Lisinopril"),
-        ("Zestril", "Lisinopril"),
         ("Bayer", "Aspirin"),
     ]
 
-    # All diagnoses concatenated, duplicate Hypertension included.
+    # Phase 4: unified merge — was [Hypertension, Hypertension, Type 2 diabetes]
+    # (dup Hypertension), now concatenate+dedup → one Hypertension.
     assert [d["diagnosis_original"] for d in merged["diagnoses"]] == [
         "Hypertension",
-        "Hypertension",
         "Type 2 diabetes",
+    ]
+
+    # Vaccinations: same name + different date stays DISTINCT (date is part of
+    # the composite key); same name+date dedups.
+    assert [(v["vaccine_name"], v["date_administered"]) for v in merged["vaccinations"]] == [
+        ("Influenza", "2024-01-02"),
+        ("Influenza", "2025-01-02"),
     ]
 
 
@@ -245,12 +266,30 @@ def test_section_merge_encounter_skips_dateless_then_takes_next():
     assert merged["encounter"] == {"encounter_date": "2024-03-03", "provider": "Dr Real"}
 
 
-def test_section_merge_cost_extends_items_and_takes_first_total():
-    a = {"cost": {"line_items": [{"description": "X", "amount": "1"}], "total_amount": "10", "currency": "EUR"}}
-    b = {"cost": {"line_items": [{"description": "Y", "amount": "2"}], "total_amount": "20", "currency": "USD"}}
+def test_section_merge_cost_dedups_items_and_takes_first_total():
+    a = {
+        "cost": {
+            "line_items": [{"description": "X", "amount": "1"}],
+            "total_amount": "10",
+            "currency": "EUR",
+        }
+    }
+    b = {
+        "cost": {
+            # Same description+amount as A -> duplicate; Y is new.
+            "line_items": [
+                {"description": "X", "amount": "1"},
+                {"description": "Y", "amount": "2"},
+            ],
+            "total_amount": "20",
+            "currency": "USD",
+        }
+    }
     merged = _merge_section_extractions([a, b])
-    # Items concatenated; first total/currency wins.
+    # Phase 4: unified merge — was extend-all (duplicate X survives), now
+    # concatenate+dedup by description+amount → the second X is dropped.
     assert [li["description"] for li in merged["cost"]["line_items"]] == ["X", "Y"]
+    # Quirk preserved: first total/currency wins (cost totals are NOT summed).
     assert merged["cost"]["total_amount"] == "10"
     assert merged["cost"]["currency"] == "EUR"
 
@@ -271,7 +310,8 @@ def test_section_merge_empty_input_returns_full_fixed_key_set():
 
 def test_section_merge_ignores_non_dict_and_non_list_entries():
     """Non-dict section entries are skipped; a list-typed value where a list is
-    expected is extended, but a non-list value for a list key is ignored."""
+    expected is concatenated+deduped, but a non-list value for a list key is
+    ignored. (Unchanged by Phase 4 — the robustness guard is the same.)"""
     merged = _merge_section_extractions(
         [
             "garbage",  # skipped (not a dict)
@@ -283,49 +323,101 @@ def test_section_merge_ignores_non_dict_and_non_list_entries():
 
 
 # ==========================================================================
-# Strategy 3: vision merge — documented, not directly callable.
+# Strategy 3: vision merge — now the canonical ``merge_extraction_dicts``.
 # ==========================================================================
+#
+# The vision flow (``vision_extractor.extract_with_vision``) used to merge its
+# per-page extractions with an inline loop:
+#
+#     merged = {}
+#     for ex in all_extractions:
+#         for key, val in ex.items():
+#             if val and not merged.get(key):
+#                 merged[key] = val
+#
+# i.e. first-non-empty value per top-level key, lists taken whole (no concat,
+# no dedup). Phase 4 replaced that loop with
+# ``merge_extraction_dicts(all_extractions, fill_scalars=True)``: scalar keys
+# keep first-non-empty-wins, but ARRAY keys now concatenate+dedup across pages.
 
 
-def test_vision_merge_semantics_note():
-    """The vision merge is inline in ``extract_with_vision`` and not a callable
-    function, so we pin its semantics by replicating the exact loop:
+def _vision_merge(all_extractions):
+    """The current vision merge, exactly as ``extract_with_vision`` calls it."""
+    return merge_extraction_dicts(all_extractions, fill_scalars=True)
 
-        merged = {}
-        for ex in all_extractions:
-            for key, val in ex.items():
-                if val and not merged.get(key):
-                    merged[key] = val
 
-    i.e. first-non-empty value per top-level key wins; later pages can fill a
-    key the earlier page left empty/falsy, but never overwrite a set key, and
-    lists are taken whole (no row concatenation, no dedup). This test exercises
-    that algorithm so the refactor can confirm the replacement preserves it.
-    """
-
-    def vision_merge(all_extractions):
-        merged: dict = {}
-        for ex in all_extractions:
-            for key, val in ex.items():
-                if val and not merged.get(key):
-                    merged[key] = val
-        return merged
-
+def test_vision_merge_scalar_fields_first_non_empty_wins():
+    """Scalar/metadata fields are UNCHANGED by Phase 4: first non-empty value
+    per key wins; a key left empty/falsy by page 1 can be filled by page 2, but
+    a set key is never overwritten."""
     page1 = {
         "doc_type": "lab_report",
-        "lab_results": [{"test_name_original": "WBC"}],
         "summary": "",  # falsy -> does not claim the key
     }
     page2 = {
         "doc_type": "OVERWRITE-ATTEMPT",  # ignored: doc_type already set
-        "lab_results": [{"test_name_original": "Glucose"}],  # ignored: list already set
         "summary": "Filled in by page 2",  # claims the previously-empty key
         "patient_name": "Jane",  # new key
     }
-    merged = vision_merge([page1, page2])
+    merged = _vision_merge([page1, page2])
 
     assert merged["doc_type"] == "lab_report"  # first non-empty wins
-    # The WHOLE first list is kept; page2's lab_results are NOT concatenated.
-    assert merged["lab_results"] == [{"test_name_original": "WBC"}]
     assert merged["summary"] == "Filled in by page 2"  # empty -> later fills it
     assert merged["patient_name"] == "Jane"
+
+
+def test_vision_merge_arrays_now_concatenate_and_dedup():
+    """Phase 4: unified merge — was first-page-list-wins (page 2's array
+    dropped whole), now concatenate+dedup across pages."""
+    page1 = {"lab_results": [{"test_name_original": "WBC"}]}
+    page2 = {
+        "lab_results": [
+            {"test_name_original": "WBC"},  # duplicate of page 1 -> dropped
+            {"test_name_original": "Glucose"},  # new -> kept
+        ]
+    }
+    merged = _vision_merge([page1, page2])
+
+    # Phase 4: unified merge — was [{"test_name_original":"WBC"}] (page 2's
+    # whole list dropped because the key was already set), now concatenate+dedup
+    # → page 2's Glucose is appended and its duplicate WBC is dropped.
+    assert [r["test_name_original"] for r in merged["lab_results"]] == ["WBC", "Glucose"]
+
+
+def test_vision_merge_full_synthetic_matches_chunked_output():
+    """Phase 4: feeding the shared CHUNK_A / CHUNK_B multi-part input through
+    the vision merge now yields the SAME deduped child-row sets as the chunked
+    and section paths — the whole point of unification.
+
+    Was (old first-page-wins vision loop): lab_results=[WBC, RBC];
+    medications=[Zestril/Lisinopril]; diagnoses=[Hypertension];
+    vaccinations=[(Influenza,2024-01-02)]; cost=[Blood panel].
+    """
+    merged = _vision_merge([copy.deepcopy(CHUNK_A), copy.deepcopy(CHUNK_B)])
+
+    # Phase 4: unified merge — was [WBC, RBC] (chunk B dropped), now
+    # concatenate+dedup.
+    assert [r["test_name_original"] for r in merged["lab_results"]] == ["WBC", "RBC", "Glucose"]
+    # Phase 4: unified merge — was [Zestril/Lisinopril] only, now +Bayer/Aspirin.
+    assert [
+        (m["brand_name"], m["active_ingredient_original"]) for m in merged["medications"]
+    ] == [("Zestril", "Lisinopril"), ("Bayer", "Aspirin")]
+    # Phase 4: unified merge — was [Hypertension] only, now +Type 2 diabetes.
+    assert [d["diagnosis_original"] for d in merged["diagnoses"]] == [
+        "Hypertension",
+        "Type 2 diabetes",
+    ]
+    # Phase 4: unified merge — was [(Influenza,2024-01-02)] only, now the
+    # second date survives as a distinct row.
+    assert [(v["vaccine_name"], v["date_administered"]) for v in merged["vaccinations"]] == [
+        ("Influenza", "2024-01-02"),
+        ("Influenza", "2025-01-02"),
+    ]
+    # Phase 4: unified merge — was [Blood panel] only, now +Office visit.
+    assert [(li["description"], li["amount"]) for li in merged["cost"]["line_items"]] == [
+        ("Blood panel", "50.00"),
+        ("Office visit", "120.00"),
+    ]
+    # Scalar fields unchanged: first non-empty doc_type / encounter win.
+    assert merged["doc_type"] == "lab_report"
+    assert merged["encounter"] == {"encounter_date": "2024-01-02", "provider": "Dr A"}

@@ -16,6 +16,7 @@ from PIL import Image
 
 from asclepius.config import AppConfig, VisionLlmProviderEntry
 from asclepius.llm.json_utils import parse_llm_json
+from asclepius.pipeline.extraction_merge import merge_extraction_dicts
 from asclepius.pipeline.vision_io import (
     MAX_IMAGE_BYTES,
     MAX_VISION_PIXELS,
@@ -309,11 +310,13 @@ async def _extract_with_provider(
 
     full_text = "\n\n".join(all_text_parts)
 
-    merged: dict = {}
-    for ex in all_extractions:
-        for key, val in ex.items():
-            if val and not merged.get(key):
-                merged[key] = val
+    # Phase 4: route the per-page merge through the canonical merger. Scalar /
+    # metadata fields keep their first-non-empty-value-wins behaviour, but the
+    # extraction ARRAYS (lab_results, medications, …) now CONCATENATE across
+    # pages and dedup by the shared composite keys instead of the old
+    # first-page-list-wins. A lab table split across two page images is now
+    # fully captured rather than dropped after the first page.
+    merged = merge_extraction_dicts(all_extractions, fill_scalars=True)
 
     if not full_text.strip() and not merged:
         raise RuntimeError(

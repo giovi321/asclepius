@@ -14,6 +14,7 @@ import aiosqlite
 
 from asclepius.config import AppConfig
 from asclepius.llm.prompts import chunk_context_preamble
+from asclepius.pipeline.extraction_merge import merge_pair
 from asclepius.pipeline.ocr_cache import load_cached_ocr_pages
 
 logger = logging.getLogger(__name__)
@@ -407,55 +408,16 @@ def _build_page_chunks(
 
 
 def merge_extractions(base: dict, additional: dict) -> dict:
-    """Merge additional extraction results into the base, deduplicating."""
-    # Merge lab results — deduplicate by test_name_original
-    existing_labs = {lr.get("test_name_original") for lr in base.get("lab_results", [])}
-    for lab in additional.get("lab_results", []):
-        if lab.get("test_name_original") not in existing_labs:
-            base.setdefault("lab_results", []).append(lab)
-            existing_labs.add(lab.get("test_name_original"))
+    """Merge ``additional`` extraction results into ``base``, deduplicating.
 
-    # Merge medications — deduplicate by brand_name + active_ingredient_original
-    existing_meds = {
-        (m.get("brand_name"), m.get("active_ingredient_original"))
-        for m in base.get("medications", [])
-    }
-    for med in additional.get("medications", []):
-        key = (med.get("brand_name"), med.get("active_ingredient_original"))
-        if key not in existing_meds:
-            base.setdefault("medications", []).append(med)
-            existing_meds.add(key)
-
-    # Merge diagnoses — deduplicate by diagnosis_original
-    existing_diags = {d.get("diagnosis_original") for d in base.get("diagnoses", [])}
-    for diag in additional.get("diagnoses", []):
-        if diag.get("diagnosis_original") not in existing_diags:
-            base.setdefault("diagnoses", []).append(diag)
-            existing_diags.add(diag.get("diagnosis_original"))
-
-    # Merge vaccinations — deduplicate by vaccine_name + date_administered
-    existing_vax = {
-        (v.get("vaccine_name"), v.get("date_administered")) for v in base.get("vaccinations", [])
-    }
-    for vax in additional.get("vaccinations", []):
-        key = (vax.get("vaccine_name"), vax.get("date_administered"))
-        if key not in existing_vax:
-            base.setdefault("vaccinations", []).append(vax)
-            existing_vax.add(key)
-
-    # Merge cost line items — deduplicate by description + amount
-    base_cost = base.get("cost", {})
-    add_cost = additional.get("cost", {})
-    existing_items = {
-        (li.get("description"), li.get("amount")) for li in base_cost.get("line_items", [])
-    }
-    for item in add_cost.get("line_items", []):
-        key = (item.get("description"), item.get("amount"))
-        if key not in existing_items:
-            base_cost.setdefault("line_items", []).append(item)
-            existing_items.add(key)
-
-    return base
+    Thin wrapper over the canonical ``extraction_merge.merge_pair`` — the
+    composite dedup keys this chunked path historically defined now live
+    centrally in ``extraction_merge.ARRAY_DEDUP_KEYS`` and are shared by the
+    section and vision paths too. Behaviour is unchanged for the chunked flow:
+    only the array fields (and nested cost line items) are merged in place;
+    every scalar/metadata field is left as ``base`` had it.
+    """
+    return merge_pair(base, additional)
 
 
 # Threshold above which a document is chunked even when it's single-page or

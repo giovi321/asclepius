@@ -10,6 +10,7 @@ import fitz  # pymupdf
 
 from asclepius.config import AppConfig
 from asclepius.llm.base import LLMProvider
+from asclepius.pipeline.extraction_merge import merge_section_extractions
 from asclepius.pipeline.text_utils import _ALT_OR_LABEL, _HTML_TAG
 
 logger = logging.getLogger(__name__)
@@ -257,39 +258,13 @@ async def process_with_sections(
 
 
 def _merge_section_extractions(extractions: list[dict]) -> dict:
-    """Merge multiple section extractions into one combined result."""
-    merged: dict = {
-        "lab_results": [],
-        "diagnoses": [],
-        "medications": [],
-        "vaccinations": [],
-        "encounter": {},
-        "cost": {"line_items": []},
-    }
+    """Merge multiple section extractions into one combined result.
 
-    for ext in extractions:
-        if not isinstance(ext, dict):
-            continue
-
-        for key in ("lab_results", "diagnoses", "medications", "vaccinations"):
-            items = ext.get(key, [])
-            if isinstance(items, list):
-                merged[key].extend(items)
-
-        # Merge encounter (keep the most detailed one)
-        enc = ext.get("encounter", {})
-        if isinstance(enc, dict) and enc.get("encounter_date"):
-            if not merged["encounter"].get("encounter_date"):
-                merged["encounter"] = enc
-
-        # Merge cost
-        cost = ext.get("cost", {})
-        if isinstance(cost, dict):
-            items = cost.get("line_items", [])
-            if isinstance(items, list):
-                merged["cost"]["line_items"].extend(items)
-            if cost.get("total_amount") and not merged["cost"].get("total_amount"):
-                merged["cost"]["total_amount"] = cost["total_amount"]
-                merged["cost"]["currency"] = cost.get("currency")
-
-    return merged
+    Delegates to the canonical ``extraction_merge.merge_section_extractions``.
+    Behaviour change (Phase 4): the array fields are now concatenated AND
+    deduped by the shared composite keys instead of extended verbatim, so
+    page-boundary-overlap duplicates collapse exactly as they do on the
+    chunked path. The fixed key skeleton, first-encounter-with-a-date, and
+    first-total/first-currency quirks are preserved.
+    """
+    return merge_section_extractions(extractions)

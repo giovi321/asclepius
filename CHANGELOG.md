@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+A large internal refactor. Most of it is behaviour-preserving cleanup, but it
+also closes several security holes and changes a few behaviours on purpose
+(noted under Changed). The backend test suite and the frontend type-check/build
+stayed green throughout.
+
+### Security
+- Medical events had no authorization at all. Every `/api/events` endpoint
+  depended only on a valid session, so any logged-in account — including a
+  viewer with no grant — could read, edit, and cascade-delete another patient's
+  events and the documents linked to them. Every endpoint now checks patient
+  access, the listing is scoped to the caller's patients, and deleting requires
+  editor or owner.
+- Backup and prompt endpoints were gated by login, not by role. A viewer-level
+  account could download a full SQLite snapshot — every patient record, OTP, and
+  password hash — through `GET /api/settings/backup` and the scheduled-backup
+  endpoints, or rewrite the extraction prompts through `PUT`/`DELETE
+  /api/settings/prompts`. These now require admin, enforced where the routers are
+  mounted so a new handler cannot ship under-gated by accident. `GET
+  /api/settings/logs` is admin-only for the same reason.
+- More cross-tenant holes found during review: linking a document to an event
+  never checked the document's patient (an IDOR that leaked the document's
+  metadata back through the event view and could re-parent or cascade-delete
+  another patient's file); `POST /documents/{id}/edit-with-ai`,
+  `/generate-filename`, and the `/documents/{id}/link[s]` endpoints had no access
+  check; the normalization "documents using this entry" listing returned every
+  patient's filenames unscoped; and the normalization edit/merge/delete endpoints
+  were open to any logged-in user (now editor or admin).
+- Editing a patient's encounters or medications only required *some* grant on the
+  patient, so a viewer could change them. Child-record writes now require editor
+  or owner, matching the rule the rest of the document already used.
+- Three error handlers (the two backup endpoints and the event-link handler)
+  returned the raw exception text to the caller and logged nothing. They now log
+  the traceback and return a generic message.
+
+### Changed
+- Background SQLite connections — the file watcher, pipeline workers, the prompt
+  manager, and a few routes — were opened without the per-connection PRAGMAs, so
+  `foreign_keys=ON` was never set and `ON DELETE CASCADE` silently did not fire.
+  Deleting a document left its lab results, encounters, and other child rows
+  orphaned. Every connection now goes through one helper that sets the PRAGMAs,
+  with a test that fails if a raw connection reappears.
+- The Claude provider now retries transient errors and honours JSON mode and
+  per-request timeouts, like the Ollama and OpenAI providers. It previously made
+  a single attempt and ignored those settings.
+- A multi-page document now produces the same lab results, medications, and
+  diagnoses regardless of which path processed it. The three merge strategies had
+  drifted: the section path kept duplicate rows from overlapping page ranges, and
+  the vision path dropped everything after the first page that had data. All three
+  now concatenate and de-duplicate on the same keys.
+- A custom classification or SQL-generation prompt set in Settings now applies on
+  every path, including long (chunked) documents and the chat query. Those two
+  ignored the override and used the built-in default.
+- Admins can open imaging studies without an explicit grant on the patient,
+  matching how every other module already treated admins.
+
+### Internal
+- Split the largest files into focused modules: `imaging/routes.py` (1121 lines),
+  `share/service.py` (933), and the pipeline `extractor.py` (1161) on the backend,
+  plus five oversized React pages/components on the frontend. Folded the
+  duplicated authorization checks into one `authz` module, the per-provider LLM
+  bodies into the base class, and the divergent vision image-IO and
+  provider-resolution code into one place each.
+- Added a backend characterization-test suite, and on the frontend an ESLint
+  config and a Vitest harness (there were no frontend tests before). Both run in
+  CI, and API responses on the main pages are now typed against the generated
+  OpenAPI schema, so a backend field rename shows up as a frontend compile error.
+- Removed dead code and four unused npm dependencies, deleted an orphaned
+  `backend/Dockerfile`, and created the `idx_documents_event_date` index a schema
+  comment had promised but never made.
+
+### Fixed
+- A region-translation timestamp rendered in the wrong timezone: a naive UTC value
+  was parsed as local time. Backend timestamps now parse as UTC everywhere.
+- The pipeline stage names disagreed across the three places they were shown
+  (one view labelled a stage "Vision", another "Vision extraction"). They now come
+  from one shared table.
+- The diverged OCR-vs-vision image renderer could feed an Ollama vision model
+  dimensions it rejected with a hard crash; both paths now use the same
+  patch-aligned sizing.
+
 ## [1.3.0] - 2026-06-12
 
 ### Security

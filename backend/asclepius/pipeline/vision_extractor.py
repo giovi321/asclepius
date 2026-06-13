@@ -7,11 +7,7 @@ failure on the top provider falls back to the next.
 """
 
 import asyncio
-import base64
-import io
-import json
 import logging
-import re
 from pathlib import Path
 
 import httpx
@@ -19,49 +15,28 @@ import fitz  # pymupdf
 from PIL import Image
 
 from asclepius.config import AppConfig, VisionLlmProviderEntry
+from asclepius.llm.json_utils import parse_llm_json
+from asclepius.pipeline.vision_io import (
+    MAX_IMAGE_BYTES,
+    MAX_VISION_PIXELS,
+    VISION_PATCH_ALIGN,
+    call_vision,
+    compress_image_for_vision,
+    render_page_for_vision,
+    resolve_vision_gate_key,
+)
 
 logger = logging.getLogger(__name__)
 
-
-MAX_IMAGE_BYTES = 4_500_000  # Stay under Claude's 5MB limit
-
-# Qwen2.5-VL uses 14x14 patches with a 2x2 spatial merger, so the model
-# requires each dimension to be a multiple of 28 AND the resulting patch count
-# per dimension to be even. If these constraints aren't met, Ollama's vision
-# encoder crashes with ``GGML_ASSERT(a->ne[2] * 4 == b->ne[0])``.
-# Llama3.2-vision uses 14x14 patches without the 2x2 merger, so 28-alignment
-# is strictly more than it needs and causes no harm.
-VISION_PATCH_ALIGN = 28
-
-# Qwen2.5-VL's default ``max_pixels`` is ``28*28*1280 ≈ 1,003,520``. Images
-# exceeding it get internally downscaled by Ollama to odd dimensions that no
-# longer satisfy the patch-merger shape check, which is where the GGML_ASSERT
-# fires. Scale images below this cap before we hand them off, so we control
-# the final dimensions instead of the server.
-MAX_VISION_PIXELS = 1_003_520
-
-
-def _resize_for_vision_limits(img: "Image.Image") -> "Image.Image":
-    """Scale down so total pixels stay under ``MAX_VISION_PIXELS``."""
-    pixels = img.width * img.height
-    if pixels <= MAX_VISION_PIXELS:
-        return img
-    scale = (MAX_VISION_PIXELS / pixels) ** 0.5
-    new_w = max(VISION_PATCH_ALIGN, int(img.width * scale))
-    new_h = max(VISION_PATCH_ALIGN, int(img.height * scale))
-    return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-
-def _align_to_patch_grid(img: "Image.Image") -> "Image.Image":
-    """Crop the bottom/right edge so each dimension is a multiple of VISION_PATCH_ALIGN."""
-    w = (img.width // VISION_PATCH_ALIGN) * VISION_PATCH_ALIGN
-    h = (img.height // VISION_PATCH_ALIGN) * VISION_PATCH_ALIGN
-    # Guard: never crop below one patch per side — fall back to whatever we have.
-    if w < VISION_PATCH_ALIGN or h < VISION_PATCH_ALIGN:
-        return img
-    if w == img.width and h == img.height:
-        return img
-    return img.crop((0, 0, w, h))
+# Canonical image-IO helpers now live in ``vision_io`` (shared with the OCR
+# flow). Keep the patch-alignment constants re-exported for callers/tests
+# that reference them via this module.
+__all__ = [
+    "MAX_IMAGE_BYTES",
+    "MAX_VISION_PIXELS",
+    "VISION_PATCH_ALIGN",
+    "extract_with_vision",
+]
 
 
 async def _get_extraction_prompt(config: AppConfig) -> str:
@@ -76,74 +51,33 @@ async def _get_extraction_prompt(config: AppConfig) -> str:
     return canonical_language_directive(config.llm.canonical_language) + prompt
 
 
-# ── Image rendering helpers ──────────────────────────────────────
+# ── Image rendering helpers (canonical impls in vision_io) ───────
 
-
-def _render_page_for_vision(page) -> str:
-    """Render a PDF page to a base64 JPEG sized to satisfy both the byte and
-    pixel budgets enforced in ``_compress_image_for_vision``.
-    """
-    pix = page.get_pixmap(dpi=150)
-    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    return _compress_image_for_vision(img)
-
-
-def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
-    """Compress an image to JPEG base64, resizing if needed to stay under limits.
-
-    Two constraints:
-    - Total pixels stay under ``MAX_VISION_PIXELS`` (the vision model's cap)
-      so the server doesn't downscale and produce unaligned dimensions.
-    - Final dimensions are multiples of ``VISION_PATCH_ALIGN`` so qwen2.5-vl's
-      patch-merger matmul shape check passes.
-    """
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-
-    img = _resize_for_vision_limits(img)
-    img = _align_to_patch_grid(img)
-
-    for q in [quality, 70, 50]:
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=q)
-        data = buf.getvalue()
-        if len(data) <= MAX_IMAGE_BYTES:
-            return base64.b64encode(data).decode("utf-8")
-
-    # Fallback: halve the dimensions and try again. Never exceed a patch grid.
-    halved = img.resize(
-        (max(VISION_PATCH_ALIGN, img.width // 2), max(VISION_PATCH_ALIGN, img.height // 2)),
-        Image.Resampling.LANCZOS,
-    )
-    halved = _align_to_patch_grid(halved)
-    buf = io.BytesIO()
-    halved.save(buf, format="JPEG", quality=40)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+# These are the patch-aligned, pixel-capped renderer/compressor shared with
+# the OCR flow. Aliased here so existing call sites keep working.
+_render_page_for_vision = render_page_for_vision
+_compress_image_for_vision = compress_image_for_vision
 
 
 # ── JSON parsing ─────────────────────────────────────────────────
 
 
 def _parse_vision_extraction(raw: str) -> dict | None:
-    """Parse JSON from a vision-LLM response. Tolerant of fenced code blocks."""
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
-    match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(0))
-        except json.JSONDecodeError:
-            pass
-    logger.warning("Failed to parse vision extraction JSON: %s", raw[:200])
-    return None
+    """Parse JSON from a vision-LLM response.
+
+    Delegates to the shared ``json_utils.parse_llm_json`` so the vision flow
+    inherits its truncation-repair (balanced-brace) recovery in addition to
+    the fenced-code-block / surrounding-prose tolerance the old local parser
+    had. ``parse_llm_json`` always returns a dict; when parsing genuinely
+    fails it returns an ``{"error": ...}`` marker dict, which we translate
+    back to ``None`` so the callers' existing ``if parsed:`` branches keep
+    treating the raw text as the OCR transcription.
+    """
+    parsed = parse_llm_json(raw)
+    if not parsed or parsed.get("error") == "Failed to parse extraction":
+        logger.warning("Failed to parse vision extraction JSON: %s", raw[:200])
+        return None
+    return parsed
 
 
 # ── Concurrency guard ────────────────────────────────────────────
@@ -160,20 +94,12 @@ def _resolve_vision_gate_key(
     config,
 ) -> tuple[str, str, int]:
     """Return ``(credential_id, credential_name, cap)`` for a vision
-    provider entry, honouring its credential when set."""
-    from asclepius.config import resolve_credential
+    provider entry, honouring its credential when set.
 
-    cred_id = getattr(provider, "credential_id", "") or ""
-    cred = resolve_credential(config, cred_id) if cred_id else None
-    if cred is not None:
-        return cred.id, cred.name or cred.type, max(1, int(cred.max_concurrent or 2))
-    synthetic_id = f"legacy-vision-{provider.id or 'default'}"
-    name = provider.name or "Vision (legacy)"
-    try:
-        cap = max(1, int(config.vision.max_concurrent_requests or 2))
-    except Exception:
-        cap = 2
-    return synthetic_id, name, cap
+    Thin wrapper over ``vision_io.resolve_vision_gate_key`` pinned to
+    ``kind="vision"`` (legacy fallback cap floor of 2).
+    """
+    return resolve_vision_gate_key(provider, config, kind="vision")
 
 
 # ── Single vision call per provider ──────────────────────────────
@@ -201,93 +127,33 @@ async def _vision_call(
         cred.base_url if cred is not None and cred.base_url else provider.base_url
     ) or ""
     eff_api_key = cred.api_key if cred is not None and cred.api_key else provider.api_key
-
-    if eff_type == "claude":
-        from anthropic import AsyncAnthropic
-
-        client = AsyncAnthropic(api_key=eff_api_key)
-        model = provider.model or "claude-sonnet-4-20250514"
-        response = await client.messages.create(
-            model=model,
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": b64_image,
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-        )
-        return response.content[0].text
-
-    if eff_type == "openai":
-        base_url = (eff_base_url or "https://api.openai.com/v1").rstrip("/")
-        read_timeout = max(float(provider.timeout), 300.0)
-        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
-        headers = {"Authorization": f"Bearer {eff_api_key}", "Content-Type": "application/json"}
-        model = provider.model or "gpt-4o"
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{base_url}/chat/completions",
-                headers=headers,
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
-                                },
-                                {"type": "text", "text": prompt},
-                            ],
-                        }
-                    ],
-                    "max_tokens": 4096,
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-
-    # ollama
-    ollama_url = (eff_base_url or "http://ollama:11434").rstrip("/")
     read_timeout = max(float(provider.timeout), 300.0)
-    timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
-    model = provider.model or "llama3.2-vision"
-    logger.info("Vision extraction (ollama): model=%s, url=%s", model, ollama_url)
-    payload: dict = {
-        "model": model,
-        "prompt": prompt,
-        "images": [b64_image],
-        "stream": False,
-    }
-    # Note: we intentionally do NOT set {"format": "json"} for Ollama. On
-    # qwen2.5-vl / llama3.2-vision the constrained-grammar sampler interacts
-    # badly with the vision pipeline and frequently returns HTTP 500. The
-    # prompt asks for strict JSON, and ``_parse_vision_extraction`` already
-    # tolerates fenced code blocks or surrounding prose, so the constraint
-    # buys us nothing here. ``force_json`` is kept for API compatibility.
+
+    # Per-type model default. The actual transport lives in
+    # ``vision_io.call_vision``; this function owns only the vision-flow
+    # credential resolution.
+    default_model = {
+        "claude": "claude-sonnet-4-20250514",
+        "openai": "gpt-4o",
+    }.get(eff_type, "llama3.2-vision")
+
+    # Note: we intentionally do NOT pass Ollama ``options`` (e.g.
+    # {"format": "json"}). On qwen2.5-vl / llama3.2-vision the
+    # constrained-grammar sampler interacts badly with the vision pipeline
+    # and frequently returns HTTP 500. The prompt asks for strict JSON, and
+    # ``_parse_vision_extraction`` already tolerates fenced code blocks /
+    # surrounding prose, so the constraint buys us nothing here.
+    # ``force_json`` is kept for API compatibility.
     _ = force_json
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(f"{ollama_url}/api/generate", json=payload)
-        if resp.status_code >= 400:
-            body = resp.text[:500]
-            raise httpx.HTTPStatusError(
-                f"Ollama {resp.status_code} from {ollama_url}: {body}",
-                request=resp.request,
-                response=resp,
-            )
-        return resp.json().get("response", "")
+    return await call_vision(
+        provider_type=eff_type,
+        b64_image=b64_image,
+        prompt=prompt,
+        model=provider.model or default_model,
+        api_key=eff_api_key,
+        base_url=eff_base_url,
+        read_timeout=read_timeout,
+    )
 
 
 async def _vision_call_with_retry(

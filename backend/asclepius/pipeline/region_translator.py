@@ -23,10 +23,8 @@ from PIL import Image
 from asclepius.config import AppConfig, OcrProviderEntry
 from asclepius.db.connection import open_db
 from asclepius.llm.prompt_manager import get_prompt
-from asclepius.pipeline.ocr import (
-    _compress_image_for_vision,
-    _llm_vision_page_with_retry,
-)
+from asclepius.pipeline.ocr import _llm_vision_page_with_retry
+from asclepius.pipeline.vision_io import compress_image_for_vision
 from asclepius.pipeline.provider_factory import _build_llm_provider, get_llm_provider
 from asclepius.pipeline.stage_events import (
     STAGE_REGION_OCR,
@@ -82,7 +80,7 @@ async def _ocr_pil_image(
     in this codebase yet.
     """
     if provider is not None and provider.type == "llm_vision":
-        b64 = _compress_image_for_vision(img)
+        b64 = compress_image_for_vision(img)
         text = await _llm_vision_page_with_retry(
             b64,
             config,

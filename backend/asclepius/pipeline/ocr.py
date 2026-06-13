@@ -1,6 +1,5 @@
 """OCR processing with Tesseract and optional cloud fallback."""
 
-import base64
 import logging
 from pathlib import Path
 
@@ -12,8 +11,25 @@ from PIL import Image
 from asclepius.config import AppConfig, OcrProviderEntry, resolve_credential
 from asclepius.config.resolver import _first_enabled_llm
 from asclepius.llm.gate import credential_slot, register_credential
+from asclepius.pipeline.vision_io import (
+    MAX_IMAGE_BYTES as MAX_IMAGE_BYTES,  # re-export for callers/tests
+)
+from asclepius.pipeline.vision_io import (
+    call_vision,
+    compress_image_for_vision,
+    render_page_for_vision,
+    resolve_vision_gate_key,
+)
 
 logger = logging.getLogger(__name__)
+
+# Backwards-compatible aliases. The canonical implementations now live in
+# ``vision_io`` (patch-aligned renderer/compressor shared with the vision
+# flow). ``region_translator`` and a few tests still import these private
+# names from ``ocr``, so re-export them here. ``MAX_IMAGE_BYTES`` is also
+# re-exported for callers/tests that read it via this module.
+_compress_image_for_vision = compress_image_for_vision
+_render_page_for_vision = render_page_for_vision
 
 
 def _resolve_vision_gate_key(
@@ -23,24 +39,11 @@ def _resolve_vision_gate_key(
     """Return ``(credential_id, credential_name, cap)`` for an LLM-vision
     OCR request.
 
-    When the provider entry points at a configured credential, the gate
-    keys off the credential's id and honours its ``max_concurrent`` cap.
-    Legacy entries with no credential fall back to a synthetic id that
-    respects the process-wide ``ocr.max_concurrent_vision_requests``
-    setting so they still queue sensibly.
+    Thin wrapper over ``vision_io.resolve_vision_gate_key`` pinned to
+    ``kind="ocr"`` so legacy entries without a credential fall back to
+    ``ocr.max_concurrent_vision_requests``.
     """
-    cred_id = getattr(provider_entry, "credential_id", "") or "" if provider_entry else ""
-    cred = resolve_credential(config, cred_id) if cred_id else None
-    if cred is not None:
-        return cred.id, cred.name or cred.type, max(1, int(cred.max_concurrent or 1))
-    synthetic_id = f"legacy-vision-{getattr(provider_entry, 'id', 'default') or 'default'}"
-    name = (
-        (getattr(provider_entry, "name", "") or "Vision (legacy)")
-        if provider_entry
-        else "Vision (legacy)"
-    )
-    cap = max(1, int(config.ocr.max_concurrent_vision_requests or 1))
-    return synthetic_id, name, cap
+    return resolve_vision_gate_key(provider_entry, config, kind="ocr")
 
 
 async def extract_text(
@@ -494,53 +497,6 @@ async def _extract_llm_vision(
     return "", 0.0, "none"
 
 
-MAX_IMAGE_BYTES = 4_500_000  # Stay under Claude's 5MB limit
-
-
-def _render_page_for_vision(page) -> str:
-    """Render a PDF page to a base64 JPEG, sized to stay under the API limit."""
-    # Start with 150 DPI, reduce if too large
-    for dpi in [150, 100, 72]:
-        pix = page.get_pixmap(dpi=dpi)
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        b64 = _compress_image_for_vision(img)
-        raw_size = len(base64.b64decode(b64))
-        if raw_size <= MAX_IMAGE_BYTES:
-            return b64
-    # Last resort: very small
-    pix = page.get_pixmap(dpi=50)
-    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-    return _compress_image_for_vision(img, quality=60)
-
-
-def _compress_image_for_vision(img: Image.Image, quality: int = 85) -> str:
-    """Compress an image to JPEG base64, resizing if needed to stay under limit."""
-    import io as _io
-
-    # Resize if very large
-    max_dim = 2000
-    if img.width > max_dim or img.height > max_dim:
-        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
-
-    # Convert to RGB if needed (RGBA, P, etc.)
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-
-    # Try JPEG at given quality
-    for q in [quality, 70, 50]:
-        buf = _io.BytesIO()
-        img.save(buf, format="JPEG", quality=q)
-        data = buf.getvalue()
-        if len(data) <= MAX_IMAGE_BYTES:
-            return base64.b64encode(data).decode("utf-8")
-
-    # Absolute fallback
-    buf = _io.BytesIO()
-    img.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
-    img.save(buf, format="JPEG", quality=40)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
-
-
 async def _llm_vision_page_with_retry(
     b64_image: str,
     config: AppConfig,
@@ -677,74 +633,43 @@ async def _llm_vision_page(
                 vision_api_key = p.api_key
                 break
 
-    if vision_provider == "claude" and vision_api_key:
-        from anthropic import AsyncAnthropic
+    # The actual per-provider transport lives in ``vision_io.call_vision``;
+    # this function owns only the OCR-flow config/credential resolution and
+    # the OCR prompt. Vision OCR needs a generous read timeout — a single
+    # dense page can be slow.
+    read_timeout = max(float(config.llm.extraction_timeout), 300.0)
 
-        client = AsyncAnthropic(api_key=vision_api_key)
+    if vision_provider == "claude" and vision_api_key:
         default_claude_model = next(
             (p.model for p in config.llm.providers if p.type == "claude" and p.enabled),
             "claude-sonnet-4-20250514",
         )
-        model = vision_model or default_claude_model
-
-        response = await client.messages.create(
-            model=model,
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/jpeg",
-                                "data": b64_image,
-                            },
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
+        return await call_vision(
+            provider_type="claude",
+            b64_image=b64_image,
+            prompt=prompt,
+            model=vision_model or default_claude_model,
+            api_key=vision_api_key,
+            read_timeout=read_timeout,
         )
-        return response.content[0].text
 
     elif vision_provider == "openai" and vision_api_key:
         # OpenAI vision (GPT-4o etc.)
-        model = vision_model or "gpt-4o"
         if cred is not None and cred.base_url:
-            base_url = cred.base_url.rstrip("/")
+            base_url = cred.base_url
         elif provider_entry and provider_entry.llm_base_url:
-            base_url = provider_entry.llm_base_url.rstrip("/")
+            base_url = provider_entry.llm_base_url
         else:
             base_url = "https://api.openai.com/v1"
-        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
-        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
-        headers = {"Authorization": f"Bearer {vision_api_key}", "Content-Type": "application/json"}
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{base_url}/chat/completions",
-                headers=headers,
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
-                                },
-                                {"type": "text", "text": prompt},
-                            ],
-                        }
-                    ],
-                    "max_tokens": 4096,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
+        return await call_vision(
+            provider_type="openai",
+            b64_image=b64_image,
+            prompt=prompt,
+            model=vision_model or "gpt-4o",
+            api_key=vision_api_key,
+            base_url=base_url,
+            read_timeout=read_timeout,
+        )
 
     else:
         # Ollama with vision model — can use a different URL than the extraction LLM
@@ -757,43 +682,28 @@ async def _llm_vision_page(
         )
         model = vision_model or (default_ollama.model if default_ollama else "llama3.1")
         if cred is not None and cred.base_url:
-            ollama_url = cred.base_url.rstrip("/")
+            ollama_url = cred.base_url
         elif provider_entry and provider_entry.llm_base_url:
-            ollama_url = provider_entry.llm_base_url.rstrip("/")
+            ollama_url = provider_entry.llm_base_url
         else:
-            ollama_url = (
-                config.ocr.llm_vision_ollama_url
-                or (default_ollama.base_url if default_ollama else "http://ollama:11434")
-            ).rstrip("/")
-        # Vision OCR needs a generous timeout — processing a single page image can be slow
-        read_timeout = max(float(config.llm.extraction_timeout), 300.0)
-        timeout = httpx.Timeout(connect=10.0, read=read_timeout, write=10.0, pool=10.0)
-        logger.info("Vision OCR: model=%s, url=%s", model, ollama_url)
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{ollama_url}/api/generate",
-                json={
-                    "model": model,
-                    "prompt": prompt,
-                    "images": [b64_image],
-                    "stream": False,
-                    # Without an explicit num_predict, Ollama caps generation
-                    # at the model's Modelfile default (often 2048 or even
-                    # 128 tokens). Dense pages and HTML-tagged Chandra
-                    # output blow past that and the response gets cut
-                    # mid-sentence. -1 = generate until the model emits
-                    # eos. num_ctx is also raised so the request doesn't
-                    # quietly truncate the input prompt + image embedding.
-                    "options": {
-                        "num_predict": -1,
-                        "num_ctx": 16384,
-                    },
-                },
+            ollama_url = config.ocr.llm_vision_ollama_url or (
+                default_ollama.base_url if default_ollama else "http://ollama:11434"
             )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("response", "")
+        # Without an explicit num_predict, Ollama caps generation at the
+        # model's Modelfile default (often 2048 or even 128 tokens). Dense
+        # pages and HTML-tagged Chandra output blow past that and the
+        # response gets cut mid-sentence. -1 = generate until the model
+        # emits eos. num_ctx is also raised so the request doesn't quietly
+        # truncate the input prompt + image embedding.
+        return await call_vision(
+            provider_type="ollama",
+            b64_image=b64_image,
+            prompt=prompt,
+            model=model,
+            base_url=ollama_url,
+            read_timeout=read_timeout,
+            ollama_options={"num_predict": -1, "num_ctx": 16384},
+        )
 
 
 async def _extract_remote_ocr(

@@ -1,0 +1,85 @@
+import { Trash2, X } from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
+import type { LabRow } from "./types";
+
+interface OrphanReviewModalProps {
+  open: boolean;
+  onClose: () => void;
+  orphans: LabRow[];
+  orphanBusy: number | "all" | null;
+  deleteOrphan: (row: LabRow) => void;
+  deleteAllOrphans: () => void;
+}
+
+export function OrphanReviewModal({
+  open,
+  onClose,
+  orphans,
+  orphanBusy,
+  deleteOrphan,
+  deleteAllOrphans,
+}: OrphanReviewModalProps) {
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      zIndexClassName="z-[80]"
+      panelClassName="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-4 shadow-xl"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-base font-semibold">
+          Orphan lab results ({orphans.length})
+        </h3>
+        <button
+          onClick={onClose}
+          className="rounded p-1 text-muted-foreground hover:bg-accent"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        These lab results reference a document that no longer exists. Review and
+        delete any you don't want to keep.
+      </p>
+      <div className="divide-y rounded-md border">
+        {orphans.map((o) => (
+          <div
+            key={o.id}
+            className="flex items-center gap-3 px-3 py-2 text-sm"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="font-medium truncate">
+                {o.test_name_canonical || o.test_name_original}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {o.test_date || "no date"}
+                {o.value != null && ` • ${o.value} ${o.unit || ""}`}
+                {o.value_text && !o.value && ` • ${o.value_text}`}
+              </div>
+            </div>
+            <button
+              onClick={() => deleteOrphan(o)}
+              disabled={orphanBusy === o.id}
+              className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+        <Button
+          variant="danger"
+          onClick={deleteAllOrphans}
+          disabled={orphanBusy === "all"}
+        >
+          {orphanBusy === "all" ? "Deleting..." : "Delete all"}
+        </Button>
+      </div>
+    </Modal>
+  );
+}

@@ -1,59 +1,59 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" role="img" aria-label="Asclepius — drop a file in, get organized records out">
   <defs>
     <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
-      <circle cx="1" cy="1" r="0.9" fill="rgba(28,25,23,0.10)"/>
+      <circle cx="1" cy="1" r="0.9" fill="rgba(255,255,255,0.05)"/>
     </pattern>
     <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-      <polygon points="0 0, 8 3, 0 6" fill="#57534e"/>
+      <polygon points="0 0, 8 3, 0 6" fill="#8a837c"/>
     </marker>
     <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-      <polygon points="0 0, 8 3, 0 6" fill="#8E4449"/>
+      <polygon points="0 0, 8 3, 0 6" fill="#d2727a"/>
     </marker>
     <style>
-      .eyebrow{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;letter-spacing:0.2em;fill:#78716c;}
-      .name{font-family:'Geist','Inter',system-ui,sans-serif;font-weight:600;font-size:13px;fill:#1c1917;}
-      .sub{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:10px;fill:#57534e;}
-      .label{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;fill:#57534e;letter-spacing:0.06em;}
-      .label-accent{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;fill:#8E4449;letter-spacing:0.06em;}
-      .title{font-family:'Instrument Serif',Georgia,serif;font-size:22px;fill:#1c1917;}
-      .ital{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:14px;fill:#57534e;}
+      .eyebrow{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;letter-spacing:0.2em;fill:#8a837c;}
+      .name{font-family:'Geist','Inter',system-ui,sans-serif;font-weight:600;font-size:13px;fill:#ece7e1;}
+      .sub{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:10px;fill:#a8a09a;}
+      .label{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;fill:#a8a09a;letter-spacing:0.06em;}
+      .label-accent{font-family:'Geist Mono','SF Mono',Menlo,monospace;font-size:9px;fill:#d2727a;letter-spacing:0.06em;}
+      .title{font-family:'Instrument Serif',Georgia,serif;font-size:22px;fill:#ece7e1;}
+      .ital{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:14px;fill:#b0a8a1;}
     </style>
   </defs>
 
-  <rect width="100%" height="100%" fill="#faf7f2"/>
-  <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
+  <rect width="100%" height="100%" fill="#1a1612"/>
+  <rect width="100%" height="100%" fill="url(#dots)" opacity="0.7"/>
 
   <!-- Header -->
   <text x="40" y="44" class="eyebrow">ASCLEPIUS · OVERVIEW</text>
   <text x="40" y="76" class="title">Drop a file in, get organized medical records out</text>
 
   <!-- ===== Arrows (drawn first) ===== -->
-  <line x1="208" y1="200" x2="288" y2="200" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
-  <line x1="468" y1="200" x2="548" y2="200" stroke="#8E4449" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
-  <line x1="728" y1="200" x2="808" y2="200" stroke="#57534e" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="208" y1="200" x2="288" y2="200" stroke="#8a837c" stroke-width="1" marker-end="url(#arrow)"/>
+  <line x1="468" y1="200" x2="548" y2="200" stroke="#d2727a" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+  <line x1="728" y1="200" x2="808" y2="200" stroke="#8a837c" stroke-width="1" marker-end="url(#arrow)"/>
 
   <!-- arrow labels -->
-  <rect x="222" y="184" width="52" height="14" rx="2" fill="#faf7f2"/>
+  <rect x="222" y="184" width="52" height="14" rx="2" fill="#1a1612"/>
   <text x="248" y="194" class="label" text-anchor="middle">WATCH</text>
 
-  <rect x="486" y="184" width="48" height="14" rx="2" fill="#faf7f2"/>
+  <rect x="486" y="184" width="48" height="14" rx="2" fill="#1a1612"/>
   <text x="510" y="194" class="label-accent" text-anchor="middle">EXTRACT</text>
 
-  <rect x="742" y="184" width="48" height="14" rx="2" fill="#faf7f2"/>
+  <rect x="742" y="184" width="48" height="14" rx="2" fill="#1a1612"/>
   <text x="766" y="194" class="label" text-anchor="middle">STORE</text>
 
   <!-- ===== Stage 1: inbox -->
-  <rect x="40" y="140" width="168" height="120" rx="6" fill="rgba(87,83,78,0.10)" stroke="#78716c" stroke-width="1"/>
-  <rect x="48" y="148" width="44" height="14" rx="2" fill="transparent" stroke="rgba(120,113,108,0.40)" stroke-width="0.8"/>
-  <text x="70" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="rgba(120,113,108,0.9)" text-anchor="middle" letter-spacing="0.08em">INBOX</text>
+  <rect x="40" y="140" width="168" height="120" rx="6" fill="rgba(255,255,255,0.04)" stroke="#7d756e" stroke-width="1"/>
+  <rect x="48" y="148" width="44" height="14" rx="2" fill="transparent" stroke="rgba(168,160,154,0.40)" stroke-width="0.8"/>
+  <text x="70" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="#a8a09a" text-anchor="middle" letter-spacing="0.08em">INBOX</text>
   <text x="124" y="190" class="name" text-anchor="middle">PDF · image · DICOM</text>
   <text x="124" y="208" class="sub" text-anchor="middle">vault/inbox/user-X/</text>
   <text x="124" y="232" class="ital" text-anchor="middle">drop or upload</text>
 
   <!-- ===== Stage 2: pipeline (focal) -->
-  <rect x="288" y="120" width="180" height="160" rx="6" fill="rgba(142,68,73,0.10)" stroke="#8E4449" stroke-width="1.2"/>
-  <rect x="296" y="128" width="56" height="14" rx="2" fill="transparent" stroke="rgba(142,68,73,0.50)" stroke-width="0.8"/>
-  <text x="324" y="138" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="#8E4449" text-anchor="middle" letter-spacing="0.08em">PIPELINE</text>
+  <rect x="288" y="120" width="180" height="160" rx="6" fill="rgba(210,114,122,0.12)" stroke="#d2727a" stroke-width="1.2"/>
+  <rect x="296" y="128" width="56" height="14" rx="2" fill="transparent" stroke="rgba(210,114,122,0.55)" stroke-width="0.8"/>
+  <text x="324" y="138" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="#d2727a" text-anchor="middle" letter-spacing="0.08em">PIPELINE</text>
   <text x="378" y="170" class="name" text-anchor="middle">OCR + LLM</text>
   <text x="378" y="186" class="sub" text-anchor="middle">tesseract · gvision</text>
   <text x="378" y="200" class="sub" text-anchor="middle">ollama · vllm · claude</text>
@@ -62,25 +62,25 @@
   <text x="378" y="260" class="sub" text-anchor="middle">qwen2.5-vl · gpt-4o</text>
 
   <!-- ===== Stage 3: structured data -->
-  <rect x="548" y="140" width="180" height="120" rx="6" fill="#ffffff" stroke="#1c1917" stroke-width="1"/>
-  <rect x="556" y="148" width="48" height="14" rx="2" fill="transparent" stroke="rgba(28,25,23,0.40)" stroke-width="0.8"/>
-  <text x="580" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="rgba(28,25,23,0.8)" text-anchor="middle" letter-spacing="0.08em">DATA</text>
+  <rect x="548" y="140" width="180" height="120" rx="6" fill="rgba(255,255,255,0.05)" stroke="#cfc8c1" stroke-width="1"/>
+  <rect x="556" y="148" width="48" height="14" rx="2" fill="transparent" stroke="rgba(207,200,193,0.40)" stroke-width="0.8"/>
+  <text x="580" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="#cfc8c1" text-anchor="middle" letter-spacing="0.08em">DATA</text>
   <text x="638" y="184" class="name" text-anchor="middle">Structured records</text>
   <text x="638" y="202" class="sub" text-anchor="middle">labs · meds · diagnoses</text>
   <text x="638" y="216" class="sub" text-anchor="middle">imaging · invoices</text>
   <text x="638" y="240" class="ital" text-anchor="middle">SQLite + FTS5</text>
 
   <!-- ===== Stage 4: vault + UI -->
-  <rect x="808" y="140" width="132" height="120" rx="6" fill="rgba(28,25,23,0.05)" stroke="#57534e" stroke-width="1"/>
-  <rect x="816" y="148" width="44" height="14" rx="2" fill="transparent" stroke="rgba(87,83,78,0.40)" stroke-width="0.8"/>
-  <text x="838" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="rgba(87,83,78,0.9)" text-anchor="middle" letter-spacing="0.08em">VAULT</text>
+  <rect x="808" y="140" width="132" height="120" rx="6" fill="rgba(255,255,255,0.03)" stroke="#8a837c" stroke-width="1"/>
+  <rect x="816" y="148" width="44" height="14" rx="2" fill="transparent" stroke="rgba(138,131,124,0.45)" stroke-width="0.8"/>
+  <text x="838" y="158" font-family="'Geist Mono','SF Mono',Menlo,monospace" font-size="8" fill="#a8a09a" text-anchor="middle" letter-spacing="0.08em">VAULT</text>
   <text x="874" y="186" class="name" text-anchor="middle">patient/year/</text>
   <text x="874" y="204" class="sub" text-anchor="middle">{date}_{provider}</text>
   <text x="874" y="216" class="sub" text-anchor="middle">_{doctype}.pdf</text>
   <text x="874" y="240" class="ital" text-anchor="middle">+ web UI</text>
 
   <!-- footer rule + colophon -->
-  <line x1="40" y1="304" x2="940" y2="304" stroke="rgba(28,25,23,0.10)" stroke-width="0.8"/>
+  <line x1="40" y1="304" x2="940" y2="304" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
   <text x="40" y="324" class="ital">Self-hosted. Single Docker container. Bring your own LLM.</text>
   <text x="940" y="324" class="label" text-anchor="end">github.com/giovi321/asclepius</text>
 </svg>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-13
+
 A large internal refactor. Most of it is behaviour-preserving cleanup, but it
 also closes several security holes and changes a few behaviours on purpose
 (noted under Changed). The backend test suite and the frontend type-check/build

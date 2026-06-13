@@ -82,6 +82,11 @@ def _reset_rate_limit():
 async def app(db_path, tmp_vault):
     """Create a test FastAPI application."""
     os.environ["ASCLEPIUS_VAULT_PATH"] = str(tmp_vault)
+    # Point the settings file at an isolated temp path. Endpoints that PATCH
+    # settings (and the settings round-trip tests) persist YAML to
+    # ASCLEPIUS_CONFIG_PATH; without this they would write a stray
+    # ``nonexistent.yaml`` into the backend working tree.
+    os.environ["ASCLEPIUS_CONFIG_PATH"] = os.path.join(os.path.dirname(db_path), "settings.yaml")
 
     # Override config
     from asclepius.config import get_config

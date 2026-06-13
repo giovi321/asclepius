@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { ActionButton, IconButton } from "./inlineEditPrimitives";
 
 /** Proper singular noun for each normalization entity type. The previous
@@ -75,18 +76,15 @@ export function EditableCombobox({
   const loadingOptions = source.loading;
 
   // Close on outside click
-  useEffect(() => {
-    if (!editing) return;
-    const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setEditing(false);
-        setQuery("");
-        setPendingChange(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [editing]);
+  useOnClickOutside(
+    rootRef,
+    () => {
+      setEditing(false);
+      setQuery("");
+      setPendingChange(null);
+    },
+    editing,
+  );
 
   const displayOf = (opt: any) =>
     opt.canonical_display || opt.name || opt.display || "";

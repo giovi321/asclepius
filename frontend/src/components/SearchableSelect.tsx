@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 export interface SearchableOption {
   value: string;
@@ -50,17 +51,14 @@ export default function SearchableSelect({
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useOnClickOutside(
+    ref,
+    () => {
+      setOpen(false);
+      setSearch("");
+    },
+    open,
+  );
 
   // Focus the search field on open; flip alignment if the dropdown would
   // overflow the viewport's right edge.

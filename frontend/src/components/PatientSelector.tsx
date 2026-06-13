@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { usePatient } from "@/contexts/PatientContext";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import {
   User,
   Users as UsersIcon,
@@ -28,19 +29,7 @@ export default function PatientSelector() {
     return () => clearInterval(interval);
   }, [refetch]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useOnClickOutside(containerRef, () => setOpen(false), open);
 
   useEffect(() => {
     if (open) {

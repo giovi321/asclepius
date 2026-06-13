@@ -6,12 +6,7 @@ import {
   Loader2,
   Ban,
   MinusCircle,
-  ScanText,
   Brain,
-  Eye,
-  FolderOutput,
-  FileSearch,
-  Layers,
   Clock,
   Hourglass,
   Upload as UploadIcon,
@@ -27,38 +22,7 @@ import type {
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useCollapseState } from "@/components/document-detail/DocumentDetailHelpers";
 import { parseBackendTs } from "@/lib/utils";
-
-const STAGE_LABELS: Record<string, string> = {
-  ocr: "OCR",
-  vision_extraction: "Vision extraction",
-  llm_extraction: "LLM extraction",
-  page_classification: "Page classification",
-  section_extraction: "Section extraction",
-  organizing: "Organizing",
-  thumbnail: "Thumbnail",
-  cache_ocr: "Cache OCR",
-  translation: "Translation",
-  region_ocr: "Region OCR",
-  region_translation: "Region translation",
-  ai_edit: "AI edit",
-};
-
-const STAGE_ICONS: Record<string, any> = {
-  ocr: ScanText,
-  vision_extraction: Eye,
-  llm_extraction: Brain,
-  organizing: FolderOutput,
-  page_classification: FileSearch,
-  section_extraction: Layers,
-  translation: Languages,
-  region_ocr: ScanText,
-  region_translation: Languages,
-  ai_edit: Brain,
-};
-
-function stageLabel(stage: string): string {
-  return STAGE_LABELS[stage] ?? stage.replace(/_/g, " ");
-}
+import { stageLabel, stageIcon, flowBadge } from "@/lib/pipelineStages";
 
 type StatusVisual = {
   label: string;
@@ -293,20 +257,7 @@ function runOutcome(
 function runFlowBadge(
   events: DocumentStageEvent[],
 ): { label: string; pill: string } | null {
-  const stages = new Set(events.map((e) => e.stage));
-  if (stages.has("vision_extraction")) {
-    return {
-      label: "Vision-LLM",
-      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
-    };
-  }
-  if (stages.has("ocr")) {
-    return {
-      label: "OCR + LLM",
-      pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700",
-    };
-  }
-  return null;
+  return flowBadge(events.map((e) => e.stage));
 }
 
 interface Props {
@@ -552,7 +503,7 @@ function StageRow({
   isLast: boolean;
 }) {
   const v = statusVisuals(event.status);
-  const StageIcon = STAGE_ICONS[event.stage] ?? FileSearch;
+  const StageIcon = stageIcon(event.stage);
   const dur = durationMs(event.started_at, event.finished_at);
 
   return (

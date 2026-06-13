@@ -17,6 +17,7 @@ import DicomViewer from "@/components/DicomViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDiagnoses } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import {
   Section,
   InfoRow,
@@ -214,17 +215,14 @@ function IcdCodeSelect({
       )
     : null;
 
-  useEffect(() => {
-    if (!editing) return;
-    const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setEditing(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [editing]);
+  useOnClickOutside(
+    rootRef,
+    () => {
+      setEditing(false);
+      setQuery("");
+    },
+    editing,
+  );
 
   const save = async (code: string | null) => {
     setSaving(true);
@@ -461,16 +459,7 @@ function MedicationRow({
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [pickerOpen]);
+  useOnClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
 
   const visible = MED_FIELDS.filter(
     (f) => hasValue(f.key) || revealed.has(f.key),

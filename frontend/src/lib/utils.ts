@@ -2,6 +2,11 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { DocumentStatus } from "@/types";
 
+// parseBackendTs is the canonical naive-UTC ISO parser; it now lives in
+// lib/datetime alongside the other timestamp helpers. Re-exported here for the
+// existing call sites that import it from "@/lib/utils".
+export { parseBackendTs } from "@/lib/datetime";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -38,24 +43,6 @@ export function formatDate(s: string | null | undefined): string {
 export function formatDocType(type: string | null | undefined): string {
   if (!type) return "Unknown type";
   return type.replace(/_/g, " ");
-}
-
-/**
- * Parse an ISO timestamp coming from the backend, treating naive strings
- * (no `Z`, no `+HH:MM` / `-HH:MM` offset) as UTC.
- *
- * Most backend writers use ``datetime.utcnow().isoformat()``, which emits
- * naive ISO strings like ``2026-05-03T13:00:00``. ``new Date(...)`` parses
- * those as **local** time per the ECMAScript spec, so an elapsed-time
- * readout in CET ends up offset by +1/+2h from reality. Appending ``Z``
- * before constructing the Date forces UTC interpretation, which matches
- * what the backend actually wrote.
- */
-export function parseBackendTs(ts: string | null | undefined): number | null {
-  if (!ts) return null;
-  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(ts);
-  const ms = new Date(hasTz ? ts : `${ts}Z`).getTime();
-  return Number.isFinite(ms) ? ms : null;
 }
 
 // ─── Status badge styling ──────────────────────────────

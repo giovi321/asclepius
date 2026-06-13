@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { ActionButton, IconButton } from "./inlineEditPrimitives";
 
 export function EditableSelect({
@@ -136,17 +137,14 @@ export function EditableSearchableSelect({
   const rootRef = useRef<HTMLDivElement>(null);
   const fmt = formatLabel || ((v: string) => v.replace(/_/g, " "));
 
-  useEffect(() => {
-    if (!editing) return;
-    const handler = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setEditing(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [editing]);
+  useOnClickOutside(
+    rootRef,
+    () => {
+      setEditing(false);
+      setQuery("");
+    },
+    editing,
+  );
 
   const handleSave = async (newVal: string | null) => {
     setSaving(true);

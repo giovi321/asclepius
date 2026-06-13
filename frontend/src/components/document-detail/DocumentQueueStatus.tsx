@@ -1,51 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { Hourglass, Loader2 } from "lucide-react";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import type { PipelineProviders } from "@/types";
 import { parseBackendTs } from "@/lib/utils";
+import { stageLabel, formatElapsed, useNow } from "@/lib/pipelineStages";
 
 interface Props {
   docId: number;
-}
-
-const STAGE_LABELS: Record<string, string> = {
-  ocr: "OCR",
-  vision_extraction: "Vision",
-  llm_extraction: "LLM",
-  page_classification: "Classifying",
-  section_extraction: "Sections",
-  organizing: "Organizing",
-  thumbnail: "Thumbnail",
-  cache_ocr: "Cache OCR",
-  ai_edit: "AI edit",
-};
-
-function stageLabel(stage: string | null | undefined): string {
-  if (!stage) return "";
-  return STAGE_LABELS[stage] ?? stage.replace(/_/g, " ");
-}
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return "0s";
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rs = s % 60;
-  if (m < 60) return `${m}m ${rs.toString().padStart(2, "0")}s`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return `${h}h ${rm}m`;
-}
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [active]);
-  return now;
 }
 
 /** Header-bar pill that replaces the Reprocess button while a document is

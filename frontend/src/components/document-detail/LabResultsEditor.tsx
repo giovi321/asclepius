@@ -6,6 +6,7 @@ import { Section } from "./DocumentDetailHelpers";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useLabTests } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 type LabRow = {
   id?: number;
@@ -78,15 +79,7 @@ function TestPicker({
     );
   }, [labTests, query]);
 
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
+  useOnClickOutside(rootRef, () => setOpen(false), open);
 
   const q = query.trim().toLowerCase();
   const exact = options.some(

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Share2 } from "lucide-react";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 export type ReprocessMode = "both" | "ocr" | "llm";
 
@@ -53,15 +54,7 @@ export default function BulkActionsBar({
   const [ocrId, setOcrId] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useOnClickOutside(ref, () => setOpen(false), open);
 
   // Collapse the dropdown whenever the selection count changes, so a
   // filter change or manual clear doesn't leave stale state visible.

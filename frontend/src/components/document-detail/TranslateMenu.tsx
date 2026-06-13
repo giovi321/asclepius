@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronDown, Crop, FileText, Languages } from "lucide-react";
 import api from "@/api/client";
 import { useLlmProviders, useOcrProviders } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 export interface TranslateMenuProps {
   docId: number | string;
@@ -59,15 +60,7 @@ export default function TranslateMenu({
   const [ocrId, setOcrId] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useOnClickOutside(ref, () => setOpen(false), open);
 
   const handleStartDoc = async () => {
     setOpen(false);

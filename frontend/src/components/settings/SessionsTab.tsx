@@ -4,6 +4,7 @@ import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { RefreshCw, Trash2, Monitor, Smartphone, Globe } from "lucide-react";
+import { formatDateTime, formatRelative, parseBackendTs } from "@/lib/datetime";
 
 interface SessionRow {
   session_id: string;
@@ -52,41 +53,6 @@ function describeUserAgent(ua: string | null): {
             ? "Linux"
             : "";
   return { label: os ? `${browser} on ${os}` : browser, icon };
-}
-
-function formatDuration(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds));
-  if (s < 60) return `${s}s`;
-  const min = Math.round(s / 60);
-  if (min < 60) return `${min}m`;
-  const hr = Math.floor(s / 3600);
-  if (hr < 24) {
-    const m = Math.round((s - hr * 3600) / 60);
-    return m > 0 ? `${hr}h ${m}m` : `${hr}h`;
-  }
-  const days = Math.floor(s / 86400);
-  const remHr = Math.round((s - days * 86400) / 3600);
-  if (days < 7 && remHr > 0) return `${days}d ${remHr}h`;
-  return `${days}d`;
-}
-
-function formatPast(iso: string): string {
-  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  const delta = (Date.now() - d.getTime()) / 1000;
-  if (delta < 0) return "just now";
-  return `${formatDuration(delta)} ago`;
-}
-
-function formatFuture(iso: string): string {
-  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  const delta = (d.getTime() - Date.now()) / 1000;
-  if (delta <= 0) return "expired";
-  return `in ${formatDuration(delta)}`;
-}
-
-function formatAbsolute(iso: string): string {
-  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
-  return d.toLocaleString();
 }
 
 export default function SessionsTab() {
@@ -242,9 +208,9 @@ export default function SessionsTab() {
                   s.user_agent,
                 );
                 const isRevoked = s.revoked_at !== null;
+                const expiresMs = parseBackendTs(s.expires_at);
                 const isExpired =
-                  !isRevoked &&
-                  new Date(s.expires_at + "Z").getTime() < Date.now();
+                  !isRevoked && expiresMs != null && expiresMs < Date.now();
                 return (
                   <tr
                     key={s.session_id}
@@ -280,21 +246,21 @@ export default function SessionsTab() {
                     </td>
                     <td
                       className="px-3 py-1.5 text-muted-foreground"
-                      title={formatAbsolute(s.last_active_at)}
+                      title={formatDateTime(s.last_active_at)}
                     >
-                      {formatPast(s.last_active_at)}
+                      {formatRelative(s.last_active_at, "past")}
                     </td>
                     <td
                       className="px-3 py-1.5 text-muted-foreground"
-                      title={formatAbsolute(s.created_at)}
+                      title={formatDateTime(s.created_at)}
                     >
-                      {formatPast(s.created_at)}
+                      {formatRelative(s.created_at, "past")}
                     </td>
                     <td
                       className="px-3 py-1.5 text-muted-foreground"
-                      title={formatAbsolute(s.expires_at)}
+                      title={formatDateTime(s.expires_at)}
                     >
-                      {formatFuture(s.expires_at)}
+                      {formatRelative(s.expires_at, "future")}
                     </td>
                     <td className="px-3 py-1.5">
                       {isRevoked ? (

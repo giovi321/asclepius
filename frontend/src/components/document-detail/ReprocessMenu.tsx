@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronDown, RefreshCw } from "lucide-react";
 import api from "@/api/client";
 import {
@@ -6,6 +6,7 @@ import {
   useOcrProviders,
   useVisionProviders,
 } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 export interface ReprocessMenuProps {
   docId: number | string;
@@ -56,15 +57,7 @@ export default function ReprocessMenu({
   const [visionId, setVisionId] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  useOnClickOutside(ref, () => setOpen(false), open);
 
   const handleStart = async () => {
     if (onBeforeReprocess) {

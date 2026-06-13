@@ -17,6 +17,7 @@ import {
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
+import { formatDateTime } from "@/lib/datetime";
 
 interface ShareSummary {
   id: number;
@@ -1008,9 +1009,5 @@ function ActionLabel({ action }: { action: string }) {
 }
 
 function formatLocal(iso: string): string {
-  try {
-    return new Date(iso + (iso.endsWith("Z") ? "" : "Z")).toLocaleString();
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }

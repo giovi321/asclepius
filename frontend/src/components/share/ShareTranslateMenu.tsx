@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Languages, Loader2, Crop, FileText } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 interface ShareTranslateMenuProps {
   documentId: number;
@@ -87,19 +88,7 @@ export default function ShareTranslateMenu({
   ]);
 
   // Click-outside to dismiss the popover.
-  useEffect(() => {
-    if (!open) return;
-    const onMouseDown = (e: MouseEvent) => {
-      if (
-        popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [open]);
+  useOnClickOutside(popoverRef, () => setOpen(false), open);
 
   const onTranslateCurrentPage = async () => {
     setOpen(false);

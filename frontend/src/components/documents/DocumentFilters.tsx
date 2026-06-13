@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, Columns3, Search, Upload, X } from "lucide-react";
 import MultiSelectFilter from "@/components/MultiSelectFilter";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { COLUMNS, DOC_TYPES, type ColumnKey } from "./columns";
 
 export interface DocumentFiltersValue {
@@ -53,16 +54,7 @@ export default function DocumentFilters({
   const [colsOpen, setColsOpen] = useState(false);
   const colsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!colsOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (colsRef.current && !colsRef.current.contains(e.target as Node)) {
-        setColsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [colsOpen]);
+  useOnClickOutside(colsRef, () => setColsOpen(false), colsOpen);
 
   const hasAnyFilter = !!(
     dateFrom ||

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Search, X, Check } from "lucide-react";
+import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 interface FilterOption {
   value: string;
@@ -28,17 +29,13 @@ export default function MultiSelectFilter({
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Close on click outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  // Close on click outside. Listener stays attached regardless of open state
+  // (mirrors the original permanent-listener behaviour); the contains-check
+  // makes it a no-op while closed.
+  useOnClickOutside(ref, () => {
+    setOpen(false);
+    setSearch("");
+  });
 
   // Focus search and decide alignment on open. If a left-aligned dropdown
   // would overflow the viewport's right edge, flip it to align with the

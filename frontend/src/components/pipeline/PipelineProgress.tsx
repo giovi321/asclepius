@@ -1,15 +1,8 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Check,
   Loader2,
-  ScanText,
-  Brain,
-  FileSearch,
-  Eye,
-  FolderOutput,
-  FileImage,
-  Layers,
   Activity,
   Hourglass,
   AlertCircle,
@@ -26,34 +19,13 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useToast } from "@/contexts/ToastContext";
 import { parseBackendTs } from "@/lib/utils";
-
-const STAGE_LABELS: Record<string, string> = {
-  ocr: "OCR",
-  vision_extraction: "Vision",
-  llm_extraction: "LLM extraction",
-  page_classification: "Page classification",
-  section_extraction: "Section extraction",
-  organizing: "Organizing",
-  thumbnail: "Thumbnail",
-  cache_ocr: "Cache OCR",
-  ai_edit: "AI edit",
-};
-
-const STAGE_ICONS: Record<string, any> = {
-  ocr: ScanText,
-  vision_extraction: Eye,
-  llm_extraction: Brain,
-  page_classification: FileSearch,
-  section_extraction: Layers,
-  organizing: FolderOutput,
-  thumbnail: FileImage,
-  cache_ocr: ScanText,
-  ai_edit: Brain,
-};
-
-function stageLabel(stage: string): string {
-  return STAGE_LABELS[stage] ?? stage.replace(/_/g, " ");
-}
+import {
+  stageLabel,
+  stageIcon,
+  flowBadge,
+  formatElapsed,
+  useNow,
+} from "@/lib/pipelineStages";
 
 function kindBadge(kind: PipelineJobKind | null): {
   label: string;
@@ -91,55 +63,6 @@ function kindBadge(kind: PipelineJobKind | null): {
     ring: "ring-blue-300/60 dark:ring-blue-600/40",
     glow: "from-blue-500/10 via-blue-500/5 to-transparent",
   };
-}
-
-/** Infer the flow architecture from the planned stages.
- *
- * Backend doesn't expose ``flow`` directly on ``current_job``; the stage list
- * carries the same information unambiguously: ``vision_extraction`` only
- * appears in the Vision-LLM flow (single-step image → text + extraction),
- * everything else uses the OCR-then-LLM flow. We surface this so the user
- * can A/B-compare flows on the dashboard without having to read the stages.
- */
-function flowBadge(stages: string[]): { label: string; pill: string } | null {
-  if (stages.includes("vision_extraction")) {
-    return {
-      label: "Vision-LLM",
-      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
-    };
-  }
-  if (stages.includes("ocr")) {
-    return {
-      label: "OCR + LLM",
-      pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700",
-    };
-  }
-  return null;
-}
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return "0s";
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rs = s % 60;
-  if (m < 60) return `${m}m ${rs.toString().padStart(2, "0")}s`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return `${h}h ${rm}m`;
-}
-
-/** Tick once a second so the elapsed-time readout in the running card stays
- * live. Returns the current Date.now() — components that want a live clock
- * just call this and re-render when it changes. */
-function useNow(active: boolean): number {
-  const [now, setNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [active]);
-  return now;
 }
 
 interface Props {
@@ -460,7 +383,7 @@ function Stepper({
             const isDone = done.has(s);
             const isCurrent =
               !isDone && (i === progressIndex || s === currentStage);
-            const Icon = STAGE_ICONS[s] ?? FileSearch;
+            const Icon = stageIcon(s);
             return (
               <li
                 key={`${s}-${i}`}

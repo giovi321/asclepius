@@ -1,4 +1,14 @@
-"""Imaging API routes."""
+"""Imaging API routes.
+
+Thin FastAPI layer over the imaging helper modules:
+  - :mod:`asclepius.imaging.frames` — DICOM frame resolve / render helpers.
+  - :mod:`asclepius.imaging.bundles` — bundle directory walking helpers.
+  - :mod:`asclepius.imaging.reports` — report-lifecycle (placeholder swap) helper.
+  - :mod:`asclepius.imaging.service` — study queries + list SQL builder.
+
+Access control stays via ``_study_with_access`` /
+``asclepius.authz.require_patient_access``.
+"""
 
 from pathlib import Path
 
@@ -7,55 +17,22 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import aiosqlite
+import pydicom
 from asclepius.auth.session import get_current_user
 from asclepius.authz import require_patient_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
-from asclepius.documents.service import migrate_document_links
+from asclepius.imaging.bundles import _bundle_root_for_study, _kind_for_extension
+from asclepius.imaging.frames import (
+    DICOM_EXTS,
+    _resolve_frame,
+    _series_folder_with_access,
+)
+from asclepius.imaging.reports import swap_study_document
+from asclepius.imaging.service import _study_with_access, list_imaging_studies_query
 from asclepius.patients.service import check_patient_access
 
 router = APIRouter()
-
-
-async def _study_with_access(
-    study_id: int,
-    current_user: dict,
-    db: aiosqlite.Connection,
-) -> dict:
-    """Load a study row and enforce read access, or raise 404/403.
-
-    Access goes through the canonical :func:`asclepius.authz.require_patient_access`,
-    which ADDS an admin bypass this check previously lacked: admins can now
-    reach any study even without an explicit patient grant.
-    """
-    cursor = await db.execute(
-        "SELECT id, document_id, patient_id, folder_path " "FROM imaging_studies WHERE id = ?",
-        (study_id,),
-    )
-    row = await cursor.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Study not found")
-    study = dict(row)
-    if study["patient_id"]:
-        await require_patient_access(db, study["patient_id"], current_user)
-    return study
-
-
-_LIST_SORT_COLUMNS: dict[str, str] = {
-    # Frontend sort key → SQL expression. Whitelist only — anything not
-    # here falls back to ``study_date DESC``. Doctor + facility are
-    # joined through documents → doctors / facilities so the sort lines
-    # up with the canonical names shown in the UI. Study date now lives
-    # on the parent ``documents.event_date`` (single source of truth).
-    "modality": "s.modality",
-    "body_part": "s.body_part",
-    "study_date": "d.event_date",
-    "doctor": "doc.name",
-    "facility": "f.name",
-    "patient": "p.display_name",
-    "report_status": "s.report_status",
-    "date_added": "d.created_at",
-}
 
 
 @router.get("")
@@ -78,83 +55,20 @@ async def list_imaging_studies(
 ):
     """List imaging studies. Mirrors the documents-list shape: search,
     filters, sort, paginated results with ``total`` count."""
-    conditions = []
-    params: list = []
-
-    if patient_id:
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
-        conditions.append("s.patient_id = ?")
-        params.append(patient_id)
-    else:
-        conditions.append(
-            "s.patient_id IN (SELECT patient_id FROM user_patient_access WHERE user_id = ?)"
-        )
-        params.append(current_user["id"])
-
-    if modality:
-        conditions.append("s.modality = ?")
-        params.append(modality)
-    if report_status:
-        conditions.append("s.report_status = ?")
-        params.append(report_status)
-    if date_from:
-        conditions.append("d.event_date >= ?")
-        params.append(date_from)
-    if date_to:
-        conditions.append("d.event_date <= ?")
-        params.append(date_to)
-    if q:
-        like = f"%{q}%"
-        # Search is across imaging-specific text + the canonical doctor /
-        # facility names that come from the parent documents row.
-        conditions.append(
-            "(s.body_part LIKE ? OR s.study_description LIKE ? "
-            "OR doc.name LIKE ? OR f.name LIKE ?)"
-        )
-        params.extend([like, like, like, like])
-
-    where = "WHERE " + " AND ".join(conditions) if conditions else ""
-
-    sort_sql = _LIST_SORT_COLUMNS.get(sort or "", "d.event_date")
-    order_sql = "ASC" if (order or "desc").lower() == "asc" else "DESC"
-
-    # Count total (unbounded) so the UI can paginate.
-    count_cursor = await db.execute(
-        f"""SELECT COUNT(*)
-            FROM imaging_studies s
-            LEFT JOIN documents d ON s.document_id = d.id
-            LEFT JOIN patients p ON s.patient_id = p.id
-            LEFT JOIN doctors doc ON s.doctor_id = doc.id
-            LEFT JOIN facilities f ON s.facility_id = f.id
-            {where}""",
-        params,
+    return await list_imaging_studies_query(
+        db,
+        current_user,
+        patient_id=patient_id,
+        modality=modality,
+        date_from=date_from,
+        date_to=date_to,
+        q=q,
+        report_status=report_status,
+        sort=sort,
+        order=order,
+        limit=limit,
+        offset=offset,
     )
-    total_row = await count_cursor.fetchone()
-    total = total_row[0] if total_row else 0
-
-    cursor = await db.execute(
-        f"""SELECT s.*,
-                  p.display_name as patient_name,
-                  doc.name as doctor_name,
-                  f.name as facility_name,
-                  d.original_filename as report_filename,
-                  d.file_path as report_file_path,
-                  d.event_date as study_date,
-                  d.created_at as date_added
-           FROM imaging_studies s
-           LEFT JOIN documents d ON s.document_id = d.id
-           LEFT JOIN patients p ON s.patient_id = p.id
-           LEFT JOIN doctors doc ON s.doctor_id = doc.id
-           LEFT JOIN facilities f ON s.facility_id = f.id
-           {where}
-           ORDER BY {sort_sql} {order_sql}, s.id DESC
-           LIMIT ? OFFSET ?""",
-        params + [limit, offset],
-    )
-    rows = await cursor.fetchall()
-    return {"items": [dict(r) for r in rows], "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/{study_id}")
@@ -196,35 +110,6 @@ async def get_imaging_study(
     return study
 
 
-async def _series_folder_with_access(
-    study_id: int,
-    series_id: int,
-    current_user: dict,
-    db: aiosqlite.Connection,
-) -> str:
-    """Resolve the series folder after enforcing patient access.
-
-    Both ``list_frames`` and ``get_frame`` need the same lookup + access
-    check. Without the access check any authenticated user could fetch
-    DICOM frames for any patient by guessing study/series IDs.
-    """
-    cursor = await db.execute(
-        """SELECT se.folder_path AS folder_path, st.patient_id AS patient_id
-           FROM imaging_series se
-           JOIN imaging_studies st ON se.study_id = st.id
-           WHERE se.id = ? AND se.study_id = ?""",
-        (series_id, study_id),
-    )
-    row = await cursor.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Series not found")
-
-    patient_id = row["patient_id"]
-    if patient_id:
-        await require_patient_access(db, patient_id, current_user)
-    return row["folder_path"]
-
-
 @router.get("/{study_id}/series/{series_id}/frames")
 async def list_frames(
     study_id: int,
@@ -241,7 +126,7 @@ async def list_frames(
         return {"frames": [], "count": 0}
 
     frames = sorted(
-        [f.name for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}]
+        [f.name for f in series_path.iterdir() if f.suffix.lower() in DICOM_EXTS]
     )
     return {"frames": frames, "count": len(frames)}
 
@@ -272,31 +157,21 @@ async def get_frame(
     ~1.5× and ``upscale=4`` past ~3×, trading bandwidth for sharpness so
     the canvas-scale fallback no longer pixelates.
     """
-    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
-
-    config = get_config()
-    series_path = Path(config.vault.root_path) / folder
-    if not series_path.exists():
-        raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
-
-    if index < 0 or index >= len(frames):
-        raise HTTPException(status_code=404, detail="Frame not found")
+    frame_path = await _resolve_frame(study_id, series_id, index, current_user, db)
 
     if format == "dicom":
         return FileResponse(
-            path=str(frames[index]),
+            path=str(frame_path),
             media_type="application/dicom",
         )
 
     # Convert DICOM to PNG for browser display
     try:
-        import pydicom
         from PIL import Image as PILImage
         import numpy as np
         import io
 
-        ds = pydicom.dcmread(str(frames[index]))
+        ds = pydicom.dcmread(str(frame_path))
         pixel_array = ds.pixel_array.astype(float)
 
         # Apply Modality LUT (RescaleSlope/RescaleIntercept) before windowing.
@@ -365,7 +240,7 @@ async def get_frame(
     except Exception:
         # Fallback: serve raw DICOM
         return FileResponse(
-            path=str(frames[index]),
+            path=str(frame_path),
             media_type="application/dicom",
         )
 
@@ -386,22 +261,10 @@ async def get_frame_metadata(
     hundred tags). Tags whose value can't be represented as plain JSON
     are coerced to ``str(value)``.
     """
-    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
-    config = get_config()
-    series_path = Path(config.vault.root_path) / folder
-    if not series_path.exists():
-        raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
-    if index < 0 or index >= len(frames):
-        raise HTTPException(status_code=404, detail="Frame not found")
+    frame_path = await _resolve_frame(study_id, series_id, index, current_user, db)
 
     try:
-        import pydicom
-    except ImportError:
-        raise HTTPException(status_code=500, detail="pydicom not installed")
-
-    try:
-        ds = pydicom.dcmread(str(frames[index]), stop_before_pixels=True)
+        ds = pydicom.dcmread(str(frame_path), stop_before_pixels=True)
     except Exception:
         raise HTTPException(status_code=500, detail="Could not read DICOM header")
 
@@ -461,19 +324,10 @@ async def get_frame_window(
     when the DICOM file doesn't carry that tag (the viewer falls back
     to a min/max stretch in that case).
     """
-    folder = await _series_folder_with_access(study_id, series_id, current_user, db)
-    config = get_config()
-    series_path = Path(config.vault.root_path) / folder
-    if not series_path.exists():
-        raise HTTPException(status_code=404, detail="Frame not found")
-    frames = sorted([f for f in series_path.iterdir() if f.suffix.lower() in {".dcm", ".dicom"}])
-    if index < 0 or index >= len(frames):
-        raise HTTPException(status_code=404, detail="Frame not found")
+    frame_path = await _resolve_frame(study_id, series_id, index, current_user, db)
 
     try:
-        import pydicom
-
-        ds = pydicom.dcmread(str(frames[index]), stop_before_pixels=True)
+        ds = pydicom.dcmread(str(frame_path), stop_before_pixels=True)
     except Exception:
         return {"window_center": None, "window_width": None}
 
@@ -495,36 +349,6 @@ async def get_frame_window(
 
 
 # ── Bundle files (DICOMDIR, JPEG previews, etc.) ───────────────────
-
-
-def _bundle_root_for_study(folder_path: str) -> str | None:
-    """Return the imaging-bundles directory path for a given study folder.
-
-    Study folder layouts handled:
-      - ``patients/{slug}/{year}/{study_folder}`` →
-        ``patients/{slug}/imaging-bundles``
-      - ``patients/{slug}/{year}/imaging/{study_folder}`` →
-        ``patients/{slug}/imaging-bundles``
-      - ``unclassified/{year}/{study_folder}`` (or with intermediate
-        ``imaging/`` segment) →
-        ``unclassified/imaging-bundles``
-
-    Returns None if the path does not match any of the above shapes.
-    """
-    parts = folder_path.split("/")
-    if not parts:
-        return None
-    # Trim the optional ``imaging`` segment when present.
-    if "imaging" in parts:
-        idx = parts.index("imaging")
-        return "/".join(parts[:idx] + ["imaging-bundles"])
-    # patients/{slug}/{year}/{study} → patients/{slug}/imaging-bundles
-    # unclassified/{year}/{study}    → unclassified/imaging-bundles
-    if parts[0] == "patients" and len(parts) >= 4:
-        return f"{parts[0]}/{parts[1]}/imaging-bundles"
-    if parts[0] == "unclassified" and len(parts) >= 3:
-        return "unclassified/imaging-bundles"
-    return None
 
 
 @router.get("/{study_id}/bundle-files")
@@ -572,16 +396,6 @@ async def list_bundle_files(
             )
     items.sort(key=lambda i: i["name"])
     return {"items": items}
-
-
-def _kind_for_extension(ext: str) -> str:
-    if ext in {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".gif", ".bmp"}:
-        return "image"
-    if ext == ".pdf":
-        return "pdf"
-    if ext in {".dcm", ".dicom"}:
-        return "dicom"
-    return "other"
 
 
 @router.get("/{study_id}/bundle-file/{name:path}")
@@ -892,25 +706,7 @@ async def attach_imaging_report(
         # Repoint + remove the placeholder. We do the placeholder delete
         # AFTER the FK has been moved off it, otherwise the cascade would
         # take imaging_studies with it.
-        await db.execute(
-            "UPDATE imaging_studies SET document_id = ?, report_status = 'attached' WHERE id = ?",
-            (document_id, study_id),
-        )
-        # Repoint any document_links anchored on the OLD parent so the
-        # imaging study's "linked documents" survive the swap. Without this
-        # the placeholder delete below would cascade-wipe them.
-        await migrate_document_links(db, placeholder_doc_id, document_id)
-        if placeholder_doc_id and placeholder_doc_id != document_id:
-            cursor = await db.execute(
-                "SELECT file_path, doc_type FROM documents WHERE id = ?",
-                (placeholder_doc_id,),
-            )
-            old = await cursor.fetchone()
-            # Only drop the OLD row if it really was a placeholder
-            # (empty file_path and doc_type imaging_report). Refusing
-            # silently for non-placeholders prevents accidental data loss.
-            if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
-                await db.execute("DELETE FROM documents WHERE id = ?", (placeholder_doc_id,))
+        await swap_study_document(db, study_id, placeholder_doc_id, document_id, "attached")
         await db.commit()
         return {"status": "attached", "document_id": document_id}
 
@@ -992,19 +788,7 @@ async def attach_imaging_report(
                     status_code=409,
                     detail="This PDF already exists in the system but you do not have access to it.",
                 )
-        await db.execute(
-            "UPDATE imaging_studies SET document_id = ?, report_status = 'attached' WHERE id = ?",
-            (existing_id, study_id),
-        )
-        await migrate_document_links(db, placeholder_doc_id, existing_id)
-        if placeholder_doc_id and placeholder_doc_id != existing_id:
-            cursor = await db.execute(
-                "SELECT file_path, doc_type FROM documents WHERE id = ?",
-                (placeholder_doc_id,),
-            )
-            old = await cursor.fetchone()
-            if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
-                await db.execute("DELETE FROM documents WHERE id = ?", (placeholder_doc_id,))
+        await swap_study_document(db, study_id, placeholder_doc_id, existing_id, "attached")
         await db.commit()
         return {
             "status": "attached",
@@ -1089,29 +873,12 @@ async def detach_imaging_report(
     )
     new_placeholder_id = cursor.lastrowid
 
-    await db.execute(
-        "UPDATE imaging_studies SET document_id = ?, report_status = 'placeholder' WHERE id = ?",
-        (new_placeholder_id, study_id),
-    )
-
-    # Repoint document_links anchored on the previously-attached doc onto
-    # the fresh placeholder. Done unconditionally (even when the OLD parent
+    # Repoint the study at the fresh placeholder, migrate document_links
+    # off the previously-attached doc, and drop it only if it was itself a
+    # placeholder. Done unconditionally for links (even when the OLD parent
     # is a real PDF that survives) so links follow the imaging study, not
-    # whichever document happens to be the parent today. Without this,
-    # detaching would strand them on a now-orphaned doc id.
-    await migrate_document_links(db, old_doc_id, new_placeholder_id)
-
-    # If the previously-attached row was itself a placeholder (defensive
-    # check — shouldn't happen given the report_status guard above), we
-    # can drop it. Real PDF documents stay alive on purpose.
-    if old_doc_id and old_doc_id != new_placeholder_id:
-        cursor = await db.execute(
-            "SELECT file_path, doc_type FROM documents WHERE id = ?",
-            (old_doc_id,),
-        )
-        old = await cursor.fetchone()
-        if old and not (old["file_path"] or "") and old["doc_type"] == "imaging_report":
-            await db.execute("DELETE FROM documents WHERE id = ?", (old_doc_id,))
+    # whichever document happens to be the parent today.
+    await swap_study_document(db, study_id, old_doc_id, new_placeholder_id, "placeholder")
 
     await db.commit()
     return {

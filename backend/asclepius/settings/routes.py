@@ -36,8 +36,13 @@ from .view_prefs_routes import router as view_prefs_router
 
 router = APIRouter()
 router.include_router(logs_router)
-router.include_router(backup_router)
-router.include_router(prompts_router)
+# Backup (full DB snapshot = all PHI) and prompt overrides are admin-only.
+# Gating at include time means any handler added to these routers inherits the
+# admin requirement by default, so a future endpoint can't silently ship
+# under-gated. The individual handlers also declare require_role("admin") for
+# defense-in-depth and readability.
+router.include_router(backup_router, dependencies=[Depends(require_role("admin"))])
+router.include_router(prompts_router, dependencies=[Depends(require_role("admin"))])
 router.include_router(provider_router)
 router.include_router(smtp_router)
 router.include_router(users_router)

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from asclepius.auth.session import get_current_user
+from asclepius.auth.session import require_role
 from asclepius.config import get_config
 
 router = APIRouter()
@@ -11,7 +11,7 @@ router = APIRouter()
 
 @router.get("/prompts")
 async def list_prompts(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
     config = get_config()
     from asclepius.llm.prompt_manager import get_all_prompts
@@ -27,7 +27,7 @@ class PromptUpdate(BaseModel):
 async def update_prompt(
     key: str,
     body: PromptUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
     config = get_config()
     from asclepius.llm.prompt_manager import PROMPT_REGISTRY, set_prompt
@@ -41,7 +41,7 @@ async def update_prompt(
 @router.delete("/prompts/{key}")
 async def reset_prompt(
     key: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
     config = get_config()
     from asclepius.llm.prompt_manager import PROMPT_REGISTRY

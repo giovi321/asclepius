@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 import aiosqlite
 from asclepius.audit.service import audit_log, get_client_ip
-from asclepius.auth.session import get_current_user, require_role
+from asclepius.auth.session import require_role
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 
@@ -73,9 +73,9 @@ async def get_audit_log(
 
 @router.get("/backup")
 async def download_backup(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
-    """Download a SQLite backup of the database."""
+    """Download a SQLite backup of the database (admin only)."""
     import tempfile
     from datetime import datetime
 
@@ -104,9 +104,9 @@ async def download_backup(
 
 @router.get("/backup/files")
 async def list_scheduled_backups(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
-    """List files in the scheduled-backup directory, newest-first."""
+    """List files in the scheduled-backup directory, newest-first (admin only)."""
     from asclepius.backup.scheduler import list_backup_files
 
     config = get_config()
@@ -116,9 +116,9 @@ async def list_scheduled_backups(
 @router.get("/backup/files/{name}")
 async def download_scheduled_backup(
     name: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_role("admin")),
 ):
-    """Download a single scheduled-backup file."""
+    """Download a single scheduled-backup file (admin only)."""
     from fastapi.responses import FileResponse
 
     from asclepius.util.paths import is_within, safe_filename

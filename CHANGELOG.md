@@ -73,6 +73,10 @@ stayed green throughout.
   config and a Vitest harness (there were no frontend tests before). Both run in
   CI, and API responses on the main pages are now typed against the generated
   OpenAPI schema, so a backend field rename shows up as a frontend compile error.
+- Extracted shared frontend building blocks the split pages reuse: a click-outside
+  hook (previously inlined in a dozen components), date-formatting helpers, one
+  pipeline-stage metadata table, and Modal/Button/ProviderSelect primitives that
+  replace the per-component hand-rolled overlays.
 - Removed dead code and four unused npm dependencies, deleted an orphaned
   `backend/Dockerfile`, and created the `idx_documents_event_date` index a schema
   comment had promised but never made.
@@ -86,6 +90,9 @@ stayed green throughout.
 - The diverged OCR-vs-vision image renderer could feed an Ollama vision model
   dimensions it rejected with a hard crash; both paths now use the same
   patch-aligned sizing.
+- Error toasts showed "[object Object]" when the backend returned a validation
+  error (FastAPI returns a 422 with an array of messages); they now show the
+  actual text. The duplicated error-extraction snippet was folded into one helper.
 
 ## [1.3.0] - 2026-06-12
 

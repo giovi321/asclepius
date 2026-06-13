@@ -11,6 +11,7 @@ import { ImagingStudiesSection } from "@/components/document-detail/ChildRecordS
 import ReportSlot from "@/components/imaging/ReportSlot";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import type { Document, DocumentLink } from "@/types";
 
 const MODALITY_LABELS: Record<string, string> = {
   CT: "CT scan",
@@ -63,9 +64,12 @@ export default function ImagingDetailPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
 
+  // TODO: type once backend exposes schema — the /imaging/{study_id}
+  // detail response is a dict with joined fields (report_status,
+  // patient_name, num_series/num_images) that has no generated schema type.
   const [study, setStudy] = useState<any>(null);
-  const [doc, setDoc] = useState<any>(null);
-  const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
+  const [doc, setDoc] = useState<Document | null>(null);
+  const [linkedDocs, setLinkedDocs] = useState<DocumentLink[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -75,7 +79,9 @@ export default function ImagingDetailPage() {
       const sRes = await api.get(`/imaging/${studyId}`);
       setStudy(sRes.data);
       if (sRes.data?.document_id) {
-        const dRes = await api.get(`/documents/${sRes.data.document_id}`);
+        const dRes = await api.get<Document>(
+          `/documents/${sRes.data.document_id}`,
+        );
         setDoc(dRes.data);
         setLinkedDocs(dRes.data.links || []);
       }
@@ -90,8 +96,8 @@ export default function ImagingDetailPage() {
     load();
   }, [load]);
 
-  const updateDocFields = (updated?: any) => {
-    if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
+  const updateDocFields = (updated?: Partial<Document>) => {
+    if (updated) setDoc((prev) => (prev ? { ...prev, ...updated } : prev));
   };
 
   const handleDelete = async () => {
@@ -202,7 +208,7 @@ export default function ImagingDetailPage() {
                 patientId={doc.patient_id}
                 currentEventId={doc.event_id}
                 onUpdate={(eventId) =>
-                  setDoc((prev: any) => ({ ...prev, event_id: eventId }))
+                  setDoc((prev) => (prev ? { ...prev, event_id: eventId } : prev))
                 }
               />
               <NotesEditor docId={doc.id} initialNotes={doc.user_notes || ""} />

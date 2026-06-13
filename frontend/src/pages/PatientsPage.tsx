@@ -4,20 +4,13 @@ import { Plus, Trash2, ChevronDown, ChevronUp, Save, X } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePatients } from "@/hooks/data";
-
-interface Patient {
-  id: number;
-  slug: string;
-  display_name: string;
-  date_of_birth?: string | null;
-  sex?: string | null;
-}
+import type { Patient, PatientCreate } from "@/types";
 
 export default function PatientsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const { data, loading, refetch } = usePatients();
-  const patients: Patient[] = Array.isArray(data) ? (data as Patient[]) : [];
+  const patients: Patient[] = Array.isArray(data) ? data : [];
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [editData, setEditData] = useState<Partial<Patient>>({});
   const [showCreate, setShowCreate] = useState(false);
@@ -74,11 +67,12 @@ export default function PatientsPage() {
     if (!newPatient.display_name?.trim()) return;
     setSaving(true);
     try {
-      await api.post("/patients", {
-        display_name: newPatient.display_name?.trim(),
+      const body: PatientCreate = {
+        display_name: newPatient.display_name?.trim() ?? "",
         date_of_birth: newPatient.date_of_birth || null,
         sex: newPatient.sex || null,
-      });
+      };
+      await api.post("/patients", body);
       setNewPatient({});
       setShowCreate(false);
       await loadPatients();

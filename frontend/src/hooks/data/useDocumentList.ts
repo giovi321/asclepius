@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "@/api/client";
 import type { SortKey } from "@/components/documents/columns";
+import type { Document, ListResponse } from "@/types";
 
 export interface DocumentListFilters {
   search: string;
@@ -111,7 +112,7 @@ export interface UseDocumentListOpts {
 }
 
 export interface UseDocumentListResult {
-  items: any[];
+  items: Document[];
   total: number;
   loading: boolean;
   filters: DocumentListFilters;
@@ -123,7 +124,7 @@ export interface UseDocumentListResult {
   page: number;
   setPage: (p: number) => void;
   reload: () => Promise<void>;
-  setItems: React.Dispatch<React.SetStateAction<any[]>>;
+  setItems: React.Dispatch<React.SetStateAction<Document[]>>;
 }
 
 export function useDocumentList(
@@ -170,7 +171,7 @@ export function useDocumentList(
   const [page, setPage] = useState(initial.page);
   const [sort, setSort] = useState<DocumentListSort>(initial.sort);
 
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<Document[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -256,15 +257,17 @@ export function useDocumentList(
 
   useEffect(() => {
     setLoading(true);
-    api.get("/documents", { params: buildParams() }).then((res: any) => {
-      setItems(res.data.items || []);
-      setTotal(res.data.total || 0);
-      setLoading(false);
-    });
+    api
+      .get<ListResponse<Document>>("/documents", { params: buildParams() })
+      .then((res) => {
+        setItems(res.data.items || []);
+        setTotal(res.data.total || 0);
+        setLoading(false);
+      });
   }, [buildParams]);
 
   const reload = useCallback(async () => {
-    const res = await api.get("/documents", {
+    const res = await api.get<ListResponse<Document>>("/documents", {
       params: buildParamsRef.current(),
     });
     setItems(res.data.items || []);

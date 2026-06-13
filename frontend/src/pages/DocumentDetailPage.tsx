@@ -33,16 +33,17 @@ import type { NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
+import type { Document, DocumentLink } from "@/types";
 
 // Imaging documents (``imaging_dicom`` and ``imaging_report``) share most
 // of the layout but skip OCR / AI-edit features that don't apply to DICOM
 // bundles.
-function isImagingDoc(doc: any): boolean {
+function isImagingDoc(doc: Document | null): boolean {
   return (
     doc?.doc_type === "imaging_dicom" || doc?.doc_type === "imaging_report"
   );
 }
-function isImagingPlaceholder(doc: any): boolean {
+function isImagingPlaceholder(doc: Document | null): boolean {
   return isImagingDoc(doc) && !doc?.file_path;
 }
 
@@ -52,9 +53,9 @@ export default function DocumentDetailPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const { status: pipelineStatus } = usePipelineStatus();
-  const [doc, setDoc] = useState<any>(null);
+  const [doc, setDoc] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
-  const [linkedDocs, setLinkedDocs] = useState<any[]>([]);
+  const [linkedDocs, setLinkedDocs] = useState<DocumentLink[]>([]);
 
   // Region-translate selection state. ``selectionMode`` flips the PDF
   // viewer into draw-rectangle mode; the resolved provider IDs travel
@@ -81,7 +82,7 @@ export default function DocumentDetailPage() {
   const loadDoc = async (showLoading = true) => {
     const scrollY = window.scrollY;
     if (showLoading && !doc) setLoading(true);
-    const res = await api.get(`/documents/${id}`);
+    const res = await api.get<Document>(`/documents/${id}`);
     setDoc(res.data);
     setLinkedDocs(res.data.links || []);
     setLoading(false);
@@ -93,8 +94,8 @@ export default function DocumentDetailPage() {
   }, [id]);
 
   // Lightweight doc update - merges new fields without full reload (preserves scroll)
-  const updateDocFields = (updated?: any) => {
-    if (updated) setDoc((prev: any) => ({ ...prev, ...updated }));
+  const updateDocFields = (updated?: Partial<Document>) => {
+    if (updated) setDoc((prev) => (prev ? { ...prev, ...updated } : prev));
   };
 
   const handleCancel = async () => {
@@ -370,7 +371,7 @@ export default function DocumentDetailPage() {
             patientId={doc.patient_id}
             currentEventId={doc.event_id}
             onUpdate={(eventId) =>
-              setDoc((prev: any) => ({ ...prev, event_id: eventId }))
+              setDoc((prev) => (prev ? { ...prev, event_id: eventId } : prev))
             }
           />
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
-import type { Patient } from "@/types";
+import type { ListResponse, Patient } from "@/types";
 import type { LabRow } from "./types";
 
 /**
@@ -32,8 +32,8 @@ export function useLabResults(selectedPatient: Patient | null, search: string) {
     if (search) params.test_name = search;
     try {
       const [res, orphRes] = await Promise.all([
-        api.get("/lab-results", { params }),
-        api.get("/lab-results/orphans", {
+        api.get<ListResponse<LabRow>>("/lab-results", { params }),
+        api.get<ListResponse<LabRow>>("/lab-results/orphans", {
           params: { patient_id: selectedPatient.id },
         }),
       ]);

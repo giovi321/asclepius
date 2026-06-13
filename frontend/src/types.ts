@@ -11,14 +11,35 @@
 //   npm --prefix frontend run gen:api
 
 import type { components } from "./api/schema";
+import type { RegionTranslation } from "./components/document-detail/RegionTranslationsSection";
+
+export type { RegionTranslation };
 
 export type DocumentUpdate = components["schemas"]["DocumentUpdate"];
 export type DocumentMoveRequest = components["schemas"]["DocumentMoveRequest"];
+export type DocumentLinkRequest = components["schemas"]["DocumentLinkRequest"];
 export type PatientCreate = components["schemas"]["PatientCreate"];
 export type PatientUpdate = components["schemas"]["PatientUpdate"];
 export type EventCreate = components["schemas"]["EventCreate"];
 export type EventUpdate = components["schemas"]["EventUpdate"];
 export type EventLinkRequest = components["schemas"]["EventLinkRequest"];
+export type LabResultCreate = components["schemas"]["LabResultCreate"];
+export type LabResultUpdate = components["schemas"]["LabResultUpdate"];
+export type ShareCreateRequest = components["schemas"]["ShareCreateRequest"];
+export type ShareCreateResponse = components["schemas"]["ShareCreateResponse"];
+
+// ─── List-response wrapper ─────────────────────────────
+//
+// Several list endpoints (documents, lab-results, imaging) return a
+// ``dict`` of the shape ``{items, total}`` rather than a Pydantic model,
+// so the generated schema types the body as ``unknown``. This generic
+// mirrors that wire shape so callers get typed ``items`` without
+// changing any request.
+
+export interface ListResponse<T> {
+  items: T[];
+  total: number;
+}
 
 // ─── Document ──────────────────────────────────────────
 
@@ -75,15 +96,18 @@ export interface Document {
   process_at: string | null;
   created_at: string;
   updated_at: string;
-  // Joined fields from related tables
+  // Joined fields from related tables (populated by the document-detail
+  // endpoint, which returns a dict — see the file header).
   links?: DocumentLink[];
   sections?: DocumentSection[];
   lab_results?: LabResult[];
   medications?: Medication[];
   diagnoses?: Diagnosis[];
+  encounters?: Encounter[];
   imaging_studies?: ImagingStudy[];
   vaccinations?: Vaccination[];
   invoice_items?: InvoiceItem[];
+  region_translations?: RegionTranslation[];
 }
 
 export interface DocumentLink {
@@ -400,6 +424,29 @@ export interface Diagnosis {
   diagnosis_original: string | null;
   diagnosis_code: string | null;
   norm_diagnosis_id: number | null;
+}
+
+// ─── Encounters ────────────────────────────────────────
+// Joined into the document-detail response (the ``encounters`` array).
+// Mirrors the ``encounters`` table the detail route reads back.
+
+export interface Encounter {
+  id: number;
+  document_id: number;
+  patient_id: number;
+  doctor_id: number | null;
+  facility_id: number | null;
+  encounter_date: string | null;
+  admission_date: string | null;
+  discharge_date: string | null;
+  norm_diagnosis_id: number | null;
+  diagnosis_original: string | null;
+  diagnosis_code: string | null;
+  norm_specialty_id: number | null;
+  notes: string | null;
+  findings: string | null;
+  follow_up_date: string | null;
+  follow_up_instructions: string | null;
 }
 
 // ─── Invoice Items ─────────────────────────────────────

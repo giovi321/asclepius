@@ -14,6 +14,7 @@ import {
 import { EVENT_COLORS } from "./events/constants";
 import EventForm from "./events/EventForm";
 import { useEventsPage } from "./events/useEventsPage";
+import type { LinkedDocument, MedicalEvent, MedicalEventDetail } from "@/types";
 
 export default function EventsPage() {
   const { selectedPatient } = usePatient();
@@ -21,7 +22,9 @@ export default function EventsPage() {
   const { events, loading, loadEvents } = useEventsPage(selectedPatient);
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [eventDetail, setEventDetail] = useState<any>(null);
+  const [eventDetail, setEventDetail] = useState<MedicalEventDetail | null>(
+    null,
+  );
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editData, setEditData] = useState<any>(null);
   const [newEvent, setNewEvent] = useState({
@@ -89,11 +92,11 @@ export default function EventsPage() {
     setExpandedId(id);
     setEditingId(null);
     setEditData(null);
-    const res = await api.get(`/events/${id}`);
+    const res = await api.get<MedicalEventDetail>(`/events/${id}`);
     setEventDetail(res.data);
   };
 
-  const startEdit = (event: any) => {
+  const startEdit = (event: MedicalEvent) => {
     setEditingId(event.id);
     setEditData({
       title: event.title || "",
@@ -125,7 +128,7 @@ export default function EventsPage() {
       notes: editData.notes || null,
     };
     await api.patch(`/events/${editingId}`, payload);
-    const res = await api.get(`/events/${editingId}`);
+    const res = await api.get<MedicalEventDetail>(`/events/${editingId}`);
     setEventDetail(res.data);
     setEditingId(null);
     setEditData(null);
@@ -250,7 +253,7 @@ export default function EventsPage() {
                         </h4>
                         {eventDetail.documents?.length > 0 ? (
                           <div className="space-y-1">
-                            {eventDetail.documents.map((doc: any) => (
+                            {eventDetail.documents.map((doc: LinkedDocument) => (
                               <Link
                                 key={doc.document_id}
                                 to={`/documents/${doc.document_id}`}

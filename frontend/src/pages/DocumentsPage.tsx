@@ -67,14 +67,14 @@ export default function DocumentsPage() {
   // also derive the patient name for the dialog header so the user can
   // sanity-check before clicking Create.
   const sharePatient = useMemo(() => {
-    const selected = documents.filter((d: any) => selectedIds.has(d.id));
+    const selected = documents.filter((d) => selectedIds.has(d.id));
     if (selected.length === 0)
       return {
         id: null as number | null,
         name: null as string | null,
         conflict: false,
       };
-    const ids = new Set(selected.map((d: any) => d.patient_id));
+    const ids = new Set(selected.map((d) => d.patient_id));
     if (ids.size > 1) return { id: null, name: null, conflict: true };
     const first = selected[0];
     return {
@@ -108,13 +108,13 @@ export default function DocumentsPage() {
   // Poll pipeline status for live page progress
   useEffect(() => {
     api
-      .get("/pipeline/status")
-      .then((res: any) => setPipeline(res.data))
+      .get<PipelineStatus>("/pipeline/status")
+      .then((res) => setPipeline(res.data))
       .catch(() => {});
     const interval = setInterval(() => {
       api
-        .get("/pipeline/status")
-        .then((res: any) => setPipeline(res.data))
+        .get<PipelineStatus>("/pipeline/status")
+        .then((res) => setPipeline(res.data))
         .catch(() => {});
     }, 3000);
     return () => clearInterval(interval);
@@ -139,7 +139,7 @@ export default function DocumentsPage() {
     if (selectedIds.size === documents.length && documents.length > 0) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(documents.map((d: any) => d.id)));
+      setSelectedIds(new Set(documents.map((d) => d.id)));
     }
   };
 
@@ -323,9 +323,7 @@ export default function DocumentsPage() {
         onToggleSelectAll={toggleSelectAllOnPage}
         onRenamed={(updated) => {
           setDocuments((prev) =>
-            prev.map((d: any) =>
-              d.id === updated.id ? { ...d, ...updated } : d,
-            ),
+            prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d)),
           );
         }}
         sortBy={sort.sortBy}

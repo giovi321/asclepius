@@ -23,9 +23,9 @@ export function createResource<T>(path: string) {
   function load() {
     if (inflight) return inflight;
     inflight = api
-      .get(path)
+      .get<T>(path)
       .then((r) => {
-        data = r.data as T;
+        data = r.data;
         error = null;
       })
       .catch((e) => {

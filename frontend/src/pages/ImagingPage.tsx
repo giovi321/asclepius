@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import { useColumnPrefs } from "@/lib/columnPrefs";
+import type { ListResponse } from "@/types";
 
 const MODALITY_LABELS: Record<string, string> = {
   CT: "CT scan",
@@ -126,7 +127,7 @@ export default function ImagingPage() {
   const reload = useCallback(() => {
     setLoading(true);
     api
-      .get("/imaging", { params })
+      .get<ListResponse<Study>>("/imaging", { params })
       .then((res) => {
         setItems(res.data.items || []);
         setTotal(res.data.total || 0);

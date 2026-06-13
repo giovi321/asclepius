@@ -37,9 +37,9 @@ function load(
   if (patientId) params.patient_id = patientId;
   if (eventType) params.event_type = eventType;
   e.inflight = api
-    .get("/events", { params })
+    .get<MedicalEvent[]>("/events", { params })
     .then((r) => {
-      e!.data = r.data as MedicalEvent[];
+      e!.data = r.data;
       e!.error = null;
     })
     .catch((err) => {

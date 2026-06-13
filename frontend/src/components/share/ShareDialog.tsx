@@ -16,6 +16,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
 import Modal from "@/components/ui/Modal";
 import ProviderSelect from "@/components/ui/ProviderSelect";
+import type { ShareCreateRequest, ShareCreateResponse } from "@/types";
 
 // Same shape as backend `_EMAIL_RE`; client-side guard so the user
 // gets a hint before the round trip.
@@ -37,11 +38,9 @@ interface ShareSummary {
   created_by_username: string;
 }
 
-interface CreateResult {
-  share_id: number;
-  share_url: string;
-  expires_at: string;
-}
+// Server response for POST /shares — aliased from the generated schema so
+// a backend field rename surfaces here at compile time.
+type CreateResult = ShareCreateResponse;
 
 interface ActiveOtp {
   code: string;
@@ -145,7 +144,7 @@ export default function ShareDialog({
     }
     setSubmitting(true);
     try {
-      const res = await api.post<CreateResult>("/shares", {
+      const payload: ShareCreateRequest = {
         patient_id: patientId,
         document_ids: documentIds,
         recipient_label: recipientLabel.trim() || "Outside doctor",
@@ -157,7 +156,8 @@ export default function ShareDialog({
         // first-enabled provider at translate time.
         default_ocr_provider_id: ocrProviderId || null,
         default_llm_provider_id: llmProviderId || null,
-      });
+      };
+      const res = await api.post<CreateResult>("/shares", payload);
       setCreateResult(res.data);
       refresh();
     } catch (err: any) {

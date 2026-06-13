@@ -8,9 +8,9 @@ import logging
 import os
 from pathlib import Path
 
-import aiosqlite
 
 from asclepius.config import AppConfig
+from asclepius.db.connection import open_db
 from asclepius.documents.service import compute_file_hash, migrate_document_links
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.organizer import build_organized_path, move_file
@@ -123,11 +123,7 @@ async def process_file(file_path: str, config: AppConfig) -> None:
 
     logger.info("Processing: %s", path.name)
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         try:
             # Compute file hash and size for dedup
             file_hash = compute_file_hash(file_path)

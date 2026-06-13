@@ -22,6 +22,7 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig, get_active_llm_provider_config
+from asclepius.db.connection import open_db
 from asclepius.pipeline.extractor import (
     _extract_type_specific,
     build_extraction_context,
@@ -197,11 +198,7 @@ async def ai_edit_document(
     if not in_range:
         return {"error": f"No requested page is within 1..{page_count}."}
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         cursor = await db.execute(
             "SELECT id, file_path, original_filename FROM documents WHERE id = ?",
             (doc_id,),

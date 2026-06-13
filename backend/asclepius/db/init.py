@@ -7,6 +7,8 @@ from pathlib import Path
 
 import aiosqlite
 
+from asclepius.db.connection import open_db
+
 logger = logging.getLogger(__name__)
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
@@ -21,11 +23,7 @@ async def initialize_database(db_path: str) -> None:
     """Initialize the database schema and seed data if needed."""
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-        await db.execute("PRAGMA busy_timeout=5000")
-
+    async with open_db(db_path) as db:
         # Execute schema
         schema_sql = SCHEMA_PATH.read_text()
         await db.executescript(schema_sql)

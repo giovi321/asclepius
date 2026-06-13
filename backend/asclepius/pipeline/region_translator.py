@@ -21,6 +21,7 @@ import pytesseract
 from PIL import Image
 
 from asclepius.config import AppConfig, OcrProviderEntry
+from asclepius.db.connection import open_db
 from asclepius.llm.prompt_manager import get_prompt
 from asclepius.pipeline.ocr import (
     _compress_image_for_vision,
@@ -129,11 +130,7 @@ async def translate_region(
         target_language or getattr(config.llm, "translation_target_language", "") or "English"
     )
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         cursor = await db.execute(
             "SELECT id, file_path, original_filename FROM documents WHERE id = ?",
             (doc_id,),

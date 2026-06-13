@@ -2,8 +2,7 @@
 
 import logging
 
-import aiosqlite
-
+from asclepius.db.connection import open_db
 from asclepius.llm import prompts as default_prompts
 
 logger = logging.getLogger(__name__)
@@ -185,8 +184,7 @@ def get_default_prompt(key: str) -> str:
 async def get_prompt(db_path: str, key: str) -> str:
     """Get a prompt — custom from DB if exists, otherwise default."""
     try:
-        async with aiosqlite.connect(db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with open_db(db_path) as db:
             cursor = await db.execute(
                 "SELECT prompt_text FROM custom_prompts WHERE prompt_key = ?", (key,)
             )
@@ -205,8 +203,7 @@ async def get_all_prompts(db_path: str) -> list[dict]:
     custom = {}
 
     try:
-        async with aiosqlite.connect(db_path) as db:
-            db.row_factory = aiosqlite.Row
+        async with open_db(db_path) as db:
             cursor = await db.execute(
                 "SELECT prompt_key, prompt_text, updated_at FROM custom_prompts"
             )
@@ -241,8 +238,7 @@ async def set_prompt(db_path: str, key: str, text: str) -> None:
     if key not in PROMPT_REGISTRY:
         raise ValueError(f"Unknown prompt key: {key}")
 
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute("PRAGMA journal_mode=WAL")
+    async with open_db(db_path) as db:
         await db.execute(
             """INSERT INTO custom_prompts (prompt_key, prompt_text, description, updated_at)
                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
@@ -256,6 +252,6 @@ async def set_prompt(db_path: str, key: str, text: str) -> None:
 
 async def reset_prompt(db_path: str, key: str) -> None:
     """Delete custom prompt, reverting to default."""
-    async with aiosqlite.connect(db_path) as db:
+    async with open_db(db_path) as db:
         await db.execute("DELETE FROM custom_prompts WHERE prompt_key = ?", (key,))
         await db.commit()

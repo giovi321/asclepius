@@ -8,6 +8,7 @@ from pathlib import Path
 import aiosqlite
 
 from asclepius.config import AppConfig
+from asclepius.db.connection import open_db
 from asclepius.pipeline.ocr import extract_text
 from asclepius.pipeline.chunked_extraction import run_extraction
 from asclepius.pipeline.ocr_cache import cache_ocr_pages
@@ -84,11 +85,7 @@ async def reprocess_document(
     if _current_task is not None:
         register_running_task(doc_id, _current_task)
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         cursor = await db.execute(
             "SELECT id, ocr_text, file_path, original_filename, patient_id FROM documents WHERE id = ?",
             (doc_id,),
@@ -452,11 +449,7 @@ async def _reprocess_vision_llm(
     if _current_task is not None:
         register_running_task(doc_id, _current_task)
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         cursor = await db.execute(
             "SELECT id, file_path, original_filename FROM documents WHERE id = ?",
             (doc_id,),

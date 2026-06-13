@@ -13,6 +13,7 @@ import logging
 import aiosqlite
 
 from asclepius.config import AppConfig
+from asclepius.db.connection import open_db
 from asclepius.llm.prompt_manager import get_prompt
 from asclepius.pipeline.chunked_extraction import _build_page_chunks, _load_pages
 from asclepius.pipeline.provider_factory import _build_llm_provider, get_llm_provider
@@ -67,11 +68,7 @@ async def translate_document(
     if _current_task is not None:
         register_running_task(doc_id, _current_task)
 
-    async with aiosqlite.connect(config.database.path) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA journal_mode=WAL")
-        await db.execute("PRAGMA foreign_keys=ON")
-
+    async with open_db() as db:
         cursor = await db.execute(
             "SELECT id, ocr_text, ocr_engine, original_filename FROM documents WHERE id = ?",
             (doc_id,),

@@ -17,6 +17,7 @@ from watchdog.events import (
 from watchdog.observers import Observer
 
 from asclepius.config import AppConfig
+from asclepius.db.connection import open_db
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,6 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
         from asclepius.pipeline.translator import translate_document
         from asclepius.pipeline.region_translator import translate_region
         from asclepius.pipeline.inbox_sweep import sweep_inbox
-        import aiosqlite as _aiosqlite
 
         consecutive_provider_failures = 0
         idle_ticks_since_sweep = 0
@@ -259,8 +259,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 if idle_ticks_since_sweep >= 15:
                     idle_ticks_since_sweep = 0
                     try:
-                        async with _aiosqlite.connect(config.database.path) as _db:
-                            _db.row_factory = _aiosqlite.Row
+                        async with open_db() as _db:
                             await sweep_inbox(
                                 inbox_root=Path(config.vault.inbox_path),
                                 vault_root=Path(config.vault.root_path),
@@ -325,9 +324,7 @@ def _pipeline_worker(config: AppConfig, queue: PriorityQueue, app_state=None) ->
                 # no worker behind it. Best-effort — failures here only
                 # affect cosmetics.
                 try:
-                    import aiosqlite as _aiosqlite
-
-                    async with _aiosqlite.connect(config.database.path) as _db:
+                    async with open_db() as _db:
                         await _db.execute(
                             """UPDATE documents
                                SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
@@ -566,12 +563,9 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
     # process left behind (e.g. crash after copy, before unlink) so
     # they don't get re-queued and re-processed below.
     try:
-        import aiosqlite as _aiosqlite
         from asclepius.pipeline.inbox_sweep import sweep_inbox
 
-        async with _aiosqlite.connect(config.database.path) as _db:
-            _db.row_factory = _aiosqlite.Row
-            await _db.execute("PRAGMA foreign_keys=ON")
+        async with open_db() as _db:
             await sweep_inbox(
                 inbox_root=Path(inbox_path),
                 vault_root=Path(config.vault.root_path),
@@ -646,10 +640,7 @@ async def start_watcher(config: AppConfig, app_state=None) -> None:
 
             # Check for scheduled documents whose process_at time has passed
             try:
-                import aiosqlite
-
-                async with aiosqlite.connect(config.database.path) as db:
-                    await db.execute("PRAGMA journal_mode=WAL")
+                async with open_db() as db:
                     cursor = await db.execute(
                         "SELECT id, file_path FROM documents WHERE status = 'scheduled' AND process_at <= DATETIME('now')"
                     )

@@ -149,8 +149,7 @@ class ErrorAuditMiddleware(BaseHTTPMiddleware):
             return response
         try:
             from asclepius.audit.service import audit_log as _audit_log, get_client_ip
-            from asclepius.db.connection import get_db_path
-            import aiosqlite
+            from asclepius.db.connection import open_db
 
             user_id: int | None = None
             try:
@@ -165,7 +164,7 @@ class ErrorAuditMiddleware(BaseHTTPMiddleware):
                 "path": request.url.path,
                 "status": status,
             }
-            async with aiosqlite.connect(get_db_path()) as db:
+            async with open_db() as db:
                 await _audit_log(
                     db,
                     user_id=user_id,

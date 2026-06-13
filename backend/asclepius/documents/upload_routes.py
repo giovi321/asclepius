@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
-from asclepius.db.connection import get_db
+from asclepius.db.connection import get_db, open_db
 from asclepius.documents.service import compute_file_hash, get_document
 from asclepius.util.paths import UnsafePathError, safe_filename, safe_vault_join
 
@@ -308,7 +308,7 @@ async def upload_document(
     inbox_subfolder = f"user-{user_id}"
     if patient_id:
         try:
-            async with aiosqlite.connect(config.database.path) as _db:
+            async with open_db() as _db:
                 cursor = await _db.execute(
                     "SELECT slug FROM patients WHERE id = ?",
                     (patient_id,),
@@ -384,7 +384,7 @@ async def upload_document(
     if patient_id:
         from asclepius.patients.service import check_patient_access
 
-        async with aiosqlite.connect(config.database.path) as db:
+        async with open_db() as db:
             role = await check_patient_access(db, user_id, patient_id)
         if not role:
             dest.unlink(missing_ok=True)
@@ -439,7 +439,7 @@ async def upload_document(
     file_size = os.path.getsize(str(dest))
     existing_doc = None
     try:
-        async with aiosqlite.connect(config.database.path) as db:
+        async with open_db() as db:
             cursor = await db.execute(
                 "SELECT id, original_filename, patient_id FROM documents WHERE file_hash = ?",
                 (file_hash,),
@@ -479,9 +479,7 @@ async def upload_document(
     # Create a DB record immediately so the document shows up in the UI.
     # The pipeline will find this row by file_hash rather than duplicating.
     try:
-        async with aiosqlite.connect(config.database.path) as db:
-            await db.execute("PRAGMA journal_mode=WAL")
-            await db.execute("PRAGMA foreign_keys=ON")
+        async with open_db() as db:
             await db.execute(
                 """INSERT INTO documents
                    (file_path, original_filename, file_hash, file_size, patient_id,
@@ -506,7 +504,7 @@ async def upload_document(
     suggestion_message = None
     queue_size = 0
     try:
-        async with aiosqlite.connect(config.database.path) as db2:
+        async with open_db() as db2:
             cursor = await db2.execute(
                 "SELECT COUNT(*) FROM documents WHERE status IN ('pending', 'processing')"
             )

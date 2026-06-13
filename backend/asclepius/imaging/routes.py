@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
+from asclepius.authz import require_patient_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.documents.service import migrate_document_links
@@ -21,6 +22,12 @@ async def _study_with_access(
     current_user: dict,
     db: aiosqlite.Connection,
 ) -> dict:
+    """Load a study row and enforce read access, or raise 404/403.
+
+    Access goes through the canonical :func:`asclepius.authz.require_patient_access`,
+    which ADDS an admin bypass this check previously lacked: admins can now
+    reach any study even without an explicit patient grant.
+    """
     cursor = await db.execute(
         "SELECT id, document_id, patient_id, folder_path " "FROM imaging_studies WHERE id = ?",
         (study_id,),
@@ -30,9 +37,7 @@ async def _study_with_access(
         raise HTTPException(status_code=404, detail="Study not found")
     study = dict(row)
     if study["patient_id"]:
-        role = await check_patient_access(db, current_user["id"], study["patient_id"])
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
+        await require_patient_access(db, study["patient_id"], current_user)
     return study
 
 
@@ -178,9 +183,7 @@ async def get_imaging_study(
     study = dict(study)
 
     if study["patient_id"]:
-        role = await check_patient_access(db, current_user["id"], study["patient_id"])
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
+        await require_patient_access(db, study["patient_id"], current_user)
 
     # Get series
     cursor = await db.execute(
@@ -218,9 +221,7 @@ async def _series_folder_with_access(
 
     patient_id = row["patient_id"]
     if patient_id:
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
+        await require_patient_access(db, patient_id, current_user)
     return row["folder_path"]
 
 

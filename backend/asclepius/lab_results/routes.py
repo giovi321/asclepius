@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
+from asclepius.authz import require_patient_access
 from asclepius.db.connection import get_db
-from asclepius.patients.service import check_patient_access
 
 router = APIRouter()
 
@@ -79,9 +79,7 @@ async def list_lab_results(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     if patient_id:
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
+        await require_patient_access(db, patient_id, current_user)
 
     conditions = []
     params: list = []
@@ -150,9 +148,7 @@ async def list_orphan_lab_results(
     params: list = []
 
     if patient_id:
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
+        await require_patient_access(db, patient_id, current_user)
         conditions.append("lr.patient_id = ?")
         params.append(patient_id)
     else:
@@ -183,9 +179,7 @@ async def lab_timeline(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """Get time-series data for a specific test for charting."""
-    role = await check_patient_access(db, current_user["id"], patient_id)
-    if not role:
-        raise HTTPException(status_code=403, detail="No access")
+    await require_patient_access(db, patient_id, current_user)
 
     cursor = await db.execute(
         """SELECT lr.test_date, lr.value, lr.value_text, lr.unit,
@@ -225,12 +219,7 @@ async def create_lab_result(
             detail="Document has no patient assigned — set the patient before adding lab results",
         )
 
-    if current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
-        if role == "viewer":
-            raise HTTPException(status_code=403, detail="Viewers cannot create lab results")
+    await require_patient_access(db, patient_id, current_user, write=True)
 
     test_name = (body.test_name_original or "").strip()
     if not test_name:
@@ -278,12 +267,7 @@ async def update_lab_result(
     if not row:
         raise HTTPException(status_code=404, detail="Lab result not found")
 
-    if current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], row["patient_id"])
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
-        if role == "viewer":
-            raise HTTPException(status_code=403, detail="Viewers cannot edit lab results")
+    await require_patient_access(db, row["patient_id"], current_user, write=True)
 
     updates = {}
     for field in body.model_fields_set:
@@ -322,12 +306,7 @@ async def delete_lab_result(
     if not row:
         raise HTTPException(status_code=404, detail="Lab result not found")
 
-    if current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], row["patient_id"])
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
-        if role == "viewer":
-            raise HTTPException(status_code=403, detail="Viewers cannot delete lab results")
+    await require_patient_access(db, row["patient_id"], current_user, write=True)
 
     await db.execute("DELETE FROM lab_results WHERE id = ?", (result_id,))
     await db.commit()

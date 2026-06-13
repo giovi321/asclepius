@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.authz import require_document_access
 from asclepius.documents.service import (
     get_document,
-    require_document_access,
     update_document_fields,
 )
 

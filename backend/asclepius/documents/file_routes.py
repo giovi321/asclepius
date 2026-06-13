@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from asclepius.auth.session import get_current_user
+from asclepius.authz import require_document_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.documents.service import get_document
@@ -35,20 +36,12 @@ async def _require_write_access(
 ) -> None:
     """Raise 403 unless the caller may mutate this document.
 
-    Allowed:
-    - admins
-    - the original uploader
-    - users with ``owner``/``editor`` role on the document's patient
+    Thin wrapper over :func:`asclepius.authz.require_document_access` with
+    ``write=True`` — kept so the many call sites here and in
+    ``documents/routes.py`` need not change their argument order. Allowed:
+    admins, the original uploader, or an ``owner``/``editor`` patient grant.
     """
-    if current_user.get("role") == "admin":
-        return
-    if doc.get("uploaded_by_user_id") == current_user["id"]:
-        return
-    if doc.get("patient_id"):
-        role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-        if role in ("owner", "editor"):
-            return
-    raise HTTPException(status_code=403, detail="Insufficient permissions")
+    await require_document_access(db, doc, current_user, write=True)
 
 
 def _resolve_vault_file(vault_root: Path, relative_path: str) -> Path:

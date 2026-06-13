@@ -9,10 +9,10 @@ from pydantic import BaseModel
 from asclepius.auth.session import get_current_user
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
+from asclepius.authz import require_document_access
 from asclepius.documents.service import (
     get_document,
     get_document_links,
-    require_document_access,
 )
 from asclepius.patients.service import check_patient_access
 

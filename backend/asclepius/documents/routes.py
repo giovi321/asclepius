@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 import aiosqlite
 from asclepius.auth.session import get_current_user, require_role
 from asclepius.audit.service import audit_log, get_client_ip
+from asclepius.authz import require_document_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.util.dates import best_date_with_received
@@ -220,19 +221,9 @@ async def get_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check access. Admins see everything. Non-admins pass if they have
-    # patient-level access OR they uploaded the file themselves; unclassified
-    # docs that legacy-migrated with no uploader stay admin-only.
-    if current_user.get("role") != "admin":
-        has_access = False
-        if doc["patient_id"]:
-            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-            if role:
-                has_access = True
-        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
-            has_access = True
-        if not has_access:
-            raise HTTPException(status_code=403, detail="No access")
+    # Read access: admins, the uploader, or any patient grant (canonical rule
+    # in asclepius.authz). Unclassified docs with no uploader stay admin-only.
+    await require_document_access(db, doc, current_user)
 
     # Get related data
     lab_results = await get_related_records(db, "lab_results", doc_id)
@@ -473,22 +464,11 @@ async def delete_doc(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check access — admins can always delete; uploaders can always delete
-    # their own upload; otherwise the caller needs a non-viewer role on the
-    # patient.
-    if current_user.get("role") != "admin":
-        uploader_match = doc.get("uploaded_by_user_id") == current_user["id"]
-        if doc["patient_id"]:
-            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-            if (not role or role == "viewer") and not uploader_match:
-                raise HTTPException(
-                    status_code=403, detail="Insufficient permissions to delete this document"
-                )
-        elif not uploader_match:
-            # Unclassified doc and not the uploader → block.
-            raise HTTPException(
-                status_code=403, detail="Insufficient permissions to delete this document"
-            )
+    # Delete requires write access: admins, the uploader, or an owner/editor
+    # patient grant (canonical rule in asclepius.authz). Viewers and callers
+    # with no grant on a classified doc are rejected; unclassified docs with
+    # no uploader stay admin-only.
+    await require_document_access(db, doc, current_user, write=True)
 
     # If document is being processed, cancel it first — both cooperatively
     # and hard-cancel so an in-flight LLM request releases its gate slot.
@@ -725,16 +705,7 @@ async def get_doc_stages(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if current_user.get("role") != "admin":
-        has_access = False
-        if doc.get("patient_id"):
-            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-            if role:
-                has_access = True
-        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
-            has_access = True
-        if not has_access:
-            raise HTTPException(status_code=403, detail="No access")
+    await require_document_access(db, doc, current_user)
 
     cursor = await db.execute(
         """SELECT id, stage, status, job_kind, message,
@@ -1064,16 +1035,7 @@ async def get_region_thumbnail(
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    if current_user.get("role") != "admin":
-        has_access = False
-        if doc["patient_id"]:
-            role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-            if role:
-                has_access = True
-        if not has_access and doc.get("uploaded_by_user_id") == current_user["id"]:
-            has_access = True
-        if not has_access:
-            raise HTTPException(status_code=403, detail="No access")
+    await require_document_access(db, doc, current_user)
 
     cursor = await db.execute(
         """SELECT thumbnail_path FROM region_translations

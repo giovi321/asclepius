@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 import aiosqlite
 from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.auth.session import get_current_user
+from asclepius.authz import require_document_access
 from asclepius.db.connection import get_db
 from asclepius.documents.service import get_document
 from asclepius.normalization.resolver import (
@@ -23,7 +24,6 @@ from asclepius.normalization.resolver import (
     resolve_medication,
     resolve_specialty,
 )
-from asclepius.patients.service import check_patient_access
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,15 @@ async def _require_doc_write(
     current_user: dict,
     doc: dict,
 ) -> None:
-    """Patient-level access check, mirroring documents/routes.py PATCH."""
-    role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-    if not role:
-        raise HTTPException(status_code=403, detail="No access to this document")
+    """Write-access check for child-record edits/deletes.
+
+    Delegates to the canonical :func:`asclepius.authz.require_document_access`
+    with ``write=True``. This intentionally tightens the old behavior: the
+    previous copy accepted *any* patient grant, which let viewers edit and
+    delete encounters / medications. Viewers are now rejected; admins, the
+    uploader, and owner/editor grants are allowed.
+    """
+    await require_document_access(db, doc, current_user, write=True)
 
 
 # ── Encounters ─────────────────────────────────────────────────────

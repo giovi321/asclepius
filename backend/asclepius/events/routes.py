@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 import aiosqlite
 from asclepius.auth.session import get_current_user
+from asclepius.authz import require_patient_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
 from asclepius.patients.service import check_patient_access
@@ -34,14 +35,11 @@ async def _event_with_access(
     if not row:
         raise HTTPException(status_code=404, detail="Event not found")
     event = dict(row)
-    if current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], event["patient_id"])
-        if not role:
-            raise HTTPException(status_code=403, detail="No access")
-        if require_delete and role == "viewer":
-            raise HTTPException(
-                status_code=403, detail="Insufficient permissions to delete this event"
-            )
+    # Access goes through the canonical authz helper. ``require_delete`` maps
+    # to write access (viewers are rejected); ordinary access allows any grant.
+    await require_patient_access(
+        db, event["patient_id"], current_user, write=require_delete
+    )
     return event
 
 
@@ -49,10 +47,7 @@ async def _require_patient_access(
     db: aiosqlite.Connection, patient_id: int, current_user: dict
 ) -> None:
     """Enforce that the caller may act on ``patient_id`` (admin or any grant)."""
-    if current_user.get("role") != "admin":
-        role = await check_patient_access(db, current_user["id"], patient_id)
-        if not role:
-            raise HTTPException(status_code=403, detail="No access to this patient")
+    await require_patient_access(db, patient_id, current_user)
 
 
 async def _require_document_in_event_patient(

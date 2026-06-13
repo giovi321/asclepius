@@ -4,40 +4,15 @@ import hashlib
 from pathlib import Path
 
 import aiosqlite
-from fastapi import HTTPException
 
-from asclepius.patients.service import check_patient_access
 from asclepius.util.dates import BEST_DATE_SQL, BEST_DATE_SQL_WITH_CREATED
 
-
-async def require_document_access(
-    db: aiosqlite.Connection,
-    doc: dict,
-    current_user: dict,
-    *,
-    write: bool = False,
-) -> None:
-    """Raise 403 unless the caller may access ``doc`` (a ``get_document()`` row).
-
-    Read access: admins, the original uploader, or any patient grant.
-    Write access (``write=True``): admins, the uploader, or an owner/editor
-    grant — viewers are rejected. Mirrors the documents-detail and file-write
-    rules; the several per-router copies of this check are consolidated here
-    and will move into a dedicated authz module in a later pass.
-    """
-    if current_user.get("role") == "admin":
-        return
-    if doc.get("uploaded_by_user_id") == current_user["id"]:
-        return
-    role = None
-    if doc.get("patient_id"):
-        role = await check_patient_access(db, current_user["id"], doc["patient_id"])
-    if not role:
-        raise HTTPException(status_code=403, detail="No access to this document")
-    if write and role == "viewer":
-        raise HTTPException(
-            status_code=403, detail="Insufficient permissions to modify this document"
-        )
+# ``require_document_access`` now lives in :mod:`asclepius.authz` (the single
+# source of truth for access control). It is intentionally NOT re-exported
+# from here: ``authz`` imports ``get_document`` from this module, so importing
+# it back the other way would create a circular import. The two former
+# importers (documents.ai_routes, documents.link_routes) import it from
+# ``asclepius.authz`` directly.
 
 
 async def get_document(db: aiosqlite.Connection, doc_id: int) -> dict | None:

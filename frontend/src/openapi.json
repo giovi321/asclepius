@@ -3,7 +3,7 @@
   "info": {
     "title": "Asclepius",
     "description": "Self-hosted medical records manager",
-    "version": "1.2.4"
+    "version": "1.3.0"
   },
   "paths": {
     "/health": {
@@ -2553,7 +2553,7 @@
       "get": {
         "tags": ["events"],
         "summary": "List Events",
-        "description": "List medical events, optionally filtered by patient and type.",
+        "description": "List medical events, optionally filtered by patient and type.\n\nResults are scoped to the caller's accessible patients: admins see all,\nnon-admins see only patients they hold a ``user_patient_access`` grant for.",
         "operationId": "list_events_api_events_get",
         "parameters": [
           {
@@ -4870,7 +4870,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "Get Logs",
-        "description": "Get recent application logs from the in-memory buffer.",
+        "description": "Get recent application logs from the in-memory buffer (admin only).\n\nLogs can contain PHI-adjacent content (file paths, patient slugs in error\nmessages), so this is restricted to admins.",
         "operationId": "get_logs_api_settings_logs_get",
         "parameters": [
           {
@@ -5026,7 +5026,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "Download Backup",
-        "description": "Download a SQLite backup of the database.",
+        "description": "Download a SQLite backup of the database (admin only).",
         "operationId": "download_backup_api_settings_backup_get",
         "responses": {
           "200": {
@@ -5044,7 +5044,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "List Scheduled Backups",
-        "description": "List files in the scheduled-backup directory, newest-first.",
+        "description": "List files in the scheduled-backup directory, newest-first (admin only).",
         "operationId": "list_scheduled_backups_api_settings_backup_files_get",
         "responses": {
           "200": {
@@ -5062,7 +5062,7 @@
       "get": {
         "tags": ["settings"],
         "summary": "Download Scheduled Backup",
-        "description": "Download a single scheduled-backup file.",
+        "description": "Download a single scheduled-backup file (admin only).",
         "operationId": "download_scheduled_backup_api_settings_backup_files__name__get",
         "parameters": [
           {
@@ -6500,11 +6500,136 @@
         }
       }
     },
+    "/api/shares/{share_id}/documents": {
+      "post": {
+        "tags": ["shares"],
+        "summary": "Add Share Documents",
+        "description": "Add documents to an existing share.\n\nLets the admin build a share across several filter/search views: pick\na subset, add it here, change the filter, add the next subset to the\nsame share \u2014 without having to get every document into one filtered\nlist at once.\n\nSame guard rails as creation: admin or patient-owner only, and every\ndocument must belong to the share's patient. Adding to a revoked share\nis refused (revive by creating a fresh one). Documents already on the\nshare are silently skipped.",
+        "operationId": "add_share_documents_api_shares__share_id__documents_post",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareAddDocumentsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["shares"],
+        "summary": "Share Document List",
+        "description": "Lightweight admin view of the share's document membership.\n\nReturns the same JOIN shape the doctor sees so the admin can preview\nexactly what was shared without opening a doctor session.",
+        "operationId": "share_document_list_api_shares__share_id__documents_get",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{share_id}": {
       "delete": {
         "tags": ["shares"],
         "summary": "Revoke Share",
         "operationId": "revoke_share_api_shares__share_id__delete",
+        "parameters": [
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Share Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shares/{share_id}/purge": {
+      "delete": {
+        "tags": ["shares"],
+        "summary": "Purge Share",
+        "description": "Permanently delete a share and its dependent rows from the DB.\n\nUnlike :func:`revoke_share` (which keeps the row, flagged revoked, so\nit still shows on the dashboard), this removes the share, its\ndocument membership, OTPs, sessions, queue entries, and audit trail\nentirely. Used to clean up old/stale shares \u2014 including legacy rows\nthat predate the revoke feature. Any live doctor session dies with\nthe cascade on the next request.",
+        "operationId": "purge_share_api_shares__share_id__purge_delete",
         "parameters": [
           {
             "name": "share_id",
@@ -6593,45 +6718,6 @@
         "summary": "Share Active Otp",
         "description": "Return only the live OTP code for a share, if any.\n\nFaster than ``/{id}/audit?include_active_otp=true`` because it\nskips the audit-event listing \u2014 the dashboard hits this every time\nthe admin clicks \"Show active code\", so it must be cheap.\n\nResponse shape: ``{\"active_otp\": null}`` when no code is live, or\n``{\"active_otp\": {\"code\": ..., \"expires_at\": ..., \"attempts\": ...}}``.",
         "operationId": "share_active_otp_api_shares__share_id__active_otp_get",
-        "parameters": [
-          {
-            "name": "share_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Share Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/shares/{share_id}/documents": {
-      "get": {
-        "tags": ["shares"],
-        "summary": "Share Document List",
-        "description": "Lightweight admin view of the share's document membership.\n\nReturns the same JOIN shape the doctor sees so the admin can preview\nexactly what was shared without opening a doctor session.",
-        "operationId": "share_document_list_api_shares__share_id__documents_get",
         "parameters": [
           {
             "name": "share_id",
@@ -9882,6 +9968,22 @@
         "required": ["username", "password", "display_name", "patient_name"],
         "title": "SetupRequest"
       },
+      "ShareAddDocumentsRequest": {
+        "properties": {
+          "document_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Document Ids"
+          }
+        },
+        "type": "object",
+        "required": ["document_ids"],
+        "title": "ShareAddDocumentsRequest"
+      },
       "ShareCreateRequest": {
         "properties": {
           "patient_id": {
@@ -9983,28 +10085,6 @@
           "bbox": {
             "$ref": "#/components/schemas/RegionBbox"
           },
-          "ocr_provider_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Ocr Provider Id"
-          },
-          "llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider Id"
-          },
           "target_language": {
             "anyOf": [
               {
@@ -10023,17 +10103,6 @@
       },
       "ShareTranslateRequest": {
         "properties": {
-          "llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider Id"
-          },
           "target_language": {
             "anyOf": [
               {

@@ -1231,6 +1231,9 @@ export interface paths {
     /**
      * List Events
      * @description List medical events, optionally filtered by patient and type.
+     *
+     *     Results are scoped to the caller's accessible patients: admins see all,
+     *     non-admins see only patients they hold a ``user_patient_access`` grant for.
      */
     get: operations["list_events_api_events_get"];
     put?: never;
@@ -1972,7 +1975,10 @@ export interface paths {
     };
     /**
      * Get Logs
-     * @description Get recent application logs from the in-memory buffer.
+     * @description Get recent application logs from the in-memory buffer (admin only).
+     *
+     *     Logs can contain PHI-adjacent content (file paths, patient slugs in error
+     *     messages), so this is restricted to admins.
      */
     get: operations["get_logs_api_settings_logs_get"];
     put?: never;
@@ -2012,7 +2018,7 @@ export interface paths {
     };
     /**
      * Download Backup
-     * @description Download a SQLite backup of the database.
+     * @description Download a SQLite backup of the database (admin only).
      */
     get: operations["download_backup_api_settings_backup_get"];
     put?: never;
@@ -2032,7 +2038,7 @@ export interface paths {
     };
     /**
      * List Scheduled Backups
-     * @description List files in the scheduled-backup directory, newest-first.
+     * @description List files in the scheduled-backup directory, newest-first (admin only).
      */
     get: operations["list_scheduled_backups_api_settings_backup_files_get"];
     put?: never;
@@ -2052,7 +2058,7 @@ export interface paths {
     };
     /**
      * Download Scheduled Backup
-     * @description Download a single scheduled-backup file.
+     * @description Download a single scheduled-backup file (admin only).
      */
     get: operations["download_scheduled_backup_api_settings_backup_files__name__get"];
     put?: never;
@@ -2672,6 +2678,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/shares/{share_id}/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Share Document List
+     * @description Lightweight admin view of the share's document membership.
+     *
+     *     Returns the same JOIN shape the doctor sees so the admin can preview
+     *     exactly what was shared without opening a doctor session.
+     */
+    get: operations["share_document_list_api_shares__share_id__documents_get"];
+    put?: never;
+    /**
+     * Add Share Documents
+     * @description Add documents to an existing share.
+     *
+     *     Lets the admin build a share across several filter/search views: pick
+     *     a subset, add it here, change the filter, add the next subset to the
+     *     same share — without having to get every document into one filtered
+     *     list at once.
+     *
+     *     Same guard rails as creation: admin or patient-owner only, and every
+     *     document must belong to the share's patient. Adding to a revoked share
+     *     is refused (revive by creating a fresh one). Documents already on the
+     *     share are silently skipped.
+     */
+    post: operations["add_share_documents_api_shares__share_id__documents_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/shares/{share_id}": {
     parameters: {
       query?: never;
@@ -2684,6 +2727,33 @@ export interface paths {
     post?: never;
     /** Revoke Share */
     delete: operations["revoke_share_api_shares__share_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/shares/{share_id}/purge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Purge Share
+     * @description Permanently delete a share and its dependent rows from the DB.
+     *
+     *     Unlike :func:`revoke_share` (which keeps the row, flagged revoked, so
+     *     it still shows on the dashboard), this removes the share, its
+     *     document membership, OTPs, sessions, queue entries, and audit trail
+     *     entirely. Used to clean up old/stale shares — including legacy rows
+     *     that predate the revoke feature. Any live doctor session dies with
+     *     the cascade on the next request.
+     */
+    delete: operations["purge_share_api_shares__share_id__purge_delete"];
     options?: never;
     head?: never;
     patch?: never;
@@ -2730,29 +2800,6 @@ export interface paths {
      *     ``{"active_otp": {"code": ..., "expires_at": ..., "attempts": ...}}``.
      */
     get: operations["share_active_otp_api_shares__share_id__active_otp_get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/shares/{share_id}/documents": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Share Document List
-     * @description Lightweight admin view of the share's document membership.
-     *
-     *     Returns the same JOIN shape the doctor sees so the admin can preview
-     *     exactly what was shared without opening a doctor session.
-     */
-    get: operations["share_document_list_api_shares__share_id__documents_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -3622,6 +3669,11 @@ export interface components {
       /** Patient Sex */
       patient_sex?: string | null;
     };
+    /** ShareAddDocumentsRequest */
+    ShareAddDocumentsRequest: {
+      /** Document Ids */
+      document_ids: number[];
+    };
     /** ShareCreateRequest */
     ShareCreateRequest: {
       /** Patient Id */
@@ -3662,17 +3714,11 @@ export interface components {
       /** Page */
       page: number;
       bbox: components["schemas"]["RegionBbox"];
-      /** Ocr Provider Id */
-      ocr_provider_id?: string | null;
-      /** Llm Provider Id */
-      llm_provider_id?: string | null;
       /** Target Language */
       target_language?: string | null;
     };
     /** ShareTranslateRequest */
     ShareTranslateRequest: {
-      /** Llm Provider Id */
-      llm_provider_id?: string | null;
       /** Target Language */
       target_language?: string | null;
     };
@@ -8427,7 +8473,104 @@ export interface operations {
       };
     };
   };
+  share_document_list_api_shares__share_id__documents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_share_documents_api_shares__share_id__documents_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ShareAddDocumentsRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   revoke_share_api_shares__share_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        share_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  purge_share_api_shares__share_id__purge_delete: {
     parameters: {
       query?: never;
       header?: never;
@@ -8492,37 +8635,6 @@ export interface operations {
     };
   };
   share_active_otp_api_shares__share_id__active_otp_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        share_id: number;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  share_document_list_api_shares__share_id__documents_get: {
     parameters: {
       query?: never;
       header?: never;

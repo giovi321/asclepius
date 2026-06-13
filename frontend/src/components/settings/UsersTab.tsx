@@ -447,8 +447,6 @@ function AccessModal({
   const [filter, setFilter] = useState("");
   const [saving, setSaving] = useState(false);
 
-  if (!user) return null;
-
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return patients;
@@ -547,6 +545,11 @@ function AccessModal({
     }
     return n;
   }, [selection, initialMap]);
+
+  // Guard placed after all hooks so hook order stays stable across renders
+  // (react-hooks/rules-of-hooks). The early return only short-circuits the
+  // JSX/callbacks below, which is behaviour-identical to the prior guard.
+  if (!user) return null;
 
   return (
     <div

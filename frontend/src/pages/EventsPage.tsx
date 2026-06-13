@@ -11,47 +11,14 @@ import {
   ChevronUp,
   Pencil,
 } from "lucide-react";
-import { useEvents } from "@/hooks/data";
-
-const EVENT_TYPES = [
-  "symptom",
-  "diagnosis",
-  "hospitalization",
-  "surgery",
-  "treatment",
-  "follow_up",
-  "emergency",
-  "pregnancy",
-  "chronic_condition",
-  "injury",
-  "screening",
-  "other",
-];
-
-const EVENT_COLORS: Record<string, string> = {
-  symptom: "bg-yellow-500",
-  diagnosis: "bg-red-500",
-  hospitalization: "bg-purple-500",
-  surgery: "bg-pink-500",
-  treatment: "bg-blue-500",
-  follow_up: "bg-cyan-500",
-  emergency: "bg-red-600",
-  pregnancy: "bg-rose-400",
-  chronic_condition: "bg-orange-500",
-  injury: "bg-amber-500",
-  screening: "bg-green-500",
-  other: "bg-gray-500",
-};
+import { EVENT_COLORS } from "./events/constants";
+import EventForm from "./events/EventForm";
+import { useEventsPage } from "./events/useEventsPage";
 
 export default function EventsPage() {
   const { selectedPatient } = usePatient();
   const confirm = useConfirm();
-  const {
-    data: eventsData,
-    loading,
-    refetch,
-  } = useEvents({ patientId: selectedPatient?.id });
-  const events = Array.isArray(eventsData) ? eventsData : [];
+  const { events, loading, loadEvents } = useEventsPage(selectedPatient);
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [eventDetail, setEventDetail] = useState<any>(null);
@@ -68,8 +35,6 @@ export default function EventsPage() {
     diagnosis_text: "",
     notes: "",
   });
-
-  const loadEvents = () => refetch();
 
   const handleCreate = async () => {
     if (!newEvent.title.trim() || !selectedPatient) return;
@@ -189,111 +154,13 @@ export default function EventsPage() {
       {/* Create form */}
       {showCreate && selectedPatient && (
         <div className="rounded-lg border p-4 space-y-3">
-          <h3 className="font-medium">New Medical Event</h3>
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              type="text"
-              placeholder="Title (e.g. Sleep Apnea Treatment)"
-              value={newEvent.title}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, title: e.target.value })
-              }
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            />
-            <select
-              value={newEvent.event_type}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, event_type: e.target.value })
-              }
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t.replace(/_/g, " ")}
-                </option>
-              ))}
-            </select>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              Start date
-              <input
-                type="date"
-                value={newEvent.date_start}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, date_start: e.target.value })
-                }
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              End date{" "}
-              <span className="text-muted-foreground/70">
-                (leave empty if ongoing)
-              </span>
-              <input
-                type="date"
-                value={newEvent.date_end}
-                onChange={(e) =>
-                  setNewEvent({ ...newEvent, date_end: e.target.value })
-                }
-                className="rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-            <input
-              type="text"
-              placeholder="Diagnosis"
-              value={newEvent.diagnosis_text}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, diagnosis_text: e.target.value })
-              }
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            />
-            <select
-              value={newEvent.severity || ""}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, severity: e.target.value })
-              }
-              className="rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              <option value="">Severity...</option>
-              <option value="mild">Mild</option>
-              <option value="moderate">Moderate</option>
-              <option value="severe">Severe</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
-          <textarea
-            placeholder="Description..."
-            value={newEvent.description}
-            onChange={(e) =>
-              setNewEvent({ ...newEvent, description: e.target.value })
-            }
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            rows={2}
+          <EventForm
+            mode="create"
+            value={newEvent}
+            onChange={setNewEvent}
+            onSubmit={handleCreate}
+            onCancel={() => setShowCreate(false)}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={newEvent.is_ongoing}
-              onChange={(e) =>
-                setNewEvent({ ...newEvent, is_ongoing: e.target.checked })
-              }
-            />
-            Ongoing condition
-          </label>
-          <div className="flex gap-2">
-            <button
-              onClick={handleCreate}
-              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
-            >
-              Create
-            </button>
-            <button
-              onClick={() => setShowCreate(false)}
-              className="rounded-md border px-4 py-2 text-sm"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
 
@@ -356,134 +223,13 @@ export default function EventsPage() {
               {expandedId === event.id && eventDetail && (
                 <div className="border-t p-4 space-y-3">
                   {editingId === event.id && editData ? (
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-medium">Edit Event</h4>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <input
-                          type="text"
-                          placeholder="Title"
-                          value={editData.title}
-                          onChange={(e) =>
-                            setEditData({ ...editData, title: e.target.value })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                        <select
-                          value={editData.event_type}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              event_type: e.target.value,
-                            })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        >
-                          {EVENT_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {t.replace(/_/g, " ")}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          value={editData.date_start}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              date_start: e.target.value,
-                            })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                        <input
-                          type="date"
-                          value={editData.date_end}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              date_end: e.target.value,
-                            })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Diagnosis"
-                          value={editData.diagnosis_text}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              diagnosis_text: e.target.value,
-                            })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        />
-                        <select
-                          value={editData.severity}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              severity: e.target.value,
-                            })
-                          }
-                          className="rounded-md border bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="">Severity...</option>
-                          <option value="mild">Mild</option>
-                          <option value="moderate">Moderate</option>
-                          <option value="severe">Severe</option>
-                          <option value="critical">Critical</option>
-                        </select>
-                      </div>
-                      <textarea
-                        placeholder="Description..."
-                        value={editData.description}
-                        onChange={(e) =>
-                          setEditData({
-                            ...editData,
-                            description: e.target.value,
-                          })
-                        }
-                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                        rows={2}
-                      />
-                      <textarea
-                        placeholder="Notes..."
-                        value={editData.notes}
-                        onChange={(e) =>
-                          setEditData({ ...editData, notes: e.target.value })
-                        }
-                        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-                        rows={2}
-                      />
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={editData.is_ongoing}
-                          onChange={(e) =>
-                            setEditData({
-                              ...editData,
-                              is_ongoing: e.target.checked,
-                            })
-                          }
-                        />
-                        Ongoing condition
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleUpdate}
-                          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          className="rounded-md border px-4 py-2 text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+                    <EventForm
+                      mode="edit"
+                      value={editData}
+                      onChange={setEditData}
+                      onSubmit={handleUpdate}
+                      onCancel={cancelEdit}
+                    />
                   ) : (
                     <>
                       {eventDetail.description && (

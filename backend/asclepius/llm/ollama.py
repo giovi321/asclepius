@@ -1,7 +1,6 @@
 """Ollama LLM provider implementation."""
 
 import asyncio
-import contextlib
 import json
 import logging
 import re
@@ -23,20 +22,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 
-# Concurrency is now handled by the per-model gate in asclepius.llm.gate
+# Concurrency is handled by the per-model gate in asclepius.llm.gate
 # (wrapped at provider-build time in pipeline.provider_factory). This module
-# no longer needs its own semaphore.
-
-
-@contextlib.asynccontextmanager
-async def _noop_lock():
-    yield
-
-
-def _get_semaphore():
-    # Kept for source compatibility with callers that may still import it —
-    # the real gating happens at the provider-wrapper level.
-    return _noop_lock()
+# does not need its own semaphore.
 
 
 def _get_retry_config(provider=None) -> tuple[int, list[int]]:
@@ -132,18 +120,17 @@ class OllamaProvider(LLMProvider):
             body["format"] = json_schema
         elif json_mode:
             body["format"] = "json"
-        async with _get_semaphore():
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await asyncio.wait_for(
-                    client.post(
-                        f"{self.base_url}/api/chat",
-                        json=body,
-                    ),
-                    timeout=total_budget,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                return data.get("message", {}).get("content", "")
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await asyncio.wait_for(
+                client.post(
+                    f"{self.base_url}/api/chat",
+                    json=body,
+                ),
+                timeout=total_budget,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("message", {}).get("content", "")
 
     async def generate_sql(self, question: str, schema: str, context: str) -> str:
         prompt = SQL_GENERATION_PROMPT.format(schema=schema, context=context, question=question)
@@ -201,22 +188,21 @@ class OllamaProvider(LLMProvider):
         last_err = None
         for attempt in range(total_attempts):
             try:
-                async with _get_semaphore():
-                    async with httpx.AsyncClient(timeout=timeout) as client:
-                        resp = await asyncio.wait_for(
-                            client.post(
-                                f"{self.base_url}/api/generate",
-                                json=payload,
-                            ),
-                            timeout=total_budget,
-                        )
-                        resp.raise_for_status()
-                        data = resp.json()
-                        response = data.get("response", "")
-                        logger.info(
-                            "Ollama response: %d chars, model=%s", len(response), self.model
-                        )
-                        return response
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    resp = await asyncio.wait_for(
+                        client.post(
+                            f"{self.base_url}/api/generate",
+                            json=payload,
+                        ),
+                        timeout=total_budget,
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    response = data.get("response", "")
+                    logger.info(
+                        "Ollama response: %d chars, model=%s", len(response), self.model
+                    )
+                    return response
             except (
                 httpx.ReadTimeout,
                 httpx.ConnectTimeout,

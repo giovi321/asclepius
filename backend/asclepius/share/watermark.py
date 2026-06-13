@@ -183,15 +183,3 @@ def watermark_image_bytes(
     except Exception as exc:
         logger.exception("Watermark stamping failed for image: %s", file_path)
         raise WatermarkError(f"stamp failed: {file_path}") from exc
-
-
-def _guess_mime(path: Path) -> str:
-    suf = path.suffix.lower()
-    return {
-        ".pdf": "application/pdf",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".tif": "image/tiff",
-        ".tiff": "image/tiff",
-    }.get(suf, "application/octet-stream")

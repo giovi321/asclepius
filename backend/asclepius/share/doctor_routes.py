@@ -517,11 +517,10 @@ async def share_translate(
         per_share_per_hour=cfg.share.translate_per_share_per_hour,
     )
     if not allowed:
-        return Response(
+        raise HTTPException(
             status_code=429,
+            detail=f"Try again in {retry_after}s",
             headers={"Retry-After": str(retry_after)},
-            content=f'{{"detail":"Try again in {retry_after}s"}}',
-            media_type="application/json",
         )
 
     queue = getattr(request.app.state, "pipeline_queue", None)
@@ -622,11 +621,10 @@ async def share_translate_region(
         per_share_per_hour=cfg.share.translate_per_share_per_hour,
     )
     if not allowed:
-        return Response(
+        raise HTTPException(
             status_code=429,
+            detail=f"Try again in {retry_after}s",
             headers={"Retry-After": str(retry_after)},
-            content=f'{{"detail":"Try again in {retry_after}s"}}',
-            media_type="application/json",
         )
 
     queue = getattr(request.app.state, "pipeline_queue", None)

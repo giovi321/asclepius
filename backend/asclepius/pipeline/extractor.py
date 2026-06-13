@@ -463,10 +463,6 @@ _PLACEHOLDER_SENTINELS = {
     "to be determined",
 }
 
-# Backwards-compatible alias for the lab-only call sites that pre-dated
-# the broader sanitization sweep.
-_LAB_MISSING_SENTINELS = _PLACEHOLDER_SENTINELS
-
 
 def _is_missing(val) -> bool:
     """True if the LLM emitted a placeholder meaning 'no value'."""

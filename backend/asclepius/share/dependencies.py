@@ -1,16 +1,12 @@
 """FastAPI dependencies for the doctor-share auth surface.
 
-Three deps cover every share endpoint:
+``get_share_session`` covers every share endpoint — it pulls the
+``asclepius_share`` cookie, validates the session row (not revoked,
+not past TTL, share itself active, and not idle), bumps
+``last_seen_at`` so the idle clock resets, and returns the joined
+session+share dict.
 
-- ``get_share_session`` for doctor-facing endpoints — pulls the
-  ``asclepius_share`` cookie, validates the session row (not revoked,
-  not past TTL, share itself active, and not idle), bumps
-  ``last_seen_at`` so the idle clock resets, and returns the joined
-  session+share dict.
-- ``get_share_session_optional`` for endpoints that should fall back to
-  a public response when the cookie is missing.
-
-These deliberately do NOT touch the regular ``sessions`` table or the
+This deliberately does NOT touch the regular ``sessions`` table or the
 ``asclepius_session`` cookie — share auth is a parallel namespace. This
 keeps the regular auth code untouched and prevents any token-confusion
 bug where a share cookie could be promoted into a real account session.
@@ -57,26 +53,4 @@ async def get_share_session(
         await touch_session(db, sid)
     except Exception:
         pass
-    return session
-
-
-async def get_share_session_optional(
-    request: Request,
-    db: aiosqlite.Connection = Depends(get_db),
-) -> dict | None:
-    """Same as ``get_share_session`` but returns None instead of raising.
-
-    Used by the public OTP endpoints, which need to know whether a
-    session already exists (e.g. to short-circuit a refresh) but should
-    not 401 if one does not.
-    """
-    sid = request.cookies.get(SHARE_COOKIE_NAME)
-    if not sid:
-        return None
-    session = await get_session(db, sid)
-    cfg = get_config()
-    if not session or not session_active(
-        session, idle_timeout_minutes=cfg.share.idle_timeout_minutes
-    ):
-        return None
     return session

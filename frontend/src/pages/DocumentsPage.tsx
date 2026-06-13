@@ -285,20 +285,7 @@ export default function DocumentsPage() {
         facilityFilter={filters.facilityFilter}
         dateFrom={filters.dateFrom}
         dateTo={filters.dateTo}
-        onChange={(patch) => {
-          const next: Partial<typeof filters> = {};
-          if ("search" in patch) next.search = patch.search!;
-          if ("typeFilter" in patch) next.typeFilter = patch.typeFilter!;
-          if ("statusFilter" in patch) next.statusFilter = patch.statusFilter!;
-          if ("specialtyFilter" in patch)
-            next.specialtyFilter = patch.specialtyFilter!;
-          if ("doctorFilter" in patch) next.doctorFilter = patch.doctorFilter!;
-          if ("facilityFilter" in patch)
-            next.facilityFilter = patch.facilityFilter!;
-          if ("dateFrom" in patch) next.dateFrom = patch.dateFrom!;
-          if ("dateTo" in patch) next.dateTo = patch.dateTo!;
-          setFilters(next);
-        }}
+        onChange={setFilters}
         onClearAll={clearFilters}
         visibleCols={visibleCols}
         onVisibleColsChange={setVisibleCols}

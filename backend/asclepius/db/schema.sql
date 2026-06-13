@@ -535,8 +535,7 @@ CREATE INDEX IF NOT EXISTS idx_ocr_page_cache_doc ON ocr_page_cache(document_id)
 CREATE INDEX IF NOT EXISTS idx_documents_patient_id ON documents(patient_id);
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_doc_type ON documents(doc_type);
--- idx_documents_event_date is created in db/init.py after the date-column
--- migration has had a chance to add event_date on legacy databases.
+CREATE INDEX IF NOT EXISTS idx_documents_event_date ON documents(event_date);
 CREATE INDEX IF NOT EXISTS idx_documents_doctor_id ON documents(doctor_id);
 CREATE INDEX IF NOT EXISTS idx_documents_facility_id ON documents(facility_id);
 CREATE INDEX IF NOT EXISTS idx_documents_file_hash ON documents(file_hash);

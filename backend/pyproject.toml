@@ -8,7 +8,7 @@ version = "1.4.0"
 description = "Asclepius — self-hosted medical records manager"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.136.3",
+    "fastapi>=0.137.1",
     "uvicorn[standard]>=0.49.0",
     "aiosqlite>=0.22.1",
     "python-multipart>=0.0.32",
@@ -22,7 +22,7 @@ dependencies = [
     "pydicom>=3.0.2",
     "pymupdf>=1.27.2.3",
     "httpx>=0.28.1",
-    "anthropic>=0.109.1",
+    "anthropic>=0.109.2",
     "pillow>=12.2.0",
     "python-magic>=0.4.27",
     "authlib>=1.7.2",

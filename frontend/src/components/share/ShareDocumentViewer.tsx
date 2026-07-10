@@ -6,6 +6,7 @@ import shareApi from "@/api/shareClient";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePanZoomGestures } from "@/hooks/usePanZoomGestures";
+import { usePdfCanvasGhost } from "@/hooks/usePdfCanvasGhost";
 import {
   useRegionSelection,
   type NormalizedBbox,
@@ -97,6 +98,9 @@ export default function ShareDocumentViewer({
   const pageWrapperRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const coarse = usePointerCoarse();
+  // Keeps the previous render on screen while react-pdf re-renders at the
+  // new scale — without it every zoom step flashes the background.
+  const { beginGhost, endGhost } = usePdfCanvasGhost(pageWrapperRef);
 
   // In-flight pinch: CSS transform on the page wrapper only; committed to a
   // real react-pdf scale exactly once, at gesture end.
@@ -127,19 +131,22 @@ export default function ShareDocumentViewer({
         ZOOM_MIN,
         ZOOM_MAX,
       );
+      if (Math.abs(next - effectiveScale) < 0.005) return; // clamped edge
+      beginGhost();
       setScale(next);
       setUserZoomed(true);
     },
-    [effectiveScale],
+    [effectiveScale, beginGhost],
   );
 
   const resetToFit = useCallback(() => {
+    if (userZoomed) beginGhost();
     setUserZoomed(false);
     setScale(1.0);
     const wrapper = pageWrapperRef.current;
     if (wrapper) wrapper.style.transform = "";
     pendingPinchRef.current = null;
-  }, []);
+  }, [userZoomed, beginGhost]);
 
   // Tell the parent which page the doctor is currently looking at.
   useEffect(() => {
@@ -256,7 +263,10 @@ export default function ShareDocumentViewer({
   const { reset: resetSelection } = selection;
   useEffect(() => {
     resetSelection();
-  }, [pageNumber, resetSelection]);
+    // A ghost from a pending zoom would show the previous page's pixels
+    // over the incoming page — drop it on page turns.
+    endGhost();
+  }, [pageNumber, resetSelection, endGhost]);
 
   const confirmSelection = () => {
     const bbox = selection.confirm();
@@ -271,6 +281,7 @@ export default function ShareDocumentViewer({
       const wrapper = pageWrapperRef.current;
       const container = containerRef.current;
       if (!wrapper || !container) return;
+      beginGhost();
       // Focal point in wrapper coordinates for a visually-anchored preview.
       const wrapperRect = wrapper.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
@@ -292,6 +303,18 @@ export default function ShareDocumentViewer({
         ZOOM_MIN,
         ZOOM_MAX,
       );
+      if (Math.abs(next - effectiveScale) < 0.01) {
+        // No effective change → react-pdf won't re-render, so release the
+        // preview state here or the ghost would linger forever.
+        const wrapper = pageWrapperRef.current;
+        if (wrapper) {
+          wrapper.style.transform = "";
+          wrapper.style.willChange = "";
+        }
+        pendingPinchRef.current = null;
+        endGhost();
+        return;
+      }
       // The transform stays applied until the re-rendered page arrives
       // (onRenderSuccess below), so the preview never snaps back.
       setScale(next);
@@ -301,6 +324,7 @@ export default function ShareDocumentViewer({
       if (userZoomed) {
         resetToFit();
       } else {
+        beginGhost();
         pendingPinchRef.current = {
           ratio: DOUBLE_TAP_ZOOM / effectiveScale,
           focalX: x,
@@ -336,9 +360,10 @@ export default function ShareDocumentViewer({
     },
   });
 
-  // Commit point: the re-rendered page is on screen — drop the preview
-  // transform and correct scroll so the focal point stays put.
+  // Commit point: the re-rendered page is on screen — drop the ghost and
+  // the preview transform, and correct scroll so the focal point stays put.
   const handlePageRenderSuccess = useCallback(() => {
+    endGhost();
     const pending = pendingPinchRef.current;
     const wrapper = pageWrapperRef.current;
     const container = containerRef.current;
@@ -358,7 +383,7 @@ export default function ShareDocumentViewer({
       container.scrollTop = corrected.scrollTop;
     }
     pendingPinchRef.current = null;
-  }, []);
+  }, [endGhost]);
 
   if (loading) {
     return (

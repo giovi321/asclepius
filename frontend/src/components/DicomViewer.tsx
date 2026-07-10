@@ -379,6 +379,49 @@ export default function DicomViewer({
     setInvert(false);
   };
 
+  // Frame URL with debounced server-bound params: WC/WW fire on pauses,
+  // and the bicubic-upscale bucket follows the committed zoom so mid-pinch
+  // bucket flips don't refetch the frame repeatedly.
+  const frameUrl = (() => {
+    const params = new URLSearchParams();
+    if (isMR && debouncedWc != null) params.set("wc", String(debouncedWc));
+    if (isMR && debouncedWw != null) params.set("ww", String(debouncedWw));
+    if (invert) params.set("invert", "1");
+    const upscale =
+      debouncedZoom >= 5
+        ? 8
+        : debouncedZoom >= 3
+          ? 4
+          : debouncedZoom >= 1.5
+            ? 2
+            : 1;
+    if (upscale > 1) params.set("upscale", String(upscale));
+    const qs = params.toString();
+    return `/api/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}${qs ? `?${qs}` : ""}`;
+  })();
+
+  // Swapping <img src> directly blanks the viewport (black flash) until the
+  // server has rendered and delivered the new PNG — a full round-trip on
+  // every zoom bucket, windowing pause, or scrub step. Preload into an
+  // offscreen Image and only swap the visible src once decoded, so the old
+  // frame stays on screen the whole time.
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setDisplayUrl(null);
+  }, [studyId, seriesId]);
+  useEffect(() => {
+    if (totalFrames === 0) return;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) setDisplayUrl(frameUrl);
+    };
+    img.src = frameUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [frameUrl, totalFrames]);
+
   if (loading) {
     return (
       <div className="flex h-full min-h-[280px] items-center justify-center text-muted-foreground">
@@ -402,19 +445,6 @@ export default function DicomViewer({
       </div>
     );
   }
-
-  // Frame URL with debounced server-bound params: WC/WW fire on pauses,
-  // and the bicubic-upscale bucket follows the committed zoom so mid-pinch
-  // bucket flips don't refetch the frame repeatedly.
-  const params = new URLSearchParams();
-  if (isMR && debouncedWc != null) params.set("wc", String(debouncedWc));
-  if (isMR && debouncedWw != null) params.set("ww", String(debouncedWw));
-  if (invert) params.set("invert", "1");
-  const upscale =
-    debouncedZoom >= 5 ? 8 : debouncedZoom >= 3 ? 4 : debouncedZoom >= 1.5 ? 2 : 1;
-  if (upscale > 1) params.set("upscale", String(upscale));
-  const qs = params.toString();
-  const frameUrl = `/api/imaging/${studyId}/series/${seriesId}/frame/${currentFrame}${qs ? `?${qs}` : ""}`;
 
   const filteredMetaItems = (metaItems || []).filter((it) => {
     const q = metaQuery.trim().toLowerCase();
@@ -620,7 +650,7 @@ export default function DicomViewer({
         style={{ touchAction: "none" }}
       >
         <img
-          src={frameUrl}
+          src={displayUrl ?? frameUrl}
           alt={`Frame ${currentFrame + 1}`}
           draggable={false}
           className="pointer-events-none max-h-full max-w-full object-contain"

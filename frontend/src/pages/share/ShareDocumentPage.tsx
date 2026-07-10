@@ -8,6 +8,7 @@ import ShareDocumentViewer, {
 } from "@/components/share/ShareDocumentViewer";
 import ShareTranslateMenu from "@/components/share/ShareTranslateMenu";
 import ShareLogo from "@/components/share/ShareLogo";
+import RegionThumbLightbox from "@/components/RegionThumbLightbox";
 import { useToast } from "@/contexts/ToastContext";
 import { useShareSession } from "@/contexts/ShareSessionContext";
 
@@ -67,6 +68,9 @@ export default function ShareDocumentPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(
+    null,
+  );
 
   const allowedLanguages = me?.allowed_translation_languages?.length
     ? me.allowed_translation_languages
@@ -209,7 +213,9 @@ export default function ShareDocumentPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section>
+        {/* Bounded height: the viewer fills whatever its parent gives it
+            (sizing contract); dvh clamp keeps it on-screen on phones. */}
+        <section className="h-[min(700px,calc(100dvh-8rem))]">
           <ShareDocumentViewer
             documentId={doc.id}
             selectionMode={selectionMode}
@@ -280,10 +286,10 @@ export default function ShareDocumentPage() {
               <ul className="space-y-2">
                 {doc.region_translations.map((rt) => {
                   // Mirrors the admin RegionTranslationsSection: small
-                  // inline thumbnail in the header row with a hover-
-                  // preview pop, click to open the full crop. The
-                  // backend's /api/share endpoint enforces share scope
-                  // before serving the bytes.
+                  // inline thumbnail in the header row; tap opens the
+                  // in-app lightbox (no new-tab open). The backend's
+                  // /api/share endpoint enforces share scope before
+                  // serving the bytes.
                   const thumbUrl = rt.has_thumbnail
                     ? `/api/share/documents/${doc.id}/region-translations/${rt.id}/thumbnail`
                     : null;
@@ -300,26 +306,23 @@ export default function ShareDocumentPage() {
                           </span>
                         )}
                         {thumbUrl && (
-                          <a
-                            href={thumbUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group/thumb relative ml-auto block flex-shrink-0"
-                            title="Hover to preview, click to open full-size"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLightbox({
+                                src: thumbUrl,
+                                alt: `Region on page ${rt.page}`,
+                              })
+                            }
+                            className="ml-auto block flex-shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title="View full-size"
                           >
                             <img
                               src={thumbUrl}
                               alt={`Region on page ${rt.page}`}
                               className="h-7 w-12 object-cover rounded border bg-background"
                             />
-                            <div className="pointer-events-none absolute right-0 top-full mt-1 z-20 hidden rounded-md border bg-background p-1 shadow-xl group-hover/thumb:block">
-                              <img
-                                src={thumbUrl}
-                                alt=""
-                                className="max-h-64 max-w-xs object-contain"
-                              />
-                            </div>
-                          </a>
+                          </button>
                         )}
                       </div>
                       {rt.translated_text ? (
@@ -438,6 +441,15 @@ export default function ShareDocumentPage() {
           )}
         </section>
       </main>
+
+      <RegionThumbLightbox
+        open={lightbox !== null}
+        onOpenChange={(o) => {
+          if (!o) setLightbox(null);
+        }}
+        src={lightbox?.src ?? null}
+        alt={lightbox?.alt}
+      />
     </div>
   );
 }

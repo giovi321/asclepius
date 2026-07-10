@@ -206,7 +206,7 @@ export default function ReportSlot({
             Detach
           </button>
         </div>
-        <div className="rounded-lg border overflow-hidden h-[500px]">
+        <div className="rounded-lg border overflow-hidden h-[min(500px,calc(100dvh-8rem))]">
           <PdfViewer
             key={`pdf-${documentId}`}
             url={`/api/documents/${documentId}/file`}

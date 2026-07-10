@@ -194,7 +194,7 @@ function ImagingStudyBlock({
         // 720px gives the viewport enough room (toolbar + optional MR
         // controls + 400px min viewport + slider row). A shorter
         // container clips the slider thumb at the bottom.
-        <div className="rounded-md border h-[720px] mt-2 flex flex-col">
+        <div className="rounded-md border h-[min(720px,calc(100dvh-7rem))] mt-2 flex flex-col">
           <DicomViewer
             studyId={study.id}
             seriesId={activeSeriesId}

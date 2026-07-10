@@ -9,6 +9,7 @@ import {
   Info,
   X,
   Calendar,
+  Camera,
 } from "lucide-react";
 import Combobox from "@/components/ui/Combobox";
 import { usePatients, useEvents } from "@/hooks/data";
@@ -67,6 +68,12 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [uploadedDocIds, setUploadedDocIds] = useState<number[]>([]);
   const [uploadedCount, setUploadedCount] = useState(0);
+  // "Uploading {current} of {total}" — the upload loop is sequential,
+  // so the index advances one file at a time.
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   const { data: eventsData } = useEvents({
     patientId: selectedPatient?.id,
@@ -121,7 +128,8 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       let sawZip = false;
       const failures: { file: string; reason: string }[] = [];
       const duplicates: DuplicateInfo[] = [];
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
+        setUploadProgress({ current: index + 1, total: files.length });
         try {
           const form = new FormData();
           form.append("file", file);
@@ -167,6 +175,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
       }
 
       setUploading(false);
+      setUploadProgress(null);
       uploadInFlightRef.current = false;
       setUploadedCount(successCount);
       setShowFailures(false);
@@ -377,26 +386,37 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
         {uploading ? (
           <div className="text-muted-foreground">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
-            <p className="text-sm">Uploading...</p>
+            <p className="text-sm">
+              {uploadProgress
+                ? `Uploading ${uploadProgress.current} of ${uploadProgress.total}…`
+                : "Uploading…"}
+            </p>
           </div>
         ) : (
           <>
-            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground mb-1">
-              Drag & drop files here, or{" "}
-              <label className="text-primary cursor-pointer hover:underline">
-                browse
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dcm,.zip"
-                  className="hidden"
-                  onChange={(e) =>
-                    e.target.files && handleFiles(e.target.files)
-                  }
-                />
-              </label>
-            </p>
+            {/* The whole icon + headline block is the file-input label so
+                the entire headline area is tappable, not just "browse".
+                The Combobox pickers below stay OUTSIDE the label to avoid
+                nested-interactive problems. */}
+            <label className="block cursor-pointer">
+              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mb-1">
+                <span className="coarse:hidden">
+                  Drag & drop files here, or{" "}
+                  <span className="text-primary hover:underline">browse</span>
+                </span>
+                <span className="hidden coarse:inline">
+                  Tap to choose files
+                </span>
+              </p>
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.dcm,.zip"
+                className="hidden"
+                onChange={(e) => e.target.files && handleFiles(e.target.files)}
+              />
+            </label>
             <p className="text-xs text-muted-foreground">
               PDF, JPEG, PNG, TIFF, DICOM, ZIP (DICOM bundle)
               {selectedPatient && (
@@ -405,6 +425,21 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                 </span>
               )}
             </p>
+            {/* Camera capture — coarse pointers only. A separate input so
+                the main picker is never forced into camera mode (adding
+                `capture` to the multi-file input would hide the file
+                picker on Android). */}
+            <label className="mt-3 hidden coarse:inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md border px-3 py-2 text-sm hover:bg-accent active:bg-accent">
+              <Camera className="h-4 w-4" />
+              Take photo
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => e.target.files && handleFiles(e.target.files)}
+              />
+            </label>
             {selectedPatient && events.length > 0 && (
               <div className="mt-2 inline-block text-left min-w-[220px]">
                 <Combobox

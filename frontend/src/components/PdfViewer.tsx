@@ -1,15 +1,35 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import {
-  Check,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
+  RotateCcw,
+  RotateCw,
+  X,
   ZoomIn,
   ZoomOut,
-  RotateCw,
-  RotateCcw,
-  X,
 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePanZoomGestures } from "@/hooks/usePanZoomGestures";
+import {
+  useRegionSelection,
+  type NormalizedBbox,
+} from "@/hooks/useRegionSelection";
+import { usePointerCoarse } from "@/hooks/useMediaQuery";
+import { clampScale, focalScrollAfterZoom } from "@/lib/gestureMath";
+import SelectionOverlay, {
+  SelectionActionBar,
+} from "@/components/viewer/SelectionOverlay";
+import IconButton from "@/components/ui/IconButton";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
+} from "@/components/ui/Menu";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -19,48 +39,43 @@ import "react-pdf/dist/Page/TextLayer.css";
 // instead of the entry bundle.
 import "@/lib/pdfWorker";
 
-/** Bbox in normalized [0,1] coords relative to the rendered page. */
-export interface NormalizedBbox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+export type { NormalizedBbox };
 
 interface PdfViewerProps {
   url: string;
-  /** Called when user clicks a rotate button. Receives degrees (90 or 270) and page numbers (null = all). */
+  /** Called when user picks a rotate action. Receives degrees (90 or 270) and page numbers (null = all). */
   onRotate?: (degrees: number, pages: number[] | null) => Promise<void>;
-  /** When true, click-and-drag draws a selection rectangle on the current
-   * page instead of panning. The rectangle is shown with confirm/cancel
+  /** When true, dragging draws a selection rectangle on the current page
+   * instead of panning. The rectangle is shown with confirm/cancel
    * controls; ``onSelectionConfirm`` fires only when the user accepts. */
   selectionMode?: boolean;
   /** Called when the user confirms a selection. Bbox is normalized [0,1]. */
   onSelectionConfirm?: (page: number, bbox: NormalizedBbox) => void;
-  /** Called when the user cancels selection mode (clicks the X or hits Esc). */
+  /** Called when the user cancels selection mode (X button or Esc). */
   onSelectionCancel?: () => void;
 }
 
-/**
- * Hook that debounces a value — the returned value only updates after
- * `delay` ms of inactivity.  This prevents rapid zoom clicks from
- * flooding react-pdf with concurrent render requests that crash the
- * pdf.js worker.
- */
-function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
-// Zoom constraints + step. Ctrl+wheel and the toolbar buttons share these.
+// Zoom constraints + steps. Pinch, Ctrl+wheel, and the toolbar share these.
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3.0;
 const WHEEL_ZOOM_STEP = 0.1;
+const BUTTON_ZOOM_STEP = 0.2;
+const DOUBLE_TAP_ZOOM = 2.0;
 
+/**
+ * Admin PDF viewer.
+ *
+ * Interaction model (same architecture as ShareDocumentViewer):
+ * - Fit-to-width default; pinch zooms via a CSS-transform preview with one
+ *   committed react-pdf re-render per gesture (rapid scale changes crash
+ *   the pdf.js worker — the commit rides a 150ms debounce).
+ * - Fit zoom: native vertical scrolling (touch-action: pan-y), horizontal
+ *   swipe turns pages. Zoomed: native two-axis panning owns all drags.
+ * - Desktop: mouse drag-pan, Ctrl+wheel / toolbar zoom, click-toggle
+ *   rotate menu (the old hover-only menu was dead on touch).
+ * - Selection mode: touch-action none, one-pointer draw with corner-handle
+ *   refinement; confirm bar pinned to the frame bottom on coarse pointers.
+ */
 export default function PdfViewer({
   url,
   onRotate,
@@ -75,10 +90,8 @@ export default function PdfViewer({
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   // Natural page width in CSS pixels at scale 1.0 — captured from the
   // page's onLoadSuccess. Used to derive the effective scale of the
-  // current "Fit" rendering so the +/- buttons can step from there
-  // instead of jumping to an absolute ``scale`` of 1.0 + step. Without
-  // this the first zoom click on a landscape page in a wide column
-  // shrinks the page (fit-equivalent ~1.5 → user click drops to 1.2).
+  // current "Fit" rendering so the +/- buttons and pinch step from there
+  // instead of jumping to an absolute ``scale``.
   const [pageOriginalWidth, setPageOriginalWidth] = useState<number | null>(
     null,
   );
@@ -87,135 +100,23 @@ export default function PdfViewer({
   const [error, setError] = useState<string | null>(null);
   const [, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
-  const [showAllMenu, setShowAllMenu] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
-  const panOriginRef = useRef<{
-    x: number;
-    y: number;
-    scrollLeft: number;
-    scrollTop: number;
+  const coarse = usePointerCoarse();
+
+  // In-flight pinch preview; committed once at gesture end.
+  const pendingPinchRef = useRef<{
+    ratio: number;
+    focalX: number;
+    focalY: number;
   } | null>(null);
 
-  // Selection rectangle, in page-local pixel coords. ``drawingRect`` is
-  // the in-flight drag; ``lockedRect`` is what stays after mouseup so the
-  // confirm/cancel toolbar can render without flicker.
-  type SelectionRect = { x: number; y: number; w: number; h: number };
-  const [drawingRect, setDrawingRect] = useState<SelectionRect | null>(null);
-  const [lockedRect, setLockedRect] = useState<SelectionRect | null>(null);
-  const drawOriginRef = useRef<{ x: number; y: number } | null>(null);
-
-  // Clear selection when the user changes pages or exits selection mode.
-  useEffect(() => {
-    setDrawingRect(null);
-    setLockedRect(null);
-    drawOriginRef.current = null;
-  }, [pageNumber, selectionMode]);
-
-  // Esc cancels selection mode entirely.
-  useEffect(() => {
-    if (!selectionMode) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setDrawingRect(null);
-        setLockedRect(null);
-        drawOriginRef.current = null;
-        onSelectionCancel?.();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [selectionMode, onSelectionCancel]);
-
-  // Drag-to-draw selection. Mouse handlers are bound to the page wrapper
-  // (not the outer container) so we can use its bounding rect to convert
-  // clientX/Y to page-local coords.
-  const handleSelectionStart = useCallback(
-    (e: React.MouseEvent) => {
-      if (!selectionMode) return;
-      if (e.button !== 0) return;
-      const wrapper = pageWrapperRef.current;
-      if (!wrapper) return;
-      const rect = wrapper.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      drawOriginRef.current = { x, y };
-      setDrawingRect({ x, y, w: 0, h: 0 });
-      setLockedRect(null);
-      e.preventDefault();
-      e.stopPropagation();
-    },
-    [selectionMode],
-  );
-
-  useEffect(() => {
-    if (!drawingRect) return;
-    const onMove = (e: MouseEvent) => {
-      const origin = drawOriginRef.current;
-      const wrapper = pageWrapperRef.current;
-      if (!origin || !wrapper) return;
-      const rect = wrapper.getBoundingClientRect();
-      const cx = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-      const cy = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
-      const x = Math.min(origin.x, cx);
-      const y = Math.min(origin.y, cy);
-      const w = Math.abs(cx - origin.x);
-      const h = Math.abs(cy - origin.y);
-      setDrawingRect({ x, y, w, h });
-    };
-    const onUp = () => {
-      const final = drawingRect;
-      drawOriginRef.current = null;
-      setDrawingRect(null);
-      // Ignore tiny click-without-drag rectangles.
-      if (final && final.w >= 6 && final.h >= 6) {
-        setLockedRect(final);
-      } else {
-        setLockedRect(null);
-      }
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [drawingRect]);
-
-  const confirmSelection = () => {
-    const wrapper = pageWrapperRef.current;
-    const rect = lockedRect;
-    if (!wrapper || !rect) return;
-    const wrapperRect = wrapper.getBoundingClientRect();
-    if (wrapperRect.width <= 0 || wrapperRect.height <= 0) return;
-    const bbox: NormalizedBbox = {
-      x: rect.x / wrapperRect.width,
-      y: rect.y / wrapperRect.height,
-      w: rect.w / wrapperRect.width,
-      h: rect.h / wrapperRect.height,
-    };
-    setLockedRect(null);
-    onSelectionConfirm?.(pageNumber, bbox);
-  };
-
-  const cancelSelection = () => {
-    setLockedRect(null);
-    setDrawingRect(null);
-    drawOriginRef.current = null;
-    onSelectionCancel?.();
-  };
-
-  const activeRect = lockedRect ?? drawingRect;
-
-  // Debounce the scale so rapid zoom clicks don't flood the worker
+  // Debounce the scale so rapid zoom changes don't flood the worker.
   const debouncedScale = useDebouncedValue(scale, 150);
 
   /** Effective scale currently rendered. In user-zoom mode that's just
    * ``scale``; in fit mode it's containerWidth / originalWidth — the
-   * implicit scale react-pdf computes when ``width`` is set instead of
-   * ``scale``. Used as the basis for the next +/- step so a click after
-   * Fit doesn't jump to an absolute scale that's smaller than what the
-   * user is currently looking at. */
+   * implicit scale react-pdf computes when ``width`` is set. */
   const effectiveScale = (() => {
     if (userZoomed) return scale;
     if (containerWidth && pageOriginalWidth) {
@@ -224,83 +125,132 @@ export default function PdfViewer({
     return 1.0;
   })();
 
-  const stepZoom = (delta: number) => {
-    const next = Math.max(
-      ZOOM_MIN,
-      Math.min(ZOOM_MAX, +(effectiveScale + delta).toFixed(2)),
-    );
-    setScale(next);
-    setUserZoomed(true);
-  };
-
-  // Ctrl+wheel zooms (mirrors DicomViewer's pattern). Native listener with
-  // passive:false because React's synthetic onWheel is passive in modern
-  // React and can't preventDefault — without that the browser intercepts
-  // ctrl+wheel as page-level zoom.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const handleWheel = (e: WheelEvent) => {
-      // ctrlKey is also true on macOS pinch-to-zoom trackpad gestures, so
-      // pinch zoom comes for free. metaKey covers the same intent on Mac
-      // when a real ctrl-equivalent (cmd) is held.
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
-      const delta = e.deltaY < 0 ? WHEEL_ZOOM_STEP : -WHEEL_ZOOM_STEP;
-      stepZoom(delta);
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
-    // stepZoom closes over effectiveScale, so we need it as a dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveScale]);
-
-  // Click-and-drag pan. The viewer uses overflow:auto so panning is just
-  // adjusting scrollLeft/scrollTop. Bound to the container so toolbar
-  // buttons (which sit outside this div) keep their normal click
-  // behaviour. Text selection via drag is sacrificed in favour of
-  // pan-as-default — the user can still cursor-select via single click +
-  // shift-click or double-click word-select.
-  const handlePanStart = useCallback(
-    (e: React.MouseEvent) => {
-      if (selectionMode) return;
-      if (e.button !== 0) return;
-      const el = containerRef.current;
-      if (!el) return;
-      panOriginRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        scrollLeft: el.scrollLeft,
-        scrollTop: el.scrollTop,
-      };
-      setIsPanning(true);
-      e.preventDefault();
+  const stepZoom = useCallback(
+    (delta: number) => {
+      const next = clampScale(
+        +(effectiveScale + delta).toFixed(2),
+        ZOOM_MIN,
+        ZOOM_MAX,
+      );
+      setScale(next);
+      setUserZoomed(true);
     },
-    [selectionMode],
+    [effectiveScale],
   );
 
-  // mousemove + mouseup live on the window so a fast drag that exits the
-  // viewport doesn't strand the panning state.
+  const resetToFit = useCallback(() => {
+    setUserZoomed(false);
+    setScale(1.0);
+    const wrapper = pageWrapperRef.current;
+    if (wrapper) wrapper.style.transform = "";
+    pendingPinchRef.current = null;
+  }, []);
+
+  // Region selection (shared pointer-based hook).
+  const selection = useRegionSelection({
+    wrapperRef: pageWrapperRef,
+    enabled: selectionMode,
+    onCancel: onSelectionCancel,
+  });
+  const { reset: resetSelection } = selection;
   useEffect(() => {
-    if (!isPanning) return;
-    const onMove = (e: MouseEvent) => {
-      const origin = panOriginRef.current;
+    resetSelection();
+  }, [pageNumber, resetSelection]);
+
+  const confirmSelection = () => {
+    const bbox = selection.confirm();
+    if (bbox) onSelectionConfirm?.(pageNumber, bbox);
+  };
+
+  // Pinch / drag / swipe / double-tap / wheel.
+  usePanZoomGestures({
+    targetRef: containerRef,
+    disabled: selectionMode,
+    onPinch: ({ ratio, focalX, focalY }) => {
+      const wrapper = pageWrapperRef.current;
+      const container = containerRef.current;
+      if (!wrapper || !container) return;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const ox = focalX + containerRect.left - wrapperRect.left;
+      const oy = focalY + containerRect.top - wrapperRect.top;
+      const clampedRatio =
+        clampScale(effectiveScale * ratio, ZOOM_MIN, ZOOM_MAX) /
+        effectiveScale;
+      wrapper.style.transformOrigin = `${ox}px ${oy}px`;
+      wrapper.style.transform = `scale(${clampedRatio})`;
+      wrapper.style.willChange = "transform";
+      pendingPinchRef.current = { ratio: clampedRatio, focalX, focalY };
+    },
+    onPinchEnd: () => {
+      const pending = pendingPinchRef.current;
+      if (!pending) return;
+      const next = clampScale(
+        +(effectiveScale * pending.ratio).toFixed(2),
+        ZOOM_MIN,
+        ZOOM_MAX,
+      );
+      setScale(next);
+      setUserZoomed(true);
+    },
+    onDoubleTap: ({ x, y }) => {
+      if (userZoomed) {
+        resetToFit();
+      } else {
+        pendingPinchRef.current = {
+          ratio: DOUBLE_TAP_ZOOM / effectiveScale,
+          focalX: x,
+          focalY: y,
+        };
+        setScale(clampScale(DOUBLE_TAP_ZOOM, ZOOM_MIN, ZOOM_MAX));
+        setUserZoomed(true);
+      }
+    },
+    onSwipe: (dir) => {
+      if (userZoomed) return;
+      if (dir === "left") setPageNumber((p) => Math.min(numPages, p + 1));
+      else setPageNumber((p) => Math.max(1, p - 1));
+    },
+    onDrag: ({ dx, dy, first, last, pointerType }) => {
+      // Mouse drag-pan; touch pans natively via touch-action.
+      if (pointerType !== "mouse") return;
       const el = containerRef.current;
-      if (!origin || !el) return;
-      el.scrollLeft = origin.scrollLeft - (e.clientX - origin.x);
-      el.scrollTop = origin.scrollTop - (e.clientY - origin.y);
-    };
-    const onUp = () => {
-      setIsPanning(false);
-      panOriginRef.current = null;
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [isPanning]);
+      if (!el) return;
+      if (first) setIsPanning(true);
+      if (last) {
+        setIsPanning(false);
+        return;
+      }
+      el.scrollLeft -= dx;
+      el.scrollTop -= dy;
+    },
+    wheel: {
+      onZoom: (dir) => stepZoom(dir * WHEEL_ZOOM_STEP),
+    },
+  });
+
+  // Commit point for the pinch preview.
+  const handlePageRenderSuccess = useCallback(() => {
+    const pending = pendingPinchRef.current;
+    const wrapper = pageWrapperRef.current;
+    const container = containerRef.current;
+    if (wrapper) {
+      wrapper.style.transform = "";
+      wrapper.style.willChange = "";
+    }
+    if (pending && container) {
+      const corrected = focalScrollAfterZoom({
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop,
+        focalX: pending.focalX,
+        focalY: pending.focalY,
+        ratio: pending.ratio,
+      });
+      container.scrollLeft = corrected.scrollLeft;
+      container.scrollTop = corrected.scrollTop;
+    }
+    pendingPinchRef.current = null;
+  }, []);
 
   // Build the file URL with cache-busting parameter
   const fileUrl =
@@ -364,7 +314,6 @@ export default function PdfViewer({
   const handleRotate = async (degrees: number, mode: "page" | "all") => {
     if (!onRotate || rotating) return;
     setRotating(true);
-    setShowAllMenu(false);
     try {
       const pages = mode === "page" ? [pageNumber] : null;
       await onRotate(degrees, pages);
@@ -378,129 +327,124 @@ export default function PdfViewer({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="relative flex h-full min-h-0 flex-col">
       {/* Controls */}
-      <div className="flex items-center justify-between border-b px-3 py-2 bg-muted/30 gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-surface px-2 py-1">
         {/* Page navigation */}
-        <div className="flex items-center gap-1.5">
-          <button
+        <div className="flex items-center gap-0.5">
+          <IconButton
+            label="Previous page"
+            size="md"
             onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
             disabled={pageNumber <= 1}
-            className="rounded p-1.5 hover:bg-accent disabled:opacity-30"
-            title="Previous page"
+            className="disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-sm text-muted-foreground min-w-[60px] text-center">
+          </IconButton>
+          <span className="min-w-[60px] text-center text-sm tabular-nums text-muted-foreground">
             {pageNumber} / {numPages}
           </span>
-          <button
+          <IconButton
+            label="Next page"
+            size="md"
             onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
             disabled={pageNumber >= numPages}
-            className="rounded p-1.5 hover:bg-accent disabled:opacity-30"
-            title="Next page"
+            className="disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </IconButton>
         </div>
 
         {/* Zoom + Rotate */}
-        <div className="flex items-center gap-1">
-          {/* Zoom */}
-          <button
-            onClick={() => stepZoom(-0.2)}
-            className="rounded p-1.5 hover:bg-accent"
-            title="Zoom out (Ctrl + scroll)"
+        <div className="flex items-center gap-0.5">
+          <IconButton
+            label="Zoom out"
+            size="md"
+            onClick={() => stepZoom(-BUTTON_ZOOM_STEP)}
           >
             <ZoomOut className="h-4 w-4" />
-          </button>
-          <span
-            className="text-sm text-muted-foreground min-w-[40px] text-center"
-            title="Hold Ctrl + scroll to zoom; click and drag to pan"
-          >
-            {userZoomed ? `${Math.round(scale * 100)}%` : "Fit"}
-          </span>
+          </IconButton>
           <button
-            onClick={() => stepZoom(0.2)}
-            className="rounded p-1.5 hover:bg-accent"
-            title="Zoom in (Ctrl + scroll)"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          {/* Fit button — always rendered to prevent layout shift */}
-          <button
-            onClick={() => {
-              setUserZoomed(false);
-              setScale(1.0);
-            }}
+            onClick={resetToFit}
             disabled={!userZoomed}
-            className={`rounded px-1.5 py-1 text-[11px] transition-colors ${
+            className={cn(
+              "min-w-[44px] rounded-md px-1 py-2 text-center text-sm transition-colors coarse:min-h-11",
               userZoomed
                 ? "text-primary hover:bg-accent hover:text-foreground"
-                : "text-muted-foreground/40 cursor-default"
-            }`}
+                : "cursor-default text-muted-foreground",
+            )}
             title="Fit to width"
           >
-            Fit
+            {userZoomed ? `${Math.round(scale * 100)}%` : "Fit"}
           </button>
+          <IconButton
+            label="Zoom in"
+            size="md"
+            onClick={() => stepZoom(BUTTON_ZOOM_STEP)}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </IconButton>
 
           {/* Rotate controls */}
           {onRotate && (
             <>
-              <div className="w-px h-5 bg-border mx-1.5" />
+              <div className="mx-1.5 h-5 w-px bg-border" />
 
-              <button
+              {/* Per-page rotate: inline from md up, in the menu below md. */}
+              <IconButton
+                label="Rotate this page 90° left"
+                size="md"
                 onClick={() => handleRotate(270, "page")}
                 disabled={rotating}
-                className="rounded p-1.5 hover:bg-accent disabled:opacity-30"
-                title="Rotate this page 90° left"
+                className="hidden disabled:opacity-30 md:inline-flex"
               >
                 <RotateCcw className="h-4 w-4" />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
+                label="Rotate this page 90° right"
+                size="md"
                 onClick={() => handleRotate(90, "page")}
                 disabled={rotating}
-                className="rounded p-1.5 hover:bg-accent disabled:opacity-30"
-                title="Rotate this page 90° right"
+                className="hidden disabled:opacity-30 md:inline-flex"
               >
                 <RotateCw className="h-4 w-4" />
-              </button>
+              </IconButton>
 
-              {/* "All pages" rotate — click-to-toggle dropdown */}
-              <div
-                className="relative"
-                onMouseLeave={() => setShowAllMenu(false)}
-              >
-                <button
-                  onClick={() => setShowAllMenu(!showAllMenu)}
-                  onMouseEnter={() => setShowAllMenu(true)}
-                  disabled={rotating}
-                  className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 transition-colors"
-                  title="Rotate all pages"
-                >
-                  All
-                </button>
-                {showAllMenu && (
-                  <div className="absolute right-0 top-full pt-1 z-20">
-                    <div className="rounded-lg border bg-white dark:bg-zinc-900 p-1.5 shadow-xl flex gap-1">
-                      <button
-                        onClick={() => handleRotate(270, "all")}
-                        disabled={rotating}
-                        className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" /> All 90° left
-                      </button>
-                      <button
-                        onClick={() => handleRotate(90, "all")}
-                        disabled={rotating}
-                        className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs hover:bg-accent whitespace-nowrap disabled:opacity-30"
-                      >
-                        <RotateCw className="h-3.5 w-3.5" /> All 90° right
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* Click-toggle menu (the old hover-open dropdown was
+                  unreachable on touch). Carries everything below md. */}
+              <Menu>
+                <MenuTrigger asChild>
+                  <IconButton
+                    label="Rotate options"
+                    size="md"
+                    disabled={rotating}
+                    className="disabled:opacity-30"
+                  >
+                    <MoreHorizontal className="h-4 w-4 md:hidden" />
+                    <span className="hidden text-[11px] md:inline">All</span>
+                  </IconButton>
+                </MenuTrigger>
+                <MenuContent align="end">
+                  <MenuItem
+                    onSelect={() => handleRotate(270, "page")}
+                    className="md:hidden"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" /> This page 90° left
+                  </MenuItem>
+                  <MenuItem
+                    onSelect={() => handleRotate(90, "page")}
+                    className="md:hidden"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" /> This page 90° right
+                  </MenuItem>
+                  <MenuItem onSelect={() => handleRotate(270, "all")}>
+                    <RotateCcw className="h-3.5 w-3.5" /> All pages 90° left
+                  </MenuItem>
+                  <MenuItem onSelect={() => handleRotate(90, "all")}>
+                    <RotateCw className="h-3.5 w-3.5" /> All pages 90° right
+                  </MenuItem>
+                </MenuContent>
+              </Menu>
             </>
           )}
         </div>
@@ -508,36 +452,44 @@ export default function PdfViewer({
 
       {/* Selection-mode hint banner */}
       {selectionMode && (
-        <div className="flex items-center justify-between gap-2 border-b bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-200">
+        <div className="flex items-center justify-between gap-2 border-b border-warning/25 bg-warning-soft px-3 py-1.5 text-xs text-warning">
           <span>
-            Click and drag on page {pageNumber} to select a region. Press Esc to
-            cancel.
+            Drag on page {pageNumber} to select a region.
+            <span className="hidden sm:inline"> Press Esc to cancel.</span>
           </span>
-          <button
-            onClick={cancelSelection}
-            className="rounded p-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-            title="Cancel selection"
+          <IconButton
+            label="Cancel selection"
+            size="sm"
+            onClick={selection.cancel}
+            className="text-warning hover:bg-warning/10"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </IconButton>
         </div>
       )}
 
       {/* PDF display */}
       <div
         ref={containerRef}
-        onMouseDown={handlePanStart}
-        className={`flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto ${
+        className={cn(
+          "flex-1 overflow-auto bg-muted/20 p-4 [&>div]:mx-auto",
           selectionMode
             ? "cursor-crosshair"
             : isPanning
               ? "cursor-grabbing select-none [&_*]:cursor-grabbing"
-              : "cursor-grab"
-        }`}
+              : "cursor-grab",
+        )}
+        style={{
+          touchAction: selectionMode
+            ? "none"
+            : userZoomed
+              ? "pan-x pan-y"
+              : "pan-y",
+        }}
       >
         {error ? (
           <div className="flex flex-col items-center gap-3 py-8">
-            <div className="text-destructive text-sm">{error}</div>
+            <div className="text-sm text-destructive">{error}</div>
             <button
               onClick={() => {
                 setError(null);
@@ -556,7 +508,7 @@ export default function PdfViewer({
             onLoadSuccess={onDocumentLoadSuccess}
             onLoadError={onDocumentLoadError}
             loading={
-              <div className="text-muted-foreground text-sm py-8">
+              <div className="py-8 text-sm text-muted-foreground">
                 Loading PDF...
               </div>
             }
@@ -564,7 +516,7 @@ export default function PdfViewer({
           >
             <div
               ref={pageWrapperRef}
-              onMouseDown={handleSelectionStart}
+              onPointerDown={selection.startDraw}
               className="relative inline-block"
             >
               <Page
@@ -577,66 +529,55 @@ export default function PdfViewer({
                 renderTextLayer={!selectionMode}
                 renderAnnotationLayer={!selectionMode}
                 onRenderError={onPageRenderError}
+                onRenderSuccess={handlePageRenderSuccess}
                 onLoadSuccess={(p) => {
                   // ``originalWidth`` is the page's natural CSS-pixel width
-                  // at scale 1.0. Stashing it lets stepZoom convert the
-                  // fit-mode rendering into an equivalent scale before
-                  // applying the next +/- step (see effectiveScale above).
+                  // at scale 1.0; basis for effectiveScale in fit mode.
                   if (p?.originalWidth) {
                     setPageOriginalWidth(p.originalWidth);
                   }
                 }}
                 loading={
-                  <div className="text-muted-foreground text-sm py-8">
+                  <div className="py-8 text-sm text-muted-foreground">
                     Rendering page...
                   </div>
                 }
               />
-              {selectionMode && activeRect && (
-                <div
-                  className="pointer-events-none absolute border-2 border-amber-500 bg-amber-400/20"
-                  style={{
-                    left: activeRect.x,
-                    top: activeRect.y,
-                    width: activeRect.w,
-                    height: activeRect.h,
-                  }}
+              {selectionMode && (
+                <SelectionOverlay
+                  rect={selection.activeRect}
+                  locked={Boolean(selection.lockedRect)}
+                  onStartResize={selection.startResize}
                 />
               )}
-              {selectionMode && lockedRect && (
-                <div
-                  className="absolute z-10 flex gap-1"
-                  style={{
-                    left: lockedRect.x,
-                    top: lockedRect.y + lockedRect.h + 4,
+              {selectionMode && selection.lockedRect && !coarse && (
+                <SelectionActionBar
+                  visible
+                  variant="floating"
+                  confirmLabel="Translate this region"
+                  onConfirm={confirmSelection}
+                  onCancel={selection.cancel}
+                  position={{
+                    left: selection.lockedRect.x,
+                    top: selection.lockedRect.y + selection.lockedRect.h + 4,
                   }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      confirmSelection();
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground shadow-lg hover:bg-primary/90"
-                  >
-                    <Check className="h-3 w-3" /> Translate this region
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cancelSelection();
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs shadow-lg hover:bg-accent"
-                  >
-                    <X className="h-3 w-3" /> Cancel
-                  </button>
-                </div>
+                />
               )}
             </div>
           </Document>
         )}
       </div>
+
+      {/* Thumb-reach confirm bar on touch devices. */}
+      {selectionMode && coarse && (
+        <SelectionActionBar
+          visible={Boolean(selection.lockedRect)}
+          variant="bar"
+          confirmLabel="Translate this region"
+          onConfirm={confirmSelection}
+          onCancel={selection.cancel}
+        />
+      )}
     </div>
   );
 }

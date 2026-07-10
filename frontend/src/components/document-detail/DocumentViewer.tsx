@@ -329,7 +329,7 @@ export default function DocumentViewer({
 
   if (fp.endsWith(".pdf") || fn.endsWith(".pdf")) {
     return (
-      <div className="rounded-lg border overflow-hidden h-[700px]">
+      <div className="rounded-lg border overflow-hidden h-[min(700px,calc(100dvh-8rem))]">
         <PdfViewer
           key={`pdf-${id}`}
           url={`/api/documents/${id}/file`}

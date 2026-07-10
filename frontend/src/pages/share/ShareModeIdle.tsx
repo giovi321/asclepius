@@ -12,7 +12,7 @@ import ShareLogo from "@/components/share/ShareLogo";
  */
 export default function ShareModeIdle() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-950">
+    <div className="min-h-dvh flex items-center justify-center bg-stone-950">
       <ShareLogo size="lg" />
     </div>
   );

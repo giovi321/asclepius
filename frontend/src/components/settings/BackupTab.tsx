@@ -249,25 +249,25 @@ export default function BackupTab() {
         <div className="space-y-2">
           <span className="text-sm font-medium">What to back up</span>
           <div className="flex flex-col gap-2 rounded-md border bg-background p-3">
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm coarse:min-h-11">
               <input
                 type="checkbox"
                 checked={form.include_database}
                 onChange={(e) =>
                   setForm({ ...form, include_database: e.target.checked })
                 }
-                className="h-4 w-4 rounded"
+                className="h-4 w-4 rounded coarse:h-5 coarse:w-5"
               />
               <span>Database (SQLite snapshot)</span>
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 text-sm coarse:min-h-11">
               <input
                 type="checkbox"
                 checked={form.include_vault}
                 onChange={(e) =>
                   setForm({ ...form, include_vault: e.target.checked })
                 }
-                className="h-4 w-4 rounded"
+                className="h-4 w-4 rounded coarse:h-5 coarse:w-5"
               />
               <span>Vault (document files)</span>
             </label>
@@ -296,7 +296,7 @@ export default function BackupTab() {
             {RETENTION_OPTIONS.map((opt) => (
               <label
                 key={opt.value}
-                className="flex items-center gap-2 text-sm"
+                className="flex items-center gap-2 text-sm coarse:min-h-11"
               >
                 <input
                   type="radio"
@@ -309,7 +309,7 @@ export default function BackupTab() {
                       retention_mode: opt.value as RetentionMode,
                     })
                   }
-                  className="h-4 w-4"
+                  className="h-4 w-4 coarse:h-5 coarse:w-5"
                 />
                 <span>{opt.label}</span>
               </label>
@@ -332,7 +332,7 @@ export default function BackupTab() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-1">
           <span>
             Last run:{" "}
             <span className="font-mono">
@@ -343,7 +343,7 @@ export default function BackupTab() {
             type="button"
             onClick={runNow}
             disabled={running || !scopeOk}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50 coarse:min-h-11"
           >
             {running ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -367,7 +367,7 @@ export default function BackupTab() {
           </h3>
           <button
             onClick={loadFiles}
-            className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
+            className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent coarse:min-h-11"
           >
             <RefreshCw className="h-3 w-3" /> Refresh
           </button>
@@ -407,17 +407,18 @@ export default function BackupTab() {
                       {f.created_at.replace("T", " ")}
                     </td>
                     <td className="py-2 pr-2 whitespace-nowrap text-right">
-                      <div className="inline-flex gap-1">
+                      <div className="inline-flex items-center gap-1">
                         <button
                           onClick={() => downloadFile(f)}
-                          className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent"
+                          className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent coarse:min-h-11"
                           title="Download"
                         >
                           <Download className="h-3 w-3" /> Download
                         </button>
                         <button
                           onClick={() => deleteFile(f)}
-                          className="rounded p-1 text-muted-foreground hover:text-destructive"
+                          aria-label="Delete backup file"
+                          className="flex items-center justify-center rounded p-1 text-muted-foreground hover:text-destructive coarse:min-h-11 coarse:min-w-11"
                           title="Delete"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -442,7 +443,7 @@ export default function BackupTab() {
         <button
           onClick={downloadOneShot}
           disabled={downloadingOneShot}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-50 coarse:min-h-11"
         >
           <Download className="h-4 w-4" />
           {downloadingOneShot ? "Downloading..." : "Download database backup"}

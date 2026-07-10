@@ -1,4 +1,5 @@
 import { Loader2, Trash2 } from "lucide-react";
+import Button from "@/components/ui/Button";
 import Sheet from "@/components/ui/Sheet";
 
 export interface LinkedDocumentsModalProps {
@@ -34,19 +35,13 @@ export default function LinkedDocumentsModal({
           <p className="text-sm text-muted-foreground">
             No documents reference this entry. It's safe to delete.
           </p>
-          <div className="flex gap-2">
-            <button
-              onClick={onDelete}
-              className="inline-flex items-center gap-1 rounded-md bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90"
-            >
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="danger" onClick={onDelete}>
               <Trash2 className="h-3 w-3" /> Delete "{subjectName}"
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
-            >
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -55,7 +50,7 @@ export default function LinkedDocumentsModal({
             <a
               key={d.id}
               href={`/documents/${d.id}`}
-              className="flex flex-col gap-0.5 px-3 py-2 text-sm hover:bg-accent"
+              className="flex flex-col justify-center gap-0.5 px-3 py-2 text-sm hover:bg-accent coarse:min-h-11"
             >
               <span className="font-medium truncate">
                 {d.original_filename || `Document #${d.id}`}

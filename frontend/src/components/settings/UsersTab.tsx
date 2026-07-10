@@ -7,6 +7,10 @@ import { Plus, Trash2, ScrollText, UserCog, Check } from "lucide-react";
 import { usePatients } from "@/hooks/data";
 import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Badge, { type BadgeVariant } from "@/components/ui/Badge";
 
 interface Patient {
   id: number;
@@ -136,87 +140,73 @@ export default function UsersTab() {
     setUsers(users.map((u) => (u.id === userId ? { ...u, role } : u)));
   };
 
-  const roleBadgeClass = (role: string) => {
+  const roleBadgeVariant = (role: string): BadgeVariant => {
     switch (role) {
       case "admin":
-        return "bg-red-500/15 text-red-700 dark:text-red-300";
+        return "destructive";
       case "editor":
-        return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
-      case "viewer":
-        return "bg-slate-500/15 text-slate-700 dark:text-slate-300";
+        return "info";
       default:
-        return "bg-muted text-muted-foreground";
+        return "neutral";
     }
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-medium">User Management</h3>
-        <div className="flex gap-2">
-          <button
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
             onClick={() => {
               setShowAudit(!showAudit);
               if (!showAudit) loadAuditLog();
             }}
-            className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
           >
-            <ScrollText className="h-4 w-4" />{" "}
+            <ScrollText className="h-4 w-4" />
             {showAudit ? "Hide Audit Log" : "Audit Log"}
-          </button>
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
-          >
+          </Button>
+          <Button onClick={() => setShowCreate(!showCreate)}>
             <Plus className="h-4 w-4" /> Add User
-          </button>
+          </Button>
         </div>
       </div>
 
       {showCreate && (
         <div className="rounded-lg border p-4 space-y-3 max-w-md">
-          <input
+          <Input
             type="text"
             placeholder="Username"
             value={newUser.username}
             onChange={(e) =>
               setNewUser({ ...newUser, username: e.target.value })
             }
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           />
-          <input
+          <Input
             type="password"
             placeholder="Password"
             value={newUser.password}
             onChange={(e) =>
               setNewUser({ ...newUser, password: e.target.value })
             }
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           />
-          <input
+          <Input
             type="text"
             placeholder="Display Name"
             value={newUser.display_name}
             onChange={(e) =>
               setNewUser({ ...newUser, display_name: e.target.value })
             }
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           />
-          <select
+          <Select
             value={newUser.role}
             onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           >
             <option value="admin">Admin</option>
             <option value="editor">Editor</option>
             <option value="viewer">Viewer</option>
-          </select>
-          <button
-            onClick={createUser}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
-          >
-            Create
-          </button>
+          </Select>
+          <Button onClick={createUser}>Create</Button>
         </div>
       )}
 
@@ -234,7 +224,8 @@ export default function UsersTab() {
         </p>
       </div>
 
-      <div className="rounded-lg border">
+      {/* md+ table */}
+      <div className="hidden rounded-lg border md:block">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
             <tr>
@@ -257,11 +248,9 @@ export default function UsersTab() {
                   <td className="px-4 py-2">{u.display_name}</td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${roleBadgeClass(u.role || "editor")}`}
-                      >
+                      <Badge variant={roleBadgeVariant(u.role || "editor")}>
                         {u.role || "editor"}
-                      </span>
+                      </Badge>
                       <select
                         value={u.role || "editor"}
                         onChange={(e) => updateRole(u.id, e.target.value)}
@@ -279,34 +268,7 @@ export default function UsersTab() {
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {u.role === "admin" ? (
-                        <span className="text-xs italic text-muted-foreground">
-                          all patients (admin)
-                        </span>
-                      ) : userGrants.length === 0 ? (
-                        <span className="text-xs italic text-muted-foreground">
-                          no access
-                        </span>
-                      ) : (
-                        <>
-                          {userGrants.slice(0, 3).map((g) => (
-                            <span
-                              key={g.id}
-                              className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs"
-                            >
-                              {g.display_name}
-                              <span className="text-[10px] text-muted-foreground">
-                                ({g.role})
-                              </span>
-                            </span>
-                          ))}
-                          {userGrants.length > 3 && (
-                            <span className="text-xs text-muted-foreground">
-                              +{userGrants.length - 3} more
-                            </span>
-                          )}
-                        </>
-                      )}
+                      <GrantChips role={u.role} userGrants={userGrants} />
                       <button
                         onClick={() => setAccessForUser(u.id)}
                         className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
@@ -316,12 +278,14 @@ export default function UsersTab() {
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <button
+                    <IconButton
+                      label="Delete user"
+                      variant="danger"
+                      size="sm"
                       onClick={() => deleteUser(u.id)}
-                      className="rounded p-1 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </IconButton>
                   </td>
                 </tr>
               );
@@ -329,6 +293,65 @@ export default function UsersTab() {
           </tbody>
         </table>
       </div>
+
+      {/* < md stacked cards */}
+      <ul className="divide-y overflow-hidden rounded-lg border bg-card md:hidden">
+        {users.map((u) => {
+          const userGrants = grants[u.id] || [];
+          return (
+            <li key={u.id} className="space-y-2 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {u.display_name || u.username}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    @{u.username}
+                    {u.created_at
+                      ? ` · created ${u.created_at.split("T")[0]}`
+                      : ""}
+                  </p>
+                </div>
+                <Badge
+                  variant={roleBadgeVariant(u.role || "editor")}
+                  className="shrink-0"
+                >
+                  {u.role || "editor"}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <GrantChips role={u.role} userGrants={userGrants} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={u.role || "editor"}
+                  onChange={(e) => updateRole(u.id, e.target.value)}
+                  title="Change role"
+                  className="h-9 w-auto min-w-[6.5rem] flex-none"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="editor">Editor</option>
+                  <option value="viewer">Viewer</option>
+                </Select>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAccessForUser(u.id)}
+                >
+                  <UserCog className="h-4 w-4" /> Manage access
+                </Button>
+                <IconButton
+                  label="Delete user"
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => deleteUser(u.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </IconButton>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
       {/* Access management modal */}
       {accessForUser !== null && (
@@ -355,7 +378,8 @@ export default function UsersTab() {
             </span>
           </div>
           <div className="rounded-lg border max-h-[400px] overflow-y-auto">
-            <table className="w-full text-xs">
+            {/* md+ table */}
+            <table className="hidden w-full text-xs md:table">
               <thead className="border-b bg-muted/50 sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Time</th>
@@ -405,10 +429,88 @@ export default function UsersTab() {
                 )}
               </tbody>
             </table>
+
+            {/* < md two-line rows */}
+            <ul className="divide-y md:hidden">
+              {auditLog.length === 0 ? (
+                <li className="p-4 text-center text-sm text-muted-foreground">
+                  No audit log entries
+                </li>
+              ) : (
+                auditLog.map((entry) => (
+                  <li key={entry.id} className="px-3 py-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span className="font-medium">
+                        {entry.username || `#${entry.user_id}`}
+                      </span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
+                        {entry.action}
+                      </span>
+                      {(entry.resource_type || entry.resource_id) && (
+                        <span className="text-muted-foreground">
+                          {entry.resource_type && `${entry.resource_type}`}
+                          {entry.resource_id && ` #${entry.resource_id}`}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 break-words text-muted-foreground">
+                      {entry.details && <span>{entry.details} · </span>}
+                      <span>
+                        {entry.created_at?.replace("T", " ").slice(0, 19)}
+                      </span>
+                      {entry.ip_address && (
+                        <span className="font-mono"> · {entry.ip_address}</span>
+                      )}
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ── Patient-access chips (shared by the md+ table and the phone cards) ──
+
+function GrantChips({
+  role,
+  userGrants,
+}: {
+  role?: string;
+  userGrants: Grant[];
+}) {
+  if (role === "admin") {
+    return (
+      <span className="text-xs italic text-muted-foreground">
+        all patients (admin)
+      </span>
+    );
+  }
+  if (userGrants.length === 0) {
+    return (
+      <span className="text-xs italic text-muted-foreground">no access</span>
+    );
+  }
+  return (
+    <>
+      {userGrants.slice(0, 3).map((g) => (
+        <span
+          key={g.id}
+          className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs"
+        >
+          {g.display_name}
+          <span className="text-[10px] text-muted-foreground">({g.role})</span>
+        </span>
+      ))}
+      {userGrants.length > 3 && (
+        <span className="text-xs text-muted-foreground">
+          +{userGrants.length - 3} more
+        </span>
+      )}
+    </>
   );
 }
 
@@ -589,17 +691,16 @@ function AccessModal({
       }
     >
         <div className="border-b pb-3 space-y-2">
-          <input
+          <Input
             type="text"
             placeholder="Filter patients..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <button
               onClick={toggleAllVisible}
-              className="hover:text-foreground"
+              className="inline-flex items-center hover:text-foreground coarse:min-h-11"
             >
               {allVisibleSelected ? "Clear visible" : "Select all visible"}
             </button>
@@ -632,12 +733,12 @@ function AccessModal({
                     key={p.id}
                     className={`flex items-center gap-3 px-3 py-2 ${checked ? "bg-primary/5" : ""}`}
                   >
-                    <label className="flex flex-1 items-center gap-2 cursor-pointer">
+                    <label className="flex min-w-0 flex-1 items-center gap-2 cursor-pointer coarse:min-h-11">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggle(p.id)}
-                        className="h-4 w-4"
+                        className="h-4 w-4 coarse:h-5 coarse:w-5"
                       />
                       <span className="text-sm">{p.display_name}</span>
                       {initialMap[p.id] && (
@@ -650,7 +751,7 @@ function AccessModal({
                       <select
                         value={selection[p.id]}
                         onChange={(e) => setRole(p.id, e.target.value)}
-                        className="rounded-md border bg-background px-2 py-0.5 text-xs"
+                        className="rounded-md border bg-background px-2 py-0.5 text-xs coarse:min-h-11"
                       >
                         <option value="viewer">viewer</option>
                         <option value="owner">owner</option>

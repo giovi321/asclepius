@@ -112,7 +112,7 @@ function ViewSection({
         <h3 className="font-medium">{title}</h3>
         <button
           onClick={reset}
-          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 coarse:min-h-11"
           title="Reset to defaults"
         >
           <RotateCcw className="h-3 w-3" /> Reset
@@ -129,7 +129,7 @@ function ViewSection({
                 type="checkbox"
                 checked={visible}
                 onChange={() => toggle(k)}
-                className="h-4 w-4"
+                className="h-4 w-4 coarse:h-5 coarse:w-5"
               />
               <span
                 className={`flex-1 ${visible ? "" : "text-muted-foreground/60"}`}
@@ -139,7 +139,8 @@ function ViewSection({
               <button
                 onClick={() => move(k, "up")}
                 disabled={i === 0}
-                className="rounded p-1 hover:bg-accent disabled:opacity-30"
+                aria-label="Move up"
+                className="flex items-center justify-center rounded p-1 hover:bg-accent disabled:opacity-30 coarse:min-h-11 coarse:min-w-11"
                 title="Move up"
               >
                 <ChevronUp className="h-3.5 w-3.5" />
@@ -147,7 +148,8 @@ function ViewSection({
               <button
                 onClick={() => move(k, "down")}
                 disabled={i === ordered.length - 1}
-                className="rounded p-1 hover:bg-accent disabled:opacity-30"
+                aria-label="Move down"
+                className="flex items-center justify-center rounded p-1 hover:bg-accent disabled:opacity-30 coarse:min-h-11 coarse:min-w-11"
                 title="Move down"
               >
                 <ChevronDown className="h-3.5 w-3.5" />

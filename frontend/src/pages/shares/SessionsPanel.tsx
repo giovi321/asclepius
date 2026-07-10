@@ -107,12 +107,31 @@ function SessionsTable<T extends SessionTableRow>({
   onAction: (rowid: number) => void;
   renderStatus?: (r: T) => React.ReactNode;
 }) {
+  const actionButton = (rowid: number) => (
+    <button
+      onClick={() => onAction(rowid)}
+      className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-0.5 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950 coarse:min-h-11 coarse:px-3"
+      title={actionTitle}
+    >
+      <Trash2 className="h-3 w-3" /> {actionLabel}
+    </button>
+  );
+  const statusPill = (r: T) =>
+    renderStatus ? (
+      renderStatus(r)
+    ) : (
+      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+        waiting
+      </span>
+    );
   return (
     <div className="rounded-md border bg-card overflow-hidden">
       <div className="bg-muted/30 px-2 py-1 text-[11px] font-semibold uppercase text-muted-foreground">
         {title}
       </div>
-      <table className="w-full text-xs">
+      {/* md+ keeps the 6-column table; below md each session stacks into
+          a two-line row so nothing pushes the card wider than the phone. */}
+      <table className="hidden w-full text-xs md:table">
         <thead className="bg-muted/20 text-muted-foreground">
           <tr>
             <th className="text-left px-2 py-1 w-20">Status</th>
@@ -127,15 +146,7 @@ function SessionsTable<T extends SessionTableRow>({
         <tbody className="divide-y">
           {rows.map((r) => (
             <tr key={r.rowid}>
-              <td className="px-2 py-1">
-                {renderStatus ? (
-                  renderStatus(r)
-                ) : (
-                  <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
-                    waiting
-                  </span>
-                )}
-              </td>
+              <td className="px-2 py-1">{statusPill(r)}</td>
               <td className="px-2 py-1 whitespace-nowrap text-muted-foreground">
                 {formatLocal(r.created_at)}
               </td>
@@ -151,19 +162,36 @@ function SessionsTable<T extends SessionTableRow>({
               <td className="px-2 py-1 text-muted-foreground truncate max-w-[260px]">
                 {r.user_agent || ""}
               </td>
-              <td className="px-2 py-1 text-right">
-                <button
-                  onClick={() => onAction(r.rowid)}
-                  className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-0.5 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                  title={actionTitle}
-                >
-                  <Trash2 className="h-3 w-3" /> {actionLabel}
-                </button>
-              </td>
+              <td className="px-2 py-1 text-right">{actionButton(r.rowid)}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ul className="divide-y text-xs md:hidden">
+        {rows.map((r) => (
+          <li key={r.rowid} className="space-y-1 px-2 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {statusPill(r)}
+              {r.client_ip && (
+                <span className="font-mono text-muted-foreground">
+                  {r.client_ip}
+                </span>
+              )}
+              <span className="ml-auto">{actionButton(r.rowid)}</span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground">
+              <span>started {formatLocal(r.created_at)}</span>
+              <span>seen {r.last_seen_at ? formatLocal(r.last_seen_at) : "—"}</span>
+              <span>expires {formatLocal(r.expires_at)}</span>
+            </div>
+            {r.user_agent && (
+              <div className="truncate text-muted-foreground">
+                {r.user_agent}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
       <p className="px-2 py-1 text-[11px] italic text-muted-foreground border-t">
         {caption}
       </p>

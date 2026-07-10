@@ -29,7 +29,9 @@ export default function AuditPanel({
         <ScrollText className="h-3 w-3" /> Audit log ({events.length})
       </div>
       <div className="rounded-md border bg-card overflow-hidden">
-        <table className="w-full text-xs">
+        {/* md+ keeps the 5-column table; below md each event stacks into
+            a two-line row that wraps instead of overflowing the card. */}
+        <table className="hidden w-full text-xs md:table">
           <thead className="bg-muted/30">
             <tr>
               <th className="text-left px-2 py-1">When</th>
@@ -61,6 +63,32 @@ export default function AuditPanel({
             ))}
           </tbody>
         </table>
+        <ul className="divide-y text-xs md:hidden">
+          {events.map((e) => (
+            <li key={e.id} className="space-y-0.5 px-2 py-1.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <ActionLabel action={e.action} />
+                {e.document_id != null && (
+                  <span className="text-muted-foreground">
+                    doc {e.document_id}
+                  </span>
+                )}
+                <span className="ml-auto whitespace-nowrap text-muted-foreground">
+                  {formatLocal(e.created_at)}
+                </span>
+              </div>
+              {(e.client_ip || e.user_agent) && (
+                <div className="truncate text-muted-foreground">
+                  {e.client_ip && (
+                    <span className="font-mono">{e.client_ip}</span>
+                  )}
+                  {e.client_ip && e.user_agent ? " · " : ""}
+                  {e.user_agent || ""}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

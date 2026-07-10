@@ -116,7 +116,7 @@ export default function LanguageTab() {
           <select
             value={defaultLanguage}
             onChange={(e) => setDefaultLanguage(e.target.value as Language)}
-            className="w-full max-w-sm rounded-md border bg-background px-3 py-1.5 text-sm"
+            className="w-full max-w-sm rounded-md border bg-background px-3 py-1.5 text-base sm:text-sm coarse:min-h-11"
           >
             {allowed.map((lang) => (
               <option key={lang} value={lang}>
@@ -140,7 +140,7 @@ export default function LanguageTab() {
               return (
                 <label
                   key={lang}
-                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                  className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm coarse:min-h-11 ${
                     checked ? "bg-primary/5 border-primary/30" : "bg-background"
                   } ${isLastAllowedDefault ? "opacity-70" : "cursor-pointer"}`}
                 >
@@ -149,7 +149,7 @@ export default function LanguageTab() {
                     checked={checked}
                     disabled={isLastAllowedDefault}
                     onChange={() => toggleLanguage(lang)}
-                    className="h-4 w-4 rounded border-muted-foreground"
+                    className="h-4 w-4 rounded border-muted-foreground coarse:h-5 coarse:w-5"
                   />
                   <span>{lang}</span>
                 </label>
@@ -167,7 +167,7 @@ export default function LanguageTab() {
           <button
             onClick={save}
             disabled={!canSave || saving}
-            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-50 coarse:min-h-11"
           >
             {saved ? (
               <Check className="h-3.5 w-3.5" />

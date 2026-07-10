@@ -9,6 +9,9 @@ import {
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
+import { useConfirm } from "@/contexts/ConfirmContext";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import {
   type AuditEvent,
   type ActiveOtp,
@@ -23,6 +26,7 @@ import OtpCell from "@/pages/shares/OtpCell";
 import CopyLinkButton from "@/pages/shares/CopyLinkButton";
 import SessionsPanel from "@/pages/shares/SessionsPanel";
 import AuditPanel from "@/pages/shares/AuditPanel";
+import ShareCard from "@/pages/shares/ShareCard";
 
 /**
  * Admin dashboard listing every doctor share the caller can manage.
@@ -35,6 +39,7 @@ import AuditPanel from "@/pages/shares/AuditPanel";
  */
 export default function SharesPage() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { shares, loading, refresh } = useShares();
   // Multi-select status filter — admins want to see e.g. active +
   // expired without revoked. Default includes everything so first
@@ -97,12 +102,13 @@ export default function SharesPage() {
   };
 
   const onRevoke = async (id: number) => {
-    if (
-      !confirm(
-        "Revoke this share? The doctor's session will be killed immediately.",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Revoke this share?",
+      description: "The doctor's session will be killed immediately.",
+      confirmText: "Revoke",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/shares/${id}`);
       toast({ title: "Share revoked", variant: "success" });
@@ -117,14 +123,16 @@ export default function SharesPage() {
   };
 
   const onDelete = async (id: number) => {
-    if (
-      !confirm(
-        "Permanently delete this share? It will be removed from the database " +
-          "along with its OTPs, sessions, and audit history. Any live doctor " +
-          "session is killed. This cannot be undone.",
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "Permanently delete this share?",
+      description:
+        "It will be removed from the database along with its OTPs, sessions, " +
+        "and audit history. Any live doctor session is killed. This cannot " +
+        "be undone.",
+      confirmText: "Delete",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/shares/${id}/purge`);
       toast({ title: "Share deleted", variant: "success" });
@@ -206,13 +214,13 @@ export default function SharesPage() {
   };
 
   const onRevokeSession = async (shareId: number, rowid: number) => {
-    if (
-      !confirm(
-        "Kill this active doctor session? They will be bounced back to the landing page.",
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Kill this active doctor session?",
+      description: "They will be bounced back to the landing page.",
+      confirmText: "Kill session",
+      variant: "destructive",
+    });
+    if (!ok) return;
     try {
       await api.delete(`/shares/${shareId}/sessions/${rowid}`);
       toast({ title: "Session terminated", variant: "success" });
@@ -260,14 +268,14 @@ export default function SharesPage() {
             toggle; the selection set is the union of statuses to show.
             Click "All" to flip every status on, "None" to show nothing
             (handy for hiding the table during a search). */}
-        <div className="flex items-center gap-1 rounded-md border bg-card p-0.5 text-sm">
+        <div className="flex flex-wrap items-center gap-1 rounded-md border bg-card p-0.5 text-sm">
           {ALL_STATUSES.map((s) => {
             const on = statusFilter.has(s);
             return (
               <button
                 key={s}
                 onClick={() => toggleStatus(s)}
-                className={`rounded px-3 py-1 capitalize transition-colors ${
+                className={`rounded px-3 py-1 capitalize transition-colors coarse:min-h-11 ${
                   on
                     ? "bg-primary text-primary-foreground"
                     : "hover:bg-accent text-muted-foreground"
@@ -283,7 +291,7 @@ export default function SharesPage() {
           <button
             onClick={() => setStatusFilter(new Set(ALL_STATUSES))}
             disabled={statusFilter.size === ALL_STATUSES.length}
-            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default"
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default coarse:min-h-11"
             title="Show all statuses"
           >
             All
@@ -291,25 +299,22 @@ export default function SharesPage() {
           <button
             onClick={() => setStatusFilter(new Set())}
             disabled={statusFilter.size === 0}
-            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default"
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-default coarse:min-h-11"
             title="Hide all statuses"
           >
             None
           </button>
         </div>
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter by recipient, patient, contact..."
-          className="flex-1 min-w-[200px] rounded-md border bg-background px-3 py-1.5 text-sm"
+          className="w-full sm:w-auto sm:flex-1 sm:min-w-[200px]"
         />
-        <button
-          onClick={refresh}
-          className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-        >
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
+        <Button variant="secondary" size="md" onClick={refresh}>
+          <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
+        </Button>
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -336,7 +341,10 @@ export default function SharesPage() {
             : "No shares match the current filter."}
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <>
+        {/* md+ keeps the 10-column table; below md the same shares render
+            as cards (no x-scroll fallback — the table never fit phones). */}
+        <div className="hidden md:block rounded-lg border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase">
               <tr>
@@ -490,6 +498,45 @@ export default function SharesPage() {
             </tbody>
           </table>
         </div>
+
+        <div className="space-y-3 md:hidden">
+          {filtered.map((s) => {
+            const now = new Date().toISOString();
+            const isRevoked = !!s.revoked_at;
+            const isExpired = !isRevoked && s.expires_at < now;
+            const status: ShareStatus = isRevoked
+              ? "revoked"
+              : isExpired
+                ? "expired"
+                : "active";
+            return (
+              <ShareCard
+                key={s.id}
+                share={s}
+                status={status}
+                expanded={expandedId === s.id}
+                onToggleExpand={() => onToggleAudit(s.id)}
+                otpVisible={!!otpVisible[s.id]}
+                otpLoading={!!otpLoading[s.id]}
+                otp={activeOtp[s.id] ?? null}
+                onShowOtp={() => onShowOtp(s.id)}
+                onHideOtp={() =>
+                  setOtpVisible((st) => ({ ...st, [s.id]: false }))
+                }
+                onRevoke={() => onRevoke(s.id)}
+                onDelete={() => onDelete(s.id)}
+                sessionsLoading={!!sessionsLoading[s.id]}
+                sessions={sessionsByShare[s.id]}
+                onRefreshSessions={() => loadSessions(s.id)}
+                onRevokeSession={(rowid) => onRevokeSession(s.id, rowid)}
+                onDropQueue={(rowid) => onDropQueue(s.id, rowid)}
+                auditLoading={!!auditLoading[s.id]}
+                auditEvents={auditByShare[s.id] || []}
+              />
+            );
+          })}
+        </div>
+        </>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import ShareDocumentViewer, {
 } from "@/components/share/ShareDocumentViewer";
 import ShareTranslateMenu from "@/components/share/ShareTranslateMenu";
 import ShareLogo from "@/components/share/ShareLogo";
+import Badge from "@/components/ui/Badge";
 import RegionThumbLightbox from "@/components/RegionThumbLightbox";
 import { useToast } from "@/contexts/ToastContext";
 import { useShareSession } from "@/contexts/ShareSessionContext";
@@ -158,7 +159,7 @@ export default function ShareDocumentPage() {
     return <div className="p-8 text-muted-foreground">Loading...</div>;
   if (error || !doc) {
     return (
-      <div className="min-h-screen bg-muted/30">
+      <div className="min-h-dvh bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3">
             <ShareLogo size="sm" />
@@ -176,7 +177,7 @@ export default function ShareDocumentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-dvh bg-muted/30">
       <header className="border-b bg-background">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -225,9 +226,9 @@ export default function ShareDocumentPage() {
           />
         </section>
 
-        <section className="space-y-6">
+        <section className="min-w-0 space-y-6">
           <div>
-            <h1 className="text-lg font-semibold">
+            <h1 className="text-lg font-semibold break-words">
               {doc.original_filename || doc.doc_type || "Document"}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -354,7 +355,8 @@ export default function ShareDocumentPage() {
           {doc.lab_results && doc.lab_results.length > 0 && (
             <div>
               <h2 className="text-sm font-semibold mb-2">Lab results</h2>
-              <div className="rounded-md border overflow-hidden">
+              {/* md+: the classic 4-column table. */}
+              <div className="hidden md:block rounded-md border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-xs">
                     <tr>
@@ -368,11 +370,7 @@ export default function ShareDocumentPage() {
                     {doc.lab_results.map((lr: any) => (
                       <tr
                         key={lr.id}
-                        className={
-                          lr.is_abnormal
-                            ? "bg-amber-50/40 dark:bg-amber-900/10"
-                            : ""
-                        }
+                        className={lr.is_abnormal ? "bg-warning-soft/50" : ""}
                       >
                         <td className="px-3 py-1.5">
                           {lr.test_name_canonical || lr.test_name_original}
@@ -392,6 +390,42 @@ export default function ShareDocumentPage() {
                   </tbody>
                 </table>
               </div>
+              {/* Below md: same rows as a stacked read-only list so the
+                  4 columns never overflow a narrow viewport. */}
+              <ul className="md:hidden rounded-md border bg-card divide-y overflow-hidden">
+                {doc.lab_results.map((lr: any) => (
+                  <li
+                    key={lr.id}
+                    className={
+                      lr.is_abnormal
+                        ? "p-3 text-sm bg-warning-soft/50"
+                        : "p-3 text-sm"
+                    }
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                      <span className="min-w-0 break-words font-medium">
+                        {lr.test_name_canonical || lr.test_name_original}
+                        {lr.is_abnormal && (
+                          <Badge variant="warning" size="sm" className="ml-1.5 align-middle">
+                            Abnormal
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="font-mono">
+                        {lr.value ?? lr.value_text ?? ""}
+                        {lr.unit ? ` ${lr.unit}` : ""}
+                      </span>
+                    </div>
+                    {(lr.reference_range_low != null ||
+                      lr.reference_range_high != null) && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        Reference: {lr.reference_range_low ?? ""} -{" "}
+                        {lr.reference_range_high ?? ""}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

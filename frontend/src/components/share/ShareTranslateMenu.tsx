@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Languages, Loader2, Crop, FileText } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import Sheet from "@/components/ui/Sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/Popover";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 interface ShareTranslateMenuProps {
   documentId: number;
@@ -39,7 +45,8 @@ interface ShareTranslateMenuProps {
 /**
  * Translate trigger for the doctor share view.
  *
- * One button + a popover with a language picker and two choices:
+ * One button opening a menu (anchored popover from sm up, bottom sheet
+ * below sm) with a language picker and two choices:
  *  - "Translate current page" — POSTs /translate-region with a
  *    full-page bbox so the existing region-translate pipeline handles
  *    it without a new endpoint.
@@ -65,7 +72,9 @@ export default function ShareTranslateMenu({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
+  // Same content, two presentations: anchored popover from sm up, bottom
+  // sheet below (thumb-reachable, no cramped floating panel at 390px).
+  const isSm = useMediaQuery("(min-width: 640px)");
 
   // Ensure the parent's selected language is always one we can actually
   // send; if the admin removed it from the allow-list since the doctor
@@ -86,9 +95,6 @@ export default function ShareTranslateMenu({
     targetLanguage,
     onTargetLanguageChange,
   ]);
-
-  // Click-outside to dismiss the popover.
-  useOnClickOutside(popoverRef, () => setOpen(false), open);
 
   const onTranslateCurrentPage = async () => {
     setOpen(false);
@@ -153,6 +159,37 @@ export default function ShareTranslateMenu({
 
   const showPicker = allowedLanguages.length > 1;
 
+  // Identical action list rendered inside the sm+ popover and the
+  // below-sm bottom sheet.
+  const menuOptions = (
+    <>
+      <button
+        onClick={onTranslateCurrentPage}
+        className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent coarse:min-h-11"
+      >
+        <FileText className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="font-medium">Translate current page</div>
+          <div className="text-xs text-muted-foreground">
+            Page {currentPage} into {targetLanguage}.
+          </div>
+        </div>
+      </button>
+      <button
+        onClick={onTranslateRegion}
+        className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent coarse:min-h-11"
+      >
+        <Crop className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+        <div className="min-w-0">
+          <div className="font-medium">Translate selected region</div>
+          <div className="text-xs text-muted-foreground">
+            Drag a rectangle on the page; output in {targetLanguage}.
+          </div>
+        </div>
+      </button>
+    </>
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -163,7 +200,7 @@ export default function ShareTranslateMenu({
               value={targetLanguage}
               onChange={(e) => onTargetLanguageChange(e.target.value)}
               disabled={isBusy}
-              className="rounded-md border bg-background px-2 py-1 text-sm text-foreground disabled:opacity-50"
+              className="rounded-md border bg-background px-2 py-1 text-base sm:text-sm text-foreground disabled:opacity-50 coarse:min-h-11"
             >
               {allowedLanguages.map((lang) => (
                 <option key={lang} value={lang}>
@@ -173,56 +210,37 @@ export default function ShareTranslateMenu({
             </select>
           </label>
         )}
-        <div className="relative inline-block" ref={popoverRef}>
-          <button
-            onClick={() => setOpen((o) => !o)}
-            disabled={isBusy || !hasFile}
-            title={disabledReason}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isBusy ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Translating...
-              </>
-            ) : (
-              <>
-                <Languages className="h-4 w-4" />
-                Translate
-                <ChevronDown className="h-3 w-3 opacity-60" />
-              </>
-            )}
-          </button>
-          {open && !isBusy && (
-            <div className="absolute left-0 top-full mt-1 z-30 w-64 rounded-lg border bg-background shadow-xl p-1.5 text-foreground">
-              <button
-                onClick={onTranslateCurrentPage}
-                className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-              >
-                <FileText className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-medium">Translate current page</div>
-                  <div className="text-xs text-muted-foreground">
-                    Page {currentPage} into {targetLanguage}.
-                  </div>
-                </div>
-              </button>
-              <button
-                onClick={onTranslateRegion}
-                className="w-full text-left flex items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-              >
-                <Crop className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-medium">Translate selected region</div>
-                  <div className="text-xs text-muted-foreground">
-                    Drag a rectangle on the page; output in {targetLanguage}.
-                  </div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+        <Popover open={open && !isBusy && isSm} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              disabled={isBusy || !hasFile}
+              title={disabledReason}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed coarse:min-h-11"
+            >
+              {isBusy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Translating...
+                </>
+              ) : (
+                <>
+                  <Languages className="h-4 w-4" />
+                  Translate
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </>
+              )}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-1.5">{menuOptions}</PopoverContent>
+        </Popover>
       </div>
+      <Sheet
+        open={open && !isBusy && !isSm}
+        onOpenChange={setOpen}
+        title="Translate"
+      >
+        <div className="space-y-1">{menuOptions}</div>
+      </Sheet>
       {message && (
         <p className="text-xs text-muted-foreground max-w-md">{message}</p>
       )}

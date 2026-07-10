@@ -9,7 +9,7 @@ describe("Button", () => {
     expect(btn).toHaveClass(
       "bg-primary",
       "text-primary-foreground",
-      "hover:bg-primary/90",
+      "hover:bg-primary-hover",
     );
   });
 
@@ -26,7 +26,6 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toHaveClass(
       "bg-destructive",
       "text-destructive-foreground",
-      "hover:bg-destructive/90",
     );
   });
 
@@ -37,13 +36,22 @@ describe("Button", () => {
     expect(btn).not.toHaveClass("border");
   });
 
-  it("applies the size scale", () => {
+  it("applies the fixed-height size scale with a coarse-pointer floor", () => {
     render(
       <Button size="md" data-testid="md">
         Wide
       </Button>,
     );
-    expect(screen.getByTestId("md")).toHaveClass("px-4", "py-2");
+    expect(screen.getByTestId("md")).toHaveClass("h-9", "coarse:min-h-11");
+  });
+
+  it("renders the 44px lg size", () => {
+    render(
+      <Button size="lg" data-testid="lg">
+        Tap
+      </Button>,
+    );
+    expect(screen.getByTestId("lg")).toHaveClass("h-11");
   });
 
   it("fires onClick", () => {
@@ -61,6 +69,20 @@ describe("Button", () => {
       </Button>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Go" }));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it("disables the button and shows a spinner while loading", () => {
+    const onClick = vi.fn();
+    render(
+      <Button onClick={onClick} loading>
+        Save
+      </Button>,
+    );
+    const btn = screen.getByRole("button", { name: "Save" });
+    expect(btn).toBeDisabled();
+    expect(btn.querySelector("svg")).not.toBeNull();
+    fireEvent.click(btn);
     expect(onClick).not.toHaveBeenCalled();
   });
 

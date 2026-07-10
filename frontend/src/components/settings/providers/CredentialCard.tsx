@@ -87,8 +87,9 @@ export default function CredentialCard({
         </div>
         <button
           onClick={onEditCredential}
-          className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent"
+          className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent coarse:min-h-11 coarse:min-w-11"
           title="Edit provider"
+          aria-label="Edit provider"
         >
           <Pencil className="h-4 w-4" />
         </button>
@@ -100,7 +101,8 @@ export default function CredentialCard({
               ? `${refs.total} model(s) attached - remove them first`
               : "Delete provider"
           }
-          className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:text-muted-foreground disabled:hover:bg-transparent"
+          aria-label="Delete provider"
+          className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:hover:text-muted-foreground disabled:hover:bg-transparent coarse:min-h-11 coarse:min-w-11"
         >
           <Trash2 className="h-4 w-4" />
         </button>

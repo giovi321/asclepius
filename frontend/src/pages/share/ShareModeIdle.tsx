@@ -11,8 +11,10 @@ import ShareLogo from "@/components/share/ShareLogo";
  * share link goes straight to ``/share/{token}`` and never sees this.
  */
 export default function ShareModeIdle() {
+  // bg-stone-950 is intentional: this page is always dark and
+  // theme-independent (leak-nothing placeholder, no app tokens).
   return (
-    <div className="min-h-screen flex items-center justify-center bg-stone-950">
+    <div className="min-h-dvh flex items-center justify-center bg-stone-950">
       <ShareLogo size="lg" />
     </div>
   );

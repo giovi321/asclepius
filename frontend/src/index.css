@@ -2,50 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens v2 — see DESIGN.md at the repo root.
+ * Palette derives from the logo: brick red #8E4449 (hsl 356 35% 41%) as the
+ * accent, neutrals tinted toward the logo slate #495155 (hue ~203-205).
+ * Values are HSL channel triples consumed as hsl(var(--x) / <alpha-value>).
+ * All ink/surface pairs verified >= 4.5:1 (body) / >= 3:1 (non-text).
+ */
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 15%;
+    /* neutrals (slate-tinted) */
+    --background: 200 20% 97%;
+    --foreground: 203 15% 16%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 15%;
+    --card-foreground: 203 15% 16%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
-    --primary: 348 55% 30%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 93%;
-    --secondary-foreground: 0 0% 20%;
-    --muted: 0 0% 93%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 93%;
-    --accent-foreground: 0 0% 20%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 85%;
-    --input: 0 0% 85%;
-    --ring: 348 55% 30%;
+    --popover-foreground: 203 15% 16%;
+    --surface: 205 16% 94%;
+    --surface-foreground: 203 15% 16%;
+    --secondary: 205 15% 91%;
+    --secondary-foreground: 203 15% 20%;
+    --muted: 205 16% 93%;
+    --muted-foreground: 203 9% 38%;
+    --accent: 205 18% 92%;
+    --accent-foreground: 203 15% 16%;
+    --border: 205 14% 87%;
+    --input: 205 12% 58%;
+
+    /* brand (logo red) */
+    --primary: 356 35% 41%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 356 37% 35%;
+    --ring: 356 35% 41%;
+
+    /* status: ink + soft tint pairs; borders derive as hsl(var(--x) / 0.25) */
+    --destructive: 0 60% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 75% 95%;
+    --success: 152 55% 26%;
+    --success-soft: 150 45% 94%;
+    --warning: 35 85% 30%;
+    --warning-soft: 45 92% 92%;
+    --info: 205 70% 34%;
+    --info-soft: 205 75% 94%;
+
+    /* categorical (pipeline kinds) */
+    --cat-violet: 275 45% 42%;
+    --cat-violet-soft: 275 60% 95%;
+    --cat-teal: 175 55% 26%;
+    --cat-teal-soft: 172 45% 92%;
+
+    /* geometry / elevation / motion */
     --radius: 0.5rem;
+    --shadow-1: 0 1px 2px 0 hsl(203 30% 12% / 0.06);
+    --shadow-2: 0 2px 8px -2px hsl(203 30% 12% / 0.12);
+    --shadow-3: 0 12px 32px -8px hsl(203 30% 12% / 0.18);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-fast: 150ms;
+    --dur-base: 200ms;
+    --dur-slow: 250ms;
+    --font-sans:
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
   }
 
   .dark {
-    --background: 0 0% 12%;
-    --foreground: 0 0% 90%;
-    --card: 0 0% 15%;
-    --card-foreground: 0 0% 90%;
-    --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 90%;
-    --primary: 348 55% 40%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 20%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 0 0% 20%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 85%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 25%;
-    --input: 0 0% 25%;
-    --ring: 348 55% 40%;
+    --background: 203 12% 10%;
+    --foreground: 200 12% 92%;
+    --card: 203 11% 13%;
+    --card-foreground: 200 12% 92%;
+    --popover: 203 11% 15%;
+    --popover-foreground: 200 12% 92%;
+    --surface: 203 12% 15%;
+    --surface-foreground: 200 12% 92%;
+    --secondary: 203 10% 19%;
+    --secondary-foreground: 200 12% 88%;
+    --muted: 203 10% 18%;
+    --muted-foreground: 203 8% 65%;
+    --accent: 203 10% 20%;
+    --accent-foreground: 200 12% 92%;
+    --border: 203 10% 24%;
+    --input: 203 8% 46%;
+
+    /* the logo red lightens in dark mode; primary fills flip to dark text
+       because white on the lightened red is only 3.4:1 */
+    --primary: 356 45% 62%;
+    --primary-foreground: 356 50% 10%;
+    --primary-hover: 356 48% 67%;
+    --ring: 356 45% 62%;
+
+    --destructive: 0 70% 66%;
+    --destructive-foreground: 0 60% 10%;
+    --destructive-soft: 0 45% 16%;
+    --success: 150 45% 60%;
+    --success-soft: 150 35% 15%;
+    --warning: 42 80% 60%;
+    --warning-soft: 40 45% 14%;
+    --info: 205 70% 64%;
+    --info-soft: 207 55% 16%;
+
+    --cat-violet: 275 55% 72%;
+    --cat-violet-soft: 275 35% 18%;
+    --cat-teal: 172 45% 55%;
+    --cat-teal-soft: 175 40% 13%;
+
+    --shadow-1: 0 1px 2px 0 hsl(0 0% 0% / 0.4);
+    --shadow-2: 0 4px 12px -2px hsl(0 0% 0% / 0.5);
+    --shadow-3: 0 16px 40px -8px hsl(0 0% 0% / 0.6);
   }
 }
 
@@ -55,10 +123,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family:
-      system-ui,
-      -apple-system,
-      sans-serif;
+    font-family: var(--font-sans);
   }
   /* Fix native form elements in dark mode */
   select,
@@ -78,6 +143,40 @@
   .dark input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(1);
   }
+
+  /* Motion is state feedback only; honor the OS preference globally. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Share-surface viewers: suppress the iOS long-press callout (save/share
+     sheet) and text selection on protected content. */
+  .no-touch-callout {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Thicker range-input variant for touch (DICOM frame/window sliders). */
+.slider-touch {
+  height: 28px;
+}
+.slider-touch::-webkit-slider-thumb {
+  width: 28px;
+  height: 28px;
+}
+.slider-touch::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
 }
 
 /* Pipeline progress bar shimmer — used by PipelineProgress.tsx for the

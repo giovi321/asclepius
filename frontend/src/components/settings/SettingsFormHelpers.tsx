@@ -24,7 +24,7 @@ export function SettingsForm({
       <button
         onClick={onSave}
         disabled={saving}
-        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-50 coarse:min-h-11"
       >
         {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
         {saved ? "Saved" : saving ? "Saving..." : "Save"}
@@ -59,7 +59,7 @@ export function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+        className="w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm coarse:min-h-11"
       />
     </label>
   );
@@ -92,7 +92,7 @@ export function NumberField({
         min={min}
         max={max}
         step={step}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+        className="w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm coarse:min-h-11"
       />
       {description && (
         <span className="block text-xs text-muted-foreground">
@@ -120,7 +120,7 @@ export function SelectField({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+        className="w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm coarse:min-h-11"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -153,7 +153,10 @@ export function ToggleField({
       </div>
       <button
         onClick={() => onChange(!value)}
-        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${value ? "bg-primary" : "bg-muted"}`}
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors coarse:before:absolute coarse:before:-inset-3 coarse:before:content-[''] ${value ? "bg-primary" : "bg-muted"}`}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${value ? "translate-x-6" : "translate-x-1"}`}

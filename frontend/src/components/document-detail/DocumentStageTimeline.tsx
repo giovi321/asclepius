@@ -21,7 +21,7 @@ import type {
 } from "@/types";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useCollapseState } from "@/components/document-detail/DocumentDetailHelpers";
-import { parseBackendTs } from "@/lib/utils";
+import { cn, parseBackendTs } from "@/lib/utils";
 import { stageLabel, stageIcon, flowBadge } from "@/lib/pipelineStages";
 
 type StatusVisual = {
@@ -39,38 +39,34 @@ function statusVisuals(status: DocumentStageEvent["status"]): StatusVisual {
       return {
         label: "Completed",
         Icon: Check,
-        iconClass: "bg-emerald-500 text-white",
-        rowAccentClass: "border-l-emerald-500",
-        pillClass:
-          "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+        iconClass: "bg-success text-white",
+        rowAccentClass: "border-l-success",
+        pillClass: "bg-success-soft text-success",
       };
     case "failed":
       return {
         label: "Failed",
         Icon: X,
-        iconClass: "bg-red-500 text-white",
-        rowAccentClass: "border-l-red-500",
-        pillClass:
-          "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+        iconClass: "bg-destructive text-white",
+        rowAccentClass: "border-l-destructive",
+        pillClass: "bg-destructive-soft text-destructive",
       };
     case "started":
       return {
         label: "Running",
         Icon: Loader2,
-        iconClass: "bg-blue-500 text-white",
-        rowAccentClass: "border-l-blue-500",
-        pillClass:
-          "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+        iconClass: "bg-info text-white",
+        rowAccentClass: "border-l-info",
+        pillClass: "bg-info-soft text-info",
         spin: true,
       };
     case "cancelled":
       return {
         label: "Cancelled",
         Icon: Ban,
-        iconClass: "bg-amber-500 text-white",
-        rowAccentClass: "border-l-amber-500",
-        pillClass:
-          "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+        iconClass: "bg-warning text-white",
+        rowAccentClass: "border-l-warning",
+        pillClass: "bg-warning-soft text-warning",
       };
     case "skipped":
     default:
@@ -262,13 +258,15 @@ function runFlowBadge(
 
 interface Props {
   documentId: number;
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
 }
 
 /** Per-document stage timeline. Reads the persisted ``document_stage_events``
  * rows and renders them as a vertical run-grouped timeline. Refetches every
  * few seconds while this doc is the active pipeline job so the user sees
  * stages tick in live. */
-export default function DocumentStageTimeline({ documentId }: Props) {
+export default function DocumentStageTimeline({ documentId, className }: Props) {
   const [data, setData] = useState<DocumentStagesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { status: pipeline } = usePipelineStatus();
@@ -337,7 +335,7 @@ export default function DocumentStageTimeline({ documentId }: Props) {
   if (!data || (data.events.length === 0 && !liveJob)) return null;
 
   return (
-    <div className="rounded-xl border bg-card">
+    <div className={cn("rounded-xl border bg-card", className)}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -351,7 +349,7 @@ export default function DocumentStageTimeline({ documentId }: Props) {
               ` · ${data.events.length} event${data.events.length === 1 ? "" : "s"}`}
           </p>
           {isLive && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-info-soft px-2.5 py-1 text-xs font-medium text-info">
               <span className="relative inline-flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-current opacity-50 animate-ping" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
@@ -406,19 +404,19 @@ function RunCard({ group }: { group: RunGroup }) {
   const flow = runFlowBadge(group.events);
 
   const headerColor = isAiEdit
-    ? "bg-amber-50/60 dark:bg-amber-900/15 border-amber-200/60 dark:border-amber-900"
+    ? "bg-warning-soft/60 border-warning/25"
     : isTranslate
-      ? "bg-emerald-50/60 dark:bg-emerald-900/15 border-emerald-200/60 dark:border-emerald-900"
+      ? "bg-cat-teal-soft/60 border-cat-teal/25"
       : isReprocess
-        ? "bg-purple-50/60 dark:bg-purple-900/15 border-purple-200/60 dark:border-purple-900"
-        : "bg-blue-50/60 dark:bg-blue-900/15 border-blue-200/60 dark:border-blue-900";
+        ? "bg-cat-violet-soft/60 border-cat-violet/25"
+        : "bg-info-soft/60 border-info/25";
   const kindIconColor = isAiEdit
-    ? "bg-amber-500 text-white"
+    ? "bg-warning text-white"
     : isTranslate
-      ? "bg-emerald-500 text-white"
+      ? "bg-cat-teal text-white"
       : isReprocess
-        ? "bg-purple-500 text-white"
-        : "bg-blue-500 text-white";
+        ? "bg-cat-violet text-white"
+        : "bg-info text-white";
 
   return (
     <div className="overflow-hidden rounded-lg border">
@@ -440,7 +438,7 @@ function RunCard({ group }: { group: RunGroup }) {
                 row always painted "In progress" alongside the default
                 "Completed" outcome even when the run had finished. */}
             {outcome === "started" ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-blue-500 text-white px-1.5 py-0.5 text-[10px] font-semibold">
+              <span className="inline-flex items-center gap-1 rounded-full bg-info text-white px-1.5 py-0.5 text-[10px] font-semibold">
                 <Loader2 className="h-2.5 w-2.5 animate-spin" />
                 In progress
               </span>
@@ -551,7 +549,7 @@ function StageRow({
             formatTimestamp(event.finished_at)}
         </div>
         {event.message && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400 break-words whitespace-pre-wrap">
+          <p className="mt-1 text-xs text-destructive break-words whitespace-pre-wrap">
             {event.message}
           </p>
         )}

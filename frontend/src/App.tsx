@@ -1,32 +1,38 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
+// Eager: first paint for the two entry surfaces (login form, share idle
+// placeholder). Everything else is route-split — AppLayout renders lazy
+// pages behind its own Suspense skeleton so the shell never flashes.
 import LoginPage from "@/pages/LoginPage";
-import SetupWizardPage from "@/pages/SetupWizardPage";
-import DashboardPage from "@/pages/DashboardPage";
-import DocumentsPage from "@/pages/DocumentsPage";
-import DocumentDetailPage from "@/pages/DocumentDetailPage";
-import UnclassifiedPage from "@/pages/UnclassifiedPage";
-import LabResultsPage from "@/pages/LabResultsPage";
-import ImagingPage from "@/pages/ImagingPage";
-import ImagingDetailPage from "@/pages/ImagingDetailPage";
-import ChatPage from "@/pages/ChatPage";
-import SearchPage from "@/pages/SearchPage";
-import SettingsPage from "@/pages/SettingsPage";
-import PatientsPage from "@/pages/PatientsPage";
-import TimelinePage from "@/pages/TimelinePage";
-import EventsPage from "@/pages/EventsPage";
-import FileBrowserPage from "@/pages/FileBrowserPage";
-import SharesPage from "@/pages/SharesPage";
-import ShareLandingPage from "@/pages/share/ShareLandingPage";
-import ShareVerifyPage from "@/pages/share/ShareVerifyPage";
-import ShareWaitingPage from "@/pages/share/ShareWaitingPage";
-import ShareDashboardPage from "@/pages/share/ShareDashboardPage";
-import ShareDocumentPage from "@/pages/share/ShareDocumentPage";
 import ShareModeIdle from "@/pages/share/ShareModeIdle";
 import { ShareSessionProvider } from "@/contexts/ShareSessionContext";
+
+const SetupWizardPage = lazy(() => import("@/pages/SetupWizardPage"));
+const DashboardPage = lazy(() => import("@/pages/DashboardPage"));
+const DocumentsPage = lazy(() => import("@/pages/DocumentsPage"));
+const DocumentDetailPage = lazy(() => import("@/pages/DocumentDetailPage"));
+const UnclassifiedPage = lazy(() => import("@/pages/UnclassifiedPage"));
+const LabResultsPage = lazy(() => import("@/pages/LabResultsPage"));
+const ImagingPage = lazy(() => import("@/pages/ImagingPage"));
+const ImagingDetailPage = lazy(() => import("@/pages/ImagingDetailPage"));
+const ChatPage = lazy(() => import("@/pages/ChatPage"));
+const SearchPage = lazy(() => import("@/pages/SearchPage"));
+const SettingsPage = lazy(() => import("@/pages/SettingsPage"));
+const PatientsPage = lazy(() => import("@/pages/PatientsPage"));
+const TimelinePage = lazy(() => import("@/pages/TimelinePage"));
+const EventsPage = lazy(() => import("@/pages/EventsPage"));
+const FileBrowserPage = lazy(() => import("@/pages/FileBrowserPage"));
+const SharesPage = lazy(() => import("@/pages/SharesPage"));
+const ShareLandingPage = lazy(() => import("@/pages/share/ShareLandingPage"));
+const ShareVerifyPage = lazy(() => import("@/pages/share/ShareVerifyPage"));
+const ShareWaitingPage = lazy(() => import("@/pages/share/ShareWaitingPage"));
+const ShareDashboardPage = lazy(
+  () => import("@/pages/share/ShareDashboardPage"),
+);
+const ShareDocumentPage = lazy(() => import("@/pages/share/ShareDocumentPage"));
 
 type AppMode = "core" | "share";
 
@@ -65,7 +71,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, needsSetup } = useAuth();
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
       </div>
     );
@@ -85,13 +91,23 @@ function SetupRoute() {
   const { user, loading, needsSetup } = useAuth();
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-dvh items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
   if (!needsSetup) return <Navigate to={user ? "/" : "/login"} replace />;
-  return <SetupWizardPage />;
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-dvh items-center justify-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <SetupWizardPage />
+    </Suspense>
+  );
 }
 
 /** Wrap a page element in its own ErrorBoundary so one crash doesn't blank the shell. */
@@ -152,7 +168,9 @@ export default function App() {
         path="/share"
         element={
           <ShareSessionProvider>
-            <Outlet />
+            <Suspense fallback={<ShareModeIdle />}>
+              <Outlet />
+            </Suspense>
           </ShareSessionProvider>
         }
       >

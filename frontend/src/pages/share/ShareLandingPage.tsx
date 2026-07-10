@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareLogo from "@/components/share/ShareLogo";
+import Button from "@/components/ui/Button";
 
 type DeliveryInfo = {
   delivery: "manual" | "email";
@@ -103,7 +104,7 @@ export default function ShareLandingPage() {
     info?.delivery === "email" ? "Email me a code" : "Request access code";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm space-y-6">
         <div className="flex justify-center">
           <ShareLogo size="md" />
@@ -114,14 +115,15 @@ export default function ShareLandingPage() {
         </div>
         <p className="text-sm text-muted-foreground">{bodyCopy}</p>
         <form onSubmit={onSubmit} className="space-y-3">
-          <button
+          <Button
             type="submit"
-            disabled={submitting || !token}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            size="lg"
+            className="w-full"
+            loading={submitting}
+            disabled={!token}
           >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             {buttonLabel}
-          </button>
+          </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
         <p className="text-xs text-muted-foreground border-t pt-4">

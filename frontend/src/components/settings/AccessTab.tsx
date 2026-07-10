@@ -35,7 +35,7 @@ export default function AccessTab() {
           <button
             key={t.key}
             onClick={() => setSubTab(t.key)}
-            className={`whitespace-nowrap border-b-2 -mb-px px-1 py-2 transition-colors ${
+            className={`whitespace-nowrap border-b-2 -mb-px px-1 py-2 transition-colors coarse:min-h-11 ${
               subTab === t.key
                 ? "border-primary/60 text-foreground font-medium"
                 : "border-transparent text-muted-foreground hover:text-foreground"

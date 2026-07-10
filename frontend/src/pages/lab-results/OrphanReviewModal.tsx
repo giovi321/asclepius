@@ -1,5 +1,5 @@
-import { Trash2, X } from "lucide-react";
-import Modal from "@/components/ui/Modal";
+import { Trash2 } from "lucide-react";
+import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";
 import type { LabRow } from "./types";
 
@@ -21,23 +21,14 @@ export function OrphanReviewModal({
   deleteAllOrphans,
 }: OrphanReviewModalProps) {
   return (
-    <Modal
+    <Sheet
       open={open}
-      onClose={onClose}
-      zIndexClassName="z-[80]"
-      panelClassName="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-4 shadow-xl"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={`Orphan lab results (${orphans.length})`}
+      contentClassName="h-[calc(100dvh-3rem)] sm:h-auto sm:max-w-2xl"
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-base font-semibold">
-          Orphan lab results ({orphans.length})
-        </h3>
-        <button
-          onClick={onClose}
-          className="rounded p-1 text-muted-foreground hover:bg-accent"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
       <p className="mb-3 text-sm text-muted-foreground">
         These lab results reference a document that no longer exists. Review and
         delete any you don't want to keep.
@@ -80,6 +71,6 @@ export function OrphanReviewModal({
           {orphanBusy === "all" ? "Deleting..." : "Delete all"}
         </Button>
       </div>
-    </Modal>
+    </Sheet>
   );
 }

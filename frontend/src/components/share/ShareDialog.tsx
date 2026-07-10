@@ -14,7 +14,10 @@ import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
+import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import Input from "@/components/ui/Input";
 import ProviderSelect from "@/components/ui/ProviderSelect";
 import type { ShareCreateRequest, ShareCreateResponse } from "@/types";
 
@@ -261,21 +264,18 @@ export default function ShareDialog({
       : `${documentIds.length} documents`;
 
   return (
-    <Modal
+    <Sheet
       open
-      onClose={onClose}
-      closeOnBackdropClick={false}
-      closeOnEscape={false}
-      panelClassName="w-full max-w-2xl rounded-lg bg-card border shadow-lg max-h-[90vh] overflow-y-auto"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      dismissible={false}
+      title="Share with doctor"
+      // Near-full-height bottom sheet on phones (the form + existing-shares
+      // list is tall); auto-sized centered dialog from sm up.
+      contentClassName="h-[calc(100dvh-3rem)] sm:h-auto sm:max-w-2xl"
     >
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h2 className="font-semibold">Share with doctor</h2>
-          <button onClick={onClose} className="rounded p-1.5 hover:bg-accent">
-            ×
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-4 text-sm">
+        <div className="space-y-4 text-sm">
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
             <div className="text-muted-foreground">Sharing:</div>
             <div className="font-medium">{docCountLabel}</div>
@@ -292,12 +292,11 @@ export default function ShareDialog({
                 <label className="block text-xs font-medium mb-1">
                   Recipient name (shown on watermark + audit log)
                 </label>
-                <input
+                <Input
                   type="text"
                   value={recipientLabel}
                   onChange={(e) => setRecipientLabel(e.target.value)}
                   placeholder="e.g. Dr. Maria Rossi"
-                  className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                 />
               </div>
               <div>
@@ -305,14 +304,16 @@ export default function ShareDialog({
                   OTP delivery
                 </label>
                 <div className="flex flex-col gap-1.5 rounded-md border bg-background p-2.5">
-                  <label className="flex items-start gap-2 text-xs">
+                  {/* The whole label is the touch target; coarse:min-h-11
+                      grows each option to the 44px minimum on phones. */}
+                  <label className="flex cursor-pointer items-start gap-2 text-xs coarse:min-h-11">
                     <input
                       type="radio"
                       name="otp_delivery"
                       value="manual"
                       checked={otpDelivery === "manual"}
                       onChange={() => setOtpDelivery("manual")}
-                      className="mt-0.5"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                     />
                     <span>
                       <span className="font-medium">
@@ -325,7 +326,7 @@ export default function ShareDialog({
                     </span>
                   </label>
                   <label
-                    className={`flex items-start gap-2 text-xs ${!smtpEnabled ? "opacity-60" : ""}`}
+                    className={`flex items-start gap-2 text-xs coarse:min-h-11 ${!smtpEnabled ? "opacity-60" : "cursor-pointer"}`}
                   >
                     <input
                       type="radio"
@@ -334,7 +335,7 @@ export default function ShareDialog({
                       checked={otpDelivery === "email"}
                       onChange={() => setOtpDelivery("email")}
                       disabled={!smtpEnabled}
-                      className="mt-0.5"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
                     />
                     <span>
                       <span className="font-medium">
@@ -355,7 +356,7 @@ export default function ShareDialog({
                     ? "Recipient email (OTPs will be sent here)"
                     : "Contact (free-text, for your records only)"}
                 </label>
-                <input
+                <Input
                   type={otpDelivery === "email" ? "email" : "text"}
                   value={recipientContact}
                   onChange={(e) => setRecipientContact(e.target.value)}
@@ -364,20 +365,19 @@ export default function ShareDialog({
                       ? "doctor@example.com"
                       : "phone, email, or other identifier"
                   }
-                  className="w-full rounded-md border bg-background px-3 py-1.5 text-sm"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">
                   Expires after (days)
                 </label>
-                <input
+                <Input
                   type="number"
                   min={1}
                   max={90}
                   value={days}
                   onChange={(e) => setDays(parseInt(e.target.value, 10) || 7)}
-                  className="w-32 rounded-md border bg-background px-3 py-1.5 text-sm"
+                  className="w-32"
                 />
               </div>
               {/* Provider defaults — when the doctor clicks Translate
@@ -385,7 +385,7 @@ export default function ShareDialog({
                   them. The doctor surface intentionally has no provider
                   picker, so the admin's choice here is final from the
                   doctor's point of view. */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-medium mb-1">
                     OCR provider for translation
@@ -410,16 +410,16 @@ export default function ShareDialog({
                 </div>
               </div>
               <div className="flex justify-end">
-                <button
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={onCreate}
-                  disabled={
-                    submitting || !patientId || documentIds.length === 0
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                  loading={submitting}
+                  disabled={!patientId || documentIds.length === 0}
+                  className="w-full sm:w-auto"
                 >
-                  {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   Create share link
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -429,23 +429,26 @@ export default function ShareDialog({
               <p className="text-xs font-medium text-primary">
                 Share created. Copy the link below; it is shown only once.
               </p>
-              <div className="flex items-stretch gap-1.5">
-                <input
+              <div className="flex items-center gap-1.5">
+                <Input
                   readOnly
                   value={createResult.share_url}
-                  className="flex-1 rounded-md border bg-background px-3 py-1.5 font-mono text-xs"
+                  className="min-w-0 flex-1 font-mono"
                 />
-                <button
+                <IconButton
+                  variant="secondary"
+                  label={tokenCopied ? "Copied" : "Copy link"}
                   onClick={onCopyUrl}
-                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 hover:bg-accent"
-                  title="Copy"
+                  // h-10 matches the Input primitive's height on fine
+                  // pointers; both grow to 44px on coarse.
+                  className="h-10 w-10 bg-background"
                 >
                   {tokenCopied ? (
-                    <Check className="h-4 w-4 text-green-600" />
+                    <Check className="h-4 w-4 text-success" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
-                </button>
+                </IconButton>
               </div>
               <p className="text-xs text-muted-foreground">
                 {otpDelivery === "email" ? (
@@ -531,12 +534,14 @@ export default function ShareDialog({
                                     )}
                                   </div>
                                 ) : (
-                                  <button
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={() => onRevealOtp(s.id)}
-                                    className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
                                   >
-                                    <Eye className="h-3 w-3" /> Show active code
-                                  </button>
+                                    <Eye className="h-3 w-3" aria-hidden /> Show
+                                    active code
+                                  </Button>
                                 )}
                                 {revealOtp[s.id] && !loadingOtp[s.id] && (
                                   <div className="inline-flex items-center gap-1 ml-2">
@@ -545,25 +550,25 @@ export default function ShareDialog({
                                         code={activeOtps[s.id]!.code}
                                       />
                                     )}
-                                    <button
+                                    <IconButton
+                                      label="Refetch code"
+                                      size="sm"
                                       onClick={() => onRevealOtp(s.id)}
-                                      className="rounded p-0.5 hover:bg-accent"
-                                      title="Refetch"
                                     >
                                       <RefreshCw className="h-3 w-3" />
-                                    </button>
-                                    <button
+                                    </IconButton>
+                                    <IconButton
+                                      label="Hide code"
+                                      size="sm"
                                       onClick={() =>
                                         setRevealOtp((r) => ({
                                           ...r,
                                           [s.id]: false,
                                         }))
                                       }
-                                      className="rounded p-0.5 hover:bg-accent"
-                                      title="Hide"
                                     >
                                       <EyeOff className="h-3 w-3" />
-                                    </button>
+                                    </IconButton>
                                   </div>
                                 )}
                               </div>
@@ -571,10 +576,12 @@ export default function ShareDialog({
                         </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {!isRevoked && !isExpired && documentIds.length > 0 && (
-                            <button
+                            <Button
+                              variant="secondary"
+                              size="sm"
                               onClick={() => onAddToShare(s.id)}
                               disabled={addingTo !== null}
-                              className="inline-flex items-center gap-1 rounded-md border border-primary/40 px-2 py-1 text-xs text-primary hover:bg-primary/5 disabled:opacity-50"
+                              className="border-primary/40 text-primary hover:bg-primary/5 active:bg-primary/5"
                               title={`Add the ${docCountLabel} to this share`}
                             >
                               {addingTo === s.id ? (
@@ -583,16 +590,18 @@ export default function ShareDialog({
                                 <Plus className="h-3 w-3" />
                               )}
                               Add these
-                            </button>
+                            </Button>
                           )}
                           {!isRevoked && (
-                            <button
+                            <IconButton
+                              label="Revoke share"
+                              variant="danger"
+                              size="sm"
                               onClick={() => onRevoke(s.id)}
-                              className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-                              title="Revoke share"
+                              className="border border-destructive/40"
                             >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
                           )}
                         </div>
                       </li>
@@ -603,7 +612,7 @@ export default function ShareDialog({
             </div>
           )}
         </div>
-    </Modal>
+    </Sheet>
   );
 }
 
@@ -619,16 +628,16 @@ function CopyOtpInlineButton({ code }: { code: string }) {
     }
   };
   return (
-    <button
+    <IconButton
+      label={copied ? "Copied" : "Copy code"}
+      size="sm"
       onClick={onCopy}
-      className="rounded p-0.5 hover:bg-accent"
-      title={copied ? "Copied" : "Copy code"}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-600" />
+        <Check className="h-3 w-3 text-success" />
       ) : (
         <Copy className="h-3 w-3" />
       )}
-    </button>
+    </IconButton>
   );
 }

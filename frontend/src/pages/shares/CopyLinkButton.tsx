@@ -1,6 +1,17 @@
 import { useState } from "react";
 import { Check, Link as LinkIcon } from "lucide-react";
 
+/**
+ * Server-built URL respects ``share.public_base_url`` so split-host
+ * setups (LAN admin + public doctor host) hand the admin the
+ * doctor-facing URL. Fall back to the admin's own origin only when
+ * the server didn't provide one (single-host deployments where
+ * public_base_url is empty AND the host header was missing).
+ */
+export function buildShareUrl(token: string, shareUrl: string | null): string {
+  return shareUrl || `${window.location.origin}/share/${token}`;
+}
+
 export default function CopyLinkButton({
   token,
   shareUrl,
@@ -10,12 +21,7 @@ export default function CopyLinkButton({
 }) {
   const [copied, setCopied] = useState(false);
   const onCopy = async () => {
-    // Server-built URL respects ``share.public_base_url`` so split-host
-    // setups (LAN admin + public doctor host) hand the admin the
-    // doctor-facing URL. Fall back to the admin's own origin only when
-    // the server didn't provide one (single-host deployments where
-    // public_base_url is empty AND the host header was missing).
-    const url = shareUrl || `${window.location.origin}/share/${token}`;
+    const url = buildShareUrl(token, shareUrl);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -31,7 +37,7 @@ export default function CopyLinkButton({
       title={copied ? "Copied" : "Copy share link"}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-600" />
+        <Check className="h-3 w-3 text-success" />
       ) : (
         <LinkIcon className="h-3 w-3" />
       )}

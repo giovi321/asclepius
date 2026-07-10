@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
 import { ActionButton, IconButton } from "./inlineEditPrimitives";
@@ -167,14 +167,18 @@ export function EditableField({
   if (multiline) {
     return (
       <div
-        className="space-y-1 py-1 group cursor-pointer rounded px-1 -mx-1 hover:bg-accent/30"
+        className="space-y-1 py-1 group cursor-pointer rounded px-1 -mx-1 hover:bg-accent/30 coarse:min-h-11"
         onClick={() => {
           setVal(value || "");
           setEditing(true);
         }}
       >
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
           {label}
+          <Pencil
+            aria-hidden
+            className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+          />
         </p>
         {value ? (
           <p className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -191,14 +195,14 @@ export function EditableField({
 
   return (
     <div
-      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      className="flex items-center justify-between gap-2 text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1 coarse:min-h-11"
       onClick={() => {
         setVal(value || "");
         setEditing(true);
       }}
     >
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">
+      <span className="flex min-w-0 items-center gap-1.5 font-medium">
         {value ? (
           formatDisplay ? (
             formatDisplay(value)
@@ -206,10 +210,14 @@ export function EditableField({
             value
           )
         ) : (
-          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs coarse:opacity-70">
             click to edit
           </span>
         )}
+        <Pencil
+          aria-hidden
+          className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+        />
       </span>
     </div>
   );

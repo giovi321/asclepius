@@ -13,17 +13,19 @@ export const EVENT_TYPES = [
   "other",
 ];
 
+// Event-type dot colors collapsed onto the semantic tokens (DESIGN.md);
+// hue-adjacent types intentionally share an accent.
 export const EVENT_COLORS: Record<string, string> = {
-  symptom: "bg-yellow-500",
-  diagnosis: "bg-red-500",
-  hospitalization: "bg-purple-500",
-  surgery: "bg-pink-500",
-  treatment: "bg-blue-500",
-  follow_up: "bg-cyan-500",
-  emergency: "bg-red-600",
-  pregnancy: "bg-rose-400",
-  chronic_condition: "bg-orange-500",
-  injury: "bg-amber-500",
-  screening: "bg-green-500",
-  other: "bg-gray-500",
+  symptom: "bg-warning",
+  diagnosis: "bg-destructive",
+  hospitalization: "bg-cat-violet",
+  surgery: "bg-cat-violet",
+  treatment: "bg-info",
+  follow_up: "bg-cat-teal",
+  emergency: "bg-destructive",
+  pregnancy: "bg-primary",
+  chronic_condition: "bg-warning",
+  injury: "bg-warning",
+  screening: "bg-success",
+  other: "bg-muted-foreground",
 };

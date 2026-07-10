@@ -5,6 +5,7 @@ import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
 import { parseBackendTs } from "@/lib/datetime";
+import RegionThumbLightbox from "@/components/RegionThumbLightbox";
 
 export interface RegionTranslation {
   id: number;
@@ -50,6 +51,9 @@ export default function RegionTranslationsSection({
   const { toast } = useToast();
   const confirm = useConfirm();
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(
+    null,
+  );
 
   const handleDelete = async (id: number) => {
     const ok = await confirm({
@@ -108,29 +112,23 @@ export default function RegionTranslationsSection({
                 )}
                 {item.created_at && <span>{formatTs(item.created_at)}</span>}
                 {thumbUrl ? (
-                  <a
-                    href={thumbUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group/thumb relative ml-auto block flex-shrink-0"
-                    title="Hover to preview, click to open full-size"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox({
+                        src: thumbUrl,
+                        alt: `Region on page ${item.page}`,
+                      })
+                    }
+                    className="ml-auto block flex-shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    title="View full-size"
                   >
                     <img
                       src={thumbUrl}
                       alt={`Region on page ${item.page}`}
                       className="h-7 w-12 object-cover rounded border bg-background"
                     />
-                    {/* Hover preview — anchored to the right of the
-                        thumbnail and pointer-events-none so it doesn't
-                        steal hover from the trigger. */}
-                    <div className="pointer-events-none absolute right-0 top-full mt-1 z-20 hidden rounded-md border bg-background p-1 shadow-xl group-hover/thumb:block">
-                      <img
-                        src={thumbUrl}
-                        alt=""
-                        className="max-h-64 max-w-xs object-contain"
-                      />
-                    </div>
-                  </a>
+                  </button>
                 ) : (
                   <span className="ml-auto text-[10px] italic">
                     {pending ? "Processing..." : "(no thumbnail)"}
@@ -139,8 +137,9 @@ export default function RegionTranslationsSection({
                 <button
                   onClick={() => handleDelete(item.id)}
                   disabled={busyId === item.id}
-                  className="flex-shrink-0 rounded p-1 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  className="flex flex-shrink-0 items-center justify-center rounded p-1 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 coarse:min-h-11 coarse:min-w-11"
                   title="Delete this region translation"
+                  aria-label="Delete this region translation"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -152,7 +151,7 @@ export default function RegionTranslationsSection({
                   Processing - the cropped region is being OCR'd and translated.
                 </p>
               ) : failed ? (
-                <p className="text-sm text-red-600 dark:text-red-400">
+                <p className="text-sm text-destructive">
                   {item.translated_text}
                 </p>
               ) : (
@@ -174,6 +173,15 @@ export default function RegionTranslationsSection({
           );
         })}
       </div>
+
+      <RegionThumbLightbox
+        open={lightbox !== null}
+        onOpenChange={(o) => {
+          if (!o) setLightbox(null);
+        }}
+        src={lightbox?.src ?? null}
+        alt={lightbox?.alt}
+      />
     </Section>
   );
 }

@@ -107,7 +107,7 @@ export default function PromptsTab() {
             value={canonicalLanguage}
             onChange={(e) => saveLanguage(e.target.value)}
             disabled={savingLanguage}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
+            className="rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50 coarse:min-h-11"
           >
             {CANONICAL_LANGUAGES.includes(canonicalLanguage) ? null : (
               <option value={canonicalLanguage}>{canonicalLanguage}</option>
@@ -176,7 +176,7 @@ export default function PromptsTab() {
                           navigator.clipboard?.writeText(token);
                           toast({ title: `Copied ${token}` });
                         }}
-                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] hover:bg-accent"
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] hover:bg-accent coarse:min-h-11 coarse:px-2"
                       >
                         {`{${v.name}}`}
                         {v.optional ? "?" : ""}
@@ -198,25 +198,25 @@ export default function PromptsTab() {
                 className="w-full rounded-md border bg-background px-3 py-2 text-xs font-mono min-h-[200px]"
                 disabled={saving}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handleSave(p.key)}
                   disabled={saving}
-                  className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50 coarse:min-h-11"
                 >
                   <Save className="h-3 w-3" /> {saving ? "Saving..." : "Save"}
                 </button>
                 {p.is_custom && (
                   <button
                     onClick={() => handleReset(p.key)}
-                    className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
+                    className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent coarse:min-h-11"
                   >
                     <RotateCcw className="h-3 w-3" /> Reset to default
                   </button>
                 )}
                 <button
                   onClick={() => setEditing(null)}
-                  className="rounded-md border px-3 py-1.5 text-xs"
+                  className="flex items-center rounded-md border px-3 py-1.5 text-xs hover:bg-accent coarse:min-h-11"
                 >
                   Cancel
                 </button>

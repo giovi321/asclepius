@@ -251,18 +251,18 @@ export default function SmtpTab() {
           Sends a fixed diagnostic message via the current SMTP settings. Useful
           right after entering a password or changing TLS mode.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             type="email"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
             placeholder="you@example.com"
-            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+            className="min-w-0 flex-1 rounded-md border bg-background px-3 py-2 text-base sm:text-sm coarse:min-h-11"
           />
           <button
             onClick={onTest}
             disabled={testing}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-60 coarse:min-h-11"
           >
             {testing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -293,7 +293,7 @@ export default function SmtpTab() {
               setF({ ...f, share_email_otp_body: e.target.value })
             }
             rows={10}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono"
+            className="w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm font-mono"
           />
         </label>
         <div className="rounded-md border bg-muted/30 p-2 text-xs">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Eye, EyeOff, Pill, Syringe } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCollapseState } from "./useCollapseState";
 
 export function TechnicalDetails({
@@ -68,11 +69,18 @@ export function TechnicalDetails({
 
 // ─── OcrSection (collapsible) ──────────────────────────────────
 
-export function OcrSection({ text }: { text: string | null }) {
+export function OcrSection({
+  text,
+  className,
+}: {
+  text: string | null;
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
+}) {
   const [open, setOpen] = useCollapseState("ocr-text", false);
   if (!text) return null;
   return (
-    <div className="rounded-lg border">
+    <div className={cn("rounded-lg border", className)}>
       <button
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between p-4 hover:bg-accent/50"
@@ -155,35 +163,23 @@ export function TranslatedTextSection({
 // ─── getSectionTypeStyle ───────────────────────────────────────
 
 export function getSectionTypeStyle(type: string): string {
+  // Categorical chips collapsed onto the semantic token pairs (DESIGN.md);
+  // related section types intentionally share an accent.
   const styles: Record<string, string> = {
-    lab_results_page:
-      "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    clinical_notes:
-      "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    nursing_notes:
-      "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
-    vital_signs: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    consent_form:
-      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    cover_page:
-      "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
-    medication_chart:
-      "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-    operative_notes:
-      "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-    discharge_summary:
-      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    imaging_report:
-      "bg-cyan-100 text-cyan-700 dark:bg-cyan-900 dark:text-cyan-300",
-    correspondence:
-      "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-    invoice_page:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    lab_results_page: "bg-info-soft text-info",
+    clinical_notes: "bg-success-soft text-success",
+    nursing_notes: "bg-cat-teal-soft text-cat-teal",
+    vital_signs: "bg-destructive-soft text-destructive",
+    consent_form: "bg-muted text-muted-foreground",
+    cover_page: "bg-info-soft text-info",
+    medication_chart: "bg-cat-violet-soft text-cat-violet",
+    operative_notes: "bg-warning-soft text-warning",
+    discharge_summary: "bg-warning-soft text-warning",
+    imaging_report: "bg-cat-teal-soft text-cat-teal",
+    correspondence: "bg-cat-violet-soft text-cat-violet",
+    invoice_page: "bg-warning-soft text-warning",
   };
-  return (
-    styles[type] ||
-    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-  );
+  return styles[type] || "bg-muted text-muted-foreground";
 }
 
 // ─── MedFormBadge ──────────────────────────────────────────────
@@ -191,7 +187,7 @@ export function getSectionTypeStyle(type: string): string {
 export function MedFormBadge({ form }: { form?: string }) {
   if (!form) return <span className="text-muted-foreground">{"—"}</span>;
   const lower = form.toLowerCase();
-  let color = "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  let color = "bg-muted text-muted-foreground";
   let Icon: any = Pill;
 
   if (
@@ -199,35 +195,33 @@ export function MedFormBadge({ form }: { form?: string }) {
     lower.includes("pill") ||
     lower.includes("capsule")
   ) {
-    color = "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+    color = "bg-info-soft text-info";
     Icon = Pill;
   } else if (
     lower.includes("inject") ||
     lower.includes("iv") ||
     lower.includes("syringe")
   ) {
-    color =
-      "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
+    color = "bg-cat-violet-soft text-cat-violet";
     Icon = Syringe;
   } else if (
     lower.includes("cream") ||
     lower.includes("ointment") ||
     lower.includes("topical")
   ) {
-    color = "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
+    color = "bg-success-soft text-success";
   } else if (
     lower.includes("liquid") ||
     lower.includes("syrup") ||
     lower.includes("solution")
   ) {
-    color =
-      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
+    color = "bg-warning-soft text-warning";
   } else if (
     lower.includes("inhaler") ||
     lower.includes("spray") ||
     lower.includes("nasal")
   ) {
-    color = "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300";
+    color = "bg-cat-teal-soft text-cat-teal";
   }
 
   return (

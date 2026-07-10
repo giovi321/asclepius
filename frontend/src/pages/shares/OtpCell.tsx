@@ -21,7 +21,7 @@ export default function OtpCell({
     return (
       <button
         onClick={onShow}
-        className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent"
+        className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-accent coarse:min-h-11 coarse:px-3"
       >
         <Eye className="h-3 w-3" /> Show
       </button>
@@ -56,15 +56,17 @@ export default function OtpCell({
       )}
       <button
         onClick={onRefresh}
-        className="rounded p-0.5 hover:bg-accent flex-shrink-0"
+        className="rounded p-0.5 hover:bg-accent flex-shrink-0 coarse:p-2.5"
         title="Refetch"
+        aria-label="Refetch code"
       >
         <RefreshCw className="h-3 w-3" />
       </button>
       <button
         onClick={onHide}
-        className="rounded p-0.5 hover:bg-accent flex-shrink-0"
+        className="rounded p-0.5 hover:bg-accent flex-shrink-0 coarse:p-2.5"
         title="Hide"
+        aria-label="Hide code"
       >
         <EyeOff className="h-3 w-3" />
       </button>

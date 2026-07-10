@@ -4,10 +4,8 @@ export default function StatusBadge({
   status: "active" | "expired" | "revoked";
 }) {
   const map = {
-    active:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    expired:
-      "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+    active: "bg-success-soft text-success",
+    expired: "bg-warning-soft text-warning",
     revoked: "bg-muted text-muted-foreground line-through",
   };
   return (

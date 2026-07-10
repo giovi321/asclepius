@@ -5,6 +5,9 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
 import { RefreshCw, Trash2, Monitor, Smartphone, Globe } from "lucide-react";
 import { formatDateTime, formatRelative, parseBackendTs } from "@/lib/datetime";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Badge from "@/components/ui/Badge";
 
 interface SessionRow {
   session_id: string;
@@ -53,6 +56,18 @@ function describeUserAgent(ua: string | null): {
             ? "Linux"
             : "";
   return { label: os ? `${browser} on ${os}` : browser, icon };
+}
+
+/** Status chip shared by the md+ table and the phone cards. */
+function statusBadge(
+  isRevoked: boolean,
+  isExpired: boolean,
+  isCurrent: boolean,
+) {
+  if (isRevoked) return <Badge variant="neutral">revoked</Badge>;
+  if (isExpired) return <Badge variant="warning">expired</Badge>;
+  if (isCurrent) return <Badge variant="info">current</Badge>;
+  return <Badge variant="success">active</Badge>;
 }
 
 export default function SessionsTab() {
@@ -149,30 +164,27 @@ export default function SessionsTab() {
             {includeRevoked ? ` • ${counts.revoked} revoked/expired` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-sm coarse:min-h-11">
             <input
               type="checkbox"
               checked={includeRevoked}
               onChange={(e) => setIncludeRevoked(e.target.checked)}
+              className="coarse:h-5 coarse:w-5"
             />
             Include revoked / expired
           </label>
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          >
+          <Button variant="secondary" onClick={load}>
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
-      <input
+      <Input
         type="text"
         placeholder="Filter by user, IP, or browser..."
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
-        className="w-full rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
       />
 
       {loading ? (
@@ -186,7 +198,9 @@ export default function SessionsTab() {
             : "No sessions match the filter."}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <>
+        {/* md+ table */}
+        <div className="hidden overflow-hidden rounded-lg border md:block">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/50">
               <tr>
@@ -263,30 +277,14 @@ export default function SessionsTab() {
                       {formatRelative(s.expires_at, "future")}
                     </td>
                     <td className="px-3 py-1.5">
-                      {isRevoked ? (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
-                          revoked
-                        </span>
-                      ) : isExpired ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                          expired
-                        </span>
-                      ) : s.is_current ? (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                          current
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                          active
-                        </span>
-                      )}
+                      {statusBadge(isRevoked, isExpired, s.is_current)}
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">
                       {!isRevoked && !isExpired && (
                         <button
                           onClick={() => revoke(s)}
                           disabled={busyId === s.session_id}
-                          className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive-soft disabled:opacity-50 coarse:min-h-11"
                           title="Revoke this session"
                         >
                           <Trash2 className="h-3 w-3" /> Revoke
@@ -299,6 +297,79 @@ export default function SessionsTab() {
             </tbody>
           </table>
         </div>
+
+        {/* < md stacked cards */}
+        <ul className="divide-y overflow-hidden rounded-lg border bg-card md:hidden">
+          {filtered.map((s) => {
+            const { label: uaLabel, icon: UAIcon } = describeUserAgent(
+              s.user_agent,
+            );
+            const isRevoked = s.revoked_at !== null;
+            const expiresMs = parseBackendTs(s.expires_at);
+            const isExpired =
+              !isRevoked && expiresMs != null && expiresMs < Date.now();
+            return (
+              <li
+                key={s.session_id}
+                className={`space-y-2 p-3 ${
+                  isRevoked || isExpired
+                    ? "opacity-60"
+                    : s.is_current
+                      ? "bg-primary/5"
+                      : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {s.display_name || s.username}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      @{s.username} · {s.role}
+                    </p>
+                  </div>
+                  <span className="shrink-0">
+                    {statusBadge(isRevoked, isExpired, s.is_current)}
+                  </span>
+                </div>
+                <div
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                  title={s.user_agent || ""}
+                >
+                  <UAIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{uaLabel}</span>
+                  {s.ip_address && (
+                    <span className="shrink-0 font-mono">
+                      · {s.ip_address}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span title={formatDateTime(s.last_active_at)}>
+                    active {formatRelative(s.last_active_at, "past")}
+                  </span>
+                  <span title={formatDateTime(s.created_at)}>
+                    created {formatRelative(s.created_at, "past")}
+                  </span>
+                  <span title={formatDateTime(s.expires_at)}>
+                    expires {formatRelative(s.expires_at, "future")}
+                  </span>
+                </div>
+                {!isRevoked && !isExpired && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => revoke(s)}
+                    disabled={busyId === s.session_id}
+                    className="border-destructive/30 text-destructive hover:bg-destructive-soft active:bg-destructive-soft"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Revoke
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        </>
       )}
     </div>
   );

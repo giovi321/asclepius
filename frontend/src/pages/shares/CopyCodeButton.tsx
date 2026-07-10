@@ -19,7 +19,7 @@ export default function CopyCodeButton({ code }: { code: string }) {
       title={copied ? "Copied" : "Copy code"}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-600" />
+        <Check className="h-3 w-3 text-success" />
       ) : (
         <Copy className="h-3 w-3" />
       )}

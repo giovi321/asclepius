@@ -4,6 +4,7 @@ import { Hourglass, Loader2, X } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareLogo from "@/components/share/ShareLogo";
+import Button from "@/components/ui/Button";
 
 /**
  * Queueing UX.
@@ -90,7 +91,7 @@ export default function ShareWaitingPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm space-y-6">
         <div className="flex justify-center">
           <ShareLogo size="md" />
@@ -121,14 +122,16 @@ export default function ShareWaitingPage() {
             request a fresh access code.
           </p>
         )}
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="lg"
+          className="w-full"
           onClick={onCancel}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-md border bg-background px-4 py-2 text-sm hover:bg-muted"
         >
           <X className="h-4 w-4" />
           Cancel and exit
-        </button>
+        </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <p className="text-xs text-muted-foreground border-t pt-4">
           Only one device can view a share at a time. If you closed an earlier

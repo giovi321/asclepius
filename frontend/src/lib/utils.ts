@@ -48,13 +48,12 @@ export function formatDocType(type: string | null | undefined): string {
 // ─── Status badge styling ──────────────────────────────
 
 const STATUS_CLASSES: Record<string, string> = {
-  done: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-  failed: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-  processing: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  pending: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  needs_review:
-    "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  cancelled: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  done: "bg-success-soft text-success",
+  failed: "bg-destructive-soft text-destructive",
+  processing: "bg-info-soft text-info",
+  pending: "bg-muted text-muted-foreground",
+  needs_review: "bg-warning-soft text-warning",
+  cancelled: "bg-muted text-muted-foreground",
 };
 
 /**

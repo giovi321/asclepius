@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertCircle } from "lucide-react";
+import Select from "@/components/ui/Select";
 import { formatDocType, getBestDate } from "@/lib/utils";
 
 export default function UnclassifiedPage() {
@@ -32,8 +33,8 @@ export default function UnclassifiedPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-muted-foreground">
-        <AlertCircle className="h-4 w-4 text-yellow-500" />
-        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+        <AlertCircle className="h-4 w-4 text-warning" />
+        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
           {documents.length}
         </span>
         <span className="text-sm">unclassified</span>
@@ -46,9 +47,9 @@ export default function UnclassifiedPage() {
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center justify-between rounded-lg border p-4"
+              className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
             >
-              <div>
+              <div className="min-w-0">
                 <Link
                   to={`/documents/${doc.id}`}
                   className="font-medium text-primary hover:underline"
@@ -65,9 +66,10 @@ export default function UnclassifiedPage() {
                   </p>
                 )}
               </div>
-              <select
-                className="rounded-md border px-3 py-1.5 text-sm"
+              <Select
+                className="w-full shrink-0 md:w-56"
                 defaultValue=""
+                aria-label="Assign to patient"
                 onChange={(e) => {
                   if (e.target.value)
                     assignPatient(doc.id, Number(e.target.value));
@@ -79,7 +81,7 @@ export default function UnclassifiedPage() {
                     {p.display_name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ))}
         </div>

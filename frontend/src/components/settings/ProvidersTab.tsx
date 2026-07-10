@@ -387,7 +387,7 @@ export default function ProvidersTab() {
 
       <button
         onClick={() => setEditingCred({})}
-        className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+        className="flex items-center gap-2 rounded-md border border-dashed px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors coarse:min-h-11"
       >
         <Plus className="h-4 w-4" /> Add Provider
       </button>

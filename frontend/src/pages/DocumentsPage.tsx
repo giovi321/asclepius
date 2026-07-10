@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Upload } from "lucide-react";
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { usePatient } from "@/contexts/PatientContext";
@@ -11,16 +12,31 @@ import {
   COLUMNS,
   DOCUMENTS_DEFAULTS,
   type ColumnKey,
+  type SortKey,
 } from "@/components/documents/columns";
 import { useColumnPrefs } from "@/lib/columnPrefs";
 import DocumentFilters from "@/components/documents/DocumentFilters";
 import BulkActionsBar, {
   type ReprocessMode,
 } from "@/components/documents/BulkActionsBar";
+import MobileBulkBar from "@/components/documents/MobileBulkBar";
 import DocumentTable from "@/components/documents/DocumentTable";
+import Button from "@/components/ui/Button";
+import Sheet from "@/components/ui/Sheet";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 import { useDocumentList } from "@/hooks/data/useDocumentList";
 import { useLlmProviders, useOcrProviders } from "@/hooks/data";
 import ShareDialog from "@/components/share/ShareDialog";
+
+/** Fields offered by the phone sort sheet (same keys toggleSort handles). */
+const SORT_FIELDS: { key: SortKey; label: string }[] = [
+  { key: "file", label: "File" },
+  { key: "type", label: "Type" },
+  { key: "date", label: "Date" },
+  { key: "facility", label: "Facility" },
+  { key: "status", label: "Status" },
+  { key: "date_added", label: "Date added" },
+];
 
 export default function DocumentsPage() {
   const { selectedPatient } = usePatient();
@@ -45,6 +61,16 @@ export default function DocumentsPage() {
 
   const [pipeline, setPipeline] = useState<PipelineStatus | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
+
+  // Phone selection mode: cards grow checkboxes and taps toggle instead of
+  // navigating. Desktop has always-on checkboxes, so the mode is exited
+  // (selection kept) when the viewport crosses up to md.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const { isMobile } = useBreakpoint();
+  useEffect(() => {
+    if (!isMobile && selectionMode) setSelectionMode(false);
+  }, [isMobile, selectionMode]);
 
   // Column visibility — synced through the backend so the user's choice
   // follows them across devices. The hook migrates the legacy localStorage
@@ -265,8 +291,11 @@ export default function DocumentsPage() {
     });
   };
 
+  const activeSortField = SORT_FIELDS.find((f) => f.key === sort.sortBy);
+  const mobileBulkBarVisible = selectionMode && selectedIds.size > 0;
+
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${mobileBulkBarVisible ? "pb-20 md:pb-0" : ""}`}>
       {showUpload && (
         <FileUpload
           onUploadComplete={() => {
@@ -292,6 +321,67 @@ export default function DocumentsPage() {
         onUploadClick={() => setShowUpload(!showUpload)}
       />
 
+      {/* Phone list controls: sort sheet trigger + selection-mode toggle */}
+      <div className="flex items-center justify-between gap-2 md:hidden">
+        <Button
+          variant="secondary"
+          onClick={() => setSortSheetOpen(true)}
+          className="gap-1.5"
+        >
+          <ArrowUpDown className="h-4 w-4" aria-hidden />
+          {activeSortField ? `Sort: ${activeSortField.label}` : "Sort"}
+          {activeSortField &&
+            (sort.sortOrder === "asc" ? (
+              <ArrowUp className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <ArrowDown className="h-3.5 w-3.5" aria-hidden />
+            ))}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            if (selectionMode) {
+              setSelectionMode(false);
+              setSelectedIds(new Set());
+            } else {
+              setSelectionMode(true);
+            }
+          }}
+        >
+          {selectionMode ? `Cancel (${selectedIds.size})` : "Select"}
+        </Button>
+      </div>
+
+      <Sheet
+        open={sortSheetOpen}
+        onOpenChange={setSortSheetOpen}
+        title="Sort by"
+      >
+        <div className="flex flex-col">
+          {SORT_FIELDS.map((f) => {
+            const active = sort.sortBy === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => toggleSort(f.key)}
+                className="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm hover:bg-accent coarse:min-h-11"
+              >
+                <span className={active ? "font-medium text-primary" : ""}>
+                  {f.label}
+                </span>
+                {active &&
+                  (sort.sortOrder === "asc" ? (
+                    <ArrowUp className="h-4 w-4 text-primary" aria-hidden />
+                  ) : (
+                    <ArrowDown className="h-4 w-4 text-primary" aria-hidden />
+                  ))}
+              </button>
+            );
+          })}
+        </div>
+      </Sheet>
+
       <BulkActionsBar
         selectedCount={selectedIds.size}
         bulkBusy={bulkBusy}
@@ -304,6 +394,20 @@ export default function DocumentsPage() {
         onShare={() => setBulkShareOpen(true)}
         shareTooltip={shareTooltip}
       />
+
+      {mobileBulkBarVisible && (
+        <MobileBulkBar
+          selectedCount={selectedIds.size}
+          bulkBusy={bulkBusy}
+          llmProviders={llmProviders}
+          ocrProviders={ocrProviders}
+          onDelete={bulkDelete}
+          onReprocess={bulkReprocess}
+          onRegenerateFilename={bulkRegenerateFilename}
+          onShare={() => setBulkShareOpen(true)}
+          shareTooltip={shareTooltip}
+        />
+      )}
 
       <ShareDialog
         open={bulkShareOpen}
@@ -330,6 +434,8 @@ export default function DocumentsPage() {
         sortOrder={sort.sortOrder}
         onSortToggle={toggleSort}
         pipeline={pipeline}
+        selectionMode={selectionMode}
+        onUploadClick={() => setShowUpload(!showUpload)}
       />
 
       {total > limit && (
@@ -355,6 +461,19 @@ export default function DocumentsPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Phone upload FAB — same flow as the toolbar Upload button. Hidden
+          while selection mode is on so it never fights the bulk bar. */}
+      {!selectionMode && (
+        <button
+          type="button"
+          onClick={() => setShowUpload(!showUpload)}
+          aria-label="Upload documents"
+          className="fixed bottom-5 right-4 z-fab flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-floating transition-colors duration-fast hover:bg-primary-hover active:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:hidden"
+        >
+          <Upload className="h-6 w-6" aria-hidden />
+        </button>
       )}
     </div>
   );

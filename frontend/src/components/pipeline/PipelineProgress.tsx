@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import {
   Check,
+  ChevronRight,
   Loader2,
   Activity,
   Hourglass,
@@ -19,6 +20,7 @@ import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useToast } from "@/contexts/ToastContext";
 import { parseBackendTs } from "@/lib/utils";
+import { kindBadgeClasses } from "@/lib/statusTokens";
 import {
   stageLabel,
   stageIcon,
@@ -36,32 +38,32 @@ function kindBadge(kind: PipelineJobKind | null): {
   if (kind === "reprocess") {
     return {
       label: "Reprocess",
-      pill: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800",
-      ring: "ring-purple-300/60 dark:ring-purple-600/40",
-      glow: "from-purple-500/10 via-purple-500/5 to-transparent",
+      pill: kindBadgeClasses(kind),
+      ring: "ring-cat-violet/30",
+      glow: "from-cat-violet/10 via-cat-violet/5 to-transparent",
     };
   }
   if (kind === "translate") {
     return {
       label: "Translate",
-      pill: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800",
-      ring: "ring-emerald-300/60 dark:ring-emerald-600/40",
-      glow: "from-emerald-500/10 via-emerald-500/5 to-transparent",
+      pill: kindBadgeClasses(kind),
+      ring: "ring-cat-teal/30",
+      glow: "from-cat-teal/10 via-cat-teal/5 to-transparent",
     };
   }
   if (kind === "ai_edit") {
     return {
       label: "AI edit",
-      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
-      ring: "ring-amber-300/60 dark:ring-amber-600/40",
-      glow: "from-amber-500/10 via-amber-500/5 to-transparent",
+      pill: kindBadgeClasses(kind),
+      ring: "ring-warning/30",
+      glow: "from-warning/10 via-warning/5 to-transparent",
     };
   }
   return {
     label: "Upload",
-    pill: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800",
-    ring: "ring-blue-300/60 dark:ring-blue-600/40",
-    glow: "from-blue-500/10 via-blue-500/5 to-transparent",
+    pill: kindBadgeClasses("upload"),
+    ring: "ring-info/30",
+    glow: "from-info/10 via-info/5 to-transparent",
   };
 }
 
@@ -115,8 +117,8 @@ function IdleCard({ status }: { status: PipelineStatus }) {
         <div
           className={`flex h-11 w-11 items-center justify-center rounded-full ${
             stopped
-              ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300"
-              : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300"
+              ? "bg-destructive-soft text-destructive"
+              : "bg-success-soft text-success"
           }`}
         >
           <Icon className="h-5 w-5" />
@@ -129,6 +131,21 @@ function IdleCard({ status }: { status: PipelineStatus }) {
             {status.last_processed
               ? `Last processed: ${status.last_processed}`
               : "No documents in flight"}
+          </p>
+          <p className="text-xs text-muted-foreground sm:hidden">
+            <span className="tabular-nums">{status.total_processed}</span>{" "}
+            processed
+            <span className="mx-1 opacity-30">|</span>
+            <span
+              className={
+                status.total_errors > 0
+                  ? "text-destructive font-medium tabular-nums"
+                  : "tabular-nums"
+              }
+            >
+              {status.total_errors}
+            </span>{" "}
+            errors
           </p>
         </div>
         <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
@@ -160,7 +177,7 @@ function Stat({
         {label}
       </div>
       <div
-        className={`text-sm font-semibold tabular-nums ${tone === "red" ? "text-red-600 dark:text-red-400" : ""}`}
+        className={`text-sm font-semibold tabular-nums ${tone === "red" ? "text-destructive" : ""}`}
       >
         {value}
       </div>
@@ -212,7 +229,7 @@ function RunningCard({
         {/* Header: kind badge, filename, elapsed time */}
         <div className="flex items-start justify-between gap-3 min-w-0">
           <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.pill}`}
               >
@@ -280,17 +297,34 @@ function RunningCard({
           />
         )}
 
-        {/* Connected stepper */}
+        {/* Stage progress: compact bar + disclosure below md, connected
+            horizontal stepper at md+ (the stepper's equal-width grid crushes
+            to unreadable columns on phone widths). */}
         {planned.length > 0 && (
-          <Stepper
-            planned={planned}
-            done={done}
-            currentStage={job.stage}
-            progressIndex={progressIndex}
-            overallPct={overallPct}
-            providers={providers}
-            providerNames={providerNames}
-          />
+          <>
+            <div className="md:hidden">
+              <MobileStages
+                planned={planned}
+                done={done}
+                currentStage={job.stage}
+                progressIndex={progressIndex}
+                overallPct={overallPct}
+                providers={providers}
+                providerNames={providerNames}
+              />
+            </div>
+            <div className="hidden md:block">
+              <Stepper
+                planned={planned}
+                done={done}
+                currentStage={job.stage}
+                progressIndex={progressIndex}
+                overallPct={overallPct}
+                providers={providers}
+                providerNames={providerNames}
+              />
+            </div>
+          </>
         )}
 
         {/* Page progress (OCR phase, when known) */}
@@ -364,7 +398,7 @@ function Stepper({
         <div className="absolute left-5 right-5 top-5 h-0.5 -translate-y-1/2 bg-muted" />
         {/* Filled rail */}
         <div
-          className="absolute left-5 top-5 h-0.5 -translate-y-1/2 bg-gradient-to-r from-emerald-400 to-emerald-500 transition-[width] duration-500"
+          className="absolute left-5 top-5 h-0.5 -translate-y-1/2 bg-success transition-[width] duration-500"
           style={{
             width:
               planned.length > 1
@@ -393,15 +427,15 @@ function Stepper({
                   className={[
                     "relative z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors",
                     isDone
-                      ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                      ? "border-success bg-success text-white shadow-sm"
                       : isCurrent
-                        ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                        ? "border-info bg-info-soft text-info"
                         : "border-muted bg-card text-muted-foreground",
                   ].join(" ")}
                 >
                   {/* Pulsing ring around current stage */}
                   {isCurrent && (
-                    <span className="absolute inset-0 rounded-full ring-4 ring-blue-400/40 animate-pulse" />
+                    <span className="absolute inset-0 rounded-full ring-4 ring-info/40 animate-pulse" />
                   )}
                   {isDone ? (
                     <Check className="h-4 w-4" strokeWidth={3} />
@@ -415,9 +449,9 @@ function Stepper({
                   className={[
                     "mt-1.5 text-[11px] leading-tight max-w-full truncate",
                     isDone
-                      ? "text-emerald-700 dark:text-emerald-300 font-medium"
+                      ? "text-success font-medium"
                       : isCurrent
-                        ? "text-blue-700 dark:text-blue-300 font-semibold"
+                        ? "text-info font-semibold"
                         : "text-muted-foreground",
                   ].join(" ")}
                   title={stageLabel(s)}
@@ -455,6 +489,117 @@ function Stepper({
   );
 }
 
+/** Compact stage readout for phone widths: overall progress bar, a one-line
+ * "Stage x of y · <stage> · <provider>" summary, and a "Details" disclosure
+ * expanding a vertical checklist of the planned stages. Replaces the
+ * horizontal Stepper below md. */
+function MobileStages({
+  planned,
+  done,
+  currentStage,
+  progressIndex,
+  overallPct,
+  providers,
+  providerNames,
+}: {
+  planned: string[];
+  done: Set<string>;
+  currentStage: string | null | undefined;
+  progressIndex: number;
+  overallPct: number;
+  providers?: PipelineProviders | null;
+  providerNames?: PipelineProviders | null;
+}) {
+  const activeStage =
+    currentStage && planned.includes(currentStage)
+      ? currentStage
+      : planned[Math.min(progressIndex, planned.length - 1)];
+  const activeProvider = providerLabelForStage(
+    activeStage,
+    providers ?? null,
+    providerNames ?? null,
+  );
+  const summary = [
+    `Stage ${Math.min(planned.length, progressIndex + 1)} of ${planned.length}`,
+    stageLabel(activeStage),
+    activeProvider ?? "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div>
+      <div className="mb-1 flex items-end justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Pipeline
+        </span>
+        <span className="text-xs font-semibold tabular-nums">
+          {overallPct}%
+        </span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-info transition-[width] duration-500"
+          style={{ width: `${overallPct}%` }}
+        />
+      </div>
+      <p className="mt-1.5 truncate text-xs text-muted-foreground">{summary}</p>
+
+      <details className="group/stages mt-1">
+        <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1 py-1 text-xs font-medium text-muted-foreground coarse:min-h-11 [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/stages:rotate-90" />
+          Details
+        </summary>
+        <ol className="mt-1 space-y-1.5">
+          {planned.map((s, i) => {
+            const isDone = done.has(s);
+            const isCurrent =
+              !isDone && (i === progressIndex || s === currentStage);
+            const provider = providerLabelForStage(
+              s,
+              providers ?? null,
+              providerNames ?? null,
+            );
+            return (
+              <li key={`${s}-${i}`} className="flex items-center gap-2">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  {isDone ? (
+                    <Check className="h-4 w-4 text-success" strokeWidth={3} />
+                  ) : isCurrent ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-info" />
+                  ) : (
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                  )}
+                </span>
+                <span
+                  className={[
+                    "truncate text-xs",
+                    isDone
+                      ? "text-success font-medium"
+                      : isCurrent
+                        ? "text-info font-semibold"
+                        : "text-muted-foreground",
+                  ].join(" ")}
+                >
+                  {stageLabel(s)}
+                </span>
+                {provider && (
+                  <span
+                    className="min-w-0 truncate text-[10px] text-muted-foreground/80"
+                    title={provider}
+                  >
+                    {provider}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </details>
+    </div>
+  );
+}
+
 function PageProgress({
   current,
   total,
@@ -475,7 +620,7 @@ function PageProgress({
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-400 to-blue-500 bg-[length:200%_100%] transition-[width] duration-700"
+          className="h-full rounded-full bg-gradient-to-r from-info via-info/70 to-info bg-[length:200%_100%] transition-[width] duration-700"
           style={{
             width: `${pct}%`,
             animation:
@@ -626,7 +771,7 @@ function ProvidersRow({
             className={[
               "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5",
               active
-                ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                ? "border-info/25 bg-info-soft text-info"
                 : "border-muted bg-muted/40 text-muted-foreground",
             ].join(" ")}
             title={
@@ -741,7 +886,7 @@ function CancelJobButton({
         onClick={handle}
         disabled={disabled || busy || docId == null}
         title={title}
-        className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-red-800 dark:hover:bg-red-950"
+        className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive transition-colors hover:bg-destructive-soft disabled:opacity-40 disabled:cursor-not-allowed coarse:min-h-11 coarse:px-3"
       >
         {busy ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -759,7 +904,7 @@ function CancelJobButton({
       onClick={handle}
       disabled={disabled || busy || docId == null}
       title={title}
-      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
+      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground opacity-100 transition-opacity hover:text-destructive md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 coarse:h-11 coarse:w-11 disabled:cursor-not-allowed disabled:hover:text-muted-foreground"
     >
       {busy ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />

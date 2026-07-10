@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
-import { FileText, Trash2, X, Image as ImageIcon, Unlink } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
 import {
   EditableSummary,
@@ -13,8 +13,9 @@ import {
 import EventSelector from "@/components/document-detail/EventSelector";
 import LabResultsEditor from "@/components/document-detail/LabResultsEditor";
 import DocumentViewer from "@/components/document-detail/DocumentViewer";
-import ReprocessMenu from "@/components/document-detail/ReprocessMenu";
-import TranslateMenu from "@/components/document-detail/TranslateMenu";
+import ReprocessSheet from "@/components/document-detail/ReprocessMenu";
+import TranslateSheet from "@/components/document-detail/TranslateMenu";
+import DetailActionsMenu from "@/components/document-detail/DetailActionsMenu";
 import DocumentQueueStatus from "@/components/document-detail/DocumentQueueStatus";
 import MetadataEditor from "@/components/document-detail/MetadataEditor";
 import {
@@ -28,7 +29,8 @@ import AiEditForm from "@/components/document-detail/AiEditForm";
 import LinksSection from "@/components/document-detail/LinksSection";
 import DocumentStageTimeline from "@/components/document-detail/DocumentStageTimeline";
 import RegionTranslationsSection from "@/components/document-detail/RegionTranslationsSection";
-import ShareWithDoctorButton from "@/components/document-detail/ShareWithDoctorButton";
+import ShareDialog from "@/components/share/ShareDialog";
+import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 import type { NormalizedBbox } from "@/components/PdfViewer";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -47,6 +49,28 @@ function isImagingPlaceholder(doc: Document | null): boolean {
   return isImagingDoc(doc) && !doc?.file_path;
 }
 
+/** Full-page loading state: header bar, viewer block, three text sections.
+ * Skeletons, never spinners (DESIGN.md). */
+function DetailSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-2">
+          <Skeleton className="h-7 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <Skeleton className="h-9 w-24" />
+      </div>
+      <Skeleton className="h-[40dvh] w-full" />
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className="rounded-lg border p-4">
+          <SkeletonText lines={3} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function DocumentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -57,10 +81,16 @@ export default function DocumentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [linkedDocs, setLinkedDocs] = useState<DocumentLink[]>([]);
 
+  // Header action flows, opened from DetailActionsMenu. Hosted at page
+  // level so the menu (Sheet on mobile) can close before the flow opens.
+  const [reprocessOpen, setReprocessOpen] = useState(false);
+  const [translateOpen, setTranslateOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+
   // Region-translate selection state. ``selectionMode`` flips the PDF
   // viewer into draw-rectangle mode; the resolved provider IDs travel
   // with the eventual /translate-region POST so the user's choice
-  // survives the round-trip from popover → PDF interaction.
+  // survives the round-trip from panel → PDF interaction.
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectionProviders, setSelectionProviders] = useState<{
     ocrProviderId: string | null;
@@ -232,13 +262,24 @@ export default function DocumentDetailPage() {
     }
   };
 
-  if (loading) return <div className="text-muted-foreground">Loading...</div>;
+  if (loading) return <DetailSkeleton />;
   if (!doc) return <div className="text-destructive">Document not found</div>;
 
+  const docBusy =
+    doc.status === "processing" || doc.status === "pending" || inPipeline;
+  const hasOcrText = !!(doc.ocr_text && doc.ocr_text.trim());
+  const canSelectRegion =
+    !!doc.file_path &&
+    (doc.original_filename || "").toLowerCase().endsWith(".pdf");
+
   return (
-    <div className="space-y-6 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2">
+    // flex-col + gap (instead of space-y) so mobile-only `order-*` shuffling
+    // works; overflow-x-clip contains wide content without creating a scroll
+    // container, which would break the sticky header below.
+    <div className="flex flex-col gap-6 overflow-x-clip">
+      {/* Header: filename + inline View file / Cancel, everything else in the
+          overflow menu. Sticky on phones so actions stay reachable. */}
+      <div className="sticky top-0 z-sticky -mx-4 flex flex-wrap items-start gap-2 bg-background/95 px-4 py-2 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:static lg:z-auto lg:m-0 lg:bg-transparent lg:p-0">
         <div className="min-w-0 flex-1">
           <EditableFilename
             value={doc.original_filename}
@@ -250,82 +291,73 @@ export default function DocumentDetailPage() {
             {doc.patient_name || "Unclassified"}
           </p>
         </div>
-        <div className="flex gap-2">
-          {doc.imaging_studies?.[0]?.id && (
-            <>
-              <Link
-                to={`/imaging/${doc.imaging_studies[0].id}`}
-                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-                title="Open the DICOM viewer for this report's imaging study"
-              >
-                <ImageIcon className="h-4 w-4" /> Imaging view
-              </Link>
-              <button
-                onClick={handleUnlinkImaging}
-                className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-                title="Detach this PDF from its imaging study (the PDF stays in documents)"
-              >
-                <Unlink className="h-4 w-4" /> Unlink imaging
-              </button>
-            </>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
           {doc.file_path && (
             <a
               href={`/api/documents/${id}/file`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+              aria-label="View file"
+              title="View file"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background coarse:h-11 coarse:w-11"
             >
-              <FileText className="h-4 w-4" /> View file
+              <FileText className="h-4 w-4" />
             </a>
           )}
-          {(doc.status === "processing" ||
-            doc.status === "pending" ||
-            inPipeline) && (
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-1 rounded-md border border-yellow-300 px-3 py-1.5 text-sm text-yellow-600 hover:bg-yellow-50 dark:border-yellow-800 dark:hover:bg-yellow-950"
-            >
-              <X className="h-4 w-4" /> Cancel
-            </button>
-          )}
-          {doc.status === "processing" ||
-          doc.status === "pending" ||
-          inPipeline ? (
-            <DocumentQueueStatus docId={Number(id)} />
-          ) : (
+          {docBusy && (
             <>
-              <ReprocessMenu
-                docId={id!}
-                onBeforeReprocess={handleReprocessRequested}
-                onReprocessed={() => loadDoc(false)}
-              />
-              <TranslateMenu
-                docId={id!}
-                hasOcrText={!!(doc.ocr_text && doc.ocr_text.trim())}
-                canSelectRegion={
-                  !!doc.file_path &&
-                  (doc.original_filename || "").toLowerCase().endsWith(".pdf")
-                }
-                onTranslated={() => loadDoc(false)}
-                onStartRegionSelection={handleStartRegionSelection}
-              />
+              <button
+                onClick={handleCancel}
+                className="flex items-center gap-1 rounded-md border border-warning/40 px-3 py-1.5 text-sm text-warning hover:bg-warning-soft coarse:min-h-11"
+              >
+                <X className="h-4 w-4" /> Cancel
+              </button>
+              <DocumentQueueStatus docId={Number(id)} />
             </>
           )}
-          <ShareWithDoctorButton
-            patientId={doc.patient_id}
-            documentId={doc.id}
-            patientName={doc.patient_name}
-            documentLabel={doc.original_filename || doc.doc_type}
+          <DetailActionsMenu
+            imagingStudyId={doc.imaging_studies?.[0]?.id ?? null}
+            onUnlinkImaging={handleUnlinkImaging}
+            showPipelineActions={!docBusy}
+            onReprocess={() => setReprocessOpen(true)}
+            onTranslate={() => setTranslateOpen(true)}
+            translateDisabled={!hasOcrText && !canSelectRegion}
+            translateDisabledReason="No OCR text and no PDF file to translate."
+            onShare={() => setShareOpen(true)}
+            shareDisabled={!doc.patient_id}
+            shareDisabledReason="Assign this document to a patient before sharing"
+            onDelete={handleDelete}
           />
-          <button
-            onClick={handleDelete}
-            className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
-          >
-            <Trash2 className="h-4 w-4" /> Delete
-          </button>
         </div>
       </div>
+
+      {/* Header action flows (menu items only toggle these) */}
+      <ReprocessSheet
+        open={reprocessOpen}
+        onOpenChange={setReprocessOpen}
+        docId={id!}
+        onBeforeReprocess={handleReprocessRequested}
+        onReprocessed={() => loadDoc(false)}
+      />
+      <TranslateSheet
+        open={translateOpen}
+        onOpenChange={setTranslateOpen}
+        docId={id!}
+        hasOcrText={hasOcrText}
+        canSelectRegion={canSelectRegion}
+        onTranslated={() => loadDoc(false)}
+        onStartRegionSelection={handleStartRegionSelection}
+      />
+      <ShareDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        patientId={doc.patient_id}
+        documentIds={[doc.id]}
+        patientName={doc.patient_name}
+        selectionLabel={
+          doc.original_filename || doc.doc_type || `Document #${doc.id}`
+        }
+      />
 
       {/* Summary */}
       <EditableSummary
@@ -334,7 +366,12 @@ export default function DocumentDetailPage() {
         onSave={updateDocFields}
       />
 
-      <DocumentSectionsList sections={doc.sections || []} />
+      {/* Below lg the sections list drops after the (stacked) grid so the
+          viewer + metadata lead; on lg the DOM order stands. */}
+      <DocumentSectionsList
+        sections={doc.sections || []}
+        className="order-1 lg:order-none"
+      />
 
       <div className="grid gap-6 lg:grid-cols-2 overflow-hidden">
         <div className="space-y-4 min-w-0">
@@ -407,11 +444,16 @@ export default function DocumentDetailPage() {
 
       {/* Pipeline stage history — shows OCR/LLM/organizing transitions
           across the original upload and any subsequent reprocesses. */}
-      <DocumentStageTimeline documentId={doc.id} />
+      <DocumentStageTimeline
+        documentId={doc.id}
+        className="order-2 lg:order-none"
+      />
 
       {/* OCR section: hide for placeholder imaging reports (no PDF, no
           OCR text). Real PDF reports go through OCR like any document. */}
-      {!isImagingPlaceholder(doc) && <OcrSection text={doc.ocr_text} />}
+      {!isImagingPlaceholder(doc) && (
+        <OcrSection text={doc.ocr_text} className="order-2 lg:order-none" />
+      )}
     </div>
   );
 }

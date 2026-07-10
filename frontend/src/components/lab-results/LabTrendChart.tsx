@@ -121,7 +121,7 @@ export default function LabTrendChart({ rows, selectedCodes }: Props) {
   }
 
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="rounded-lg border bg-background p-2 sm:p-3">
       <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>
           Trend — {data.length} data point{data.length === 1 ? "" : "s"}
@@ -143,6 +143,8 @@ export default function LabTrendChart({ rows, selectedCodes }: Props) {
               dataKey="date"
               stroke="currentColor"
               tick={{ fontSize: 11 }}
+              interval="preserveStartEnd"
+              minTickGap={24}
             />
             <YAxis stroke="currentColor" tick={{ fontSize: 11 }} />
             <Tooltip

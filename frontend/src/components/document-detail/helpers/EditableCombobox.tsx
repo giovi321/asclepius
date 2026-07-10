@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Pencil, Plus, Search, X } from "lucide-react";
 import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
@@ -447,19 +447,23 @@ export function EditableCombobox({
 
   return (
     <div
-      className="flex justify-between text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1"
+      className="flex items-center justify-between gap-2 text-sm py-0.5 group cursor-pointer hover:bg-accent/30 rounded px-1 -mx-1 coarse:min-h-11"
       onClick={() => {
         setQuery("");
         setEditing(true);
       }}
     >
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">
+      <span className="flex min-w-0 items-center gap-1.5 font-medium">
         {value || (
-          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs">
+          <span className="text-muted-foreground/50 italic group-hover:text-primary text-xs coarse:opacity-70">
             click to edit
           </span>
         )}
+        <Pencil
+          aria-hidden
+          className="h-3 w-3 shrink-0 text-muted-foreground/60 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+        />
       </span>
     </div>
   );

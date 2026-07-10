@@ -4,6 +4,9 @@ import { LogOut, FileText, Calendar, Moon, Sun } from "lucide-react";
 
 import { useShareSession } from "@/contexts/ShareSessionContext";
 import ShareLogo from "@/components/share/ShareLogo";
+import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 /**
  * Doctor's home view inside an active share.
@@ -17,48 +20,59 @@ export default function ShareDashboardPage() {
   const { me, loading, logout, theme, toggleTheme } = useShareSession();
 
   if (loading) {
-    return <div className="p-8 text-muted-foreground">Loading...</div>;
+    return (
+      <div className="min-h-dvh bg-muted/30">
+        <main className="max-w-5xl mx-auto px-4 py-6 space-y-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="rounded-lg border bg-card p-4">
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="mt-2 h-3 w-2/3" />
+            </div>
+          ))}
+        </main>
+      </div>
+    );
   }
   if (!me) return null;
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-dvh bg-muted/30">
       <header className="border-b bg-background">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
             <ShareLogo size="sm" />
-            <div>
-              <h1 className="text-lg font-semibold">{me.patient_name}</h1>
-              <p className="text-xs text-muted-foreground">
-                Shared with {me.recipient_label} · you will be logged out
-                automatically in{" "}
-                <SessionCountdown iso={me.session_expires_at} />
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold truncate">
+                {me.patient_name}
+              </h1>
+              <p className="text-xs text-muted-foreground truncate">
+                Shared with {me.recipient_label}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="mr-auto text-xs text-muted-foreground sm:mr-0">
+              Automatic logout in{" "}
+              <SessionCountdown iso={me.session_expires_at} />
+            </p>
+            <IconButton
               onClick={toggleTheme}
-              title={
+              variant="secondary"
+              label={
                 theme === "dark"
                   ? "Switch to light mode"
                   : "Switch to dark mode"
               }
-              aria-label="Toggle theme"
-              className="rounded-md border p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               {theme === "dark" ? (
                 <Sun className="h-4 w-4" />
               ) : (
                 <Moon className="h-4 w-4" />
               )}
-            </button>
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-            >
+            </IconButton>
+            <Button variant="secondary" size="md" onClick={logout}>
               <LogOut className="h-4 w-4" /> Log out
-            </button>
+            </Button>
           </div>
         </div>
       </header>
@@ -74,7 +88,7 @@ export default function ShareDashboardPage() {
               <li key={d.id}>
                 <Link
                   to={`/share/documents/${d.id}`}
-                  className="flex items-start gap-3 rounded-lg border bg-card p-4 hover:border-primary transition-colors"
+                  className="flex min-h-11 items-start gap-3 rounded-lg border bg-card p-4 hover:border-primary transition-colors"
                 >
                   <FileText className="h-5 w-5 text-primary mt-0.5" />
                   <div className="flex-1 min-w-0">

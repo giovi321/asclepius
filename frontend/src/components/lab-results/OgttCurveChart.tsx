@@ -64,7 +64,7 @@ export default function OgttCurveChart({ rows }: { rows: LabRow[] }) {
   const unit = rows.find((r) => r.unit)?.unit || "mg/dL";
 
   return (
-    <div className="rounded-md border bg-background p-3">
+    <div className="rounded-md border bg-background p-2 sm:p-3">
       <div className="mb-2 text-xs font-medium text-muted-foreground">
         Glucose curve (OGTT) — {data.length} points · unit {unit}
       </div>
@@ -88,6 +88,8 @@ export default function OgttCurveChart({ rows }: { rows: LabRow[] }) {
               }}
               stroke="currentColor"
               tick={{ fontSize: 11 }}
+              interval="preserveStartEnd"
+              minTickGap={24}
             />
             <YAxis stroke="currentColor" tick={{ fontSize: 11 }} />
             <Tooltip

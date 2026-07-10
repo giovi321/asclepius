@@ -1,4 +1,6 @@
 import { GitMerge, Sparkles } from "lucide-react";
+import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
 
 export interface AutoMergeProposal {
   target_id: number;
@@ -36,12 +38,9 @@ export default function AutoMergePanel({
           <Sparkles className="h-4 w-4 text-primary" />
           AI merge proposals ({proposals.length})
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-        >
+        <Button size="sm" variant="secondary" onClick={onClose}>
           Close
-        </button>
+        </Button>
       </div>
       {proposals.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -58,19 +57,20 @@ export default function AutoMergePanel({
               >
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">Target:</span>
-                  <select
+                  <Select
                     value={p.target_id}
                     onChange={(e) =>
                       onUpdateTarget(idx, Number(e.target.value))
                     }
-                    className="rounded-md border bg-background px-2 py-1 text-sm"
+                    aria-label="Merge target"
+                    className="w-auto min-w-0 flex-1 md:flex-none"
                   >
                     {groupIds.map((id) => (
                       <option key={id} value={id}>
                         {entryById[id]?.canonical_display || `#${id}`}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 {p.reason && (
                   <p className="text-xs italic text-muted-foreground">
@@ -89,7 +89,7 @@ export default function AutoMergePanel({
                     p.source_ids.map((sid: number) => (
                       <label
                         key={sid}
-                        className="flex items-center gap-2 text-sm"
+                        className="flex items-center gap-2 text-sm coarse:min-h-11"
                       >
                         <input
                           type="checkbox"
@@ -109,19 +109,16 @@ export default function AutoMergePanel({
                   )}
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <button
+                  <Button
+                    size="sm"
                     onClick={() => onApply(p)}
                     disabled={p.source_ids.length === 0}
-                    className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-40"
                   >
                     <GitMerge className="h-3 w-3" /> Apply merge
-                  </button>
-                  <button
-                    onClick={() => onSkip(idx)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-accent"
-                  >
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => onSkip(idx)}>
                     Skip
-                  </button>
+                  </Button>
                 </div>
               </div>
             );

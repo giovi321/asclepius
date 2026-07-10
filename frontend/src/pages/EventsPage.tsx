@@ -9,8 +9,16 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  MoreHorizontal,
   Pencil,
 } from "lucide-react";
+import IconButton from "@/components/ui/IconButton";
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
+} from "@/components/ui/Menu";
 import { EVENT_COLORS } from "./events/constants";
 import EventForm from "./events/EventForm";
 import { useEventsPage } from "./events/useEventsPage";
@@ -184,7 +192,7 @@ export default function EventsPage() {
                 className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent/30"
               >
                 <div
-                  className={`h-3 w-3 rounded-full flex-shrink-0 ${EVENT_COLORS[event.event_type] || "bg-gray-500"}`}
+                  className={`h-3 w-3 rounded-full flex-shrink-0 ${EVENT_COLORS[event.event_type] || "bg-muted-foreground"}`}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -193,7 +201,7 @@ export default function EventsPage() {
                       {event.event_type.replace(/_/g, " ")}
                     </span>
                     {!!event.is_ongoing && (
-                      <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-600">
+                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">
                         ongoing
                       </span>
                     )}
@@ -257,23 +265,27 @@ export default function EventsPage() {
                               <Link
                                 key={doc.document_id}
                                 to={`/documents/${doc.document_id}`}
-                                className="flex items-center gap-2 rounded-md border p-2 text-xs hover:bg-accent/30"
+                                className="flex flex-col gap-0.5 rounded-md border p-2 text-xs hover:bg-accent/30 sm:flex-row sm:items-center sm:gap-2"
                               >
-                                <FileText className="h-3 w-3 flex-shrink-0 text-primary" />
-                                <span className="font-medium truncate">
-                                  {doc.original_filename}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {doc.doc_type?.replace(/_/g, " ")}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {doc.event_date}
-                                </span>
-                                {doc.relevance !== "primary" && (
-                                  <span className="rounded bg-muted px-1 py-0.5 text-[9px]">
-                                    {doc.relevance}
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <FileText className="h-3 w-3 flex-shrink-0 text-primary" />
+                                  <span className="min-w-0 truncate font-medium">
+                                    {doc.original_filename}
                                   </span>
-                                )}
+                                  <span className="shrink-0 text-muted-foreground">
+                                    {doc.doc_type?.replace(/_/g, " ")}
+                                  </span>
+                                </span>
+                                <span className="flex items-center gap-2 pl-5 sm:pl-0">
+                                  <span className="text-muted-foreground">
+                                    {doc.event_date}
+                                  </span>
+                                  {doc.relevance !== "primary" && (
+                                    <span className="rounded bg-muted px-1 py-0.5 text-[9px]">
+                                      {doc.relevance}
+                                    </span>
+                                  )}
+                                </span>
                               </Link>
                             ))}
                           </div>
@@ -284,26 +296,39 @@ export default function EventsPage() {
                         )}
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <button
                           onClick={() => startEdit(event)}
-                          className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent/30"
+                          className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-accent/30 coarse:min-h-11"
                         >
                           <Pencil className="h-3 w-3" /> Edit
                         </button>
                         <button
                           onClick={() => handleDelete(event.id)}
-                          className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                          className="flex items-center gap-1 rounded-md border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive-soft coarse:min-h-11"
                         >
                           <Trash2 className="h-3 w-3" /> Delete Event
                         </button>
-                        <button
-                          onClick={() => handleDeleteWithDocs(event.id)}
-                          className="flex items-center gap-1 rounded-md bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" /> Delete Event &
-                          Documents
-                        </button>
+                        <Menu>
+                          <MenuTrigger asChild>
+                            <IconButton
+                              label="More actions"
+                              variant="secondary"
+                              size="sm"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </IconButton>
+                          </MenuTrigger>
+                          <MenuContent align="start">
+                            <MenuItem
+                              destructive
+                              onSelect={() => handleDeleteWithDocs(event.id)}
+                            >
+                              <Trash2 className="h-4 w-4" /> Delete Event &
+                              Documents
+                            </MenuItem>
+                          </MenuContent>
+                        </Menu>
                       </div>
                     </>
                   )}

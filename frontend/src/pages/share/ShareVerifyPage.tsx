@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareLogo from "@/components/share/ShareLogo";
+import Button from "@/components/ui/Button";
 
 type DeliveryInfo = {
   delivery: "manual" | "email";
@@ -83,7 +84,7 @@ export default function ShareVerifyPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-dvh flex items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-md rounded-lg border bg-card p-8 shadow-sm space-y-6">
         <div className="flex justify-center">
           <ShareLogo size="md" />
@@ -106,17 +107,17 @@ export default function ShareVerifyPage() {
             maxLength={8}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="w-full rounded-md border bg-background px-3 py-2 text-center text-lg tracking-[0.4em] font-mono"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-center text-lg tracking-[0.4em] font-mono placeholder:text-muted-foreground transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="000000"
           />
-          <button
+          <Button
             type="submit"
-            disabled={submitting}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+            size="lg"
+            className="w-full"
+            loading={submitting}
           >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
             Verify and continue
-          </button>
+          </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>
         <p className="text-xs text-muted-foreground border-t pt-4">

@@ -62,7 +62,8 @@ export default function InlineRenameCell({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-50"
+          className="rounded p-1 text-success hover:bg-success-soft disabled:opacity-50"
+          aria-label="Save filename"
         >
           <Check className="h-3.5 w-3.5" />
         </button>
@@ -72,6 +73,7 @@ export default function InlineRenameCell({
             setVal(doc.original_filename);
           }}
           className="rounded p-1 text-muted-foreground hover:bg-accent"
+          aria-label="Cancel rename"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -95,8 +97,12 @@ export default function InlineRenameCell({
           setVal(doc.original_filename);
           setEditing(true);
         }}
-        className="opacity-0 group-hover:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
+        // Hover-only reveal is acceptable here: this cell renders only in
+        // the desktop (md+) table — the mobile card list uses DocumentCard.
+        // focus-visible keeps it reachable for keyboard users.
+        className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 rounded p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
         title="Rename"
+        aria-label="Rename"
       >
         <Pencil className="h-3 w-3" />
       </button>

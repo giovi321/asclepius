@@ -127,13 +127,13 @@ export default function PipelineTab() {
     <div className="space-y-6">
       {/* Auto-stop warning banner */}
       {pipelineStatus?.auto_stopped && (
-        <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="rounded-lg border border-warning/40 bg-warning-soft p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="font-medium text-amber-800 dark:text-amber-300">
+            <p className="font-medium text-warning">
               Pipeline automatically paused
             </p>
-            <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+            <p className="text-sm text-warning/90 mt-1">
               {pipelineStatus.auto_stop_reason ||
                 "All providers appear unreachable after consecutive failures."}{" "}
               Check your provider settings and restart when ready.
@@ -142,7 +142,7 @@ export default function PipelineTab() {
           <button
             onClick={startPipeline}
             disabled={startingPipeline}
-            className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 flex-shrink-0"
+            className="flex items-center gap-1.5 rounded-md bg-warning px-3 py-1.5 text-sm font-medium text-white hover:bg-warning/90 disabled:opacity-50 flex-shrink-0 coarse:min-h-11"
           >
             {startingPipeline ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -159,8 +159,8 @@ export default function PipelineTab() {
         <div
           className={`rounded-lg border-2 p-5 ${
             isActive
-              ? "border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10"
-              : "border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/10"
+              ? "border-success/40 bg-success-soft/50"
+              : "border-border bg-muted/40"
           }`}
         >
           <div className="flex items-center justify-between">
@@ -168,21 +168,21 @@ export default function PipelineTab() {
               <div
                 className={`flex items-center justify-center h-10 w-10 rounded-full ${
                   isActive
-                    ? "bg-green-100 dark:bg-green-900/30"
-                    : "bg-gray-100 dark:bg-gray-800"
+                    ? "bg-success-soft"
+                    : "bg-muted"
                 }`}
               >
                 {isActive ? (
-                  <Play className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <Play className="h-5 w-5 text-success" />
                 ) : (
-                  <Power className="h-5 w-5 text-gray-400" />
+                  <Power className="h-5 w-5 text-muted-foreground" />
                 )}
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span
                     className={`inline-block h-2.5 w-2.5 rounded-full ${
-                      isActive ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                      isActive ? "bg-success animate-pulse" : "bg-muted-foreground/50"
                     }`}
                   />
                   <span className="font-semibold">
@@ -222,7 +222,7 @@ export default function PipelineTab() {
                   </span>
                 </div>
                 {pipelineStatus.total_errors > 0 && (
-                  <div className="text-red-500">
+                  <div className="text-destructive">
                     Errors: {pipelineStatus.total_errors}
                   </div>
                 )}
@@ -231,7 +231,7 @@ export default function PipelineTab() {
                 <button
                   onClick={stopPipeline}
                   disabled={startingPipeline}
-                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 transition-colors coarse:min-h-11"
                 >
                   {startingPipeline ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -244,7 +244,7 @@ export default function PipelineTab() {
                 <button
                   onClick={startPipeline}
                   disabled={startingPipeline}
-                  className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-success px-4 py-2.5 text-sm font-medium text-white hover:bg-success/90 disabled:opacity-50 transition-colors coarse:min-h-11"
                 >
                   {startingPipeline ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -337,7 +337,7 @@ export default function PipelineTab() {
           <h3 className="font-medium">
             Failed Documents
             {failedDocs.length > 0 && (
-              <span className="ml-2 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+              <span className="ml-2 rounded-full bg-destructive-soft px-2 py-0.5 text-xs font-medium text-destructive">
                 {failedDocs.length}
               </span>
             )}
@@ -383,8 +383,8 @@ export default function PipelineTab() {
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
                         doc.status === "failed"
-                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          ? "bg-destructive-soft text-destructive"
+                          : "bg-warning-soft text-warning"
                       }`}
                     >
                       {doc.status}
@@ -404,14 +404,15 @@ export default function PipelineTab() {
                     </button>
                     <button
                       onClick={() => deleteDoc(doc.id)}
-                      className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      className="flex items-center justify-center rounded p-1 text-muted-foreground hover:text-destructive coarse:min-h-11 coarse:min-w-11"
+                      aria-label="Delete document"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
                 {doc.error_message && (
-                  <div className="rounded-md bg-red-50 dark:bg-red-900/10 px-3 py-2 text-xs text-red-700 dark:text-red-400 font-mono break-all">
+                  <div className="rounded-md bg-destructive-soft px-3 py-2 text-xs text-destructive font-mono break-all">
                     {doc.error_message}
                   </div>
                 )}

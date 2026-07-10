@@ -8,6 +8,8 @@ import ShareDocumentViewer, {
 } from "@/components/share/ShareDocumentViewer";
 import ShareTranslateMenu from "@/components/share/ShareTranslateMenu";
 import ShareLogo from "@/components/share/ShareLogo";
+import Badge from "@/components/ui/Badge";
+import RegionThumbLightbox from "@/components/RegionThumbLightbox";
 import { useToast } from "@/contexts/ToastContext";
 import { useShareSession } from "@/contexts/ShareSessionContext";
 
@@ -67,6 +69,9 @@ export default function ShareDocumentPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(
+    null,
+  );
 
   const allowedLanguages = me?.allowed_translation_languages?.length
     ? me.allowed_translation_languages
@@ -154,7 +159,7 @@ export default function ShareDocumentPage() {
     return <div className="p-8 text-muted-foreground">Loading...</div>;
   if (error || !doc) {
     return (
-      <div className="min-h-screen bg-muted/30">
+      <div className="min-h-dvh bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3">
             <ShareLogo size="sm" />
@@ -172,7 +177,7 @@ export default function ShareDocumentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-dvh bg-muted/30">
       <header className="border-b bg-background">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -196,7 +201,7 @@ export default function ShareDocumentPage() {
                   : "Switch to dark mode"
               }
               aria-label="Toggle theme"
-              className="rounded-md border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center justify-center rounded-md border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground coarse:min-h-11 coarse:min-w-11"
             >
               {theme === "dark" ? (
                 <Sun className="h-4 w-4" />
@@ -209,7 +214,9 @@ export default function ShareDocumentPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section>
+        {/* Bounded height: the viewer fills whatever its parent gives it
+            (sizing contract); dvh clamp keeps it on-screen on phones. */}
+        <section className="h-[min(700px,calc(100dvh-8rem))]">
           <ShareDocumentViewer
             documentId={doc.id}
             selectionMode={selectionMode}
@@ -219,9 +226,9 @@ export default function ShareDocumentPage() {
           />
         </section>
 
-        <section className="space-y-6">
+        <section className="min-w-0 space-y-6">
           <div>
-            <h1 className="text-lg font-semibold">
+            <h1 className="text-lg font-semibold break-words">
               {doc.original_filename || doc.doc_type || "Document"}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -280,10 +287,10 @@ export default function ShareDocumentPage() {
               <ul className="space-y-2">
                 {doc.region_translations.map((rt) => {
                   // Mirrors the admin RegionTranslationsSection: small
-                  // inline thumbnail in the header row with a hover-
-                  // preview pop, click to open the full crop. The
-                  // backend's /api/share endpoint enforces share scope
-                  // before serving the bytes.
+                  // inline thumbnail in the header row; tap opens the
+                  // in-app lightbox (no new-tab open). The backend's
+                  // /api/share endpoint enforces share scope before
+                  // serving the bytes.
                   const thumbUrl = rt.has_thumbnail
                     ? `/api/share/documents/${doc.id}/region-translations/${rt.id}/thumbnail`
                     : null;
@@ -300,26 +307,23 @@ export default function ShareDocumentPage() {
                           </span>
                         )}
                         {thumbUrl && (
-                          <a
-                            href={thumbUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="group/thumb relative ml-auto block flex-shrink-0"
-                            title="Hover to preview, click to open full-size"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLightbox({
+                                src: thumbUrl,
+                                alt: `Region on page ${rt.page}`,
+                              })
+                            }
+                            className="ml-auto block flex-shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            title="View full-size"
                           >
                             <img
                               src={thumbUrl}
                               alt={`Region on page ${rt.page}`}
                               className="h-7 w-12 object-cover rounded border bg-background"
                             />
-                            <div className="pointer-events-none absolute right-0 top-full mt-1 z-20 hidden rounded-md border bg-background p-1 shadow-xl group-hover/thumb:block">
-                              <img
-                                src={thumbUrl}
-                                alt=""
-                                className="max-h-64 max-w-xs object-contain"
-                              />
-                            </div>
-                          </a>
+                          </button>
                         )}
                       </div>
                       {rt.translated_text ? (
@@ -351,7 +355,8 @@ export default function ShareDocumentPage() {
           {doc.lab_results && doc.lab_results.length > 0 && (
             <div>
               <h2 className="text-sm font-semibold mb-2">Lab results</h2>
-              <div className="rounded-md border overflow-hidden">
+              {/* md+: the classic 4-column table. */}
+              <div className="hidden md:block rounded-md border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50 text-xs">
                     <tr>
@@ -365,11 +370,7 @@ export default function ShareDocumentPage() {
                     {doc.lab_results.map((lr: any) => (
                       <tr
                         key={lr.id}
-                        className={
-                          lr.is_abnormal
-                            ? "bg-amber-50/40 dark:bg-amber-900/10"
-                            : ""
-                        }
+                        className={lr.is_abnormal ? "bg-warning-soft/50" : ""}
                       >
                         <td className="px-3 py-1.5">
                           {lr.test_name_canonical || lr.test_name_original}
@@ -389,6 +390,42 @@ export default function ShareDocumentPage() {
                   </tbody>
                 </table>
               </div>
+              {/* Below md: same rows as a stacked read-only list so the
+                  4 columns never overflow a narrow viewport. */}
+              <ul className="md:hidden rounded-md border bg-card divide-y overflow-hidden">
+                {doc.lab_results.map((lr: any) => (
+                  <li
+                    key={lr.id}
+                    className={
+                      lr.is_abnormal
+                        ? "p-3 text-sm bg-warning-soft/50"
+                        : "p-3 text-sm"
+                    }
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                      <span className="min-w-0 break-words font-medium">
+                        {lr.test_name_canonical || lr.test_name_original}
+                        {lr.is_abnormal && (
+                          <Badge variant="warning" size="sm" className="ml-1.5 align-middle">
+                            Abnormal
+                          </Badge>
+                        )}
+                      </span>
+                      <span className="font-mono">
+                        {lr.value ?? lr.value_text ?? ""}
+                        {lr.unit ? ` ${lr.unit}` : ""}
+                      </span>
+                    </div>
+                    {(lr.reference_range_low != null ||
+                      lr.reference_range_high != null) && (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        Reference: {lr.reference_range_low ?? ""} -{" "}
+                        {lr.reference_range_high ?? ""}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -438,6 +475,15 @@ export default function ShareDocumentPage() {
           )}
         </section>
       </main>
+
+      <RegionThumbLightbox
+        open={lightbox !== null}
+        onOpenChange={(o) => {
+          if (!o) setLightbox(null);
+        }}
+        src={lightbox?.src ?? null}
+        alt={lightbox?.alt}
+      />
     </div>
   );
 }

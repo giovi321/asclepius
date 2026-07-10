@@ -1,9 +1,14 @@
 import { useState } from "react";
 import api from "@/api/client";
-import { Plus, Trash2, ChevronDown, ChevronUp, Save, X } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Save, X, Users } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { usePatients } from "@/hooks/data";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import type { Patient, PatientCreate } from "@/types";
 
 export default function PatientsPage() {
@@ -85,13 +90,10 @@ export default function PatientsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-        >
+        <Button size="md" onClick={() => setShowCreate(!showCreate)}>
           <Plus className="h-4 w-4" />
           New Patient
-        </button>
+        </Button>
       </div>
 
       {/* Create form */}
@@ -101,19 +103,18 @@ export default function PatientsPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1">
               <span className="text-sm font-medium">Full Name *</span>
-              <input
+              <Input
                 type="text"
                 value={newPatient.display_name || ""}
                 onChange={(e) =>
                   setNewPatient({ ...newPatient, display_name: e.target.value })
                 }
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 autoFocus
               />
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium">Date of Birth</span>
-              <input
+              <Input
                 type="date"
                 value={newPatient.date_of_birth || ""}
                 onChange={(e) =>
@@ -122,44 +123,44 @@ export default function PatientsPage() {
                     date_of_birth: e.target.value,
                   })
                 }
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               />
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium">Sex</span>
-              <select
+              <Select
                 value={newPatient.sex || ""}
                 onChange={(e) =>
                   setNewPatient({ ...newPatient, sex: e.target.value })
                 }
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
               >
                 <option value="">--</option>
                 <option value="M">Male</option>
                 <option value="F">Female</option>
                 <option value="O">Other</option>
-              </select>
+              </Select>
             </label>
           </div>
-          <div className="flex gap-2">
-            <button
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="md"
               onClick={handleCreate}
-              disabled={saving || !newPatient.display_name?.trim()}
-              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              loading={saving}
+              disabled={!newPatient.display_name?.trim()}
             >
-              <Save className="h-4 w-4" />
+              {!saving && <Save className="h-4 w-4" />}
               {saving ? "Creating..." : "Create Patient"}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
               onClick={() => {
                 setShowCreate(false);
                 setNewPatient({});
               }}
-              className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
             >
               <X className="h-4 w-4" />
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -167,7 +168,7 @@ export default function PatientsPage() {
       {/* Table */}
       <div className="rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/50">
+          <thead className="border-b bg-surface">
             <tr>
               <th className="px-4 py-2 text-left font-medium">Name</th>
               <th className="px-4 py-2 text-left font-medium">Date of Birth</th>
@@ -178,20 +179,18 @@ export default function PatientsPage() {
           <tbody className="divide-y">
             {loading ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="p-4 text-center text-muted-foreground"
-                >
-                  Loading...
+                <td colSpan={4}>
+                  <SkeletonRows rows={4} cols={3} />
                 </td>
               </tr>
             ) : patients.length === 0 ? (
               <tr>
-                <td
-                  colSpan={4}
-                  className="p-4 text-center text-muted-foreground"
-                >
-                  No patients found
+                <td colSpan={4}>
+                  <EmptyState
+                    icon={Users}
+                    title="No patients found"
+                    description="Create a patient to start filing documents and lab results against them."
+                  />
                 </td>
               </tr>
             ) : (
@@ -238,14 +237,16 @@ function PatientRow({
   return (
     <>
       <tr className="hover:bg-accent/50 cursor-pointer" onClick={onToggle}>
-        <td className="px-4 py-2 font-medium">{patient.display_name}</td>
-        <td className="px-4 py-2 text-muted-foreground">
+        <td className="px-4 py-2 coarse:py-3 font-medium">
+          {patient.display_name}
+        </td>
+        <td className="px-4 py-2 coarse:py-3 text-muted-foreground">
           {patient.date_of_birth || "--"}
         </td>
-        <td className="px-4 py-2 text-muted-foreground">
+        <td className="px-4 py-2 coarse:py-3 text-muted-foreground">
           {patient.sex || "--"}
         </td>
-        <td className="px-4 py-2">
+        <td className="px-4 py-2 coarse:py-3">
           <div className="flex items-center gap-1">
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
@@ -261,61 +262,56 @@ function PatientRow({
             <div className="grid gap-3 sm:grid-cols-3 max-w-4xl">
               <label className="space-y-1">
                 <span className="text-sm font-medium">Full Name</span>
-                <input
+                <Input
                   type="text"
                   value={editData.display_name || ""}
                   onChange={(e) =>
                     onEditChange({ ...editData, display_name: e.target.value })
                   }
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 />
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">Date of Birth</span>
-                <input
+                <Input
                   type="date"
                   value={editData.date_of_birth || ""}
                   onChange={(e) =>
                     onEditChange({ ...editData, date_of_birth: e.target.value })
                   }
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 />
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">Sex</span>
-                <select
+                <Select
                   value={editData.sex || ""}
                   onChange={(e) =>
                     onEditChange({ ...editData, sex: e.target.value })
                   }
-                  className="w-full rounded-md border bg-background px-3 py-2 text-sm"
                 >
                   <option value="">--</option>
                   <option value="M">Male</option>
                   <option value="F">Female</option>
                   <option value="O">Other</option>
-                </select>
+                </Select>
               </label>
             </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={onSave}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button size="md" onClick={onSave} loading={saving}>
+                {!saving && <Save className="h-4 w-4" />}
                 {saving ? "Saving..." : "Save"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                className="border-destructive/30 text-destructive hover:bg-destructive-soft active:bg-destructive-soft"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete();
                 }}
-                className="flex items-center gap-2 rounded-md border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete
-              </button>
+              </Button>
             </div>
           </td>
         </tr>

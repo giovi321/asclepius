@@ -1,33 +1,6 @@
-import { useEffect, useState } from "react";
-
-type Theme = "light" | "dark";
-
-export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem("theme");
-    if (stored === "dark" || stored === "light") return stored;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-  };
-
-  const setTheme = (t: Theme) => {
-    setThemeState(t);
-  };
-
-  return { theme, toggleTheme, setTheme };
-}
+/**
+ * Compatibility shim: the theme now lives in a context so multiple consumers
+ * (top bar, nav drawer, share surface) stay in sync. Import path preserved
+ * for existing call sites.
+ */
+export { useTheme } from "@/contexts/ThemeContext";

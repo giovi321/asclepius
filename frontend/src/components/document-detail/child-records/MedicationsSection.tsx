@@ -3,7 +3,9 @@ import api from "@/api/client";
 import { Pill, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import Badge from "@/components/ui/Badge";
 import {
   Section,
   EditableField,
@@ -62,8 +64,9 @@ function MedicationRow({
         <MedFormBadge form={med.form} />
         <button
           onClick={onDelete}
-          className="rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+          className="flex flex-shrink-0 items-center justify-center rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive coarse:min-h-11 coarse:min-w-11"
           title="Delete medication"
+          aria-label="Delete medication"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -119,6 +122,7 @@ export function MedicationsSection({
 }) {
   const confirm = useConfirm();
   const { toast } = useToast();
+  const { isMobile } = useBreakpoint();
   if (!medications?.length) return null;
 
   const handleDelete = async (medId: number) => {
@@ -139,7 +143,13 @@ export function MedicationsSection({
   };
 
   return (
-    <Section title="Medications" icon={Pill} sectionId="medications">
+    <Section
+      title="Medications"
+      icon={Pill}
+      sectionId="medications"
+      defaultOpen={!isMobile}
+      headerExtra={<Badge size="sm">{medications.length}</Badge>}
+    >
       {medications.map((med, i) => (
         <div key={med.id} className={i > 0 ? "pt-3 mt-3 border-t" : ""}>
           <MedicationRow

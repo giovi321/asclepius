@@ -63,3 +63,4 @@ site/
 # build-script path is read by build_lab_tests.py)
 /Loinc_*/
 /scripts/build_knowledge/loinc.csv
+.playwright-mcp/

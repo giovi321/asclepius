@@ -98,14 +98,18 @@ function PrioritySection<T extends AnyEntry>({
                 <button
                   onClick={() => move(idx, "up")}
                   disabled={idx === 0}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
+                  aria-label="Move up"
+                  title="Move up"
+                  className="flex items-center justify-center rounded-md p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 coarse:min-h-11 coarse:min-w-11"
                 >
                   <ChevronUp className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => move(idx, "down")}
                   disabled={idx === items.length - 1}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5"
+                  aria-label="Move down"
+                  title="Move down"
+                  className="flex items-center justify-center rounded-md p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 coarse:min-h-11 coarse:min-w-11"
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
@@ -135,7 +139,7 @@ function PrioritySection<T extends AnyEntry>({
                     ? "Enabled — click to disable"
                     : "Disabled — click to enable"
                 }
-                className={`rounded-md p-1.5 transition-colors ${p.enabled ? "text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20" : "text-muted-foreground hover:bg-accent"}`}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors coarse:min-h-11 coarse:min-w-11 ${p.enabled ? "text-success hover:bg-success-soft" : "text-muted-foreground hover:bg-accent"}`}
               >
                 <Power className="h-4 w-4" />
               </button>
@@ -217,7 +221,7 @@ function GeneralLlmCard({
       </div>
 
       {!isConfigured && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-2 text-xs text-amber-800 dark:text-amber-200">
+        <div className="flex items-start gap-2 rounded-md border border-warning/25 bg-warning-soft p-2 text-xs text-warning">
           <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
           <span>
             Not configured — those features will return 503 until you pick a
@@ -275,7 +279,7 @@ function GeneralLlmCard({
             ))}
           </select>
           {settings.credential_id && modelsForChosen.length === 0 && (
-            <span className="block text-[11px] text-amber-600 dark:text-amber-500">
+            <span className="block text-[11px] text-warning">
               Add an LLM model to this provider under{" "}
               <Link to="/settings/analysis/providers" className="underline">
                 Providers
@@ -287,7 +291,7 @@ function GeneralLlmCard({
         <button
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap"
+          className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-50 whitespace-nowrap coarse:min-h-11"
         >
           {saved ? (
             <Check className="h-3.5 w-3.5" />
@@ -402,7 +406,7 @@ function TranslationDefaultsCard({
         <button
           onClick={save}
           disabled={saving}
-          className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 whitespace-nowrap"
+          className="flex items-center justify-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary-hover disabled:opacity-50 whitespace-nowrap coarse:min-h-11"
         >
           {saved ? (
             <Check className="h-3.5 w-3.5" />

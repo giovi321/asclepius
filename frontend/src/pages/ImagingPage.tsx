@@ -5,12 +5,21 @@ import { usePatient } from "@/contexts/PatientContext";
 import {
   Image as ImageIcon,
   Search,
-  ChevronUp,
-  ChevronDown,
+  SlidersHorizontal,
   FileText,
   FileX2,
 } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import EmptyState from "@/components/ui/EmptyState";
+import Field from "@/components/ui/Field";
+import Input from "@/components/ui/Input";
+import ResponsiveTable, {
+  type ColumnSpec,
+} from "@/components/ui/ResponsiveTable";
+import Select from "@/components/ui/Select";
+import Sheet from "@/components/ui/Sheet";
 import { useColumnPrefs } from "@/lib/columnPrefs";
 import type { ListResponse } from "@/types";
 
@@ -65,20 +74,28 @@ interface Study {
 import {
   IMAGING_COLUMNS,
   IMAGING_DEFAULTS,
+  type ImagingColumnKey,
 } from "@/components/imaging/columns";
-const COLUMNS: { key: string; label: string; width: string }[] =
-  IMAGING_COLUMNS.map((c) => ({
-    key: c.key,
-    label: c.label,
-    width: c.width,
-  }));
 
 const PAGE_SIZE = 20;
+
+function ReportBadge({ status }: { status: Study["report_status"] }) {
+  return status === "attached" ? (
+    <Badge variant="success">
+      <FileText className="h-3 w-3" /> Attached
+    </Badge>
+  ) : (
+    <Badge variant="warning">
+      <FileX2 className="h-3 w-3" /> Pending
+    </Badge>
+  );
+}
 
 /**
  * Imaging list page. Mirrors DocumentsPage's shape: search + filter chips,
  * sortable columns, paginated results, upload zone at the top. Selecting a
- * row navigates to /imaging/:studyId for the detail view.
+ * row navigates to /imaging/:studyId for the detail view. Below `md` the
+ * table collapses to a card list and the filter controls move into a Sheet.
  */
 export default function ImagingPage() {
   const { selectedPatient } = usePatient();
@@ -97,6 +114,7 @@ export default function ImagingPage() {
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const params = useMemo(() => {
     const p: Record<string, any> = {
@@ -164,6 +182,47 @@ export default function ImagingPage() {
     }
   };
 
+  const activeFilterCount = [
+    modalityFilter,
+    reportStatusFilter,
+    dateFrom,
+    dateTo,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setModalityFilter("");
+    setReportStatusFilter("");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const modalitySelect = (
+    <Select
+      value={modalityFilter}
+      onChange={(e) => setModalityFilter(e.target.value)}
+      aria-label="Imaging type"
+    >
+      <option value="">All types</option>
+      {Object.entries(MODALITY_LABELS).map(([code, label]) => (
+        <option key={code} value={code}>
+          {label} ({code})
+        </option>
+      ))}
+    </Select>
+  );
+
+  const reportStatusSelect = (
+    <Select
+      value={reportStatusFilter}
+      onChange={(e) => setReportStatusFilter(e.target.value as any)}
+      aria-label="Report status"
+    >
+      <option value="">All reports</option>
+      <option value="attached">Report attached</option>
+      <option value="placeholder">Report pending</option>
+    </Select>
+  );
+
   return (
     <div className="space-y-4">
       {showUpload && (
@@ -175,63 +234,131 @@ export default function ImagingPage() {
         />
       )}
 
-      {/* Filters */}
+      {/* Filters: search stays inline everywhere; the selects + date range
+          render inline from md up and collapse into a Sheet below md. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
             type="text"
             placeholder="Search body part, facility, doctor, description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border bg-background pl-10 pr-3 py-2 text-sm"
+            className="pl-10"
           />
         </div>
-        <select
-          value={modalityFilter}
-          onChange={(e) => setModalityFilter(e.target.value)}
-          className="rounded-md border bg-background px-2 py-2 text-sm"
+
+        {/* Desktop inline filters */}
+        <div className="hidden items-center gap-2 md:flex">
+          <Select
+            value={modalityFilter}
+            onChange={(e) => setModalityFilter(e.target.value)}
+            aria-label="Imaging type"
+            className="w-auto"
+          >
+            <option value="">All types</option>
+            {Object.entries(MODALITY_LABELS).map(([code, label]) => (
+              <option key={code} value={code}>
+                {label} ({code})
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={reportStatusFilter}
+            onChange={(e) => setReportStatusFilter(e.target.value as any)}
+            aria-label="Report status"
+            className="w-auto"
+          >
+            <option value="">All reports</option>
+            <option value="attached">Report attached</option>
+            <option value="placeholder">Report pending</option>
+          </Select>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            aria-label="From date"
+            className="w-auto"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            aria-label="To date"
+            className="w-auto"
+          />
+        </div>
+
+        {/* Phone: filter controls live in the sheet */}
+        <Button
+          variant="secondary"
+          size="md"
+          className="md:hidden"
+          onClick={() => setFiltersOpen(true)}
         >
-          <option value="">All types</option>
-          {Object.entries(MODALITY_LABELS).map(([code, label]) => (
-            <option key={code} value={code}>
-              {label} ({code})
-            </option>
-          ))}
-        </select>
-        <select
-          value={reportStatusFilter}
-          onChange={(e) => setReportStatusFilter(e.target.value as any)}
-          className="rounded-md border bg-background px-2 py-2 text-sm"
-        >
-          <option value="">All reports</option>
-          <option value="attached">Report attached</option>
-          <option value="placeholder">Report pending</option>
-        </select>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="rounded-md border bg-background px-2 py-2 text-sm"
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="rounded-md border bg-background px-2 py-2 text-sm"
-        />
-        <button
+          <SlidersHorizontal className="h-4 w-4" />
+          Filters
+          {activeFilterCount > 0 && (
+            <Badge variant="info" size="sm">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="md"
           onClick={() => setShowUpload((v) => !v)}
-          className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
         >
           {showUpload ? "Hide upload" : "Upload"}
-        </button>
+        </Button>
       </div>
 
-      {/* Table — column visibility/order is driven by the Settings page
-          (Table columns tab). We resolve the user's prefs once here and
-          render each column key by name so visibility and reordering both
-          work without the body falling out of sync with the headers. */}
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="Filters"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={clearFilters}
+              disabled={activeFilterCount === 0}
+            >
+              Clear filters
+            </Button>
+            <Button size="md" onClick={() => setFiltersOpen(false)}>
+              Done
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 pt-1">
+          <Field label="Type">{modalitySelect}</Field>
+          <Field label="Report">{reportStatusSelect}</Field>
+          <Field label="From date">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </Field>
+          <Field label="To date">
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Sheet>
+
+      {/* Table (md+) / card list (below md) — column visibility/order is
+          driven by the Settings page (Table columns tab). We resolve the
+          user's prefs once here and render each column key by name so
+          visibility and reordering both work without the body falling out
+          of sync with the headers. */}
       <ImagingTable
         items={items}
         loading={loading}
@@ -249,20 +376,22 @@ export default function ImagingPage() {
             {Math.min((page + 1) * PAGE_SIZE, total)} of {total}
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setPage(Math.max(0, page - 1))}
               disabled={page === 0}
-              className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >
               Previous
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setPage(page + 1)}
               disabled={(page + 1) * PAGE_SIZE >= total}
-              className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -270,12 +399,32 @@ export default function ImagingPage() {
   );
 }
 
-const SortIcon = ({ active, dir }: { active: boolean; dir: "asc" | "desc" }) =>
-  !active ? null : dir === "asc" ? (
-    <ChevronUp className="h-3 w-3 inline" />
-  ) : (
-    <ChevronDown className="h-3 w-3 inline" />
-  );
+const CELL_CLASSES: Partial<Record<ImagingColumnKey, string>> = {
+  body_part: "text-muted-foreground",
+  study_date: "text-muted-foreground tabular-nums",
+  facility: "text-muted-foreground",
+  doctor: "text-muted-foreground",
+  date_added: "text-muted-foreground tabular-nums",
+};
+
+function cellContent(key: ImagingColumnKey, s: Study): React.ReactNode {
+  switch (key) {
+    case "modality":
+      return modalityLabel(s.modality);
+    case "body_part":
+      return niceCase(s.body_part) || "Unknown";
+    case "study_date":
+      return s.study_date || "";
+    case "facility":
+      return s.facility_name || "";
+    case "doctor":
+      return s.doctor_name || "";
+    case "report_status":
+      return <ReportBadge status={s.report_status} />;
+    case "date_added":
+      return s.date_added ? s.date_added.slice(0, 10) : "—";
+  }
+}
 
 function ImagingTable({
   items,
@@ -294,131 +443,63 @@ function ImagingTable({
 }) {
   const prefs = useColumnPrefs("imaging", IMAGING_DEFAULTS);
   const ordered = [
-    ...prefs.order.filter((k) => COLUMNS.some((c) => c.key === k)),
-    ...COLUMNS.map((c) => c.key).filter((k) => !prefs.order.includes(k)),
+    ...prefs.order.filter((k) => IMAGING_COLUMNS.some((c) => c.key === k)),
+    ...IMAGING_COLUMNS.map((c) => c.key as string).filter(
+      (k) => !prefs.order.includes(k),
+    ),
   ];
   const visibleCols = ordered
     .filter((k) => prefs.visible.includes(k))
-    .map((k) => COLUMNS.find((c) => c.key === k))
+    .map((k) => IMAGING_COLUMNS.find((c) => c.key === k))
     .filter((c): c is NonNullable<typeof c> => !!c);
 
-  const renderCell = (key: string, s: Study) => {
-    switch (key) {
-      case "modality":
-        return (
-          <td key={key} className="px-3 py-2">
-            {modalityLabel(s.modality)}
-          </td>
-        );
-      case "body_part":
-        return (
-          <td key={key} className="px-3 py-2 text-muted-foreground">
-            {niceCase(s.body_part) || "Unknown"}
-          </td>
-        );
-      case "study_date":
-        return (
-          <td
-            key={key}
-            className="px-3 py-2 text-muted-foreground tabular-nums"
-          >
-            {s.study_date || ""}
-          </td>
-        );
-      case "facility":
-        return (
-          <td key={key} className="px-3 py-2 text-muted-foreground truncate">
-            {s.facility_name || ""}
-          </td>
-        );
-      case "doctor":
-        return (
-          <td key={key} className="px-3 py-2 text-muted-foreground truncate">
-            {s.doctor_name || ""}
-          </td>
-        );
-      case "report_status":
-        return (
-          <td key={key} className="px-3 py-2">
-            {s.report_status === "attached" ? (
-              <span className="inline-flex items-center gap-1 text-xs rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5">
-                <FileText className="h-3 w-3" /> Attached
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-2 py-0.5">
-                <FileX2 className="h-3 w-3" /> Pending
-              </span>
-            )}
-          </td>
-        );
-      case "date_added":
-        return (
-          <td
-            key={key}
-            className="px-3 py-2 text-muted-foreground tabular-nums"
-          >
-            {s.date_added ? s.date_added.slice(0, 10) : "—"}
-          </td>
-        );
-      default:
-        return null;
-    }
-  };
+  const columns: ColumnSpec<Study>[] = visibleCols.map((c) => ({
+    key: c.key,
+    header: c.label,
+    width: c.width,
+    sortable: true,
+    cell: (s) => cellContent(c.key, s),
+    cellClassName: CELL_CLASSES[c.key],
+  }));
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <table className="w-full text-sm">
-        <colgroup>
-          {visibleCols.map((c) => (
-            <col key={c.key} style={{ width: c.width }} />
-          ))}
-        </colgroup>
-        <thead className="bg-muted/30">
-          <tr className="border-b">
-            {visibleCols.map((c) => (
-              <th
-                key={c.key}
-                className="text-left font-medium px-3 py-2 cursor-pointer select-none hover:bg-accent/30"
-                onClick={() => toggleSort(c.key)}
-              >
-                {c.label} <SortIcon active={sort === c.key} dir={order} />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr>
-              <td
-                colSpan={visibleCols.length}
-                className="px-3 py-8 text-center text-muted-foreground"
-              >
-                Loading...
-              </td>
-            </tr>
-          ) : items.length === 0 ? (
-            <tr>
-              <td
-                colSpan={visibleCols.length}
-                className="px-3 py-8 text-center text-muted-foreground"
-              >
-                <ImageIcon className="h-6 w-6 mx-auto mb-2" />
-                No imaging studies found
-              </td>
-            </tr>
-          ) : (
-            items.map((s) => (
-              <tr
-                key={s.id}
-                onClick={() => navigate(`/imaging/${s.id}`)}
-                className="border-b cursor-pointer hover:bg-accent/30 transition-colors"
-              >
-                {visibleCols.map((c) => renderCell(c.key, s))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
+    <ResponsiveTable
+      columns={columns}
+      rows={items}
+      getRowId={(s) => s.id}
+      onRowClick={(s) => navigate(`/imaging/${s.id}`)}
+      sort={{ key: sort, dir: order }}
+      onSortChange={toggleSort}
+      loading={loading}
+      empty={
+        <EmptyState
+          icon={ImageIcon}
+          title="No imaging studies found"
+          description="Upload DICOM files or imaging reports and the studies will show up here."
+        />
+      }
+      renderCard={(s) => (
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="line-clamp-2 min-w-0 text-sm font-medium">
+              {modalityLabel(s.modality)}
+              {s.body_part ? ` — ${niceCase(s.body_part)}` : ""}
+            </p>
+            <span className="shrink-0">
+              <ReportBadge status={s.report_status} />
+            </span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {[
+              s.study_date,
+              s.patient_name,
+              `${s.num_series} series · ${s.num_images} images`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+      )}
+    />
   );
 }

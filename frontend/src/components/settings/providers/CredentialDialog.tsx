@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Save, X } from "lucide-react";
+import { Save } from "lucide-react";
 import type { Credential } from "@/types";
 import { getErrorMessage } from "@/lib/errors";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";
 import { CREDENTIAL_TYPES } from "./types";
 
@@ -84,21 +84,16 @@ export default function CredentialDialog({
   };
 
   return (
-    <Modal
+    <Sheet
       open
-      onClose={onClose}
-      panelClassName="w-full max-w-md rounded-lg border bg-background p-5 shadow-xl space-y-3 max-h-[90vh] overflow-y-auto"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={initial.id ? "Edit provider" : "New provider"}
+      contentClassName="sm:max-w-md"
     >
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold">
-          {initial.id ? "Edit provider" : "New provider"}
-        </h3>
-        <button onClick={onClose} className="rounded-md p-1 hover:bg-accent">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      <label className="space-y-1 block">
+      <div className="space-y-3">
+        <label className="space-y-1 block">
           <span className="text-sm font-medium">Name</span>
           <input
             type="text"
@@ -217,7 +212,7 @@ export default function CredentialDialog({
         </span>
 
         {err && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-3 py-2 text-sm">
+          <div className="rounded-md bg-destructive-soft text-destructive px-3 py-2 text-sm">
             {err}
           </div>
         )}
@@ -231,6 +226,7 @@ export default function CredentialDialog({
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
-    </Modal>
+      </div>
+    </Sheet>
   );
 }

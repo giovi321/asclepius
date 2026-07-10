@@ -3,7 +3,7 @@
   "info": {
     "title": "Asclepius",
     "description": "Self-hosted medical records manager",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "paths": {
     "/health": {

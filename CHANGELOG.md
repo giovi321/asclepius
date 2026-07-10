@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-10
+
+The frontend rebuilt around phones. Until now the UI was desktop-first: a
+fixed sidebar that left a 390px screen about a third of its width, tables up
+to ten columns wide with no way to scroll them, viewers that only understood
+a mouse, and hover-only controls that touch could never reach. This release
+makes the app feel native on a phone without changing the desktop experience
+or the information architecture — every page keeps the same URLs and the
+same capabilities on both form factors. Frontend-only: no API or database
+changes, no migration needed.
+
+### Added
+- A mobile app shell: overlay navigation drawer (closes on navigation, traps
+  focus), top bar with a live pipeline chip and a patient switcher in thumb
+  reach, safe-area and dynamic-viewport handling for notched phones.
+- Touch gestures in the viewers. PDFs: pinch to zoom around your fingers,
+  swipe to turn pages at fit zoom, double-tap to zoom, drag a region with a
+  finger — including corner handles to refine the rectangle — for region
+  translation on both the admin and doctor-share viewers. DICOM: one-finger
+  stack scroll through frames, two-finger pan, pinch zoom, double-tap reset,
+  and an opt-in windowing-drag mode (horizontal = width, vertical = center)
+  with a live readout.
+- Phone card layouts for every wide table (documents, imaging, shares,
+  users, sessions, audit, normalization, lab results), with the desktop
+  tables unchanged. Filters and sort live in bottom sheets with removable
+  chips; documents gain an explicit selection mode with a sticky bulk-action
+  bar and an upload button in thumb reach.
+- "Take photo" upload on touch devices — photographing a paper report goes
+  straight into the pipeline.
+- Settings on phones is a drill-in list (like iOS Settings) instead of eight
+  squeezed tabs; the same URLs keep working on both form factors.
+- A design-token system derived from the logo: the brick red as the accent,
+  neutrals tinted toward the logo's slate, semantic status colors, and a
+  dark mode that follows the OS until you choose. The browser chrome color
+  follows the theme.
+
+### Changed
+- Every dialog and popover now rides one overlay primitive that renders as a
+  bottom sheet on phones and a centered dialog on desktop; toasts anchor to
+  the bottom on phones. Confirmation dialogs use full-width stacked buttons
+  on small screens.
+- Route-level code splitting: the entry bundle dropped from 1.85 MB to
+  0.45 MB (gzip 526 kB to 148 kB); pdf.js and the charting library now load
+  only on pages that use them.
+- Touch targets meet the 44px minimum on touch devices, controls that used
+  to appear only on hover are always visible on touch, and form fields keep
+  a 16px floor on phones so iOS stops auto-zooming into them.
+- The doctor-share surface got the same treatment with its hardening intact:
+  the language allowlist, the no-download viewer, one-time-code entry (with
+  SMS autofill), and the session lifecycle are unchanged.
+
+### Fixed
+- Zooming a PDF or DICOM frame no longer flashes the background: the old
+  render stays on screen until the new one is ready (snapshot overlay for
+  PDFs, preload-and-swap for DICOM frames — which also smooths scrubbing).
+- The pipeline queue's cancel button, the header metrics details, and the
+  patient selector were unreachable on touch screens; all are tap-accessible
+  now.
+- Layout heights no longer fight mobile browser bars (100vh replaced with
+  dynamic-viewport units throughout).
+
 ## [1.4.0] - 2026-06-13
 
 A large internal refactor. Most of it is behaviour-preserving cleanup, but it

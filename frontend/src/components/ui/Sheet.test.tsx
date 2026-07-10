@@ -60,6 +60,20 @@ describe("Sheet", () => {
     expect(screen.getByText("SR only")).toHaveClass("sr-only");
   });
 
+  it("does not close on Escape or backdrop click when dismissible={false}", () => {
+    const onOpenChange = vi.fn();
+    render(
+      <Sheet open onOpenChange={onOpenChange} title="Locked" dismissible={false}>
+        <p>Body</p>
+      </Sheet>,
+    );
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    const overlay = document.querySelector(".bg-black\\/40");
+    expect(overlay).not.toBeNull();
+    fireEvent.pointerDown(overlay!);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it("renders a footer bar when provided", () => {
     render(
       <Sheet

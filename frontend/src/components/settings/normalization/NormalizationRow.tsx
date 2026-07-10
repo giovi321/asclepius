@@ -9,7 +9,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import SearchableSelect from "@/components/SearchableSelect";
+import Combobox from "@/components/ui/Combobox";
 import type { NormItem } from "./types";
 
 export interface NormalizationRowProps {
@@ -175,7 +175,7 @@ export default function NormalizationRow(props: NormalizationRowProps) {
                   Merge <strong>{item.canonical_display}</strong> into:
                 </span>
                 <div className="min-w-[240px] max-w-xs">
-                  <SearchableSelect
+                  <Combobox
                     value={
                       mergeTargetId === null ? null : String(mergeTargetId)
                     }
@@ -183,6 +183,7 @@ export default function NormalizationRow(props: NormalizationRowProps) {
                       onMergeTargetChange(v === null ? null : Number(v))
                     }
                     placeholder="Select target..."
+                    title="Merge into..."
                     pinnedOptions={[
                       { value: "-1", label: "+ Create new entry..." },
                     ]}

@@ -14,7 +14,7 @@ import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { useLlmProviders, useOcrProviders, useSettings } from "@/hooks/data";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import ProviderSelect from "@/components/ui/ProviderSelect";
 import type { ShareCreateRequest, ShareCreateResponse } from "@/types";
 
@@ -261,21 +261,16 @@ export default function ShareDialog({
       : `${documentIds.length} documents`;
 
   return (
-    <Modal
+    <Sheet
       open
-      onClose={onClose}
-      closeOnBackdropClick={false}
-      closeOnEscape={false}
-      panelClassName="w-full max-w-2xl rounded-lg bg-card border shadow-lg max-h-[90vh] overflow-y-auto"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      dismissible={false}
+      title="Share with doctor"
+      contentClassName="sm:max-w-2xl"
     >
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h2 className="font-semibold">Share with doctor</h2>
-          <button onClick={onClose} className="rounded p-1.5 hover:bg-accent">
-            ×
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-4 text-sm">
+        <div className="space-y-4 text-sm">
           <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs">
             <div className="text-muted-foreground">Sharing:</div>
             <div className="font-medium">{docCountLabel}</div>
@@ -603,7 +598,7 @@ export default function ShareDialog({
             </div>
           )}
         </div>
-    </Modal>
+    </Sheet>
   );
 }
 

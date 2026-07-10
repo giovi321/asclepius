@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { ChevronDown, Columns3, Search, Upload, X } from "lucide-react";
-import MultiSelectFilter from "@/components/MultiSelectFilter";
+import MultiSelect from "@/components/ui/MultiSelect";
 import { useDoctors, useFacilities, useSpecialties } from "@/hooks/data";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { COLUMNS, DOC_TYPES, type ColumnKey } from "./columns";
@@ -80,7 +80,7 @@ export default function DocumentFilters({
           />
         </div>
 
-        <MultiSelectFilter
+        <MultiSelect
           label="Type"
           options={[
             { value: "__blank__", label: "(blank)" },
@@ -93,7 +93,7 @@ export default function DocumentFilters({
           onChange={(v: string[]) => onChange({ typeFilter: v })}
         />
 
-        <MultiSelectFilter
+        <MultiSelect
           label="Status"
           options={[
             { value: "__blank__", label: "(blank)" },
@@ -109,7 +109,7 @@ export default function DocumentFilters({
           searchable={false}
         />
 
-        <MultiSelectFilter
+        <MultiSelect
           label="Specialty"
           options={[
             { value: "__blank__", label: "(blank)" },
@@ -122,7 +122,7 @@ export default function DocumentFilters({
           onChange={(v: string[]) => onChange({ specialtyFilter: v })}
         />
 
-        <MultiSelectFilter
+        <MultiSelect
           label="Doctor"
           options={[
             { value: "__blank__", label: "(blank)" },
@@ -135,7 +135,7 @@ export default function DocumentFilters({
           onChange={(v: string[]) => onChange({ doctorFilter: v })}
         />
 
-        <MultiSelectFilter
+        <MultiSelect
           label="Facility"
           options={[
             { value: "__blank__", label: "(blank)" },

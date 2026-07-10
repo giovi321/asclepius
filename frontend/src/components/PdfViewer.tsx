@@ -14,8 +14,10 @@ import {
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Worker is initialised once in main.tsx — not here, to avoid
-// race conditions when React StrictMode double-mounts components.
+// Worker init is a module-level side effect (runs once per session, so
+// StrictMode double-mounts can't race it) and rides this lazy chunk
+// instead of the entry bundle.
+import "@/lib/pdfWorker";
 
 /** Bbox in normalized [0,1] coords relative to the rendered page. */
 export interface NormalizedBbox {

@@ -1,5 +1,10 @@
 import { type ReactNode } from "react";
-import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/Tooltip";
 import { Hourglass, Loader2 } from "lucide-react";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import type { PipelineProviders } from "@/types";
@@ -108,22 +113,19 @@ function PillTooltip({
   children: ReactNode;
 }) {
   return (
-    <Tooltip.Provider delayDuration={150}>
-      <Tooltip.Root>
-        <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-        <Tooltip.Portal>
-          <Tooltip.Content
-            side="bottom"
-            align="end"
-            sideOffset={6}
-            className="z-50 w-72 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-xl"
-          >
-            {content}
-            <Tooltip.Arrow className="fill-border" />
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="end"
+          sideOffset={6}
+          className="w-72 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-overlay"
+        >
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

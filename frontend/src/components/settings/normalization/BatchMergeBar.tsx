@@ -1,5 +1,5 @@
 import { GitMerge } from "lucide-react";
-import SearchableSelect from "@/components/SearchableSelect";
+import Combobox from "@/components/ui/Combobox";
 import type { NormItem } from "./types";
 
 export interface BatchMergeBarProps {
@@ -36,10 +36,11 @@ export default function BatchMergeBar({
         <span className="font-medium">{selectedCount} selected</span>
         <span className="text-muted-foreground">Merge into:</span>
         <div className="min-w-[240px] max-w-xs">
-          <SearchableSelect
+          <Combobox
             value={batchTargetId === null ? null : String(batchTargetId)}
             onChange={(v) => onBatchTargetChange(v === null ? null : Number(v))}
             placeholder="Select target..."
+            title="Merge into..."
             pinnedOptions={[{ value: "-1", label: "+ Create new entry..." }]}
             options={normItems
               .filter((n) => !selectedIds.has(n.id))

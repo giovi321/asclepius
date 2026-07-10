@@ -3,9 +3,9 @@ import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useToast } from "@/contexts/ToastContext";
-import { Plus, Trash2, ScrollText, UserCog, X, Check } from "lucide-react";
+import { Plus, Trash2, ScrollText, UserCog, Check } from "lucide-react";
 import { usePatients } from "@/hooks/data";
-import Modal from "@/components/ui/Modal";
+import Sheet from "@/components/ui/Sheet";
 import Button from "@/components/ui/Button";
 
 interface Patient {
@@ -554,11 +554,21 @@ function AccessModal({
   if (!user) return null;
 
   return (
-    <Modal
+    <Sheet
       open
-      onClose={onClose}
-      zIndexClassName="z-[80]"
-      panelClassName="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-lg border bg-background shadow-xl flex flex-col"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title="Patient access"
+      description={
+        <>
+          for{" "}
+          <span className="font-medium">
+            {user.display_name || user.username}
+          </span>{" "}
+          (@{user.username})
+        </>
+      }
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -578,26 +588,7 @@ function AccessModal({
         </>
       }
     >
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div>
-            <h3 className="text-base font-semibold">Patient access</h3>
-            <p className="text-xs text-muted-foreground">
-              for{" "}
-              <span className="font-medium">
-                {user.display_name || user.username}
-              </span>{" "}
-              (@{user.username})
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-muted-foreground hover:bg-accent"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="border-b p-3 space-y-2">
+        <div className="border-b pb-3 space-y-2">
           <input
             type="text"
             placeholder="Filter patients..."
@@ -623,7 +614,7 @@ function AccessModal({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div>
           {patients.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               No patients exist yet.
@@ -671,6 +662,6 @@ function AccessModal({
             </ul>
           )}
         </div>
-    </Modal>
+    </Sheet>
   );
 }

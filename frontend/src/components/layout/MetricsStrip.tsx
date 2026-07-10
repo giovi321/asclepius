@@ -1,14 +1,30 @@
-import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
-import { FileText, Brain, Eye, ScanText, Activity } from "lucide-react";
+import type { PipelineStatus } from "@/types";
+import {
+  Activity,
+  Brain,
+  Eye,
+  FileText,
+  ScanText,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  DEFAULT_KIND_BADGE,
+  KIND_BADGE_CLASSES,
+  PROVIDER_BADGE_CLASSES,
+} from "@/lib/statusTokens";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover";
+import Sheet from "@/components/ui/Sheet";
 
 type ChipSpec = {
   key: string;
-  icon: any;
+  icon: LucideIcon;
   label: string;
   colorClass: string;
-  // Card contents — optional so the pipeline-doc chip can skip the numeric grid.
+  // Card contents — cap is optional so the pipeline-doc chip can skip the
+  // numeric grid.
   cardTitle: string;
   cardSubtitle?: string;
   running?: number;
@@ -16,18 +32,22 @@ type ChipSpec = {
   cap?: number;
 };
 
-/** Chip strip shown in the top bar. Each chip renders only when its counter
- * is non-zero, so the bar is empty when the app is idle. The hover card is
- * portaled into <body> so it escapes the app-wide overflow-hidden wrapper
- * and never gets clipped by the header. */
-export default function MetricsStrip() {
-  const { status } = usePipelineStatus();
-  if (!status) return null;
+const KIND_LABELS: Record<string, string> = {
+  reprocess: "Reprocess",
+  translate: "Translate",
+  translate_region: "Region translate",
+  ai_edit: "AI edit",
+  upload: "Upload",
+};
 
+/** Build the chip list from the live pipeline snapshot. Shared by the
+ *  desktop chip strip and the mobile summary chip so both always describe
+ *  the same state. */
+function buildChips(status: PipelineStatus): ChipSpec[] {
   const chips: ChipSpec[] = [];
 
   // Current pipeline document. Prefer the richer current_job block (gives us
-  // the upload/reprocess kind and the planned-stages stepper for the hover
+  // the upload/reprocess kind and the planned-stages list for the detail
   // card); fall back to the legacy ``processing`` fields when an older
   // backend hasn't populated current_job yet.
   const job = status.current_job;
@@ -36,16 +56,7 @@ export default function MetricsStrip() {
     const stageRaw = job?.stage ?? status.processing_step ?? null;
     const step = stageRaw ? ` · ${stageRaw.replace(/_/g, " ")}` : "";
     const kind = job?.kind ?? "upload";
-    const kindLabel =
-      kind === "reprocess"
-        ? "Reprocess"
-        : kind === "translate"
-          ? "Translate"
-          : kind === "translate_region"
-            ? "Region translate"
-            : kind === "ai_edit"
-              ? "AI edit"
-              : "Upload";
+    const kindLabel = KIND_LABELS[kind] ?? "Upload";
     const pageCurrent = job?.page_current ?? status.processing_page_current;
     const pageTotal = job?.page_total ?? status.processing_pages;
     const pageInfo =
@@ -67,24 +78,15 @@ export default function MetricsStrip() {
       ]
         .filter(Boolean)
         .join(" · "),
-      colorClass:
-        kind === "reprocess"
-          ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-          : kind === "translate" || kind === "translate_region"
-            ? "text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-            : kind === "ai_edit"
-              ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-              : "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+      colorClass: KIND_BADGE_CLASSES[kind] ?? DEFAULT_KIND_BADGE,
     });
   }
 
   // Per-credential LLM / Vision / OCR queues. The chip shows credential +
-  // model display-name on a single line; the hover card breaks out the
+  // model display-name on a single line; the detail card breaks out the
   // counters. Colour + icon mirror the kind badges on the Providers and
   // Priority tabs so the user sees the same visual language across the app.
   for (const q of status.llm_queues || []) {
-    // Prefer user-chosen display names (e.g. "Chandra") over raw model ids
-    // (e.g. "fredrezones55/chandra-ocr-2") — the backend enriches the snapshot.
     const displayList =
       (q.display_names && q.display_names.length > 0
         ? q.display_names
@@ -98,26 +100,13 @@ export default function MetricsStrip() {
       q.kind === "vision" ? "Vision-LLM" : q.kind === "ocr" ? "OCR" : "LLM";
     const icon =
       q.kind === "vision" ? Eye : q.kind === "ocr" ? ScanText : Brain;
-    const colorClass =
-      q.kind === "vision"
-        ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300 border-purple-200 dark:border-purple-800"
-        : q.kind === "ocr"
-          ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 border-amber-200 dark:border-amber-800"
-          : "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300 border-green-200 dark:border-green-800";
     // The semaphore in backend/asclepius/llm/gate.py is per-credential, not
-    // per-kind: an Ollama server set to ``max_concurrent=1`` runs at most
-    // one request total across LLM and OCR purposes. The chips are still
-    // rendered separately because the gate tracks (credential_id, kind)
-    // for visibility, but only one of the same-credential chips actually
-    // shows ``running=1`` at any moment — the others queue. The status
-    // suffix below makes that explicit so the user doesn't read the dual
-    // chips as parallel calls.
+    // per-kind: only one of the same-credential chips actually shows
+    // ``running=1`` at any moment — the others queue. The status suffix
+    // makes that explicit so the user doesn't read the dual chips as
+    // parallel calls.
     const statusSuffix =
-      q.in_flight > 0
-        ? "" // running — colour + cap already say everything
-        : q.waiting > 0
-          ? " (queued)"
-          : "";
+      q.in_flight > 0 ? "" : q.waiting > 0 ? " (queued)" : "";
     chips.push({
       key: `${q.kind}-${q.credential_id}`,
       icon,
@@ -129,16 +118,12 @@ export default function MetricsStrip() {
       running: q.in_flight,
       waiting: q.waiting,
       cap: q.cap,
-      colorClass,
+      colorClass: PROVIDER_BADGE_CLASSES[q.kind] ?? DEFAULT_KIND_BADGE,
     });
   }
 
-  // Always-visible idle chip. Without this the topbar goes blank between
-  // processing ticks (a fast-burst zip upload only flashes the file chip
-  // for a few hundred ms each) and looks broken even though the pipeline
-  // is busy. The chip summarises queue depth, total processed, and the
-  // last file the worker finished, so the user has a continuous "what is
-  // the system doing" indicator even when no LLM/OCR is active.
+  // Always-visible idle chip. Without this the top bar goes blank between
+  // processing ticks and looks broken even though the pipeline is busy.
   if (chips.length === 0) {
     const queue = status.queue_depth || 0;
     const total = status.total_processed || 0;
@@ -161,118 +146,145 @@ export default function MetricsStrip() {
       label,
       cardTitle: "Pipeline status",
       cardSubtitle,
-      colorClass:
-        status.watcher_active === false
-          ? "text-muted-foreground bg-muted/40 border-muted"
-          : "text-muted-foreground bg-muted/30 border-muted/60 hover:bg-muted/50",
+      colorClass: "bg-muted text-muted-foreground border-border",
     });
   }
 
-  return (
-    <div className="flex items-center justify-end gap-2 whitespace-nowrap min-w-0 max-w-full">
-      {chips.map((c) => (
-        <Chip key={c.key} spec={c} />
-      ))}
-    </div>
-  );
+  return chips;
 }
 
-function Chip({ spec }: { spec: ChipSpec }) {
-  const Icon = spec.icon;
-  const chipRef = useRef<HTMLDivElement>(null);
-  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
-
-  const showCard = () => {
-    if (chipRef.current) setHoverRect(chipRef.current.getBoundingClientRect());
-  };
-  const hideCard = () => setHoverRect(null);
-
+/** Detail card body shared by the desktop popover and the mobile sheet. */
+function ChipDetailCard({ spec }: { spec: ChipSpec }) {
   return (
-    <>
-      <div
-        ref={chipRef}
-        onMouseEnter={showCard}
-        onMouseLeave={hideCard}
-        onFocus={showCard}
-        onBlur={hideCard}
-        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium max-w-[260px] ${spec.colorClass}`}
-      >
-        <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{spec.label}</span>
-      </div>
-
-      {hoverRect &&
-        createPortal(<HoverCard spec={spec} rect={hoverRect} />, document.body)}
-    </>
-  );
-}
-
-/** The card rendered in the body portal. Position is computed from the
- * triggering chip's bounding rect and clamped inside the viewport. */
-function HoverCard({ spec, rect }: { spec: ChipSpec; rect: DOMRect }) {
-  const GAP = 6; // distance below the chip
-  const CARD_WIDTH = 240; // wide enough for the three-column grid
-  const MARGIN = 8; // keep this much space from the viewport edge
-  const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
-
-  // Prefer left-aligned with the chip; fall back to right-aligned when
-  // that would spill past the viewport.
-  let left = rect.left;
-  if (left + CARD_WIDTH > viewportW - MARGIN) {
-    left = Math.max(MARGIN, rect.right - CARD_WIDTH);
-  }
-  const top = rect.bottom + GAP;
-
-  return (
-    <div
-      role="tooltip"
-      style={{
-        position: "fixed",
-        top,
-        left,
-        width: CARD_WIDTH,
-        zIndex: 60,
-      }}
-      className="pointer-events-none rounded-lg border bg-card text-card-foreground shadow-xl"
-    >
-      <div className="px-3 py-2 border-b">
-        <div className="text-sm font-semibold break-words">
+    <div>
+      <div className="border-b px-3 py-2">
+        <div className="break-words text-sm font-semibold">
           {spec.cardTitle}
         </div>
         {spec.cardSubtitle && (
-          <div className="mt-0.5 text-xs text-muted-foreground break-words">
+          <div className="mt-0.5 break-words text-xs text-muted-foreground">
             {spec.cardSubtitle}
           </div>
         )}
       </div>
       {typeof spec.cap === "number" && (
         <div className="grid grid-cols-3 divide-x text-center">
-          <div className="px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Running
+          {(
+            [
+              ["Running", spec.running ?? 0],
+              ["Waiting", spec.waiting ?? 0],
+              ["Cap", spec.cap],
+            ] as const
+          ).map(([label, value]) => (
+            <div key={label} className="px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {label}
+              </div>
+              <div className="text-base font-semibold tabular-nums">
+                {value}
+              </div>
             </div>
-            <div className="text-base font-semibold tabular-nums">
-              {spec.running ?? 0}
-            </div>
-          </div>
-          <div className="px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Waiting
-            </div>
-            <div className="text-base font-semibold tabular-nums">
-              {spec.waiting ?? 0}
-            </div>
-          </div>
-          <div className="px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Cap
-            </div>
-            <div className="text-base font-semibold tabular-nums">
-              {spec.cap}
-            </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Desktop chip strip (md and up). Chips are buttons: click/tap toggles the
+ * detail popover — the old hover-only card was unreachable on touch
+ * screens and for keyboard users.
+ */
+export default function MetricsStrip() {
+  const { status } = usePipelineStatus();
+  if (!status) return null;
+  const chips = buildChips(status);
+
+  return (
+    <div className="flex min-w-0 max-w-full items-center justify-end gap-2 whitespace-nowrap">
+      {chips.map((spec) => (
+        <Popover key={spec.key}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              title={spec.label}
+              className={cn(
+                "inline-flex max-w-[260px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                spec.colorClass,
+              )}
+            >
+              <spec.icon className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{spec.label}</span>
+            </button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-60 p-0">
+            <ChipDetailCard spec={spec} />
+          </PopoverContent>
+        </Popover>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Mobile summary chip (below md): one compact pill — pulsing when the
+ * pipeline is working — that opens a bottom sheet listing every queue.
+ */
+export function PipelineChip() {
+  const { status } = usePipelineStatus();
+  const [open, setOpen] = useState(false);
+  if (!status) return null;
+
+  const chips = buildChips(status);
+  const busy = Boolean(
+    status.current_job || status.processing || (status.llm_queues || []).length,
+  );
+  const queueDepth = status.queue_depth || 0;
+  const activeCount =
+    (status.current_job || status.processing ? 1 : 0) + queueDepth;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Pipeline activity"
+        className={cn(
+          "flex h-9 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors coarse:h-10",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          busy
+            ? "border-info/25 bg-info-soft text-info"
+            : "bg-muted text-muted-foreground",
+        )}
+      >
+        <Activity className={cn("h-4 w-4", busy && "animate-pulse")} />
+        {activeCount > 0 && <span className="tabular-nums">{activeCount}</span>}
+      </button>
+      <Sheet
+        open={open}
+        onOpenChange={setOpen}
+        title="Pipeline activity"
+        description={busy ? "Working" : "Idle"}
+      >
+        <div className="space-y-3">
+          {chips.map((spec) => (
+            <div key={spec.key} className="overflow-hidden rounded-lg border">
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 border-b px-3 py-1.5 text-xs font-medium",
+                  spec.colorClass,
+                )}
+              >
+                <spec.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate">{spec.label}</span>
+              </div>
+              <ChipDetailCard spec={spec} />
+            </div>
+          ))}
+        </div>
+      </Sheet>
+    </>
   );
 }

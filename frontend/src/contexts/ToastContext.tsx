@@ -24,13 +24,10 @@ const ToastContext = createContext<ToastContextType | null>(null);
 let toastCounter = 0;
 
 const variantStyles: Record<ToastVariant, string> = {
-  default: "border-border bg-background text-foreground",
-  success:
-    "border-green-500/30 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100",
-  error:
-    "border-red-500/30 bg-red-50 text-red-900 dark:bg-red-950 dark:text-red-100",
-  warning:
-    "border-yellow-500/30 bg-yellow-50 text-yellow-900 dark:bg-yellow-950 dark:text-yellow-100",
+  default: "border-border bg-popover text-popover-foreground",
+  success: "border-success/30 bg-success-soft text-success",
+  error: "border-destructive/30 bg-destructive-soft text-destructive",
+  warning: "border-warning/30 bg-warning-soft text-warning",
 };
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -55,7 +52,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map((t) => (
           <ToastPrimitive.Root
             key={t.id}
-            className={`group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-4 shadow-lg transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full ${variantStyles[t.variant]}`}
+            className={`group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-4 shadow-overlay transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-80 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-bottom-full sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=open]:slide-in-from-top-full ${variantStyles[t.variant]}`}
             onOpenChange={(open) => {
               if (!open) setToasts((prev) => prev.filter((x) => x.id !== t.id));
             }}
@@ -70,12 +67,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 </ToastPrimitive.Description>
               )}
             </div>
-            <ToastPrimitive.Close className="rounded-md p-1 opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground focus:opacity-100">
+            <ToastPrimitive.Close
+              aria-label="Dismiss"
+              className="rounded-md p-1.5 opacity-100 transition-opacity hover:text-foreground focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+            >
               <X className="h-4 w-4" />
             </ToastPrimitive.Close>
           </ToastPrimitive.Root>
         ))}
-        <ToastPrimitive.Viewport className="fixed top-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:flex-col md:max-w-[420px]" />
+        {/* Bottom of the screen on phones (thumb reach, clear of the top
+            bar), top-right from sm up. */}
+        <ToastPrimitive.Viewport className="fixed bottom-0 left-0 right-0 z-toast flex max-h-dvh w-full flex-col-reverse gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-auto sm:left-auto sm:right-0 sm:top-0 sm:max-w-[420px] sm:flex-col sm:pb-4" />
       </ToastPrimitive.Provider>
     </ToastContext.Provider>
   );

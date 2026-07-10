@@ -14,6 +14,7 @@ import shareApi from "@/api/shareClient";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import "@/lib/pdfWorker";
 
 /** Bbox in normalised [0,1] page coordinates. Mirrors the admin
  * PdfViewer's NormalizedBbox so backend payloads match. */

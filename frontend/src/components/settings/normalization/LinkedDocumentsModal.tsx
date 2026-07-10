@@ -1,5 +1,5 @@
-import { Loader2, Trash2, X } from "lucide-react";
-import Modal from "@/components/ui/Modal";
+import { Loader2, Trash2 } from "lucide-react";
+import Sheet from "@/components/ui/Sheet";
 
 export interface LinkedDocumentsModalProps {
   subjectName: string;
@@ -17,19 +17,14 @@ export default function LinkedDocumentsModal({
   onDelete,
 }: LinkedDocumentsModalProps) {
   return (
-    <Modal
+    <Sheet
       open
-      onClose={onClose}
-      panelClassName="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg border bg-background p-5 shadow-xl"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+      title={`Documents referencing "${subjectName}"`}
+      contentClassName="sm:max-w-2xl"
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-base font-semibold">
-          Documents referencing "{subjectName}"
-        </h3>
-        <button onClick={onClose} className="rounded-md p-1 hover:bg-accent">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
       {loading ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading...
@@ -74,6 +69,6 @@ export default function LinkedDocumentsModal({
           ))}
         </div>
       )}
-    </Modal>
+    </Sheet>
   );
 }

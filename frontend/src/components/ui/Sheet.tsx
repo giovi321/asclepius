@@ -25,6 +25,9 @@ export interface SheetProps {
   footer?: React.ReactNode;
   /** Hide the header close button (e.g. when the footer carries Cancel). */
   hideCloseButton?: boolean;
+  /** false = backdrop click and Escape do NOT close (for flows that must
+   *  only close via an explicit action). Default true. */
+  dismissible?: boolean;
   children?: React.ReactNode;
 }
 
@@ -70,6 +73,7 @@ export default function Sheet({
   contentClassName,
   footer,
   hideCloseButton = false,
+  dismissible = true,
   children,
 }: SheetProps) {
   return (
@@ -83,6 +87,10 @@ export default function Sheet({
           )}
         />
         <Dialog.Content
+          onInteractOutside={
+            dismissible ? undefined : (e) => e.preventDefault()
+          }
+          onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
           className={cn(PANEL_BASE, SIDE_CLASSES[side], contentClassName)}
         >
           {/* Grab handle, bottom-sheet presentation only */}

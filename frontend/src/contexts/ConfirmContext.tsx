@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { AlertTriangle, X } from "lucide-react";
+import Button from "@/components/ui/Button";
 
 type Variant = "default" | "destructive";
 
@@ -64,9 +65,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         }}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[90] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+          <Dialog.Overlay className="fixed inset-0 z-overlay bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-base" />
           <Dialog.Content
-            className="fixed left-1/2 top-1/2 z-[91] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-5 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+            className="fixed left-1/2 top-1/2 z-overlay w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-popover p-5 shadow-floating data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-base"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -98,25 +99,28 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 <X className="h-4 w-4" />
               </Dialog.Close>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
+            {/* Full-width stacked buttons on phones (confirm on top, per
+                platform convention via flex-col-reverse), inline row from
+                sm up. */}
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="secondary"
+                size="md"
+                className="w-full sm:w-auto"
                 onClick={() => close(false)}
-                className="rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
                 autoFocus
               >
                 {pending?.opts.cancelText || "Cancel"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant={destructive ? "danger" : "primary"}
+                size="md"
+                className="w-full sm:w-auto"
                 onClick={() => close(true)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                  destructive
-                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
-                }`}
               >
                 {pending?.opts.confirmText ||
                   (destructive ? "Delete" : "Confirm")}
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

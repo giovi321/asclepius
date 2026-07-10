@@ -10,7 +10,7 @@ import {
   X,
   Calendar,
 } from "lucide-react";
-import SearchableSelect from "@/components/SearchableSelect";
+import Combobox from "@/components/ui/Combobox";
 import { usePatients, useEvents } from "@/hooks/data";
 
 interface FileUploadProps {
@@ -254,7 +254,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           <p className="text-sm font-medium">
             Assign {pendingFiles.length} file(s) to a patient:
           </p>
-          <SearchableSelect
+          <Combobox
             value={chosenPatientId || null}
             onChange={(v) => setChosenPatientId(v || "")}
             options={patients.map((p) => ({
@@ -262,8 +262,9 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               label: p.display_name,
             }))}
             placeholder="No patient (process unassigned)"
+            title="Select patient"
           />
-          <SearchableSelect
+          <Combobox
             value={chosenEventId || null}
             onChange={(v) => setChosenEventId(v || "")}
             options={events.map((ev) => ({
@@ -272,6 +273,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               hint: ev.event_type?.replace(/_/g, " "),
             }))}
             placeholder="No medical event"
+            title="Select medical event"
           />
           <div className="flex gap-2">
             <button
@@ -405,7 +407,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
             </p>
             {selectedPatient && events.length > 0 && (
               <div className="mt-2 inline-block text-left min-w-[220px]">
-                <SearchableSelect
+                <Combobox
                   value={chosenEventId || null}
                   onChange={(v) => setChosenEventId(v || "")}
                   options={events.map((ev) => ({
@@ -414,6 +416,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                     hint: ev.event_type?.replace(/_/g, " "),
                   }))}
                   placeholder="No medical event"
+                  title="Select medical event"
                 />
               </div>
             )}

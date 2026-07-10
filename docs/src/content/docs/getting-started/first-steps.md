@@ -24,9 +24,11 @@ The **Priority** sub-tab reorders providers for fallback.
 ## 2. Ingest a document
 
 Upload via the Documents page (drag-and-drop or file picker) or drop files
-into `vault/inbox/`. The watcher picks them up within a few seconds
-(configurable via `pipeline.poll_interval_seconds`). Supported formats:
-PDF, PNG / JPG / TIFF, DICOM.
+into `vault/inbox/`. On a phone or tablet the drop area becomes a **Tap to
+choose files** button, and a **Take photo** button lets you shoot a paper
+report straight into the pipeline. The watcher picks up inbox files within a
+few seconds (configurable via `pipeline.poll_interval_seconds`). Supported
+formats: PDF, PNG / JPG / TIFF, DICOM.
 
 ## 3. Watch it process
 

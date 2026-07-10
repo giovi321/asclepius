@@ -77,7 +77,7 @@ Full reference: [Doctor shares](docs/src/content/docs/admin-guide/doctor-shares.
 | Component  | Technology                                                              |
 | ---------- | ----------------------------------------------------------------------- |
 | Backend    | Python + FastAPI                                                        |
-| Frontend   | React + TypeScript + Vite + shadcn/ui                                   |
+| Frontend   | React + TypeScript + Vite + Tailwind CSS + Radix primitives             |
 | Database   | SQLite (via aiosqlite)                                                  |
 | OCR        | Tesseract 5, LLM Vision, Google Vision                                  |
 | LLM        | Ollama, vLLM, Claude API, OpenAI API                                    |

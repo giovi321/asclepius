@@ -19,13 +19,13 @@ A stripped-down surface mounted at `/share/{token}`:
 - **OTP entry** — six numeric digits. Codes expire after ten minutes (`share.otp_ttl_minutes`). Five attempts then the individual code burns (`share.otp_max_attempts`). On the **third** consecutive verify failure across any sequence of codes the **whole share is revoked** and any live session is killed — see [Share-level lockout](#share-level-lockout) below.
 - **Dashboard** — every shared document, with patient name, expiry countdown ("you will be logged out automatically in 1h 23m 45s"), and a sun/moon toggle for dark mode (defaults to the doctor's system preference).
 - **Document detail** — the watermarked PDF on the left, structured data on the right (lab results, medications, vaccinations, summaries, region translations). No edit buttons, no delete, no download. Encounters are deliberately hidden — those often contain free-text physician notes that don't belong on an outside surface.
-- **Translate** — a popover with two options: "Translate current page" or "Translate selected region" (drag a rectangle on the PDF). Whole-document translation is not exposed. The button stays disabled while a translation is in flight, and the new translation appears automatically in the "Region translations" panel — no manual refresh.
+- **Translate** — two options: "Translate current page" or "Translate selected region". On desktop these live in a popover; on a phone they open in a bottom sheet. For a region, drag a rectangle on the PDF (on a touch screen you draw it with a finger and can nudge the corner handles to refine it, then confirm from the bar at the bottom of the viewer). Whole-document translation is not exposed. The button stays disabled while a translation is in flight, and the new translation appears automatically in the "Region translations" panel — no manual refresh.
 
 ## What you control
 
 ### Creating a share
 
-From any document detail page, click **Share with doctor** next to Delete. Or from the documents list, tick one or more rows and use the bulk-share button — a single share link can cover multiple documents as long as they belong to the same patient.
+From any document detail page, open the **More actions** (⋮) menu in the header and choose **Share with doctor**. Or from the documents list, tick one or more rows and use the bulk-share button — a single share link can cover multiple documents as long as they belong to the same patient.
 
 The dialog asks for:
 

@@ -37,7 +37,7 @@ Results show:
 
 - Search is case-insensitive
 - Specific medical terms produce more precise results (e.g. "hemoglobin" rather than "blood test")
-- Patient context is applied automatically when a patient is selected in the sidebar
+- Patient context is applied automatically when a patient is selected (from the sidebar footer on desktop, or the patient chip in the top bar on mobile)
 - With no patient selected, results include every patient you have access to
 
 ## FTS5 index

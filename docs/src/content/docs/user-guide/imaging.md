@@ -45,28 +45,45 @@ mimes are accepted.
 ## DICOM viewer
 
 The viewer renders one frame at a time as PNG (the backend converts
-on-demand from the source DICOM). Interactions:
+on-demand from the source DICOM).
+
+**Mouse and keyboard:**
 
 - **Frame navigation**: arrow keys, mouse wheel, prev/next buttons,
   slider.
 - **Zoom**: ``Ctrl+wheel``, ``+`` / ``-`` keys, toolbar buttons. Range
   25%, 800%. Double-click resets zoom + pan.
 - **Pan**: middle-mouse-button or ``shift``+drag. ``0`` resets the view.
-- **Contrast (MR only)**: when the modality is ``MR`` two paired
-  controls appear for *Window center* and *Window width*. Each axis
-  has a number input (precise typed value) plus a slider whose thumb
-  reflects the *real* current value, the file's own
-  ``WindowCenter`` / ``WindowWidth`` when on auto, or the user's
-  override when manual. The slider range adapts around the auto
-  value so dragging stays useful regardless of modality. Either
-  axis can be moved independently, the missing axis falls back to
-  the file's tag, and *Reset* clears both back to auto. The viewer
-  also has an **Invert colours** toggle (sends ``?invert=1`` so the
-  PNG comes back inverted post-windowing) and a **Metadata** button
-  that opens a panel listing every DICOM header tag for the current
-  frame, with a search filter.
-- Other modalities use the file's stored windowing or a default
-  min-max normalisation if none is present.
+
+**Touch:**
+
+- **Scroll frames**: drag one finger up / down over the image (stack
+  scroll).
+- **Zoom**: pinch. **Pan**: two-finger drag. **Reset**: double-tap.
+- On narrow screens the zoom / reset / first-frame controls move into a
+  **Viewer tools** sheet (the sliders icon in the toolbar); the frame
+  slider and prev/next stay inline.
+
+**Contrast (MR only):** when the modality is ``MR`` two paired
+controls appear for *Window center* and *Window width*. Each axis
+has a number input (precise typed value) plus a slider whose thumb
+reflects the *real* current value, the file's own
+``WindowCenter`` / ``WindowWidth`` when on auto, or the user's
+override when manual. The slider range adapts around the auto
+value so dragging stays useful regardless of modality. Either
+axis can be moved independently, the missing axis falls back to
+the file's tag, and *Reset* clears both back to auto. A **Drag mode**
+toggle turns one-finger (or left-button) drag into a windowing
+gesture — horizontal adjusts width, vertical adjusts center, OsiriX
+style — with a live ``WC / WW`` readout in the corner; the change is
+applied when you pause so the server isn't hit on every pixel. The
+viewer also has an **Invert colours** toggle (sends ``?invert=1`` so the
+PNG comes back inverted post-windowing) and a **Metadata** button
+that opens a panel listing every DICOM header tag for the current
+frame, with a search filter.
+
+Other modalities use the file's stored windowing or a default
+min-max normalisation if none is present.
 
 ## Radiology reports
 
@@ -113,9 +130,9 @@ exposes:
 - On the imaging detail page (``/imaging/:studyId``) the header has a
   *Document view* button → ``/documents/{report_doc_id}``.
 - On the document detail page (``/documents/:id``) any document that is
-  the parent of an imaging study gets an *Imaging view* button in the
-  header → ``/imaging/{study_id}``. This appears for both attached
-  PDF reports and placeholders.
+  the parent of an imaging study gets an *Imaging view* entry in the
+  header's **More actions** (⋮) menu → ``/imaging/{study_id}``. This
+  appears for both attached PDF reports and placeholders.
 - A document opened directly that has no real file (placeholder) shows
   a clean empty-state card with an *Open in Imaging view* button
   instead of the generic file-missing message.

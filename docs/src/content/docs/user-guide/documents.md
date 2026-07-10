@@ -7,7 +7,10 @@ title: "Documents"
 Two ingestion paths:
 
 - **Web UI**, drag-and-drop onto the upload area or use the Upload button.
-  Optionally pre-assign a patient via a fuzzy-search picker.
+  On a phone or tablet the drop area becomes a **Tap to choose files**
+  button plus a **Take photo** button that opens the camera, so a paper
+  report can go straight into the pipeline. Optionally pre-assign a patient
+  via a fuzzy-search picker.
 - **Inbox folder**, drop files into `vault/inbox/`. The watcher queues
   them automatically. To pre-assign a patient, place a `<filename>.patient_hint`
   sibling file containing the patient ID.
@@ -80,6 +83,24 @@ Selecting rows reveals a bulk action bar:
 Actions run sequentially and report a single summary toast. Selection
 clears automatically on filter / page / patient changes.
 
+### On a phone
+
+Below the tablet breakpoint the table becomes a **card list** — one card per
+document with the filename, status pill, type, date, doctor, and facility.
+The desktop toolbar collapses to a search box plus:
+
+- **Filters** — opens a bottom sheet with every filter (type, status,
+  specialty, doctor, facility, date range). Active filters show as removable
+  chips under the search box.
+- **Sort** — a sheet listing the sortable fields.
+- **Select** — turns on selection mode; cards grow checkboxes and a
+  bulk-action bar sticks to the bottom of the screen (Delete, plus Reprocess
+  / Regenerate filename / Share with doctor in a "More" sheet).
+- A round **Upload** button floats in the bottom-right corner (hidden while
+  selecting).
+
+All URLs and capabilities are identical to the desktop layout.
+
 ## Document list, row click
 
 Clicking anywhere on a row opens the document detail page. The
@@ -88,14 +109,24 @@ event propagation so they keep their own behaviour.
 
 ## Document detail page
 
+### Header actions
+
+The header shows the (editable) filename, a **View file** icon button, and a
+**More actions** (⋮) menu that holds every secondary action: *Reprocess…*,
+*Translate…*, *Share with doctor…*, *Delete*, and — for imaging documents —
+*Imaging view* / *Unlink imaging*. On desktop the menu drops down; on a phone
+it opens as a sheet. (While a document is processing, a Cancel control also
+appears inline.) Consolidating these into one menu keeps the header from
+overflowing and puts Delete a deliberate step away from the everyday actions.
+
 The left panel shows the PDF viewer for PDFs, an inline image for
 JPEG / PNG / TIFF, or, for **imaging documents** (`doc_type =
 'imaging_report'`, see [Imaging](/user-guide/imaging)), the same
 report-PDF slot used on the imaging detail page. When the report is
 attached, the PDF renders inline; when it is a placeholder, the slot
 shows *Upload PDF* / *Pick existing PDF* buttons. The DICOM viewer
-itself only lives on `/imaging/:studyId`; the document page header
-gets an *Imaging view* button that jumps there. If the document is
+itself only lives on `/imaging/:studyId`; the **Imaging view** entry in
+the More actions menu jumps there. If the document is
 missing on disk for any reason, the panel renders a clean
 "file not available" empty state instead of a broken viewer (the
 frontend HEAD-checks `/api/documents/{id}/file` before mounting the
@@ -123,8 +154,11 @@ in localStorage so the layout you set up stays put.
 
 ### PDF viewer interactions
 
-The PDF preview supports two extra interactions on top of the toolbar
-zoom buttons:
+The toolbar has prev/next page controls, zoom in/out buttons, and a zoom
+readout that shows **Fit** until you zoom (tap it to return to fit-width).
+Rotate controls sit behind an **All** click menu.
+
+On top of the toolbar, mouse users get:
 
 - **Ctrl/Cmd + scroll wheel** zooms around the cursor, capped to the
   same 0.5–3.0 range as the toolbar. A native wheel listener with
@@ -135,6 +169,14 @@ zoom buttons:
   *grabbing* so the mode is obvious. Drag-to-select-text is the
   trade-off; single-click cursor placement and double-click
   word-select still work.
+
+On a touch screen:
+
+- **Pinch** to zoom around your fingers; **double-tap** toggles zoom.
+- At fit-width, **swipe** left / right to turn the page; once you've zoomed
+  in, one finger pans instead.
+- The previous render stays on screen while the page re-renders at the new
+  zoom, so stepping the zoom no longer flashes.
 
 ### Pipeline stages
 
@@ -190,7 +232,9 @@ suggestions.
 
 ## Reprocessing
 
-The **Reprocess** dropdown re-runs processing on a document. Choose:
+**Reprocess…** in the header's More actions (⋮) menu re-runs processing on a
+document. It opens a panel (a dialog on desktop, a sheet on mobile) where you
+choose:
 
 - **What to reprocess**, OCR + LLM, OCR only, LLM only, or Vision-LLM (the
   single-step vision flow).
@@ -206,13 +250,13 @@ documents marked "done" with empty results.
 
 ## Translation
 
-The **Translate** toolbar action runs the document body through an LLM
-and stores the English rendering for later viewing. OCR is **never**
-re-run, the cached `ocr_text` is reused. Structured fields (names,
+**Translate…** in the header's More actions (⋮) menu runs the document body
+through an LLM and stores the English rendering for later viewing. OCR is
+**never** re-run, the cached `ocr_text` is reused. Structured fields (names,
 dates, codes, lab values) stay in the source language so downstream
 matching keeps working.
 
-The Translate menu has two tabs:
+The panel (a dialog on desktop, a sheet on mobile) has two tabs:
 
 ### Whole document → English
 
@@ -230,7 +274,9 @@ read it as soon as it lands.
 For situations where the full-document translation is overkill (you
 only want to know what the line above a signature says), pick an OCR
 engine + LLM provider, click **Select region on PDF**, drag a
-rectangle on the current page, confirm. The backend crops the page
+rectangle on the current page, confirm. On a touch screen you draw the
+rectangle with a finger, drag the corner handles to fine-tune it, and
+confirm from the bar pinned to the bottom of the viewer. The backend crops the page
 with PyMuPDF using normalized `[0,1]` bbox coordinates so the rectangle
 re-maps correctly even if the PDF is later re-rendered at a different
 DPI, OCRs the crop with the chosen engine, then translates with the

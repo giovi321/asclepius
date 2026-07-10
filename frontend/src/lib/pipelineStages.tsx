@@ -77,13 +77,13 @@ export function flowBadge(
   if (stages.includes("vision_extraction")) {
     return {
       label: "Vision-LLM",
-      pill: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800",
+      pill: "bg-cat-violet-soft text-cat-violet border-cat-violet/25",
     };
   }
   if (stages.includes("ocr")) {
     return {
       label: "OCR + LLM",
-      pill: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/40 dark:text-slate-300 dark:border-slate-700",
+      pill: "bg-muted text-muted-foreground border-border",
     };
   }
   return null;

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { PatientProvider } from "./contexts/PatientContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { ConfirmProvider } from "./contexts/ConfirmContext";
@@ -18,17 +19,19 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <PatientProvider>
-          <ToastProvider>
-            <ConfirmProvider>
-              <PipelineStatusProvider>
-                <App />
-              </PipelineStatusProvider>
-            </ConfirmProvider>
-          </ToastProvider>
-        </PatientProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <PatientProvider>
+            <ToastProvider>
+              <ConfirmProvider>
+                <PipelineStatusProvider>
+                  <App />
+                </PipelineStatusProvider>
+              </ConfirmProvider>
+            </ToastProvider>
+          </PatientProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );

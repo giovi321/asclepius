@@ -123,7 +123,7 @@ function DiagnosisHeading({
           </span>
         )}
       </span>
-      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0" />
+      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100 flex-shrink-0" />
     </button>
   );
 }

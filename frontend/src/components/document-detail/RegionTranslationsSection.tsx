@@ -137,8 +137,9 @@ export default function RegionTranslationsSection({
                 <button
                   onClick={() => handleDelete(item.id)}
                   disabled={busyId === item.id}
-                  className="flex-shrink-0 rounded p-1 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  className="flex flex-shrink-0 items-center justify-center rounded p-1 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 coarse:min-h-11 coarse:min-w-11"
                   title="Delete this region translation"
+                  aria-label="Delete this region translation"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -150,7 +151,7 @@ export default function RegionTranslationsSection({
                   Processing - the cropped region is being OCR'd and translated.
                 </p>
               ) : failed ? (
-                <p className="text-sm text-red-600 dark:text-red-400">
+                <p className="text-sm text-destructive">
                   {item.translated_text}
                 </p>
               ) : (

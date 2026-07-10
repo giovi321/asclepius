@@ -237,6 +237,7 @@ export function EditableFilename({
           onClick={() => setEditing(true)}
           className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground coarse:min-h-11 coarse:min-w-11"
           title="Edit filename"
+          aria-label="Edit filename"
         >
           <Pencil className="h-4 w-4" />
         </button>
@@ -245,6 +246,7 @@ export function EditableFilename({
           disabled={generating}
           className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-50 coarse:min-h-11 coarse:min-w-11"
           title="Generate filename from document data"
+          aria-label="Generate filename from document data"
         >
           <RefreshCw
             className={`h-4 w-4 ${generating ? "animate-spin" : ""}`}

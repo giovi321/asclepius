@@ -201,7 +201,7 @@ export default function ShareDocumentPage() {
                   : "Switch to dark mode"
               }
               aria-label="Toggle theme"
-              className="rounded-md border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center justify-center rounded-md border p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground coarse:min-h-11 coarse:min-w-11"
             >
               {theme === "dark" ? (
                 <Sun className="h-4 w-4" />

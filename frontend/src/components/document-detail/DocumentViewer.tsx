@@ -197,7 +197,7 @@ export default function DocumentViewer({
     return (
       <div className="rounded-lg border p-6 space-y-3">
         <div className="text-center text-muted-foreground space-y-1">
-          <FileX2 className="h-12 w-12 mx-auto mb-2 text-amber-500" />
+          <FileX2 className="h-12 w-12 mx-auto mb-2 text-warning" />
           <p className="text-foreground font-medium">File not available</p>
           <p className="text-sm">
             The document record exists but the file is missing on disk

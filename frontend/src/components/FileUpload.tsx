@@ -462,7 +462,7 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
           <div className="mt-3 space-y-2">
             <div
               className={`flex items-center justify-center gap-2 text-sm ${
-                result.ok ? "text-green-600" : "text-destructive"
+                result.ok ? "text-success" : "text-destructive"
               }`}
             >
               {result.ok ? (
@@ -479,7 +479,11 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
                   {showFailures ? "Hide" : "Show"} details
                 </button>
               )}
-              <button onClick={() => setResult(null)} className="ml-1">
+              <button
+                onClick={() => setResult(null)}
+                className="ml-1 inline-flex items-center justify-center rounded coarse:min-h-11 coarse:min-w-11"
+                aria-label="Dismiss result"
+              >
                 <X className="h-3 w-3" />
               </button>
             </div>
@@ -494,10 +498,10 @@ export default function FileUpload({ onUploadComplete }: FileUploadProps) {
               </ul>
             )}
             {result.duplicates && result.duplicates.length > 0 && (
-              <ul className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs space-y-1 max-h-48 overflow-y-auto text-left">
+              <ul className="rounded-md border border-warning/30 bg-warning/5 p-2 text-xs space-y-1 max-h-48 overflow-y-auto text-left">
                 {result.duplicates.map((d, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <Info className="h-3 w-3 mt-0.5 shrink-0 text-amber-600" />
+                    <Info className="h-3 w-3 mt-0.5 shrink-0 text-warning" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{d.file}</div>
                       <div className="text-muted-foreground">

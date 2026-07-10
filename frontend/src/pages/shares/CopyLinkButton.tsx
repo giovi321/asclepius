@@ -37,7 +37,7 @@ export default function CopyLinkButton({
       title={copied ? "Copied" : "Copy share link"}
     >
       {copied ? (
-        <Check className="h-3 w-3 text-green-600" />
+        <Check className="h-3 w-3 text-success" />
       ) : (
         <LinkIcon className="h-3 w-3" />
       )}

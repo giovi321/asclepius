@@ -33,8 +33,8 @@ export default function UnclassifiedPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-muted-foreground">
-        <AlertCircle className="h-4 w-4 text-yellow-500" />
-        <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700">
+        <AlertCircle className="h-4 w-4 text-warning" />
+        <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
           {documents.length}
         </span>
         <span className="text-sm">unclassified</span>

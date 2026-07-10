@@ -64,8 +64,9 @@ function MedicationRow({
         <MedFormBadge form={med.form} />
         <button
           onClick={onDelete}
-          className="rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+          className="flex flex-shrink-0 items-center justify-center rounded border p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive coarse:min-h-11 coarse:min-w-11"
           title="Delete medication"
+          aria-label="Delete medication"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

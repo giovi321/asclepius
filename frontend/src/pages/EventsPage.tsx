@@ -192,7 +192,7 @@ export default function EventsPage() {
                 className="w-full flex items-center gap-3 p-4 text-left hover:bg-accent/30"
               >
                 <div
-                  className={`h-3 w-3 rounded-full flex-shrink-0 ${EVENT_COLORS[event.event_type] || "bg-gray-500"}`}
+                  className={`h-3 w-3 rounded-full flex-shrink-0 ${EVENT_COLORS[event.event_type] || "bg-muted-foreground"}`}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ export default function EventsPage() {
                       {event.event_type.replace(/_/g, " ")}
                     </span>
                     {!!event.is_ongoing && (
-                      <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-600">
+                      <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10px] text-warning">
                         ongoing
                       </span>
                     )}

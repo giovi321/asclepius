@@ -38,7 +38,7 @@ export function RowsTable({
           return (
             <div
               key={lr.id}
-              className={`px-3 py-2.5 ${lr.is_abnormal ? "bg-red-50/50 dark:bg-red-950/30" : ""} ${editing ? "bg-accent/40" : ""}`}
+              className={`px-3 py-2.5 ${lr.is_abnormal ? "bg-destructive-soft/50" : ""} ${editing ? "bg-accent/40" : ""}`}
             >
               {editing ? (
                 <div className="space-y-2">
@@ -151,14 +151,14 @@ export function RowsTable({
                       </span>
                       {lr.is_abnormal && (
                         <AlertTriangle
-                          className="h-3.5 w-3.5 flex-shrink-0 text-red-600 dark:text-red-400"
+                          className="h-3.5 w-3.5 flex-shrink-0 text-destructive"
                           aria-label="Abnormal"
                         />
                       )}
                     </div>
                     <div className="text-sm">
                       <span
-                        className={`font-medium ${lr.is_abnormal ? "text-red-600 dark:text-red-400" : ""}`}
+                        className={`font-medium ${lr.is_abnormal ? "text-destructive" : ""}`}
                       >
                         {lr.value ?? lr.value_text ?? "—"}
                         {lr.unit ? ` ${lr.unit}` : ""}
@@ -241,7 +241,7 @@ export function RowsTable({
               return (
                 <tr
                   key={lr.id}
-                  className={`${lr.is_abnormal ? "bg-red-50/50 dark:bg-red-950/30" : ""} ${editing ? "bg-accent/40" : ""}`}
+                  className={`${lr.is_abnormal ? "bg-destructive-soft/50" : ""} ${editing ? "bg-accent/40" : ""}`}
                 >
                   {showDocument && (
                     <td className="px-3 py-1.5 max-w-[220px] truncate">
@@ -283,7 +283,7 @@ export function RowsTable({
                     )}
                   </td>
                   <td
-                    className={`px-3 py-1.5 font-medium ${lr.is_abnormal ? "text-red-600 dark:text-red-400" : ""}`}
+                    className={`px-3 py-1.5 font-medium ${lr.is_abnormal ? "text-destructive" : ""}`}
                   >
                     {editing ? (
                       <input

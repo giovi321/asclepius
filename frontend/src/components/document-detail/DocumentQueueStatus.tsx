@@ -49,7 +49,7 @@ export default function DocumentQueueStatus({ docId }: Props) {
           />
         }
       >
-        <div className="flex items-center gap-1.5 rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 cursor-help">
+        <div className="flex items-center gap-1.5 rounded-md border border-info/25 bg-info-soft px-3 py-1.5 text-sm text-info cursor-help">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="font-medium">Processing</span>
           {detail && (
@@ -85,7 +85,7 @@ export default function DocumentQueueStatus({ docId }: Props) {
           />
         }
       >
-        <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 cursor-help">
+        <div className="flex items-center gap-1.5 rounded-md border border-warning/25 bg-warning-soft px-3 py-1.5 text-sm text-warning cursor-help">
           <Hourglass className="h-4 w-4" />
           <span className="font-medium">Queued</span>
           <span className="text-xs opacity-80 tabular-nums">{aheadText}</span>
@@ -287,7 +287,7 @@ function ProvidersBlock({
               className={[
                 "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px]",
                 isActive
-                  ? "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                  ? "border-info/25 bg-info-soft text-info"
                   : "border-muted bg-muted/40 text-muted-foreground",
               ].join(" ")}
               title={

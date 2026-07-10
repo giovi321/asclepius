@@ -69,7 +69,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             </div>
             <ToastPrimitive.Close
               aria-label="Dismiss"
-              className="rounded-md p-1.5 opacity-100 transition-opacity hover:text-foreground focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              className="flex items-center justify-center rounded-md p-1.5 opacity-100 transition-opacity hover:text-foreground focus:opacity-100 md:opacity-0 md:group-hover:opacity-100 coarse:min-h-11 coarse:min-w-11"
             >
               <X className="h-4 w-4" />
             </ToastPrimitive.Close>

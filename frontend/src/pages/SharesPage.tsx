@@ -319,13 +319,8 @@ export default function SharesPage() {
 
       <p className="text-sm text-muted-foreground">
         {counts.total} share{counts.total === 1 ? "" : "s"} total ·{" "}
-        <span className="text-emerald-600 dark:text-emerald-400">
-          {counts.active} active
-        </span>{" "}
-        ·{" "}
-        <span className="text-amber-600 dark:text-amber-400">
-          {counts.expired} expired
-        </span>{" "}
+        <span className="text-success">{counts.active} active</span> ·{" "}
+        <span className="text-warning">{counts.expired} expired</span>{" "}
         ·{" "}
         <span className="text-muted-foreground">{counts.revoked} revoked</span>
       </p>
@@ -453,7 +448,7 @@ export default function SharesPage() {
                           {!isRevoked && (
                             <button
                               onClick={() => onRevoke(s.id)}
-                              className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+                              className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                               title="Revoke share (keeps the row, kills the session)"
                             >
                               <Trash2 className="h-3 w-3" /> Revoke
@@ -464,7 +459,7 @@ export default function SharesPage() {
                               and legacy shares can be cleaned out. */}
                           <button
                             onClick={() => onDelete(s.id)}
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-red-600"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-destructive"
                             title="Permanently delete this share from the database"
                           >
                             <Trash2 className="h-3 w-3" /> Delete

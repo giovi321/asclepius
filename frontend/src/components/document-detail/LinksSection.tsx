@@ -222,7 +222,7 @@ export default function LinksSection({
                   {linkedName}
                 </button>
                 {isImaging && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-info-soft px-2 py-0.5 text-[10px] font-medium text-info">
                     <ImageIcon className="h-3 w-3" />
                     Imaging{modality ? ` · ${modality}` : ""}
                   </span>
@@ -233,8 +233,9 @@ export default function LinksSection({
                 {!isSynthetic && (
                   <button
                     onClick={() => unlink(link.id)}
-                    className="ml-2 rounded p-1 text-muted-foreground hover:text-destructive"
+                    className="ml-2 flex items-center justify-center rounded p-1 text-muted-foreground hover:text-destructive coarse:min-h-11 coarse:min-w-11"
                     title="Remove link"
+                    aria-label="Remove link"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -292,7 +293,8 @@ export default function LinksSection({
                         prev.filter((r) => r.document_id !== sg.document_id),
                       )
                     }
-                    className="rounded p-1 text-muted-foreground hover:text-destructive"
+                    className="flex items-center justify-center rounded p-1 text-muted-foreground hover:text-destructive coarse:min-h-11 coarse:min-w-11"
+                    aria-label="Dismiss suggestion"
                   >
                     <X className="h-3 w-3" />
                   </button>

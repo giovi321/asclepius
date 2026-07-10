@@ -31,12 +31,13 @@ export default function AttachedModelRow({
 }: AttachedModelRowProps) {
   const KindIcon =
     m.kind === "vision" ? Eye : m.kind === "ocr" ? ScanText : Brain;
+  // Mirrors PROVIDER_BADGE_CLASSES in lib/statusTokens.ts (llm/vision/ocr).
   const kindClass =
     m.kind === "vision"
-      ? "text-purple-600 bg-purple-50 dark:bg-purple-900/20 dark:text-purple-300"
+      ? "text-cat-violet bg-cat-violet-soft"
       : m.kind === "ocr"
-        ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300"
-        : "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-300";
+        ? "text-warning bg-warning-soft"
+        : "text-success bg-success-soft";
 
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
@@ -89,8 +90,8 @@ export default function AttachedModelRow({
           <div
             className={`mt-0.5 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${
               result.ok
-                ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300"
-                : "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300"
+                ? "bg-success-soft text-success"
+                : "bg-destructive-soft text-destructive"
             }`}
             title={result.message}
           >
@@ -112,7 +113,10 @@ export default function AttachedModelRow({
         title={
           m.enabled ? "Enabled, click to disable" : "Disabled, click to enable"
         }
-        className={`rounded-md p-1 ${m.enabled ? "text-green-600" : "text-muted-foreground"} hover:bg-accent`}
+        aria-label={
+          m.enabled ? "Enabled, click to disable" : "Disabled, click to enable"
+        }
+        className={`flex items-center justify-center rounded-md p-1 ${m.enabled ? "text-success" : "text-muted-foreground"} hover:bg-accent coarse:min-h-11 coarse:min-w-11`}
       >
         {m.enabled ? (
           <Check className="h-3.5 w-3.5" />
@@ -124,7 +128,8 @@ export default function AttachedModelRow({
         onClick={handleTest}
         disabled={testing}
         title="Test connection"
-        className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50"
+        aria-label="Test connection"
+        className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50 coarse:min-h-11 coarse:min-w-11"
       >
         {testing ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -135,13 +140,15 @@ export default function AttachedModelRow({
       <button
         onClick={onEdit}
         title="Edit model"
-        className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent"
+        aria-label="Edit model"
+        className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent coarse:min-h-11 coarse:min-w-11"
       >
         <Pencil className="h-3.5 w-3.5" />
       </button>
       <button
         onClick={onRemove}
-        className="rounded-md p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        aria-label="Remove model"
+        className="flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 coarse:min-h-11 coarse:min-w-11"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>

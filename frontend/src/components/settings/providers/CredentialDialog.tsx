@@ -212,7 +212,7 @@ export default function CredentialDialog({
         </span>
 
         {err && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-3 py-2 text-sm">
+          <div className="rounded-md bg-destructive-soft text-destructive px-3 py-2 text-sm">
             {err}
           </div>
         )}

@@ -209,9 +209,9 @@ export default function LabResultsPage() {
     <div className="space-y-4">
       {/* Orphan banner */}
       {orphans.length > 0 && (
-        <div className="flex items-center justify-between rounded-md border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-sm dark:border-yellow-700/50 dark:bg-yellow-900/20">
+        <div className="flex items-center justify-between rounded-md border border-warning/40 bg-warning-soft px-3 py-2 text-sm">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTriangle className="h-4 w-4 text-warning" />
             <span>
               {orphans.length} lab result{orphans.length === 1 ? "" : "s"}{" "}
               reference a document that no longer exists.
@@ -312,12 +312,12 @@ export default function LabResultsPage() {
                   <span className="ml-auto text-xs text-muted-foreground">
                     {g.rows.length} test{g.rows.length === 1 ? "" : "s"}
                     {g.abnormal > 0 && (
-                      <span className="ml-2 text-red-600 dark:text-red-400">
+                      <span className="ml-2 text-destructive">
                         {g.abnormal} abnormal
                       </span>
                     )}
                     {ogtt && (
-                      <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">
+                      <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-info-soft px-1.5 py-0.5 text-[10px] font-medium text-info">
                         OGTT
                       </span>
                     )}

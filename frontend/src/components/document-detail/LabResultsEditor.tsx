@@ -462,7 +462,7 @@ export default function LabResultsEditor({
               ) : (
                 <tr
                   key={lr.id}
-                  className={lr.is_abnormal ? "text-red-600" : ""}
+                  className={lr.is_abnormal ? "text-destructive" : ""}
                 >
                   <td className="py-1 pr-2">
                     <div className="font-medium">
@@ -494,16 +494,18 @@ export default function LabResultsEditor({
                       <button
                         type="button"
                         onClick={() => setEditingId(lr.id!)}
-                        className="rounded border p-1 hover:bg-accent"
+                        className="flex items-center justify-center rounded border p-1 hover:bg-accent coarse:min-h-11 coarse:min-w-11"
                         title="Edit"
+                        aria-label="Edit lab result"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                       <button
                         type="button"
                         onClick={() => del(lr.id!)}
-                        className="rounded border p-1 hover:bg-accent text-destructive"
+                        className="flex items-center justify-center rounded border p-1 hover:bg-accent text-destructive coarse:min-h-11 coarse:min-w-11"
                         title="Delete"
+                        aria-label="Delete lab result"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>

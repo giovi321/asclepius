@@ -113,15 +113,15 @@ function ActionLabel({ action }: { action: string }) {
     action === "otp_verify_fail" ||
     action === "otp_email_failed" ||
     action === "share.locked"
-      ? "text-red-600 dark:text-red-400"
+      ? "text-destructive"
       : action === "otp_email_sent"
-        ? "text-blue-700 dark:text-blue-400"
+        ? "text-info"
         : action === "otp_email_rate_limited"
-          ? "text-amber-600 dark:text-amber-400"
+          ? "text-warning"
           : action === "view_file" || action === "view_doc"
-            ? "text-emerald-700 dark:text-emerald-400"
+            ? "text-success"
             : action === "translate"
-              ? "text-blue-700 dark:text-blue-400"
+              ? "text-info"
               : "text-foreground";
   return (
     <span className={`inline-flex items-center gap-1 ${tone}`}>

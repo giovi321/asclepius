@@ -42,39 +42,39 @@ const TYPE_COLORS: Record<
     label: "Surgical Report",
   },
   lab_test: {
-    bg: "bg-blue-500/10",
-    text: "text-blue-600 dark:text-blue-400",
-    dot: "bg-blue-500",
+    bg: "bg-info/10",
+    text: "text-info",
+    dot: "bg-info",
     label: "Lab Test",
   },
   invoice: {
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-600 dark:text-emerald-400",
-    dot: "bg-emerald-500",
+    bg: "bg-success/10",
+    text: "text-success",
+    dot: "bg-success",
     label: "Invoice",
   },
   imaging_report: {
-    bg: "bg-purple-500/10",
-    text: "text-purple-600 dark:text-purple-400",
-    dot: "bg-purple-500",
+    bg: "bg-cat-violet/10",
+    text: "text-cat-violet",
+    dot: "bg-cat-violet",
     label: "Imaging",
   },
   prescription: {
-    bg: "bg-orange-500/10",
-    text: "text-orange-600 dark:text-orange-400",
-    dot: "bg-orange-500",
+    bg: "bg-warning/10",
+    text: "text-warning",
+    dot: "bg-warning",
     label: "Prescription",
   },
   vaccination: {
-    bg: "bg-teal-500/10",
-    text: "text-teal-600 dark:text-teal-400",
-    dot: "bg-teal-500",
+    bg: "bg-cat-teal/10",
+    text: "text-cat-teal",
+    dot: "bg-cat-teal",
     label: "Vaccination",
   },
   medical_certificate: {
-    bg: "bg-amber-500/10",
-    text: "text-amber-600 dark:text-amber-400",
-    dot: "bg-amber-500",
+    bg: "bg-warning/10",
+    text: "text-warning",
+    dot: "bg-warning",
     label: "Medical Certificate",
   },
 };
@@ -258,7 +258,7 @@ export default function TimelinePage() {
       ) : (
         <div className="flex gap-4">
           {/* Mini-map sidebar */}
-          <div className="hidden md:flex flex-col sticky top-0 h-[calc(100vh-12rem)] pt-2">
+          <div className="hidden md:flex flex-col sticky top-0 h-[calc(100dvh-12rem)] pt-2">
             <div
               ref={minimapRef}
               className="relative flex-1 flex flex-col justify-between py-2 pl-1 pr-2"

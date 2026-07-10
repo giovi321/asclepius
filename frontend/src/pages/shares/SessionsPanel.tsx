@@ -52,11 +52,11 @@ export default function SessionsPanel({
               onAction={onRevokeSession}
               renderStatus={(r) =>
                 r.is_idle ? (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <span className="rounded bg-warning-soft px-1.5 py-0.5 text-warning">
                     idle
                   </span>
                 ) : (
-                  <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <span className="rounded bg-success-soft px-1.5 py-0.5 text-success">
                     live
                   </span>
                 )
@@ -110,7 +110,7 @@ function SessionsTable<T extends SessionTableRow>({
   const actionButton = (rowid: number) => (
     <button
       onClick={() => onAction(rowid)}
-      className="inline-flex items-center gap-1 rounded-md border border-red-300 px-2 py-0.5 text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950 coarse:min-h-11 coarse:px-3"
+      className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-0.5 text-destructive hover:bg-destructive/10 coarse:min-h-11 coarse:px-3"
       title={actionTitle}
     >
       <Trash2 className="h-3 w-3" /> {actionLabel}
@@ -120,7 +120,7 @@ function SessionsTable<T extends SessionTableRow>({
     renderStatus ? (
       renderStatus(r)
     ) : (
-      <span className="rounded bg-sky-100 px-1.5 py-0.5 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+      <span className="rounded bg-info-soft px-1.5 py-0.5 text-info">
         waiting
       </span>
     );

@@ -138,7 +138,7 @@ export default function ModelForm({
         </button>
       </div>
       {err && (
-        <div className="text-xs text-red-600 dark:text-red-400">{err}</div>
+        <div className="text-xs text-destructive">{err}</div>
       )}
     </div>
   );

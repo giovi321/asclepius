@@ -77,23 +77,23 @@ export default function MetadataEditor({ doc, onSave }: MetadataEditorProps) {
       <InfoRow label="Status" value={doc.status} />
       {(doc.status === "failed" || doc.status === "needs_review") &&
         doc.error_message && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 p-3 space-y-2">
-            <p className="text-xs font-semibold text-red-700 dark:text-red-400">
+          <div className="rounded-md bg-destructive-soft border border-destructive/25 p-3 space-y-2">
+            <p className="text-xs font-semibold text-destructive">
               {doc.status === "failed" ? "Processing Error" : "Review Required"}
               {doc.retry_count > 0 && (
-                <span className="font-normal ml-2 text-red-500">
+                <span className="font-normal ml-2 text-destructive/80">
                   ({doc.retry_count} retries)
                 </span>
               )}
             </p>
-            <pre className="text-xs text-red-600 dark:text-red-400 font-mono whitespace-pre-wrap break-all leading-relaxed">
+            <pre className="text-xs text-destructive font-mono whitespace-pre-wrap break-all leading-relaxed">
               {doc.error_message}
             </pre>
             <div className="flex justify-end pt-1">
               <button
                 onClick={markReviewed}
                 disabled={markingReviewed}
-                className="rounded-md border border-red-300 dark:border-red-700 bg-white dark:bg-red-950/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50"
+                className="rounded-md border border-destructive/40 bg-card px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/10 disabled:opacity-50"
                 title={
                   doc.status === "failed"
                     ? "Dismiss the error banner — fix anything left, mark the document as reviewed."

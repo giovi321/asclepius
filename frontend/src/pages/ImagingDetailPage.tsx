@@ -167,7 +167,7 @@ export default function ImagingDetailPage() {
           )}
           <button
             onClick={handleDelete}
-            className="flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-950"
+            className="flex items-center gap-1 rounded-md border border-destructive/40 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 coarse:min-h-11"
           >
             <Trash2 className="h-4 w-4" /> Delete
           </button>

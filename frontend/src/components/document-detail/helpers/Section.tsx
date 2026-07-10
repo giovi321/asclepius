@@ -1,5 +1,6 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCollapseState } from "./useCollapseState";
 
 export function Section({
@@ -9,6 +10,7 @@ export function Section({
   sectionId,
   defaultOpen = true,
   headerExtra,
+  className,
 }: {
   title: string;
   icon?: any;
@@ -22,11 +24,13 @@ export function Section({
    * badge, model chip). Click events stop propagation so it doesn't
    * toggle the section. */
   headerExtra?: React.ReactNode;
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
 }) {
   const [open, setOpen] = useCollapseState(sectionId, defaultOpen);
   if (!sectionId) {
     return (
-      <div className="rounded-lg border p-4">
+      <div className={cn("rounded-lg border p-4", className)}>
         <h3 className="mb-3 flex items-center gap-2 font-medium">
           {Icon && <Icon className="h-4 w-4" />}
           {title}
@@ -36,7 +40,7 @@ export function Section({
     );
   }
   return (
-    <div className="rounded-lg border">
+    <div className={cn("rounded-lg border", className)}>
       <button
         type="button"
         onClick={() => setOpen(!open)}

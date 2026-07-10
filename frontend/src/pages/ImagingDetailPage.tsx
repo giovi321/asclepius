@@ -131,7 +131,7 @@ export default function ImagingDetailPage() {
   return (
     <div className="space-y-6 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
           <button
             onClick={() => navigate("/imaging")}

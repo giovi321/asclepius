@@ -118,7 +118,7 @@ export function EditableSummary({
                   </span>
                 )}
               </p>
-              <p className="mt-1 text-[10px] text-primary/50 opacity-0 group-hover:opacity-100">
+              <p className="mt-1 text-[10px] text-primary/50 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                 click to edit
               </p>
             </div>
@@ -225,12 +225,17 @@ export function EditableFilename({
   }
 
   return (
-    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2">
-      <span onClick={() => setEditing(true)}>{value}</span>
-      <span className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+    <h1 className="text-xl font-semibold group cursor-pointer flex items-center gap-2 min-w-0">
+      <span
+        onClick={() => setEditing(true)}
+        className="line-clamp-2 break-words md:line-clamp-none"
+      >
+        {value}
+      </span>
+      <span className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
         <button
           onClick={() => setEditing(true)}
-          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground coarse:min-h-11 coarse:min-w-11"
           title="Edit filename"
         >
           <Pencil className="h-4 w-4" />
@@ -238,7 +243,7 @@ export function EditableFilename({
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-primary disabled:opacity-50 coarse:min-h-11 coarse:min-w-11"
           title="Generate filename from document data"
         >
           <RefreshCw

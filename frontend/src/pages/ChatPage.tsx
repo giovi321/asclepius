@@ -4,6 +4,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
+import { usePointerCoarse } from "@/hooks/useMediaQuery";
+import Sheet from "@/components/ui/Sheet";
 import { FileText, MessageCircle, Plus, Send } from "lucide-react";
 
 interface ChatSource {
@@ -11,6 +13,42 @@ interface ChatSource {
   filename: string | null;
   doc_type: string | null;
   event_date: string | null;
+}
+
+/** Source-document list, shared by the lg+ sidebar and the phone Sheet. */
+function SourcesList({ sources }: { sources: ChatSource[] }) {
+  if (sources.length === 0) {
+    return (
+      <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+        Documents the assistant cites will show up here.
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-1">
+      {sources.map((src) => (
+        <li key={src.id}>
+          <Link
+            to={`/documents/${src.id}`}
+            className="flex flex-col gap-0.5 rounded-md border bg-background px-2 py-1.5 text-xs hover:bg-accent coarse:py-2.5"
+            title={src.filename || `Document #${src.id}`}
+          >
+            <span className="flex items-center gap-1.5 font-medium">
+              <FileText className="h-3 w-3 flex-shrink-0 text-primary" />
+              <span className="truncate">
+                {src.filename || `Document #${src.id}`}
+              </span>
+            </span>
+            {(src.doc_type || src.event_date) && (
+              <span className="pl-4 text-[10px] text-muted-foreground">
+                {[src.doc_type, src.event_date].filter(Boolean).join(" • ")}
+              </span>
+            )}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 interface Message {
@@ -25,7 +63,18 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const coarsePointer = usePointerCoarse();
+
+  /** Grow the composer with its content, clamped to ~4 rows. */
+  const autoGrowComposer = () => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  };
 
   useEffect(() => {
     if (!selectedPatient) return;
@@ -59,6 +108,7 @@ export default function ChatPage() {
     if (!input.trim() || loading) return;
     const msg = input.trim();
     setInput("");
+    if (composerRef.current) composerRef.current.style.height = "auto";
     setMessages((m) => [...m, { role: "user", content: msg }]);
     setLoading(true);
 
@@ -110,14 +160,27 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-10rem)] gap-4">
+    // h-full fills the AppLayout <main> scroll container (a definite-height
+    // flex item inside the h-dvh shell), so the page never guesses at
+    // top-bar/padding offsets: messages flex-fill and scroll internally,
+    // the composer stays pinned at the bottom.
+    <div className="flex h-full min-h-0 gap-4">
       {/* Conversation column */}
-      <div className="flex flex-1 flex-col min-w-0">
-        <div className="mb-4 flex items-center justify-end">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="mb-3 flex items-center justify-end gap-2">
+          {allSources.length > 0 && (
+            <button
+              onClick={() => setSourcesOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm hover:bg-muted lg:hidden coarse:min-h-11"
+            >
+              <FileText className="h-4 w-4 text-primary" />
+              Sources ({allSources.length})
+            </button>
+          )}
           <button
             onClick={startNewChat}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50 coarse:min-h-11"
           >
             <Plus className="h-4 w-4" />
             Start new chat
@@ -125,7 +188,7 @@ export default function ChatPage() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto rounded-lg border p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border p-4">
           {messages.length === 0 && (
             <p className="py-8 text-center text-muted-foreground">
               Ask a question about {selectedPatient.display_name}'s medical
@@ -322,20 +385,34 @@ export default function ChatPage() {
         </div>
 
         {/* Input */}
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
+        <div className="mt-3 flex items-end gap-2">
+          <textarea
+            ref={composerRef}
+            rows={1}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
+            onChange={(e) => {
+              setInput(e.target.value);
+              autoGrowComposer();
+            }}
+            onKeyDown={(e) => {
+              // Fine pointers: Enter sends, Shift+Enter inserts a newline.
+              // Coarse pointers: Enter always inserts a newline; only the
+              // send button sends.
+              if (e.key === "Enter" && !e.shiftKey && !coarsePointer) {
+                e.preventDefault();
+                send();
+              }
+            }}
             placeholder="Ask about medical history..."
-            className="flex-1 rounded-md border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 resize-none rounded-md border bg-background px-4 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={loading}
           />
           <button
             onClick={send}
             disabled={loading || !input.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            aria-label="Send"
+            title="Send"
+            className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 coarse:h-11 coarse:w-11"
           >
             <Send className="h-4 w-4" />
           </button>
@@ -354,39 +431,18 @@ export default function ChatPage() {
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-2">
-          {allSources.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              Documents the assistant cites will show up here.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {allSources.map((src) => (
-                <li key={src.id}>
-                  <Link
-                    to={`/documents/${src.id}`}
-                    className="flex flex-col gap-0.5 rounded-md border bg-background px-2 py-1.5 text-xs hover:bg-accent"
-                    title={src.filename || `Document #${src.id}`}
-                  >
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <FileText className="h-3 w-3 flex-shrink-0 text-primary" />
-                      <span className="truncate">
-                        {src.filename || `Document #${src.id}`}
-                      </span>
-                    </span>
-                    {(src.doc_type || src.event_date) && (
-                      <span className="pl-4 text-[10px] text-muted-foreground">
-                        {[src.doc_type, src.event_date]
-                          .filter(Boolean)
-                          .join(" • ")}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
+          <SourcesList sources={allSources} />
         </div>
       </aside>
+
+      {/* Sources sheet, below lg */}
+      <Sheet
+        open={sourcesOpen}
+        onOpenChange={setSourcesOpen}
+        title={`Source documents (${allSources.length})`}
+      >
+        <SourcesList sources={allSources} />
+      </Sheet>
     </div>
   );
 }

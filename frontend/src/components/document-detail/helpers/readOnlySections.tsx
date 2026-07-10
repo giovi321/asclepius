@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Eye, EyeOff, Pill, Syringe } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCollapseState } from "./useCollapseState";
 
 export function TechnicalDetails({
@@ -68,11 +69,18 @@ export function TechnicalDetails({
 
 // ─── OcrSection (collapsible) ──────────────────────────────────
 
-export function OcrSection({ text }: { text: string | null }) {
+export function OcrSection({
+  text,
+  className,
+}: {
+  text: string | null;
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
+}) {
   const [open, setOpen] = useCollapseState("ocr-text", false);
   if (!text) return null;
   return (
-    <div className="rounded-lg border">
+    <div className={cn("rounded-lg border", className)}>
       <button
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between p-4 hover:bg-accent/50"

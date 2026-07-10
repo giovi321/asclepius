@@ -37,8 +37,17 @@ export interface ResponsiveTableProps<T> {
   /** Called with the column key; the page owns the toggle logic. */
   onSortChange?: (key: string) => void;
   selectable?: boolean;
+  /** Card-list checkboxes only when true; defaults to `selectable`. Lets a
+   *  page keep always-on desktop checkboxes while gating the phone cards
+   *  behind an explicit selection mode. */
+  mobileSelectable?: boolean;
   selectedIds?: ReadonlySet<string | number>;
   onToggleSelect?: (id: string | number) => void;
+  /** When provided (and `selectable`), renders a select-all checkbox in the
+   *  desktop header, checked when every row on the page is selected. */
+  onToggleSelectAll?: () => void;
+  /** Per-row checkbox aria-label; defaults to "Select row". */
+  rowSelectLabel?: (row: T) => string;
   loading?: boolean;
   loadingRows?: number;
   /** Rendered when rows is empty and not loading (use EmptyState). */
@@ -67,8 +76,11 @@ export default function ResponsiveTable<T>({
   sort,
   onSortChange,
   selectable = false,
+  mobileSelectable,
   selectedIds,
   onToggleSelect,
+  onToggleSelectAll,
+  rowSelectLabel,
   loading = false,
   loadingRows = 6,
   empty,
@@ -93,6 +105,9 @@ export default function ResponsiveTable<T>({
   }
 
   const isSelected = (row: T) => selectedIds?.has(getRowId(row)) ?? false;
+  const cardSelectable = mobileSelectable ?? selectable;
+  const allSelected =
+    rows.length > 0 && rows.every((row) => isSelected(row));
 
   const titleCol = columns.find((c) => mobileRole(c) === "title");
   const subtitleCol = columns.find((c) => mobileRole(c) === "subtitle");
@@ -153,7 +168,20 @@ export default function ResponsiveTable<T>({
           </colgroup>
           <thead className="sticky top-0 z-sticky bg-surface text-surface-foreground">
             <tr className="border-b text-left">
-              {selectable && <th className="px-2 py-2" aria-label="Select" />}
+              {selectable &&
+                (onToggleSelectAll ? (
+                  <th className="px-2 py-2">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={onToggleSelectAll}
+                      aria-label="Select all on this page"
+                      className="h-4 w-4 accent-primary align-middle"
+                    />
+                  </th>
+                ) : (
+                  <th className="px-2 py-2" aria-label="Select" />
+                ))}
               {columns.map((c) => (
                 <th
                   key={c.key}
@@ -205,7 +233,7 @@ export default function ResponsiveTable<T>({
                         type="checkbox"
                         checked={isSelected(row)}
                         onChange={() => onToggleSelect?.(id)}
-                        aria-label="Select row"
+                        aria-label={rowSelectLabel?.(row) ?? "Select row"}
                         className="h-4 w-4 accent-primary"
                       />
                     </td>
@@ -252,13 +280,13 @@ export default function ResponsiveTable<T>({
                   selected && "bg-primary/5",
                 )}
               >
-                {selectable && (
+                {cardSelectable && (
                   <input
                     type="checkbox"
                     checked={selected}
                     onChange={() => onToggleSelect?.(id)}
                     onClick={(e) => e.stopPropagation()}
-                    aria-label="Select row"
+                    aria-label={rowSelectLabel?.(row) ?? "Select row"}
                     className="mt-1 h-5 w-5 shrink-0 accent-primary"
                   />
                 )}

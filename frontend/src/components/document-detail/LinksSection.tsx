@@ -13,6 +13,8 @@ import { getErrorMessage } from "@/lib/errors";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
 import SuggestLinksButton from "@/components/document-detail/SuggestLinksButton";
+import Badge from "@/components/ui/Badge";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 
 export interface LinksSectionProps {
   docId: number;
@@ -35,6 +37,7 @@ export default function LinksSection({
 }: LinksSectionProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isMobile } = useBreakpoint();
   const [relevantDocs, setRelevantDocs] = useState<any[]>([]);
   const [loadingRelevant, setLoadingRelevant] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -181,7 +184,10 @@ export default function LinksSection({
       title="Linked Documents"
       icon={Link2}
       sectionId="linked-documents"
-      defaultOpen={links.length > 0 || relevantDocs.length > 0}
+      defaultOpen={!isMobile && (links.length > 0 || relevantDocs.length > 0)}
+      headerExtra={
+        links.length > 0 ? <Badge size="sm">{links.length}</Badge> : undefined
+      }
     >
       {links.length > 0 ? (
         <div className="space-y-2">

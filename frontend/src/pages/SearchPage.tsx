@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api from "@/api/client";
 import { usePatient } from "@/contexts/PatientContext";
 import { Search, FileText } from "lucide-react";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 export default function SearchPage() {
   const { selectedPatient } = usePatient();
@@ -26,23 +28,20 @@ export default function SearchPage() {
     <div className="space-y-4">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && doSearch()}
             placeholder="Search across all documents, lab results, and notes..."
-            className="w-full rounded-md border pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="pl-9"
             autoFocus
           />
         </div>
-        <button
-          onClick={doSearch}
-          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-        >
+        <Button size="md" className="h-10" onClick={doSearch}>
           Search
-        </button>
+        </Button>
       </div>
 
       {searched && (

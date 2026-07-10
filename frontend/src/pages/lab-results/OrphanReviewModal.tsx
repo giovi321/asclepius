@@ -27,7 +27,7 @@ export function OrphanReviewModal({
         if (!o) onClose();
       }}
       title={`Orphan lab results (${orphans.length})`}
-      contentClassName="sm:max-w-2xl"
+      contentClassName="h-[calc(100dvh-3rem)] sm:h-auto sm:max-w-2xl"
     >
       <p className="mb-3 text-sm text-muted-foreground">
         These lab results reference a document that no longer exists. Review and

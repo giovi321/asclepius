@@ -14,6 +14,8 @@ import {
   TestTube,
 } from "lucide-react";
 import OgttCurveChart from "@/components/lab-results/OgttCurveChart";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonRows } from "@/components/ui/Skeleton";
 import { looksLikeOgtt } from "@/lib/ogtt";
 import type { LabRow } from "@/pages/lab-results/types";
 import { useLabResults } from "@/pages/lab-results/useLabResults";
@@ -263,12 +265,18 @@ export default function LabResultsPage() {
 
       {/* Results */}
       {loading ? (
-        <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-          Loading...
-        </div>
+        <SkeletonRows rows={6} cols={4} className="rounded-lg border" />
       ) : results.length === 0 ? (
-        <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
-          No lab results found
+        <div className="rounded-lg border">
+          <EmptyState
+            icon={TestTube}
+            title="No lab results"
+            description={
+              search.trim()
+                ? `No tests match "${search.trim()}". Try a different search.`
+                : "Lab values extracted from uploaded documents show up here. Upload a lab report and run extraction to populate this list."
+            }
+          />
         </div>
       ) : groupByDate && groups ? (
         <div className="space-y-2">
@@ -279,22 +287,22 @@ export default function LabResultsPage() {
               <div key={g.key} className="rounded-lg border">
                 <button
                   onClick={() => toggleGroup(g.key)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-accent/40"
+                  className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left hover:bg-accent/40"
                 >
                   {open ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                   )}
                   <span className="font-medium">{g.date}</span>
                   {g.document_id && g.filename ? (
                     <Link
                       to={`/documents/${g.document_id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      className="flex min-w-0 max-w-full items-center gap-1 text-xs text-primary hover:underline"
                     >
-                      <FileText className="h-3 w-3" />
-                      {g.filename}
+                      <FileText className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{g.filename}</span>
                     </Link>
                   ) : (
                     <span className="text-xs italic text-muted-foreground">

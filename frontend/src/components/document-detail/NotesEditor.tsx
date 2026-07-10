@@ -3,6 +3,7 @@ import { StickyNote } from "lucide-react";
 import api from "@/api/client";
 import { useToast } from "@/contexts/ToastContext";
 import { Section } from "@/components/document-detail/DocumentDetailHelpers";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 
 export interface NotesEditorProps {
   docId: number | string;
@@ -11,6 +12,7 @@ export interface NotesEditorProps {
 
 export default function NotesEditor({ docId, initialNotes }: NotesEditorProps) {
   const { toast } = useToast();
+  const { isMobile } = useBreakpoint();
   const [notes, setNotes] = useState(initialNotes);
   const [editing, setEditing] = useState(false);
 
@@ -28,7 +30,7 @@ export default function NotesEditor({ docId, initialNotes }: NotesEditorProps) {
       title="Notes"
       icon={StickyNote}
       sectionId="notes"
-      defaultOpen={!!initialNotes?.trim()}
+      defaultOpen={!isMobile && !!initialNotes?.trim()}
     >
       {editing ? (
         <div className="space-y-2">

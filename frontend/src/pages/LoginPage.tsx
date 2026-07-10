@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import api from "@/api/client";
 import { Shield } from "lucide-react";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -48,7 +50,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30">
+    <div className="flex min-h-dvh items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-sm rounded-lg border bg-card p-8 shadow-sm">
         <div className="mb-6 flex flex-col items-center gap-2">
           <img
@@ -64,13 +66,15 @@ export default function LoginPage() {
 
         {oidcEnabled && (
           <>
-            <button
+            <Button
+              variant="secondary"
+              size="lg"
+              className="mb-4 w-full"
               onClick={handleOidcLogin}
-              className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium hover:bg-accent transition-colors"
             >
               <Shield className="h-4 w-4" />
               Sign in with SSO
-            </button>
+            </Button>
             {!hidePasswordLogin && (
               <div className="relative mb-4">
                 <div className="absolute inset-0 flex items-center">
@@ -98,11 +102,11 @@ export default function LoginPage() {
               <label className="mb-1.5 block text-sm font-medium">
                 Username
               </label>
-              <input
+              <Input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                autoComplete="username"
                 required
                 autoFocus
               />
@@ -112,22 +116,23 @@ export default function LoginPage() {
               <label className="mb-1.5 block text-sm font-medium">
                 Password
               </label>
-              <input
+              <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                autoComplete="current-password"
                 required
               />
             </div>
 
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              size="lg"
+              className="w-full"
+              loading={loading}
             >
               {loading ? "Signing in..." : "Sign in"}
-            </button>
+            </Button>
           </form>
         )}
       </div>

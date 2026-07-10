@@ -152,20 +152,28 @@ export default function DashboardPage() {
               <Link
                 key={doc.id}
                 to={`/documents/${doc.id}`}
-                className="flex items-center justify-between p-3 hover:bg-accent/50"
+                className="flex flex-col gap-1 p-3 hover:bg-accent/50 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
               >
-                <div>
-                  <p className="text-sm font-medium">{doc.original_filename}</p>
-                  <p className="text-xs text-muted-foreground">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {doc.original_filename}
+                  </p>
+                  <p className="hidden truncate text-xs text-muted-foreground sm:block">
                     {formatDocType(doc.doc_type)} | {getBestDate(doc) || "—"} |{" "}
                     {doc.patient_name || "Unclassified"}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}
-                >
-                  {doc.status}
-                </span>
+                <div className="flex min-w-0 items-center justify-between gap-2 sm:shrink-0 sm:justify-end">
+                  <p className="min-w-0 truncate text-xs text-muted-foreground sm:hidden">
+                    {formatDocType(doc.doc_type)} | {getBestDate(doc) || "—"} |{" "}
+                    {doc.patient_name || "Unclassified"}
+                  </p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${getStatusClasses(doc.status)}`}
+                  >
+                    {doc.status}
+                  </span>
+                </div>
               </Link>
             ))
           )}
@@ -190,21 +198,21 @@ function StatCard({
 }) {
   const colorClasses =
     color === "red"
-      ? "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10"
+      ? "border-destructive/25 bg-destructive-soft/50"
       : color === "amber"
-        ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10"
+        ? "border-warning/25 bg-warning-soft/50"
         : "";
   const iconColor =
     color === "red"
-      ? "text-red-500"
+      ? "text-destructive"
       : color === "amber"
-        ? "text-amber-500"
+        ? "text-warning"
         : "text-muted-foreground";
   const valueColor =
     color === "red"
-      ? "text-red-700 dark:text-red-400"
+      ? "text-destructive"
       : color === "amber"
-        ? "text-amber-700 dark:text-amber-400"
+        ? "text-warning"
         : "";
 
   return (

@@ -4,7 +4,9 @@ import { Stethoscope, Pencil, X, Trash2, Search } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useDiagnoses } from "@/hooks/data";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import Badge from "@/components/ui/Badge";
 import {
   Section,
   EditableField,
@@ -306,6 +308,7 @@ export function EncountersSection({
 }) {
   const confirm = useConfirm();
   const { toast } = useToast();
+  const { isMobile } = useBreakpoint();
   if (!encounters?.length) return null;
 
   const handleDelete = async (encId: number) => {
@@ -326,7 +329,13 @@ export function EncountersSection({
   };
 
   return (
-    <Section title="Encounters" icon={Stethoscope} sectionId="encounters">
+    <Section
+      title="Encounters"
+      icon={Stethoscope}
+      sectionId="encounters"
+      defaultOpen={!isMobile}
+      headerExtra={<Badge size="sm">{encounters.length}</Badge>}
+    >
       {encounters.map((enc, i) => (
         <div key={enc.id} className={i > 0 ? "pt-4 mt-4 border-t" : ""}>
           {/* Three-tier card: headline (diagnosis + ICD pill + delete) →

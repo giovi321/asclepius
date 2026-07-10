@@ -440,16 +440,16 @@ export default function TimelinePage() {
 
       {/* Floating "Go to date" picker — bottom right */}
       {documents.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-20 flex items-center gap-2 rounded-lg border bg-background shadow-lg px-3 py-2">
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-6 z-fab flex items-center gap-2 rounded-lg border bg-background shadow-lg px-3 py-2">
           <input
             type="date"
             value={targetDate}
             onChange={(e: any) => setTargetDate(e.target.value)}
-            className="rounded-md border bg-background px-2 py-1 text-sm"
+            className="rounded-md border bg-background px-2 py-1 text-sm coarse:min-h-11"
           />
           <button
             onClick={scrollToDate}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 whitespace-nowrap coarse:min-h-11"
           >
             Go to date
           </button>

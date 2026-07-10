@@ -21,13 +21,21 @@ function cleanSectionSummary(s: string | null | undefined): string {
     : combined;
 }
 
-export function DocumentSectionsList({ sections }: { sections: any[] }) {
+export function DocumentSectionsList({
+  sections,
+  className,
+}: {
+  sections: any[];
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
+}) {
   if (!sections?.length) return null;
   return (
     <Section
       title={`Document Sections (${sections.length})`}
       sectionId="document-sections"
       defaultOpen={false}
+      className={className}
     >
       {sections.map((section) => {
         const cleaned = cleanSectionSummary(section.summary_en);

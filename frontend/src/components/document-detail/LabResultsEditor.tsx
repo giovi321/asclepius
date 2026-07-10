@@ -3,9 +3,11 @@ import api from "@/api/client";
 import { getErrorMessage } from "@/lib/errors";
 import { TestTube, Pencil, Trash2, Plus, Search } from "lucide-react";
 import { Section } from "./DocumentDetailHelpers";
+import Badge from "@/components/ui/Badge";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
 import { useLabTests } from "@/hooks/data";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 
 type LabRow = {
@@ -161,17 +163,17 @@ function TestPicker({
   );
 }
 
-function EditorRow({
-  docId,
-  row,
-  onCancel,
-  onSaved,
-}: {
+interface EditorProps {
   docId: number;
   row: LabRow;
   onCancel: () => void;
   onSaved: () => void;
-}) {
+}
+
+/** The expanded edit form (all fields, stacks via sm:grid-cols-2). Shared
+ * between the md+ table (wrapped in a colSpan row) and the <md stacked
+ * card list, which renders it directly. */
+function EditorForm({ docId, row, onCancel, onSaved }: EditorProps) {
   const { toast } = useToast();
   const [draft, setDraft] = useState<LabRow>(row);
   const [saving, setSaving] = useState(false);
@@ -217,9 +219,7 @@ function EditorRow({
   };
 
   return (
-    <tr className="align-top">
-      <td colSpan={6} className="py-2">
-        <div className="rounded border bg-muted/30 p-3 space-y-2">
+    <div className="rounded border bg-muted/30 p-3 space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs">
               <span className="text-muted-foreground block mb-1">Test</span>
@@ -340,7 +340,7 @@ function EditorRow({
                 type="button"
                 onClick={onCancel}
                 disabled={saving}
-                className="rounded border px-3 py-1 text-xs"
+                className="rounded border px-3 py-1 text-xs coarse:min-h-11"
               >
                 Cancel
               </button>
@@ -348,13 +348,22 @@ function EditorRow({
                 type="button"
                 onClick={save}
                 disabled={saving}
-                className="rounded bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50"
+                className="rounded bg-primary px-3 py-1 text-xs text-primary-foreground disabled:opacity-50 coarse:min-h-11"
               >
                 {saving ? "Saving..." : draft.id ? "Save" : "Add"}
               </button>
             </div>
           </div>
-        </div>
+    </div>
+  );
+}
+
+/** Table-row host for EditorForm on md+ screens. */
+function EditorRow(props: EditorProps) {
+  return (
+    <tr className="align-top">
+      <td colSpan={6} className="py-2">
+        <EditorForm {...props} />
       </td>
     </tr>
   );
@@ -375,6 +384,7 @@ export default function LabResultsEditor({
 }) {
   const { toast } = useToast();
   const confirm = useConfirm();
+  const { isMobile } = useBreakpoint();
   const [editingId, setEditingId] = useState<number | "new" | null>(null);
 
   const isLabType = docType === "bloodtest" || docType === "labtest_other";
@@ -422,9 +432,12 @@ export default function LabResultsEditor({
       title="Lab Results"
       icon={TestTube}
       sectionId="lab-results"
-      defaultOpen={(labResults?.length ?? 0) > 0}
+      defaultOpen={!isMobile && (labResults?.length ?? 0) > 0}
+      headerExtra={
+        rows.length > 0 ? <Badge size="sm">{rows.length}</Badge> : undefined
+      }
     >
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
@@ -520,12 +533,107 @@ export default function LabResultsEditor({
           </tbody>
         </table>
       </div>
+
+      {/* <md: stacked card rows instead of the 6-column table */}
+      <div className="divide-y md:hidden">
+        {rows.map((lr) =>
+          editingId === lr.id ? (
+            <div key={lr.id} className="py-2">
+              <EditorForm
+                docId={docId}
+                row={lr}
+                onCancel={() => setEditingId(null)}
+                onSaved={onRowSaved}
+              />
+            </div>
+          ) : (
+            <div
+              key={lr.id}
+              className={`space-y-0.5 py-2 ${lr.is_abnormal ? "text-destructive" : ""}`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {lr.test_name_canonical || lr.test_name_original || ""}
+                </span>
+                {lr.is_abnormal && (
+                  <Badge variant="destructive" size="sm">
+                    Abnormal
+                  </Badge>
+                )}
+              </div>
+              {lr.test_name_canonical &&
+                lr.test_name_original &&
+                lr.test_name_canonical !== lr.test_name_original && (
+                  <div className="text-[11px] text-muted-foreground">
+                    {lr.test_name_original}
+                  </div>
+                )}
+              <div className="text-sm">
+                <span className="font-semibold">
+                  {lr.value ?? lr.value_text ?? ""}
+                  {lr.unit ? ` ${lr.unit}` : ""}
+                </span>
+                {lr.reference_range_low != null &&
+                  lr.reference_range_high != null && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · Ref {lr.reference_range_low}
+                      {"–"}
+                      {lr.reference_range_high}
+                    </span>
+                  )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {lr.test_date || ""}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(lr.id!)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-accent coarse:h-11 coarse:w-11"
+                    title="Edit"
+                    aria-label="Edit lab result"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => del(lr.id!)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md border text-destructive hover:bg-destructive-soft coarse:h-11 coarse:w-11"
+                    title="Delete"
+                    aria-label="Delete lab result"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ),
+        )}
+        {editingId === "new" && (
+          <div className="py-2">
+            <EditorForm
+              docId={docId}
+              row={blankDraft()}
+              onCancel={() => setEditingId(null)}
+              onSaved={onRowSaved}
+            />
+          </div>
+        )}
+        {rows.length === 0 && editingId !== "new" && (
+          <p className="py-3 text-center text-xs text-muted-foreground">
+            No lab results yet.
+          </p>
+        )}
+      </div>
+
       {editingId !== "new" && (
         <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={startAdd}
-            className="inline-flex items-center gap-1 rounded border px-3 py-1 text-xs hover:bg-accent"
+            className="inline-flex items-center gap-1 rounded border px-3 py-1 text-xs hover:bg-accent coarse:min-h-11"
           >
             <Plus className="h-3 w-3" /> Add test
           </button>

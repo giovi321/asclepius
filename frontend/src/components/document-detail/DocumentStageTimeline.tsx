@@ -21,7 +21,7 @@ import type {
 } from "@/types";
 import { usePipelineStatus } from "@/contexts/PipelineStatusContext";
 import { useCollapseState } from "@/components/document-detail/DocumentDetailHelpers";
-import { parseBackendTs } from "@/lib/utils";
+import { cn, parseBackendTs } from "@/lib/utils";
 import { stageLabel, stageIcon, flowBadge } from "@/lib/pipelineStages";
 
 type StatusVisual = {
@@ -262,13 +262,15 @@ function runFlowBadge(
 
 interface Props {
   documentId: number;
+  /** Extra classes on the card root (e.g. CSS `order-*` utilities). */
+  className?: string;
 }
 
 /** Per-document stage timeline. Reads the persisted ``document_stage_events``
  * rows and renders them as a vertical run-grouped timeline. Refetches every
  * few seconds while this doc is the active pipeline job so the user sees
  * stages tick in live. */
-export default function DocumentStageTimeline({ documentId }: Props) {
+export default function DocumentStageTimeline({ documentId, className }: Props) {
   const [data, setData] = useState<DocumentStagesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { status: pipeline } = usePipelineStatus();
@@ -337,7 +339,7 @@ export default function DocumentStageTimeline({ documentId }: Props) {
   if (!data || (data.events.length === 0 && !liveJob)) return null;
 
   return (
-    <div className="rounded-xl border bg-card">
+    <div className={cn("rounded-xl border bg-card", className)}>
       <button
         type="button"
         onClick={() => setOpen(!open)}

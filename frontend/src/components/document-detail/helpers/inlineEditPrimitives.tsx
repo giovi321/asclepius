@@ -25,7 +25,7 @@ export const ActionButton = React.forwardRef<
     <button
       ref={ref}
       type="button"
-      className={`h-7 inline-flex items-center justify-center rounded border-transparent px-2.5 text-xs font-medium disabled:opacity-50 ${ACTION_VARIANTS[variant]} ${className}`}
+      className={`h-7 inline-flex items-center justify-center rounded border-transparent px-2.5 text-xs font-medium disabled:opacity-50 coarse:min-h-11 coarse:px-3 ${ACTION_VARIANTS[variant]} ${className}`}
       {...props}
     />
   );
@@ -41,7 +41,7 @@ export const IconButton = React.forwardRef<
       type="button"
       title={label}
       aria-label={label}
-      className={`h-7 w-7 inline-flex items-center justify-center rounded border bg-background hover:bg-accent disabled:opacity-50 ${className}`}
+      className={`h-7 w-7 inline-flex items-center justify-center rounded border bg-background hover:bg-accent disabled:opacity-50 coarse:h-11 coarse:w-11 ${className}`}
       {...props}
     >
       {children}

@@ -3,7 +3,9 @@ import api from "@/api/client";
 import { Pill, Trash2, Plus } from "lucide-react";
 import { useToast } from "@/contexts/ToastContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
+import { useBreakpoint } from "@/hooks/useMediaQuery";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
+import Badge from "@/components/ui/Badge";
 import {
   Section,
   EditableField,
@@ -119,6 +121,7 @@ export function MedicationsSection({
 }) {
   const confirm = useConfirm();
   const { toast } = useToast();
+  const { isMobile } = useBreakpoint();
   if (!medications?.length) return null;
 
   const handleDelete = async (medId: number) => {
@@ -139,7 +142,13 @@ export function MedicationsSection({
   };
 
   return (
-    <Section title="Medications" icon={Pill} sectionId="medications">
+    <Section
+      title="Medications"
+      icon={Pill}
+      sectionId="medications"
+      defaultOpen={!isMobile}
+      headerExtra={<Badge size="sm">{medications.length}</Badge>}
+    >
       {medications.map((med, i) => (
         <div key={med.id} className={i > 0 ? "pt-3 mt-3 border-t" : ""}>
           <MedicationRow

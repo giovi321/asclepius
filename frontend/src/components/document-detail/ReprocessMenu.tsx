@@ -1,31 +1,33 @@
-import { useMemo, useRef, useState } from "react";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { useMemo, useState } from "react";
 import api from "@/api/client";
 import {
   useLlmProviders,
   useOcrProviders,
   useVisionProviders,
 } from "@/hooks/data";
-import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import ProviderSelect, { type Provider } from "@/components/ui/ProviderSelect";
+import Button from "@/components/ui/Button";
+import Sheet from "@/components/ui/Sheet";
 
-export interface ReprocessMenuProps {
+export interface ReprocessOptionsPanelProps {
   docId: number | string;
   /** Optional gate: return false to cancel the reprocess (e.g. after a confirm dialog). */
   onBeforeReprocess?: () => Promise<boolean> | boolean;
   onReprocessed: () => Promise<void> | void;
+  /** Close the hosting Sheet/Popover once the job has been kicked off. */
+  onClose: () => void;
 }
 
 /**
- * "Reprocess" button + dropdown on the Document Detail header. Owns its
- * own menu-open state so the parent page doesn't have to babysit it.
+ * Reprocess form body: mode toggle + provider selects. Presentation-free —
+ * host it in a Sheet (this file's default export) or any other container.
  */
-export default function ReprocessMenu({
+export function ReprocessOptionsPanel({
   docId,
   onBeforeReprocess,
   onReprocessed,
-}: ReprocessMenuProps) {
-  const [open, setOpen] = useState(false);
+  onClose,
+}: ReprocessOptionsPanelProps) {
   const { data: llmAll } = useLlmProviders();
   const { data: ocrAll } = useOcrProviders();
   const { data: visionAll } = useVisionProviders();
@@ -50,16 +52,13 @@ export default function ReprocessMenu({
   const [llmId, setLlmId] = useState("");
   const [ocrId, setOcrId] = useState("");
   const [visionId, setVisionId] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useOnClickOutside(ref, () => setOpen(false), open);
 
   const handleStart = async () => {
     if (onBeforeReprocess) {
       const go = await onBeforeReprocess();
       if (!go) return;
     }
-    setOpen(false);
+    onClose();
     await api.post(`/documents/${docId}/reprocess`, {
       mode,
       ...(llmId ? { llm_provider_id: llmId } : {}),
@@ -70,99 +69,125 @@ export default function ReprocessMenu({
   };
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-      >
-        <RefreshCw className="h-4 w-4" /> Reprocess{" "}
-        <ChevronDown className="h-3 w-3 ml-0.5" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-30 w-72 rounded-lg border bg-background shadow-xl p-3 space-y-3">
-          <p className="text-xs font-medium text-muted-foreground">
-            What to reprocess
-          </p>
-          <div className="grid grid-cols-2 gap-1">
-            {[
-              { value: "both", label: "OCR + LLM" },
-              { value: "ocr", label: "OCR only" },
-              { value: "llm", label: "LLM only" },
-              { value: "vision_llm", label: "Vision-LLM" },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setMode(opt.value)}
-                className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                  mode === opt.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+    <div className="space-y-3">
+      <p className="text-xs font-medium text-muted-foreground">
+        What to reprocess
+      </p>
+      <div className="grid grid-cols-2 gap-1">
+        {[
+          { value: "both", label: "OCR + LLM" },
+          { value: "ocr", label: "OCR only" },
+          { value: "llm", label: "LLM only" },
+          { value: "vision_llm", label: "Vision-LLM" },
+        ].map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setMode(opt.value)}
+            className={`rounded-md px-2 py-1.5 text-xs font-medium transition-colors coarse:min-h-11 ${
+              mode === opt.value
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
-          {mode === "vision_llm" ? (
+      {mode === "vision_llm" ? (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-1">
+            Vision-LLM Provider
+          </p>
+          {visionProviders.length === 0 ? (
+            <p className="text-xs text-warning">
+              No Vision-LLM providers enabled. Add one under Settings →
+              Document Analysis → Vision-LLM Providers.
+            </p>
+          ) : (
+            <ProviderSelect
+              kind="vision"
+              value={visionId}
+              onChange={setVisionId}
+              options={visionProviders}
+            />
+          )}
+        </div>
+      ) : (
+        <>
+          {mode !== "llm" && ocrProviders.length > 0 && (
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-1">
-                Vision-LLM Provider
+                OCR Provider
               </p>
-              {visionProviders.length === 0 ? (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  No Vision-LLM providers enabled. Add one under Settings →
-                  Document Analysis → Vision-LLM Providers.
-                </p>
-              ) : (
-                <ProviderSelect
-                  kind="vision"
-                  value={visionId}
-                  onChange={setVisionId}
-                  options={visionProviders}
-                />
-              )}
+              <ProviderSelect
+                kind="ocr"
+                value={ocrId}
+                onChange={setOcrId}
+                options={ocrProviders}
+              />
             </div>
-          ) : (
-            <>
-              {mode !== "llm" && ocrProviders.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    OCR Provider
-                  </p>
-                  <ProviderSelect
-                    kind="ocr"
-                    value={ocrId}
-                    onChange={setOcrId}
-                    options={ocrProviders}
-                  />
-                </div>
-              )}
-              {mode !== "ocr" && llmProviders.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                    LLM Provider
-                  </p>
-                  <ProviderSelect
-                    kind="llm"
-                    value={llmId}
-                    onChange={setLlmId}
-                    options={llmProviders}
-                  />
-                </div>
-              )}
-            </>
           )}
-
-          <button
-            onClick={handleStart}
-            disabled={mode === "vision_llm" && visionProviders.length === 0}
-            className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            Start Reprocessing
-          </button>
-        </div>
+          {mode !== "ocr" && llmProviders.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                LLM Provider
+              </p>
+              <ProviderSelect
+                kind="llm"
+                value={llmId}
+                onChange={setLlmId}
+                options={llmProviders}
+              />
+            </div>
+          )}
+        </>
       )}
+
+      <Button
+        onClick={handleStart}
+        disabled={mode === "vision_llm" && visionProviders.length === 0}
+        className="w-full"
+      >
+        Start Reprocessing
+      </Button>
     </div>
+  );
+}
+
+export interface ReprocessSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  docId: number | string;
+  onBeforeReprocess?: () => Promise<boolean> | boolean;
+  onReprocessed: () => Promise<void> | void;
+}
+
+/**
+ * Sheet-hosted reprocess flow: bottom sheet on phones, centered dialog on
+ * larger screens. Opened from the header's DetailActionsMenu.
+ */
+export default function ReprocessSheet({
+  open,
+  onOpenChange,
+  docId,
+  onBeforeReprocess,
+  onReprocessed,
+}: ReprocessSheetProps) {
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Reprocess document"
+      contentClassName="sm:max-w-md"
+    >
+      <ReprocessOptionsPanel
+        docId={docId}
+        onBeforeReprocess={onBeforeReprocess}
+        onReprocessed={onReprocessed}
+        onClose={() => onOpenChange(false)}
+      />
+    </Sheet>
   );
 }

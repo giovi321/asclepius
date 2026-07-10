@@ -1,3 +1,7 @@
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Textarea from "@/components/ui/Textarea";
 import { EVENT_TYPES } from "./constants";
 
 export interface EventFormData {
@@ -45,35 +49,32 @@ export default function EventForm({
         <h4 className="text-sm font-medium">Edit Event</h4>
       )}
       <div className="grid gap-3 md:grid-cols-2">
-        <input
+        <Input
           type="text"
           placeholder={
             mode === "create" ? "Title (e.g. Sleep Apnea Treatment)" : "Title"
           }
           value={value.title}
           onChange={(e) => set({ title: e.target.value })}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
         />
-        <select
+        <Select
           value={value.event_type}
           onChange={(e) => set({ event_type: e.target.value })}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
         >
           {EVENT_TYPES.map((t) => (
             <option key={t} value={t}>
               {t.replace(/_/g, " ")}
             </option>
           ))}
-        </select>
+        </Select>
         {mode === "create" ? (
           <>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
               Start date
-              <input
+              <Input
                 type="date"
                 value={value.date_start}
                 onChange={(e) => set({ date_start: e.target.value })}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -81,92 +82,76 @@ export default function EventForm({
               <span className="text-muted-foreground/70">
                 (leave empty if ongoing)
               </span>
-              <input
+              <Input
                 type="date"
                 value={value.date_end}
                 onChange={(e) => set({ date_end: e.target.value })}
-                className="rounded-md border bg-background px-3 py-2 text-sm"
               />
             </label>
           </>
         ) : (
           <>
-            <input
+            <Input
               type="date"
               value={value.date_start}
               onChange={(e) => set({ date_start: e.target.value })}
-              className="rounded-md border bg-background px-3 py-2 text-sm"
             />
-            <input
+            <Input
               type="date"
               value={value.date_end}
               onChange={(e) => set({ date_end: e.target.value })}
-              className="rounded-md border bg-background px-3 py-2 text-sm"
             />
           </>
         )}
-        <input
+        <Input
           type="text"
           placeholder="Diagnosis"
           value={value.diagnosis_text}
           onChange={(e) => set({ diagnosis_text: e.target.value })}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
         />
-        <select
+        <Select
           value={value.severity || ""}
           onChange={(e) => set({ severity: e.target.value })}
-          className="rounded-md border bg-background px-3 py-2 text-sm"
         >
           <option value="">Severity...</option>
           <option value="mild">Mild</option>
           <option value="moderate">Moderate</option>
           <option value="severe">Severe</option>
           <option value="critical">Critical</option>
-        </select>
+        </Select>
       </div>
-      <textarea
+      <Textarea
         placeholder="Description..."
         value={value.description}
         onChange={(e) => set({ description: e.target.value })}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
         rows={2}
+        className="min-h-0"
       />
       {mode === "edit" && (
-        <textarea
+        <Textarea
           placeholder="Notes..."
           value={value.notes}
           onChange={(e) => set({ notes: e.target.value })}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           rows={2}
+          className="min-h-0"
         />
       )}
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex min-h-6 items-center gap-2 text-sm coarse:min-h-11">
         <input
           type="checkbox"
           checked={value.is_ongoing}
           onChange={(e) => set({ is_ongoing: e.target.checked })}
+          className="h-4 w-4 accent-primary"
         />
         Ongoing condition
       </label>
-      <div className="flex gap-2">
-        {mode === "create" ? (
-          <button
-            onClick={onSubmit}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
-          >
-            Create
-          </button>
-        ) : (
-          <button
-            onClick={onSubmit}
-            className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-          >
-            Save
-          </button>
-        )}
-        <button onClick={onCancel} className="rounded-md border px-4 py-2 text-sm">
+      <div className="flex flex-wrap gap-2">
+        <Button size="md" onClick={onSubmit}>
+          {mode === "create" ? "Create" : "Save"}
+        </Button>
+        <Button variant="secondary" size="md" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

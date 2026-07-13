@@ -19,7 +19,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # System dependencies for Tesseract, PDF rendering, DICOM, libmagic.
 # ``gosu`` lets the entrypoint drop privileges cleanly after fixing up
 # ownership of the bind-mounted vault.
-RUN apt-get update \
+#
+# ``APT_SECURITY_REFRESH`` busts the build cache for this layer so CI
+# re-runs ``apt-get upgrade`` on every build and picks up freshly
+# published Debian security patches (otherwise the cached layer keeps
+# shipping vulnerable package versions and the Trivy scan fails). CI
+# passes a per-run value (see docker.yml); locally it defaults to 0.
+ARG APT_SECURITY_REFRESH=0
+RUN echo "apt security refresh: ${APT_SECURITY_REFRESH}" \
+    && apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
         tzdata \

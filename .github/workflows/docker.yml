@@ -27,6 +27,11 @@ jobs:
           file: Dockerfile
           load: true
           tags: asclepius:ci
+          # Re-run the apt security-upgrade layer every build so the image
+          # picks up the latest Debian patches; keeps the Trivy scan green
+          # instead of shipping cached, vulnerable package versions.
+          build-args: |
+            APT_SECURITY_REFRESH=${{ github.run_id }}-${{ github.run_attempt }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Trivy vulnerability scan

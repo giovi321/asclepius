@@ -12,15 +12,16 @@ from pathlib import Path
 
 import aiosqlite
 import fitz
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from asclepius.audit.service import audit_log, get_client_ip
 from asclepius.auth.session import get_current_user
 from asclepius.authz import require_document_access
 from asclepius.config import get_config
 from asclepius.db.connection import get_db
-from asclepius.documents.service import get_document
+from asclepius.documents.service import compute_file_hash, get_document
 from asclepius.patients.service import check_patient_access
 from asclepius.util.paths import UnsafePathError, safe_filename, safe_vault_join
 
@@ -427,31 +428,50 @@ async def relink_document(
 @router.post("/{doc_id}/replace-file")
 async def replace_document_file(
     doc_id: int,
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Upload a fresh copy of a missing file. The file lands in the
-    correct organised location (``patients/{slug}/{year}/...`` based on
-    the document's ``event_date``), the document's ``file_path`` is
-    updated, and the file is NOT re-processed (the document already has
-    its OCR text, extraction, and child rows). Patient access checked.
+    """Swap the stored file for a new one WITHOUT re-running the pipeline.
 
-    The file extension is locked to the document's ``original_filename``
-    to prevent content-type confusion.
+    Primary use case: a paper document was scanned and uploaded (often a
+    low-quality image), and the high-quality original PDF arrived later.
+    The replacement lands in the document's existing folder (or a fresh
+    ``patients/{slug}/{year}/...`` path derived from the event date), and
+    the document keeps all of its already-correct derived data: OCR text,
+    ``raw_extraction``, child rows (lab results, medications, ...),
+    sections, links, and share memberships. Only the on-disk file and the
+    file-identity columns change.
+
+    The replacement may be a DIFFERENT file type than the original (an
+    image scan replaced by a PDF is the common case); the content is
+    MIME-sniffed and ``file_hash``, ``page_count`` and ``original_filename``
+    are recomputed to match. The superseded file is deleted once the swap
+    is committed. Requires write access; patient access is enforced via
+    :func:`_require_write_access`.
+
+    Known caveat: ``region_translations`` carry page/bbox coordinates and
+    pre-rendered thumbnail PNGs tied to the OLD file's layout. A
+    higher-quality scan of the same page usually keeps them valid, but a
+    differently-laid-out replacement could leave them stale. They are kept
+    as-is; clear them via a reprocess if they no longer match.
     """
+    from asclepius.documents.upload_routes import _detect_mime
+    from asclepius.pipeline.processor import _count_pages
+
     doc = await get_document(db, doc_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     await _require_write_access(db, current_user, doc)
 
-    # Lock the extension to the original filename's extension.
-    old_ext = Path(doc["original_filename"]).suffix.lower()
-    incoming = (file.filename or "").lower()
-    if old_ext and not incoming.endswith(old_ext):
+    # The replacement keeps the document's base name but takes the new
+    # file's extension, so an image -> PDF swap produces a ``.pdf`` file.
+    new_ext = Path(file.filename or "").suffix.lower()
+    if not new_ext:
         raise HTTPException(
             status_code=400,
-            detail=f"Replacement file must have the same extension ({old_ext})",
+            detail="Replacement file must have a file extension",
         )
 
     # Compute the destination folder. Prefer the existing file_path's
@@ -480,9 +500,9 @@ async def replace_document_file(
         else:
             dest_dir_rel = "unclassified"
 
-    safe_name = safe_filename(doc["original_filename"])
+    new_filename = Path(safe_filename(doc["original_filename"])).stem + new_ext
     try:
-        dest = safe_vault_join(vault_root, dest_dir_rel, safe_name)
+        dest = safe_vault_join(vault_root, dest_dir_rel, new_filename)
     except UnsafePathError as exc:
         raise HTTPException(status_code=400, detail=f"Unsafe destination: {exc}")
 
@@ -516,11 +536,107 @@ async def replace_document_file(
         dest.unlink(missing_ok=True)
         raise
 
-    new_rel = str(dest.relative_to(vault_root.resolve())).replace("\\", "/")
-    await db.execute(
-        "UPDATE documents SET file_path = ?, file_size = ?, "
-        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (new_rel, written, doc_id),
+    # Reject content whose sniffed MIME is not an allowed upload type. The
+    # extension is user-controlled, so trust the bytes, not the name.
+    mime = _detect_mime(dest)
+    if not any(mime.startswith(p) for p in config.server.allowed_upload_mime_prefixes):
+        dest.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type: {mime or 'unknown'}",
+        )
+
+    # Recompute file identity so dedup, the viewer, and the stages UI stay
+    # consistent with the bytes now on disk.
+    new_hash = compute_file_hash(dest)
+    new_pages = _count_pages(str(dest))
+
+    # Guard the UNIQUE(file_hash) constraint: if these exact bytes already
+    # exist as a different document, refuse rather than raising IntegrityError.
+    cursor = await db.execute(
+        "SELECT id FROM documents WHERE file_hash = ? AND id != ?",
+        (new_hash, doc_id),
     )
-    await db.commit()
+    if await cursor.fetchone():
+        dest.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=409,
+            detail="This file already exists as another document",
+        )
+
+    new_rel = str(dest.relative_to(vault_root.resolve())).replace("\\", "/")
+    try:
+        await db.execute(
+            "UPDATE documents SET file_path = ?, file_size = ?, file_hash = ?, "
+            "page_count = ?, original_filename = ?, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = ?",
+            (new_rel, written, new_hash, new_pages, new_filename, doc_id),
+        )
+        await db.commit()
+    except aiosqlite.IntegrityError:
+        # Lost a race on UNIQUE(file_hash): another document committed these
+        # exact bytes between our pre-check and this commit. The constraint,
+        # not the pre-check, is the authoritative guard.
+        dest.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=409,
+            detail="This file already exists as another document",
+        )
+
+    # Delete the superseded file only after the swap is committed. Do NOT
+    # blindly trust ``existing``: ``file_path`` can be repointed via /relink
+    # to an arbitrary vault file, so an unguarded unlink would be a
+    # cross-document / cross-patient (even DB) deletion primitive. Only
+    # delete a path that is (a) different from the file we just wrote,
+    # (b) inside THIS document's own patient / uploader subtree, and (c) not
+    # still referenced by another document. A failure here must not fail the
+    # request — the swap already succeeded.
+    if existing and existing != new_rel:
+        cursor = await db.execute(
+            "SELECT slug FROM patients WHERE id = ?", (doc.get("patient_id"),)
+        )
+        row = await cursor.fetchone()
+        own_slug = row[0] if row else None
+        uploader = doc.get("uploaded_by_user_id")
+        own_prefixes = []
+        if own_slug:
+            own_prefixes += [f"patients/{own_slug}/", f"inbox/{own_slug}/"]
+        if uploader is not None:
+            own_prefixes += [f"unclassified/user-{uploader}/", f"inbox/user-{uploader}/"]
+        in_own_scope = any(existing.startswith(p) for p in own_prefixes)
+
+        cursor = await db.execute(
+            "SELECT 1 FROM documents WHERE file_path = ? AND id != ? LIMIT 1",
+            (existing, doc_id),
+        )
+        still_referenced = await cursor.fetchone() is not None
+
+        if in_own_scope and not still_referenced:
+            try:
+                old_path = safe_vault_join(vault_root, existing)
+                old_path.unlink(missing_ok=True)
+            except (UnsafePathError, OSError) as exc:
+                logger.warning(
+                    "Replaced doc %s but could not delete old file %r: %s",
+                    doc_id,
+                    existing,
+                    exc,
+                )
+        else:
+            logger.warning(
+                "Replaced doc %s; kept old file %r (out of scope or still referenced)",
+                doc_id,
+                existing,
+            )
+
+    await audit_log(
+        db,
+        current_user["id"],
+        "document.replace-file",
+        "document",
+        doc_id,
+        {"old_path": existing or None, "new_path": new_rel, "new_hash": new_hash},
+        get_client_ip(request),
+    )
+
     return await get_document(db, doc_id)

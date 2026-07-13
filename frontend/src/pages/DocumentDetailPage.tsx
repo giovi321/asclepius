@@ -173,6 +173,8 @@ export default function DocumentDetailPage() {
   // the freshly-written ocr_text_en / extraction lands in the UI without
   // the user having to refresh.
   const wasInPipeline = useRef(false);
+  // Hidden file input backing the "Replace file..." action.
+  const replaceInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const docBusy = doc?.status === "processing" || doc?.status === "pending";
     const busy = docBusy || inPipeline;
@@ -262,6 +264,39 @@ export default function DocumentDetailPage() {
     }
   };
 
+  // Replace the stored file with a new one (e.g. swap a scan for the
+  // original PDF) WITHOUT re-running the pipeline: all extracted data is
+  // kept. Confirm first, then open the file picker; the upload runs from
+  // the hidden input's onChange below.
+  const handleReplaceFile = async () => {
+    const ok = await confirm({
+      title: "Replace this file?",
+      description:
+        "Pick a new file (e.g. the original PDF for a scan). The stored file is swapped and the old one deleted, but the extracted data — OCR text, fields, lab results — is kept. It is not reprocessed.",
+      confirmText: "Choose file...",
+    });
+    if (!ok) return;
+    replaceInputRef.current?.click();
+  };
+
+  const uploadReplacement = async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      await api.post(`/documents/${id}/replace-file`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      toast({ title: "File replaced", variant: "success" });
+      loadDoc(false);
+    } catch (e: any) {
+      toast({
+        title: "Replace failed",
+        description: getErrorMessage(e),
+        variant: "error",
+      });
+    }
+  };
+
   if (loading) return <DetailSkeleton />;
   if (!doc) return <div className="text-destructive">Document not found</div>;
 
@@ -326,10 +361,24 @@ export default function DocumentDetailPage() {
             onShare={() => setShareOpen(true)}
             shareDisabled={!doc.patient_id}
             shareDisabledReason="Assign this document to a patient before sharing"
+            onReplace={handleReplaceFile}
             onDelete={handleDelete}
           />
         </div>
       </div>
+
+      {/* Hidden input backing "Replace file..." — the menu item confirms
+          then triggers this picker. */}
+      <input
+        ref={replaceInputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) uploadReplacement(f);
+          e.target.value = "";
+        }}
+      />
 
       {/* Header action flows (menu items only toggle these) */}
       <ReprocessSheet

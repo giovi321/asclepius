@@ -8,6 +8,7 @@ import {
   Share2,
   Trash2,
   Unlink,
+  Upload,
 } from "lucide-react";
 import IconButton from "@/components/ui/IconButton";
 import Sheet from "@/components/ui/Sheet";
@@ -36,6 +37,8 @@ export interface DetailActionsMenuProps {
   onShare: () => void;
   shareDisabled?: boolean;
   shareDisabledReason?: string;
+  /** Swap the stored file for a new one without re-running the pipeline. */
+  onReplace: () => void;
   onDelete: () => void;
 }
 
@@ -70,6 +73,7 @@ export default function DetailActionsMenu({
   onShare,
   shareDisabled = false,
   shareDisabledReason,
+  onReplace,
   onDelete,
 }: DetailActionsMenuProps) {
   const navigate = useNavigate();
@@ -121,6 +125,14 @@ export default function DetailActionsMenu({
       disabled: shareDisabled,
       title: shareDisabled ? shareDisabledReason : undefined,
       onSelect: onShare,
+    },
+    {
+      key: "replace-file",
+      label: "Replace file...",
+      icon: Upload,
+      title:
+        "Swap the stored file for a new one (e.g. a scan for the original PDF) — keeps the extracted data, no reprocessing",
+      onSelect: onReplace,
     },
     {
       key: "delete",

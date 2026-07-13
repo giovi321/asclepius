@@ -706,14 +706,29 @@ export interface paths {
     put?: never;
     /**
      * Replace Document File
-     * @description Upload a fresh copy of a missing file. The file lands in the
-     *     correct organised location (``patients/{slug}/{year}/...`` based on
-     *     the document's ``event_date``), the document's ``file_path`` is
-     *     updated, and the file is NOT re-processed (the document already has
-     *     its OCR text, extraction, and child rows). Patient access checked.
+     * @description Swap the stored file for a new one WITHOUT re-running the pipeline.
      *
-     *     The file extension is locked to the document's ``original_filename``
-     *     to prevent content-type confusion.
+     *     Primary use case: a paper document was scanned and uploaded (often a
+     *     low-quality image), and the high-quality original PDF arrived later.
+     *     The replacement lands in the document's existing folder (or a fresh
+     *     ``patients/{slug}/{year}/...`` path derived from the event date), and
+     *     the document keeps all of its already-correct derived data: OCR text,
+     *     ``raw_extraction``, child rows (lab results, medications, ...),
+     *     sections, links, and share memberships. Only the on-disk file and the
+     *     file-identity columns change.
+     *
+     *     The replacement may be a DIFFERENT file type than the original (an
+     *     image scan replaced by a PDF is the common case); the content is
+     *     MIME-sniffed and ``file_hash``, ``page_count`` and ``original_filename``
+     *     are recomputed to match. The superseded file is deleted once the swap
+     *     is committed. Requires write access; patient access is enforced via
+     *     :func:`_require_write_access`.
+     *
+     *     Known caveat: ``region_translations`` carry page/bbox coordinates and
+     *     pre-rendered thumbnail PNGs tied to the OLD file's layout. A
+     *     higher-quality scan of the same page usually keeps them valid, but a
+     *     differently-laid-out replacement could leave them stale. They are kept
+     *     as-is; clear them via a reprocess if they no longer match.
      */
     post: operations["replace_document_file_api_documents__doc_id__replace_file_post"];
     delete?: never;

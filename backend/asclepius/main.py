@@ -167,7 +167,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Asclepius",
         description="Self-hosted medical records manager",
-        version="1.5.0",
+        version="1.6.0",
         lifespan=lifespan,
     )
 

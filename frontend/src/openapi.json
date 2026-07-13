@@ -3,7 +3,7 @@
   "info": {
     "title": "Asclepius",
     "description": "Self-hosted medical records manager",
-    "version": "1.5.0"
+    "version": "1.6.0"
   },
   "paths": {
     "/health": {
@@ -1180,7 +1180,7 @@
       "post": {
         "tags": ["documents"],
         "summary": "Replace Document File",
-        "description": "Upload a fresh copy of a missing file. The file lands in the\ncorrect organised location (``patients/{slug}/{year}/...`` based on\nthe document's ``event_date``), the document's ``file_path`` is\nupdated, and the file is NOT re-processed (the document already has\nits OCR text, extraction, and child rows). Patient access checked.\n\nThe file extension is locked to the document's ``original_filename``\nto prevent content-type confusion.",
+        "description": "Swap the stored file for a new one WITHOUT re-running the pipeline.\n\nPrimary use case: a paper document was scanned and uploaded (often a\nlow-quality image), and the high-quality original PDF arrived later.\nThe replacement lands in the document's existing folder (or a fresh\n``patients/{slug}/{year}/...`` path derived from the event date), and\nthe document keeps all of its already-correct derived data: OCR text,\n``raw_extraction``, child rows (lab results, medications, ...),\nsections, links, and share memberships. Only the on-disk file and the\nfile-identity columns change.\n\nThe replacement may be a DIFFERENT file type than the original (an\nimage scan replaced by a PDF is the common case); the content is\nMIME-sniffed and ``file_hash``, ``page_count`` and ``original_filename``\nare recomputed to match. The superseded file is deleted once the swap\nis committed. Requires write access; patient access is enforced via\n:func:`_require_write_access`.\n\nKnown caveat: ``region_translations`` carry page/bbox coordinates and\npre-rendered thumbnail PNGs tied to the OLD file's layout. A\nhigher-quality scan of the same page usually keeps them valid, but a\ndifferently-laid-out replacement could leave them stale. They are kept\nas-is; clear them via a reprocess if they no longer match.",
         "operationId": "replace_document_file_api_documents__doc_id__replace_file_post",
         "parameters": [
           {

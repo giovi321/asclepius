@@ -8,7 +8,7 @@ version = "1.6.0"
 description = "Asclepius — self-hosted medical records manager"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.139.0",
+    "fastapi>=0.139.2",
     "uvicorn[standard]>=0.51.0",
     "aiosqlite>=0.22.1",
     "python-multipart>=0.0.32",
@@ -22,7 +22,7 @@ dependencies = [
     "pydicom>=3.0.2",
     "pymupdf>=1.28.0",
     "httpx>=0.28.1",
-    "anthropic>=0.116.0",
+    "anthropic>=0.117.0",
     "pillow>=12.3.0",
     "python-magic>=0.4.27",
     "authlib>=1.7.2",
@@ -36,7 +36,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "httpx>=0.28.1",
-    "ruff>=0.15.21",
+    "ruff>=0.15.22",
 ]
 
 [tool.setuptools.packages.find]

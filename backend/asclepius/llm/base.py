@@ -44,6 +44,10 @@ _DEFAULT_RETRY_BACKOFF = [30, 60, 120]  # seconds
 # and OpenAI caught before this refactor: ``asyncio.TimeoutError`` only ever
 # arises from Ollama's total-budget ``asyncio.wait_for`` wrapper, so catching
 # it for the other providers is harmless (they never raise it).
+# These cover providers that drive httpx themselves (Ollama, OpenAI). A
+# provider reaching the network through a vendored SDK does not raise them:
+# the SDK catches httpx's exceptions and re-raises its own types, so it must
+# extend ``LLMProvider._transient_errors`` with those. See ClaudeProvider.
 _TRANSIENT_ERRORS = (
     httpx.ReadTimeout,
     httpx.ConnectTimeout,
@@ -68,6 +72,11 @@ class LLMProvider(ABC):
     # OpenAI ``MAX_RETRIES == 3`` and the Ollama config default.
     _retry_max: int = 2
     _retry_backoff: list[int] = _DEFAULT_RETRY_BACKOFF
+
+    # Exception types ``_generate`` treats as transient and retries. Override
+    # in a subclass to add provider-specific types; always include the base
+    # tuple so the shared httpx/asyncio cases keep working.
+    _transient_errors: tuple[type[BaseException], ...] = _TRANSIENT_ERRORS
 
     # DB path used to resolve UI-customized prompt overrides. Set by the
     # provider factory; when unset (e.g. a provider built directly in a unit
@@ -279,7 +288,7 @@ class LLMProvider(ABC):
                     timeout=read_timeout,
                     max_output_tokens=max_output_tokens,
                 )
-            except _TRANSIENT_ERRORS as e:
+            except self._transient_errors as e:
                 last_err = e
                 if attempt < total_attempts - 1:
                     wait = retry_backoff[min(attempt, len(retry_backoff) - 1)]

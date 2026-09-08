@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `httpx` directly, were unaffected. `_transient_errors` is now a class
   attribute that `ClaudeProvider` extends with the SDK's own types.
 
+- Frontend `js-yaml` forced to 4.3.2 via an npm `overrides` entry scoped to
+  `@redocly/openapi-core`, closing three HIGH advisories (quadratic CPU
+  consumption on crafted YAML). It could not be fixed by a version bump:
+  `openapi-typescript` caps `@redocly/openapi-core` at `^1.34.6`, and every
+  1.x pins `js-yaml` to exactly `4.2.0`. Redocly only moved to `js-yaml@^5`
+  in 2.x, which `openapi-typescript` does not yet accept. Remove the override
+  once it does. Build-time only: the package is a dev dependency used by
+  `npm run gen:api` and never reaches the shipped bundle.
+
 ### Internal
 
 - The runtime image no longer ships `pip`. Use `python -m ensurepip` inside a

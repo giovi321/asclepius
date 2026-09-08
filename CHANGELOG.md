@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CI is green again on pull requests. Two unpinned external toolchains had
+  drifted and failed every open PR since 2026-07-24, none of it caused by the
+  PRs themselves:
+  - The `Backend` job pinned no ruff rule set, so it inherited ruff's
+    defaults. Ruff 0.16.0 widened those defaults and the lint step began
+    reporting 575 pre-existing findings across the backend. The enforced
+    rules are now listed explicitly in `backend/pyproject.toml` as `E4`,
+    `E7`, `E9`, `F`, which is what was actually being enforced before, so
+    ruff upgrades no longer change what the gate checks.
+  - The `Build & scan` job failed its Trivy HIGH/CRITICAL gate on two
+    findings in build tooling the runtime image does not need: the base
+    image's `setuptools` (CVE-2025-47273) and the `msgpack` copy vendored
+    inside `pip` (GHSA-6v7p-g79w-8964). The image now upgrades `setuptools`
+    and removes `pip` after installing the app. Upgrading `pip` would not
+    have helped: every release to date vendors the same `msgpack` version.
+
+### Internal
+
+- The runtime image no longer ships `pip`. Use `python -m ensurepip` inside a
+  throwaway container if you need it for debugging.
+
 ## [1.5.0] - 2026-07-10
 
 The frontend rebuilt around phones. Until now the UI was desktop-first: a

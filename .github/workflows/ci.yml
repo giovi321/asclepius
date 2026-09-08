@@ -31,10 +31,11 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Lint (ruff)
         working-directory: backend
-        # Only the new modules ship formatter-compliant, so we scope ruff to
-        # catch real errors (E, F, I) across the whole backend but do not
-        # gate on ``ruff format`` yet. Tighten once the legacy files are
-        # auto-formatted (see CHANGELOG).
+        # The enforced rule set is pinned in backend/pyproject.toml under
+        # ``[tool.ruff.lint] select`` -- do not rely on ruff's defaults, they
+        # change between minor releases. Only the new modules ship
+        # formatter-compliant, so we do not gate on ``ruff format`` yet.
+        # Tighten once the legacy files are auto-formatted (see CHANGELOG).
         run: ruff check .
       - name: Tests
         working-directory: backend

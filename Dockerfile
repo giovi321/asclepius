@@ -68,7 +68,22 @@ COPY bundled_config/ /app/bundled_config/
 COPY docker/entrypoint.sh /usr/local/bin/asclepius-entrypoint
 RUN chmod +x /usr/local/bin/asclepius-entrypoint
 
-RUN pip install --no-cache-dir .
+# Install the app, then deal with the build tooling that the Trivy
+# HIGH/CRITICAL gate trips over. Both findings live in tooling the app never
+# uses at runtime, not in our own dependencies:
+#   * setuptools -- the base image ships 70.3.0 (CVE-2025-47273), so upgrade
+#     it to the version pyproject's build-system already asks for.
+#   * pip -- vendors msgpack 1.1.2 (GHSA-6v7p-g79w-8964). Upgrading pip does
+#     not help: even the latest release still vendors that exact version, so
+#     pip itself is removed once the app is installed. Nothing in the app or
+#     the entrypoint shells out to pip.
+# ``APT_SECURITY_REFRESH`` busts this layer on every CI build for the same
+# reason it busts the apt layer above: a cached layer would keep shipping
+# whatever versions were current when it was built.
+RUN echo "pip security refresh: ${APT_SECURITY_REFRESH}" \
+    && pip install --no-cache-dir --upgrade setuptools \
+    && pip install --no-cache-dir . \
+    && pip uninstall --yes pip
 
 # Create data directories owned by the default unprivileged user. These
 # are overridden by bind mounts at runtime; the entrypoint will chown

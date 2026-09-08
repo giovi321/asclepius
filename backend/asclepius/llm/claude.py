@@ -2,7 +2,7 @@
 
 import logging
 
-from anthropic import AsyncAnthropic
+from anthropic import APIConnectionError, AsyncAnthropic
 
 from asclepius.llm.base import (
     _DEFAULT_RETRY_BACKOFF,
@@ -18,6 +18,15 @@ _JSON_SYSTEM = "Respond with only a single JSON object. Do not include any prose
 
 
 class ClaudeProvider(LLMProvider):
+    # The Anthropic SDK never lets httpx's exceptions escape: it catches
+    # ``httpx.TimeoutException`` and friends internally and re-raises its own
+    # types (see ``anthropic/_base_client.py``). So none of the httpx entries
+    # in the base tuple can ever match a Claude failure, and without this
+    # override a transient network blip failed the call instead of retrying.
+    # ``APITimeoutError`` subclasses ``APIConnectionError``, so the one entry
+    # covers both connect failures and read/connect timeouts.
+    _transient_errors = (*LLMProvider._transient_errors, APIConnectionError)
+
     def __init__(self, api_key: str, model: str, timeout: int = 120):
         self.client = AsyncAnthropic(api_key=api_key)
         self.model = model

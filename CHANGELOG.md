@@ -25,10 +25,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     and removes `pip` after installing the app. Upgrading `pip` would not
     have helped: every release to date vendors the same `msgpack` version.
 
+- `ClaudeProvider` now retries transient network errors. The shared retry loop
+  matched against `httpx` exception types only, but the Anthropic SDK catches
+  those internally and re-raises its own `APIConnectionError` /
+  `APITimeoutError`, so no Claude failure could ever match and every transient
+  blip failed the call on the first attempt. Ollama and OpenAI, which drive
+  `httpx` directly, were unaffected. `_transient_errors` is now a class
+  attribute that `ClaudeProvider` extends with the SDK's own types.
+
 ### Internal
 
 - The runtime image no longer ships `pip`. Use `python -m ensurepip` inside a
-  throwaway container if you need it for debugging.
+  throwaway container if you need it for debugging; the image build now
+  asserts that `ensurepip` and its bundled wheel survive, so that route is
+  verified rather than assumed.
 
 ## [1.5.0] - 2026-07-10
 

@@ -11,11 +11,13 @@ The single most important pin here is the **retry + force_json divergence**:
     * Ollama / OpenAI honor a retry config (N attempts on transient network
       errors) and a ``force_json`` flag (sets ``format=json`` /
       ``response_format``).
-    * Claude's ``_generate`` makes exactly ONE call (no retry) and silently
-      ignores ``force_json`` and ``timeout_override``.
+    * Claude's ``_generate`` originally made exactly ONE call (no retry) and
+      silently ignored ``force_json`` and ``timeout_override``. Phase 3
+      unified it onto the shared policy; the Claude tests below pin the
+      after-state.
 
-The refactor will deliberately unify this. These tests document the
-before-state so that change shows up as an intentional, visible diff.
+These tests document the before-state so that change shows up as an
+intentional, visible diff.
 
 Network/SDK boundary is mocked:
     * httpx ``AsyncClient.post`` for Ollama/OpenAI;
@@ -30,6 +32,7 @@ from unittest.mock import patch
 
 import httpx
 import pytest
+from anthropic import APIConnectionError, APITimeoutError
 
 from asclepius.llm.claude import ClaudeProvider
 from asclepius.llm.json_utils import parse_llm_json
@@ -378,6 +381,44 @@ async def test_claude_generate_retries_then_raises():
             await provider._generate("prompt")
 
     assert calls["n"] == 3  # 2 retries + 1 initial = 3 calls (shared policy)
+
+
+def _sdk_request() -> httpx.Request:
+    return httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+
+
+@pytest.mark.parametrize(
+    "exc_factory",
+    [
+        pytest.param(lambda: APIConnectionError(request=_sdk_request()), id="connection"),
+        pytest.param(lambda: APITimeoutError(request=_sdk_request()), id="timeout"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_claude_retries_on_sdk_error_types(exc_factory):
+    """Retry on the exception types the SDK actually raises.
+
+    The sibling test above injects ``httpx.ConnectError``, but the real SDK
+    never lets httpx's exceptions escape ``messages.create`` -- it catches
+    them and re-raises its own ``APIConnectionError`` (``APITimeoutError``,
+    a subclass, for timeouts). That mock artifact is why the gap went
+    unnoticed: with only the base httpx tuple in play, a real connection
+    failure escaped ``_generate`` on the first attempt and never retried.
+    """
+    provider = ClaudeProvider(api_key="k", model="claude-x", timeout=5)
+    provider._retry_max = 2
+    provider._retry_backoff = [0, 0]  # no real backoff sleep
+    calls = {"n": 0}
+
+    async def boom(**kwargs):
+        calls["n"] += 1
+        raise exc_factory()
+
+    with patch.object(provider.client.messages, "create", boom):
+        with pytest.raises(APIConnectionError):
+            await provider._generate("prompt")
+
+    assert calls["n"] == 3
 
 
 @pytest.mark.asyncio

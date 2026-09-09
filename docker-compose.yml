@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${ASCLEPIUS_PORT:-8070}:${ASCLEPIUS_BIND_PORT:-8000}"
+      - "${ASCLEPIUS_HOST_IP:-0.0.0.0}:${ASCLEPIUS_PORT:-8070}:${ASCLEPIUS_BIND_PORT:-8000}"
     volumes:
       - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
       - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config
@@ -64,7 +64,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${ASCLEPIUS_SHARE_PORT:-8071}:${ASCLEPIUS_BIND_PORT:-8000}"
+      - "${ASCLEPIUS_HOST_IP:-0.0.0.0}:${ASCLEPIUS_SHARE_PORT:-8071}:${ASCLEPIUS_BIND_PORT:-8000}"
     volumes:
       - ${ASCLEPIUS_VAULT_PATH:-./vault}:/data/vault
       - ${ASCLEPIUS_DATA_PATH:-./data}:/data/config

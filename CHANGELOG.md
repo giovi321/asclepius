@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The published port's host interface is now configurable with
+  `ASCLEPIUS_HOST_IP`, defaulting to `0.0.0.0`. Deployments that bind the
+  containers to one interface no longer need a local edit to
+  `docker-compose.yml`, which silently conflicts with any upstream change to
+  that file and can be lost on a `git pull`. Set it in `.env` instead, e.g.
+  `ASCLEPIUS_HOST_IP=10.0.0.5`. Note the default is IPv4-only, where an unset
+  host interface previously also covered IPv6.
+
 ## [1.6.1] - 2026-09-09
 
 A maintenance release. No feature work and no API or database change: it

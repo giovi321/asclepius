@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-09-09
+
+A maintenance release. No feature work and no API or database change: it
+restores CI, clears the open security advisories, and fixes a retry bug that
+had made the Claude provider give up on the first transient network error.
+
+Continuous integration had been failing on every pull request since
+2026-07-24, in both cases because an external toolchain was resolved fresh on
+each run with nothing pinning it. Thirteen dependency updates that had been
+blocked behind that failure are included.
+
 ### Fixed
 
 - CI is green again on pull requests. Two unpinned external toolchains had
@@ -42,12 +53,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once it does. Build-time only: the package is a dev dependency used by
   `npm run gen:api` and never reaches the shipped bundle.
 
+### Changed
+
+- Thirteen dependency updates that had been blocked behind the CI failure,
+  including the Anthropic SDK across a major version (0.116.0 -> 1.4.0), the
+  24-package frontend group (React 19.2.8, Radix, axios, Vite, Vitest,
+  ESLint), the 11-package backend group (FastAPI, uvicorn, pydantic, PyMuPDF,
+  numpy), the docs site (Astro 7.3.2, sharp, svgo, postcss) and
+  `actions/setup-node` / `actions/setup-python` v6 -> v7.
+- The Anthropic SDK 1.x moves its HTTP layer from `httpx` to `httpx2`. No
+  call-site change was needed: the app never hands `httpx` objects to the
+  Anthropic client, and its own `httpx` usage (Ollama, OpenAI-compatible
+  endpoints, OIDC, vision) is unaffected.
+
 ### Internal
 
 - The runtime image no longer ships `pip`. Use `python -m ensurepip` inside a
   throwaway container if you need it for debugging; the image build now
   asserts that `ensurepip` and its bundled wheel survive, so that route is
   verified rather than assumed.
+
+## [1.6.0] - 2026-07-13
+
+Recorded after the fact: this section was missing from the file. Reconstructed
+from the published release notes for the `v1.6.0` tag.
+
+### Added
+
+- Replace a document's stored file without re-running extraction, from the
+  document detail menu (More actions -> Replace file...). The replacement may
+  be a different file type than the original. Already-extracted data is kept:
+  OCR text, extracted fields, lab results, links, sections and doctor-share
+  memberships. File hash, page count and filename are recomputed to match the
+  new file and the superseded file is removed. Old-file deletion is scoped to
+  the document's own patient folder, so a file belonging to another record is
+  never touched. Uploading bytes that already exist as another document is
+  rejected with a 409.
+
+### Changed
+
+- Dependency updates across the frontend, the Python group and the docs site,
+  plus `actions/checkout` v7. Regenerated the OpenAPI schema and the typed
+  frontend bindings.
 
 ## [1.5.0] - 2026-07-10
 

@@ -58,6 +58,7 @@
   "overrides": {
     "@redocly/openapi-core": {
       "js-yaml": "4.3.2"
-    }
+    },
+    "postcss-selector-parser": "^7.1.6"
   }
 }

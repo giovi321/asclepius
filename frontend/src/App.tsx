@@ -114,22 +114,32 @@ function SetupRoute() {
 
 /**
  * Admin-only providers, mounted as a layout route around ``/setup``,
- * ``/login`` and the admin shell. They probe ``/api/setup/status``,
- * ``/api/auth/me`` and ``/api/patients`` on mount and poll
- * ``/api/pipeline/status`` every few seconds. None of these exist on the
- * share container, so mounting them on ``/share/*`` produced a stream of
- * 404s that the public proxy's fail2ban jail counts toward a ban: the
- * doctor got banned seconds after opening the dashboard.
+ * ``/login`` and the admin shell. None of the admin endpoints exist on
+ * the share container, so mounting them on ``/share/*`` produced a
+ * stream of 404s that the public proxy's fail2ban jail counts toward a
+ * ban: the doctor got banned seconds after opening the dashboard.
+ *
+ * Only AuthProvider wraps ``/login`` and ``/setup`` (it must probe
+ * ``/api/setup/status`` and ``/api/auth/me``). The patient list and the
+ * pipeline-status poll need a logged-in user, so they are mounted inside
+ * ProtectedRoute (see ``AuthedProviders``); on ``/login`` they would only
+ * produce 401s, the pipeline poll one every few seconds.
  */
 function AdminProviders() {
   return (
     <AuthProvider>
-      <PatientProvider>
-        <PipelineStatusProvider>
-          <Outlet />
-        </PipelineStatusProvider>
-      </PatientProvider>
+      <Outlet />
     </AuthProvider>
+  );
+}
+
+/** Providers that call authenticated admin endpoints. Rendered only
+ * after ProtectedRoute has confirmed a user. */
+function AuthedProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <PatientProvider>
+      <PipelineStatusProvider>{children}</PipelineStatusProvider>
+    </PatientProvider>
   );
 }
 
@@ -218,7 +228,9 @@ export default function App() {
           path="/"
           element={
             <ProtectedRoute>
-              <AppLayout />
+              <AuthedProviders>
+                <AppLayout />
+              </AuthedProviders>
             </ProtectedRoute>
           }
         >

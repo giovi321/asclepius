@@ -232,7 +232,8 @@ def test_heartbeat_bumps_last_seen(share_app):
         time.sleep(1.1)
 
         res = client.post("/api/share/heartbeat", headers=_csrf())
-        assert res.status_code == 204, (res.status_code, res.text)
+        assert res.status_code == 200, (res.status_code, res.text)
+        assert res.json() == {"active": True}
 
         conn = sqlite3.connect(str(db_path))
         try:
@@ -243,3 +244,49 @@ def test_heartbeat_bumps_last_seen(share_app):
         finally:
             conn.close()
         assert after > before, f"heartbeat did not bump last_seen_at ({before!r} → {after!r})"
+
+
+def test_heartbeat_reports_inactive_without_4xx(share_app):
+    """Heartbeat must never answer 4xx: no session, a revoked session and
+    an idle session are normal states reported as ``active: false``.
+
+    The public proxy's fail2ban jail bans an IP after 10 responses with
+    401/403/404 in 2 minutes, so the UI relies on this probe to learn the
+    session ended without collecting 4xx first.
+    """
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+
+    with TestClient(app) as client:
+        # No cookie at all.
+        res = client.post("/api/share/heartbeat", headers=_csrf())
+        assert res.status_code == 200, (res.status_code, res.text)
+        assert res.json() == {"active": False}
+
+        seed = _seed(db_path, vault)
+        share_id, token = _create_share_and_get_token(client, seed)
+        client.post(f"/api/share/{token}/request-otp", headers=_csrf())
+        _verify_otp(client, token, _fetch_active_otp(client, share_id, seed))
+
+        res = client.post("/api/share/heartbeat", headers=_csrf())
+        assert res.status_code == 200
+        assert res.json() == {"active": True}
+
+        # Session idle past the threshold: inactive, not resurrected.
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        try:
+            conn.execute(
+                "UPDATE document_share_sessions "
+                "SET last_seen_at = datetime('now', '-30 minutes') "
+                "WHERE share_id = ?",
+                (share_id,),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        res = client.post("/api/share/heartbeat", headers=_csrf())
+        assert res.status_code == 200
+        assert res.json() == {"active": False}

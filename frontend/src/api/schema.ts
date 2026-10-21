@@ -184,8 +184,13 @@ export interface paths {
      *     Called by the doctor's UI every ~60s while the page is visible and
      *     the user has interacted recently. Without this, a doctor reading a
      *     long PDF (no API traffic for minutes) would be flagged idle and
-     *     bounced. Returns 204 whether the session exists or not so the UI
-     *     does not need to differentiate.
+     *     bounced.
+     *
+     *     Always answers 200 with ``{"active": bool}``, never 4xx: a missing,
+     *     revoked, idle or expired session is a normal state here, not an
+     *     error. The UI uses ``active: false`` to stop all polling and show
+     *     the "session ended" screen without first collecting 401s, which the
+     *     public proxy's fail2ban jail counts toward an IP ban.
      */
     post: operations["heartbeat_api_share_heartbeat_post"];
     delete?: never;
@@ -4010,11 +4015,15 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description Successful Response */
-      204: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
       };
     };
   };

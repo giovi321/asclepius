@@ -1,4 +1,5 @@
 import axios from "axios";
+import { installFourxxGuard } from "./fourxxBudget";
 
 // Dedicated axios instance for the doctor-share surface.
 //
@@ -25,16 +26,90 @@ const shareApi = axios.create({
 // We deliberately do NOT do a window.location redirect on 401 here.
 // An earlier version did `window.location.href = "/share/{firstSegment}"`
 // which on the landing page (/share/{token}) redirects to the same URL
-// we're already on, producing an infinite refresh loop. On /share/dashboard
-// it does the same.
+// we're already on, producing an infinite refresh loop.
 //
-// The ShareSessionProvider's React effect handles the "session missing"
-// case correctly: it sets ``me = null`` (so the page can render an
-// inline state) and uses react-router's ``navigate("/share")`` for the
-// deep-link fallback, which is a soft route change with no reload.
+// Instead, a 401 or 403 from any session-bound endpoint marks the share
+// session as ended for the rest of this page load. From then on every
+// session-bound request is rejected locally (it never reaches the
+// network), and the ShareSessionProvider, subscribed via
+// ``onShareSessionEnded``, swaps the UI to the "session ended" screen.
+// This is what stops a forgotten tab from polling into 401s: the public
+// proxy's fail2ban jail bans the IP after 10 of them in 2 minutes.
+//
+// The flag lives in module state, so the hard navigation that follows a
+// successful OTP verify or queue claim starts with a clean slate.
+
+/** Endpoints that work without a share session (OTP bootstrap, queue,
+ * logout, heartbeat). A 401/403 from these says nothing about an
+ * existing session, and they must keep working after it ends so the
+ * doctor can request a fresh code. */
+const PUBLIC_PATH =
+  /^\/?(?:[^/]+\/(?:info|request-otp|verify-otp)|claim|queue|logout|heartbeat)\/?$/;
+
+export function isSessionBoundUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  const path = url.split("?")[0].replace(/^\/api\/share/, "");
+  return !PUBLIC_PATH.test(path);
+}
+
+export const SHARE_SESSION_ENDED_CODE = "ERR_SHARE_SESSION_ENDED";
+
+export type ShareEndReason = "unauthorized" | "expired" | "idle" | "logged_out";
+
+let endedReason: ShareEndReason | null = null;
+const listeners = new Set<(reason: ShareEndReason) => void>();
+
+/** Mark the share session as ended and notify subscribers (first call wins). */
+export function markShareSessionEnded(reason: ShareEndReason) {
+  if (endedReason !== null) return;
+  endedReason = reason;
+  listeners.forEach((fn) => fn(reason));
+}
+
+export function shareSessionEndedReason(): ShareEndReason | null {
+  return endedReason;
+}
+
+/** Subscribe to the session-ended signal. Returns the unsubscribe. */
+export function onShareSessionEnded(fn: (reason: ShareEndReason) => void) {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+/** Test helper: forget the ended state. */
+export function resetShareSessionEnded() {
+  endedReason = null;
+}
+
+shareApi.interceptors.request.use((config) => {
+  if (endedReason !== null && isSessionBoundUrl(config.url)) {
+    const err = new Error("Share session has ended") as Error & {
+      code: string;
+      config: unknown;
+    };
+    err.code = SHARE_SESSION_ENDED_CODE;
+    err.config = config;
+    return Promise.reject(err);
+  }
+  return config;
+});
+
 shareApi.interceptors.response.use(
-  (response: any) => response,
-  (error: any) => Promise.reject(error),
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (
+      (status === 401 || status === 403) &&
+      isSessionBoundUrl(error?.config?.url)
+    ) {
+      markShareSessionEnded("unauthorized");
+    }
+    return Promise.reject(error);
+  },
 );
+
+installFourxxGuard(shareApi);
 
 export default shareApi;

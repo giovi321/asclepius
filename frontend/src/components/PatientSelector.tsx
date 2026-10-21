@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePatient } from "@/contexts/PatientContext";
 import { Check, ChevronsUpDown, User, Users as UsersIcon } from "lucide-react";
 import type { Patient } from "@/types";
 import { usePatients } from "@/hooks/data";
 import { cn } from "@/lib/utils";
+import { usePolling } from "@/lib/polling";
 import PickerShell, { PickerOption } from "@/components/ui/PickerShell";
 
 export interface PatientSelectorProps {
@@ -23,16 +24,14 @@ export default function PatientSelector({
   variant = "block",
 }: PatientSelectorProps) {
   const { selectedPatient, setSelectedPatient } = usePatient();
-  const { data, refetch } = usePatients();
+  const { data, reload } = usePatients();
   const patients: Patient[] = Array.isArray(data) ? data : [];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   // Keep the list fresh so newly-added patients show up without a reload.
-  useEffect(() => {
-    const interval = setInterval(() => refetch(), 10000);
-    return () => clearInterval(interval);
-  }, [refetch]);
+  // Paused while the tab is hidden, backoff on errors, stops on 401/403/404.
+  usePolling(reload, { intervalMs: 10000 });
 
   const filtered = query.trim()
     ? patients.filter(
@@ -114,10 +113,7 @@ export default function PatientSelector({
       trigger={trigger}
       panelClassName={cn(variant === "block" && "w-[248px]")}
     >
-      <PickerOption
-        selected={!selectedPatient}
-        onClick={() => pick(null)}
-      >
+      <PickerOption selected={!selectedPatient} onClick={() => pick(null)}>
         <UsersIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
         <span className="flex-1">All patients</span>
         {!selectedPatient && <Check className="h-3.5 w-3.5 text-primary" />}

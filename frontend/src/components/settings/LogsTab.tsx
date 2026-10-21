@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
@@ -13,28 +14,27 @@ export default function LogsTab() {
   const [total, setTotal] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const fetchLogs = useCallback(() => {
+  // Rejects on failure so the poller can back off / stop.
+  const loadLogs = useCallback(() => {
     const params: Record<string, any> = { limit: 500 };
     if (levelFilter) params.level = levelFilter;
     if (moduleFilter) params.module = moduleFilter;
-    api
-      .get("/settings/logs", { params })
-      .then((res) => {
-        setLogs(res.data.logs || []);
-        setTotal(res.data.total || 0);
-      })
-      .catch(() => {});
+    return api.get("/settings/logs", { params }).then((res) => {
+      setLogs(res.data.logs || []);
+      setTotal(res.data.total || 0);
+    });
   }, [levelFilter, moduleFilter]);
+  const fetchLogs = useCallback(() => {
+    loadLogs().catch(() => {});
+  }, [loadLogs]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
-  useEffect(() => {
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchLogs, 3000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, fetchLogs]);
+  // Paused while the tab is hidden, backoff on errors, stops on
+  // 401/403/404 (e.g. a non-admin hitting an admin-only endpoint).
+  usePolling(loadLogs, { intervalMs: 3000, enabled: autoRefresh });
 
   useEffect(() => {
     if (autoScroll && scrollRef.current) {

@@ -470,7 +470,7 @@ cookie — share auth and admin auth are entirely isolated.
 | `POST` | `/api/share/{token}/verify-otp` | Token + OTP | Body: `{code: "123456"}`. On success either sets the `asclepius_share` cookie and returns 200 `{status: "active"}`, or sets the `asclepius_share_queue` cookie and returns 202 `{status: "queued", queue_expires_at}` when another device already holds the slot. 401 on bad code; 429 when the per-IP rate limit fires. After `share.share_lockout_after_failed` consecutive failures on the same share (default 3) the share itself is revoked — subsequent verifies still return 401 (no token-validity leak), but the share is inert. |
 | `POST` | `/api/share/claim` | Queue cookie | Polled by a queued waiter every 5s. Returns `{status: "active"}` (and sets the session cookie) when the slot freed up, `{status: "queued", queue_expires_at}` while still waiting, or 410 when the queue token expired or the share was revoked. |
 | `DELETE` | `/api/share/queue` | Queue cookie | Explicit cancel from the waiting page. Drops the queue entry and clears the cookie. 204. |
-| `POST` | `/api/share/heartbeat` | Session cookie | Keepalive — bumps `last_seen_at` so the idle clock resets while the doctor is reading. 204. |
+| `POST` | `/api/share/heartbeat` | Session cookie | Keepalive — bumps `last_seen_at` so the idle clock resets while the doctor is reading. Always 200 with `{"active": bool}`; `false` when there is no live session (missing, revoked, idle or expired). Never 4xx. |
 | `POST` | `/api/share/logout` | Session cookie | Revoke the session and clear cookies. CSRF-exempt so `navigator.sendBeacon` works on tab close. 200. |
 
 ### Doctor read surface

@@ -8,6 +8,7 @@ import {
 } from "react";
 import api from "@/api/client";
 import type { PipelineStatus } from "@/types";
+import { usePolling } from "@/lib/polling";
 
 interface PipelineStatusCtx {
   status: PipelineStatus | null;
@@ -41,46 +42,52 @@ export function PipelineStatusProvider({ children, pollMs }: ProviderProps) {
   const [loading, setLoading] = useState(false);
   const aliveRef = useRef(true);
 
-  const refresh = async () => {
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  // Throws on failure so usePolling can see the status.
+  const load = async () => {
     try {
       setLoading(true);
       const res = await api.get("/pipeline/status");
       if (aliveRef.current) setStatus(res.data);
-    } catch {
-      // Silently ignore — the UI just keeps showing the last known state.
     } finally {
       if (aliveRef.current) setLoading(false);
     }
   };
 
-  useEffect(() => {
-    aliveRef.current = true;
-    refresh();
-    if (pollMs === 0)
-      return () => {
-        aliveRef.current = false;
-      };
+  // Public refresh: the UI just keeps showing the last known state.
+  const refresh = async () => {
+    try {
+      await load();
+    } catch {
+      // ignore
+    }
+  };
 
-    // Adaptive cadence — re-evaluate after every poll. The interval is reset
-    // each tick so a transition from busy → idle (or vice versa) takes
-    // effect immediately rather than waiting one full cycle.
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      const busy = !!status?.processing || (status?.queue_depth ?? 0) > 0;
-      const ms =
-        pollMs ?? (busy ? POLL_INTERVAL_BUSY_MS : POLL_INTERVAL_IDLE_MS);
-      timer = setTimeout(async () => {
-        await refresh();
-        if (aliveRef.current) schedule();
-      }, ms);
-    };
-    schedule();
-    return () => {
-      aliveRef.current = false;
-      if (timer) clearTimeout(timer);
-    };
+  // Adaptive cadence: the interval follows the last answer, so a
+  // transition from busy to idle (or back) takes effect on the next
+  // tick. usePolling pauses while the tab is hidden, backs off on
+  // errors, and stops on 401/403/404 (logged out, or the endpoint does
+  // not exist on this host): repeating those only feeds the public
+  // proxy's fail2ban jail.
+  const busy = !!status?.processing || (status?.queue_depth ?? 0) > 0;
+  const intervalMs =
+    pollMs ?? (busy ? POLL_INTERVAL_BUSY_MS : POLL_INTERVAL_IDLE_MS);
+  usePolling(load, {
+    intervalMs: intervalMs || POLL_INTERVAL_IDLE_MS,
+    enabled: pollMs !== 0,
+    immediate: true,
+  });
+  // With polling disabled, still load once.
+  useEffect(() => {
+    if (pollMs === 0) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pollMs, status?.processing, status?.queue_depth]);
+  }, [pollMs]);
 
   return (
     <ctx.Provider value={{ status, loading, refresh }}>{children}</ctx.Provider>

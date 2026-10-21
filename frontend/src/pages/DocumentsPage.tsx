@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Upload } from "lucide-react";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import { getErrorMessage } from "@/lib/errors";
 import { usePatient } from "@/contexts/PatientContext";
 import { useConfirm } from "@/contexts/ConfirmContext";
@@ -131,20 +132,15 @@ export default function DocumentsPage() {
     [visibleCols],
   );
 
-  // Poll pipeline status for live page progress
-  useEffect(() => {
-    api
-      .get<PipelineStatus>("/pipeline/status")
-      .then((res) => setPipeline(res.data))
-      .catch(() => {});
-    const interval = setInterval(() => {
+  // Poll pipeline status for live page progress (paused while the tab is
+  // hidden, backoff on errors, stops on 401/403/404).
+  usePolling(
+    () =>
       api
         .get<PipelineStatus>("/pipeline/status")
-        .then((res) => setPipeline(res.data))
-        .catch(() => {});
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+        .then((res) => setPipeline(res.data)),
+    { intervalMs: 3000, immediate: true },
+  );
 
   // Clear selection when filters / page / patient change - it'd be wrong to
   // act on rows the user can no longer see.

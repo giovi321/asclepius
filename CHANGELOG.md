@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `POST /api/share/heartbeat` now answers 200 with `{"active": bool}`
+  instead of an empty 204, so the doctor share page learns that its session
+  ended without first collecting 401s.
+
 - The published port's host interface is now configurable with
   `ASCLEPIUS_HOST_IP`, defaulting to `0.0.0.0`. Deployments that bind the
   containers to one interface no longer need a local edit to
@@ -16,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that file and can be lost on a `git pull`. Set it in `.env` instead, e.g.
   `ASCLEPIUS_HOST_IP=10.0.0.5`. Note the default is IPv4-only, where an unset
   host interface previously also covered IPv6.
+
+### Fixed
+
+- The frontend no longer repeats 401, 403 or 404 responses, which the public
+  reverse proxy's fail2ban jail counts toward a 6-hour IP ban (10 in 2
+  minutes, shared by everyone behind the same NAT). A doctor share page that
+  outlived its session polled `GET /api/share/documents/{id}` every 4 seconds
+  into 401s and got the IP banned. Every poll now pauses while the tab is
+  hidden, backs off on errors and stops on 401/403/404; a 401 or 403 from a
+  share endpoint ends the share session for the page, which shows a "session
+  ended" screen and sends nothing further. The admin login page no longer
+  polls pipeline status or loads the patient list while logged out, and both
+  API clients refuse to send once five 401/403/404 responses have been seen in
+  two minutes.
 
 ## [1.6.1] - 2026-09-09
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import { getErrorMessage } from "@/lib/errors";
 import { FileText, X } from "lucide-react";
 import { formatDocType, getBestDate } from "@/lib/utils";
@@ -175,19 +176,22 @@ export default function DocumentDetailPage() {
   const wasInPipeline = useRef(false);
   // Hidden file input backing the "Replace file..." action.
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const busy =
+    doc?.status === "processing" || doc?.status === "pending" || inPipeline;
   useEffect(() => {
-    const docBusy = doc?.status === "processing" || doc?.status === "pending";
-    const busy = docBusy || inPipeline;
     if (busy) {
       wasInPipeline.current = true;
-      const interval = setInterval(loadDoc, 3000);
-      return () => clearInterval(interval);
+      return;
     }
     if (wasInPipeline.current) {
       wasInPipeline.current = false;
-      loadDoc(false);
+      loadDoc(false).catch(() => {});
     }
-  }, [doc?.status, inPipeline]);
+  }, [busy]);
+  // Paused while the tab is hidden, backoff on errors, stops on
+  // 401/403/404 (e.g. the document was deleted mid-processing) instead
+  // of re-requesting it every 3s.
+  usePolling(() => loadDoc(false), { intervalMs: 3000, enabled: busy });
 
   const handleStartRegionSelection = (providers: {
     ocrProviderId: string | null;

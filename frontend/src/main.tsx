@@ -1,34 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { PatientProvider } from "./contexts/PatientContext";
-import { ToastProvider } from "./contexts/ToastContext";
-import { ConfirmProvider } from "./contexts/ConfirmContext";
-import { PipelineStatusProvider } from "./contexts/PipelineStatusContext";
+import Root from "./Root";
 import "./index.css";
 
 // pdf.js worker init lives in lib/pdfWorker.ts, imported only by the PDF
 // viewers — keeping pdfjs-dist out of the entry bundle.
+//
+// Providers live in Root.tsx; the admin ones (auth, patient, pipeline
+// status) are mounted by App around the admin routes only, so the doctor
+// share surface never calls admin endpoints.
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <PatientProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                <PipelineStatusProvider>
-                  <App />
-                </PipelineStatusProvider>
-              </ConfirmProvider>
-            </ToastProvider>
-          </PatientProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <Root />
     </BrowserRouter>
   </React.StrictMode>,
 );

@@ -1,22 +1,27 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Hourglass, Loader2, X } from "lucide-react";
 
 import shareApi from "@/api/shareClient";
 import ShareLogo from "@/components/share/ShareLogo";
+import { usePolling } from "@/lib/polling";
 import Button from "@/components/ui/Button";
+
+const CLAIM_POLL_MS = 5000;
+const CLAIM_STOP_STATUSES = [401, 403, 404, 410];
 
 /**
  * Queueing UX.
  *
  * Shown to a doctor whose verify-otp call returned ``status: "queued"``
  * because another device already holds the share's only session slot.
- * Polls ``/api/share/claim`` every 5 seconds until:
+ * Polls ``/api/share/claim`` every 5 seconds (paused while the tab is
+ * hidden) until:
  *   - the active session dies (logout / idle / TTL / revocation) and
  *     the server promotes our queue token into a real session →
  *     hard-navigate to ``/share/dashboard``, or
- *   - the queue token expires or the share is revoked → return to the
- *     landing page with an error toast, or
+ *   - the queue token expires or the share is revoked (410, or any
+ *     other 4xx) → stop polling and return to the landing page, or
  *   - the doctor clicks "Cancel" → DELETE the queue token and bounce.
  */
 export default function ShareWaitingPage() {
@@ -26,59 +31,57 @@ export default function ShareWaitingPage() {
   const [error, setError] = useState<string | null>(null);
   const cancelledRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    let timer: number | null = null;
-
-    const tick = async () => {
+  // Poll /claim every 5s (paused while the tab is hidden, backoff on
+  // network / 5xx / 429). 410 is the server's "queue position gone"
+  // answer and is final; 401/403/404 cannot succeed on retry and count
+  // toward the public proxy's fail2ban threshold, so they stop the poll
+  // too instead of being retried as "transient".
+  const [stopped, setStopped] = useState(false);
+  usePolling(
+    async () => {
       if (cancelledRef.current) return;
-      try {
-        const res = await shareApi.post<{
-          status: "active" | "queued";
-          queue_expires_at?: string;
-          recipient_label?: string;
-        }>("/claim");
-        if (cancelled) return;
-        if (res.data?.status === "active") {
-          // Slot just freed and we won the race. Hard-navigate so the
-          // new asclepius_share cookie is picked up cleanly.
-          window.location.href = "/share/dashboard";
-          return;
-        }
-        // Still queued. Refresh the displayed expiry / label.
-        if (res.data?.queue_expires_at) {
-          setQueueExpiresAt(res.data.queue_expires_at);
-        }
-        if (res.data?.recipient_label) {
-          setRecipientLabel(res.data.recipient_label);
-        }
-      } catch (err: any) {
-        if (cancelled) return;
-        const status = err?.response?.status;
+      const res = await shareApi.post<{
+        status: "active" | "queued";
+        queue_expires_at?: string;
+        recipient_label?: string;
+      }>("/claim");
+      if (res.data?.status === "active") {
+        // Slot just freed and we won the race. Hard-navigate so the
+        // new asclepius_share cookie is picked up cleanly.
+        setStopped(true);
+        window.location.href = "/share/dashboard";
+        return;
+      }
+      // Still queued. Refresh the displayed expiry / label.
+      if (res.data?.queue_expires_at) {
+        setQueueExpiresAt(res.data.queue_expires_at);
+      }
+      if (res.data?.recipient_label) {
+        setRecipientLabel(res.data.recipient_label);
+      }
+    },
+    {
+      intervalMs: CLAIM_POLL_MS,
+      // Fire the first poll immediately so the user gets the recipient
+      // label and a fresh queue expiry without waiting 5 seconds.
+      immediate: true,
+      enabled: !stopped,
+      stopOn: CLAIM_STOP_STATUSES,
+      onStop: (status) => {
+        setStopped(true);
         if (status === 410) {
-          // Queue token expired or share revoked. Bounce home.
           setError(
             "Your waiting position has expired. Request a fresh access code to try again.",
           );
-          window.setTimeout(() => navigate("/share", { replace: true }), 2500);
-          return;
+        } else {
+          setError(
+            "Your waiting position is no longer valid. Open the share link again to request a fresh access code.",
+          );
         }
-        // Transient — keep polling.
-      }
-      if (!cancelled) {
-        timer = window.setTimeout(tick, 5000);
-      }
-    };
-
-    // Fire the first poll immediately so the user gets the recipient
-    // label and a fresh queue expiry without waiting 5 seconds.
-    void tick();
-
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [navigate]);
+        window.setTimeout(() => navigate("/share", { replace: true }), 2500);
+      },
+    },
+  );
 
   const onCancel = async () => {
     cancelledRef.current = true;

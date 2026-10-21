@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import {
   RotateCcw,
   Trash2,
@@ -30,12 +31,8 @@ export default function PipelineTab() {
   const [pipelineStatus, setPipelineStatus] = useState<any>(null);
   const [startingPipeline, setStartingPipeline] = useState(false);
 
-  const loadStatus = () => {
-    api
-      .get("/pipeline/status")
-      .then((res) => setPipelineStatus(res.data))
-      .catch(() => {});
-  };
+  const loadStatus = () =>
+    api.get("/pipeline/status").then((res) => setPipelineStatus(res.data));
 
   useEffect(() => {
     if (!settingsData) return;
@@ -52,10 +49,9 @@ export default function PipelineTab() {
 
   useEffect(() => {
     loadFailed();
-    loadStatus();
-    const interval = setInterval(loadStatus, 5000);
-    return () => clearInterval(interval);
   }, []);
+  // Paused while the tab is hidden, backoff on errors, stops on 401/403/404.
+  usePolling(loadStatus, { intervalMs: 5000, immediate: true });
 
   const loadFailed = () => {
     api
@@ -101,7 +97,7 @@ export default function PipelineTab() {
       // Also update the setting so it persists across restarts
       await api.patch("/settings", { pipeline_watch_enabled: true });
       setF((prev: any) => ({ ...prev, pipeline_watch_enabled: true }));
-      setTimeout(loadStatus, 1000);
+      setTimeout(() => loadStatus().catch(() => {}), 1000);
     } catch {
       toast({ title: "Failed to start pipeline", variant: "error" });
     }
@@ -114,7 +110,7 @@ export default function PipelineTab() {
       await api.post("/pipeline/stop");
       await api.patch("/settings", { pipeline_watch_enabled: false });
       setF((prev: any) => ({ ...prev, pipeline_watch_enabled: false }));
-      setTimeout(loadStatus, 1000);
+      setTimeout(() => loadStatus().catch(() => {}), 1000);
     } catch {
       toast({ title: "Failed to stop pipeline", variant: "error" });
     }
@@ -167,9 +163,7 @@ export default function PipelineTab() {
             <div className="flex items-center gap-4">
               <div
                 className={`flex items-center justify-center h-10 w-10 rounded-full ${
-                  isActive
-                    ? "bg-success-soft"
-                    : "bg-muted"
+                  isActive ? "bg-success-soft" : "bg-muted"
                 }`}
               >
                 {isActive ? (
@@ -182,7 +176,9 @@ export default function PipelineTab() {
                 <div className="flex items-center gap-2">
                   <span
                     className={`inline-block h-2.5 w-2.5 rounded-full ${
-                      isActive ? "bg-success animate-pulse" : "bg-muted-foreground/50"
+                      isActive
+                        ? "bg-success animate-pulse"
+                        : "bg-muted-foreground/50"
                     }`}
                   />
                   <span className="font-semibold">

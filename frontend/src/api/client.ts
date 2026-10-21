@@ -1,4 +1,5 @@
 import axios from "axios";
+import { installFourxxGuard } from "./fourxxBudget";
 
 // Shared axios instance for all backend calls.
 //
@@ -14,6 +15,21 @@ const api = axios.create({
     "Content-Type": "application/json",
     "X-Requested-With": "XMLHttpRequest",
   },
+});
+
+let redirectingToLogin = false;
+
+api.interceptors.request.use((config) => {
+  if (redirectingToLogin) {
+    const err = new Error("Session expired; redirecting to login") as Error & {
+      code: string;
+      config: unknown;
+    };
+    err.code = "ERR_AUTH_REDIRECT";
+    err.config = config;
+    return Promise.reject(err);
+  }
+  return config;
 });
 
 api.interceptors.response.use(
@@ -33,10 +49,16 @@ api.interceptors.response.use(
       !error.config?.url?.includes("/oidc/") &&
       !error.config?.url?.includes("/setup/")
     ) {
+      // Block everything else this page would still send (other polls,
+      // parallel loads) until the browser leaves for /login: each would
+      // only be another 401 toward the proxy's fail2ban threshold.
+      redirectingToLogin = true;
       window.location.href = "/login";
     }
     return Promise.reject(error);
   },
 );
+
+installFourxxGuard(api);
 
 export default api;

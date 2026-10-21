@@ -44,6 +44,14 @@ export function createResource<T>(path: string) {
     load();
   }
 
+  /** Like ``invalidate`` but resolves when the fetch settles and rejects
+   * with its error, so a poller can see 401/403/404 and stop. */
+  async function reload() {
+    invalidate();
+    if (inflight) await inflight;
+    if (error) throw error;
+  }
+
   return function useResource() {
     const [, setTick] = useState(0);
     useEffect(() => {
@@ -59,6 +67,7 @@ export function createResource<T>(path: string) {
       loading: !!inflight,
       error,
       refetch: invalidate,
+      reload,
     };
   };
 }

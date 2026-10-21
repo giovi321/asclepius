@@ -14,6 +14,7 @@ import {
   Languages,
 } from "lucide-react";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import type {
   DocumentStageEvent,
   DocumentStagesResponse,
@@ -266,38 +267,34 @@ interface Props {
  * rows and renders them as a vertical run-grouped timeline. Refetches every
  * few seconds while this doc is the active pipeline job so the user sees
  * stages tick in live. */
-export default function DocumentStageTimeline({ documentId, className }: Props) {
+export default function DocumentStageTimeline({
+  documentId,
+  className,
+}: Props) {
   const [data, setData] = useState<DocumentStagesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { status: pipeline } = usePipelineStatus();
 
   const isLive = pipeline?.current_job?.doc_id === documentId;
 
+  const load = async () => {
+    try {
+      const res = await api.get<DocumentStagesResponse>(
+        `/documents/${documentId}/stages`,
+      );
+      setData(res.data);
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await api.get<DocumentStagesResponse>(
-          `/documents/${documentId}/stages`,
-        );
-        if (!cancelled) setData(res.data);
-      } catch {
-        // 404 etc — leave data null, render nothing.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    if (!isLive)
-      return () => {
-        cancelled = true;
-      };
-    const interval = setInterval(load, 2500);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    // 404 etc — leave data null, render nothing.
+    load().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId, isLive]);
+  // Live refresh while this document is the running job. Paused while
+  // the tab is hidden, backoff on errors, stops on 401/403/404.
+  usePolling(load, { intervalMs: 2500, enabled: isLive });
 
   const liveJob = isLive ? (pipeline?.current_job ?? null) : null;
 

@@ -179,11 +179,20 @@
       "post": {
         "tags": ["share-public"],
         "summary": "Heartbeat",
-        "description": "Bump ``last_seen_at`` on the current share session.\n\nCalled by the doctor's UI every ~60s while the page is visible and\nthe user has interacted recently. Without this, a doctor reading a\nlong PDF (no API traffic for minutes) would be flagged idle and\nbounced. Returns 204 whether the session exists or not so the UI\ndoes not need to differentiate.",
+        "description": "Bump ``last_seen_at`` on the current share session.\n\nCalled by the doctor's UI every ~60s while the page is visible and\nthe user has interacted recently. Without this, a doctor reading a\nlong PDF (no API traffic for minutes) would be flagged idle and\nbounced.\n\nAlways answers 200 with ``{\"active\": bool}``, never 4xx: a missing,\nrevoked, idle or expired session is a normal state here, not an\nerror. The UI uses ``active: false`` to stop all polling and show\nthe \"session ended\" screen without first collecting 401s, which the\npublic proxy's fail2ban jail counts toward an IP ban.",
         "operationId": "heartbeat_api_share_heartbeat_post",
         "responses": {
-          "204": {
-            "description": "Successful Response"
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Heartbeat Api Share Heartbeat Post"
+                }
+              }
+            }
           }
         }
       }

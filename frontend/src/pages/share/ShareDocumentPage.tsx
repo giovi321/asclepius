@@ -12,6 +12,9 @@ import Badge from "@/components/ui/Badge";
 import RegionThumbLightbox from "@/components/RegionThumbLightbox";
 import { useToast } from "@/contexts/ToastContext";
 import { useShareSession } from "@/contexts/ShareSessionContext";
+import { usePolling } from "@/lib/polling";
+
+const TRANSLATION_POLL_MS = 4000;
 
 interface RegionTranslation {
   id: number;
@@ -62,7 +65,7 @@ interface ShareDocumentDetail {
 export default function ShareDocumentPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
-  const { me, theme, toggleTheme } = useShareSession();
+  const { me, ended, theme, toggleTheme } = useShareSession();
   const docId = id ? parseInt(id, 10) : 0;
   const [doc, setDoc] = useState<ShareDocumentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,13 +91,19 @@ export default function ShareDocumentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.default_translation_language]);
 
+  // One-shot load of the document detail. Errors are reported, never
+  // retried: 401/403 end the share session (the share client flips the
+  // provider to the "session ended" screen), 404 means the document is
+  // not in this share.
+  const loadDoc = async () => {
+    const res = await shareApi.get<ShareDocumentDetail>(`/documents/${docId}`);
+    setDoc(res.data);
+    setError(null);
+  };
+
   const refresh = async () => {
     try {
-      const res = await shareApi.get<ShareDocumentDetail>(
-        `/documents/${docId}`,
-      );
-      setDoc(res.data);
-      setError(null);
+      await loadDoc();
     } catch (err: any) {
       const status = err?.response?.status;
       setError(
@@ -107,26 +116,31 @@ export default function ShareDocumentPage() {
     }
   };
 
+  // Wait for /me to confirm the session first: on a deep link without
+  // one, firing both in parallel would cost two 401s instead of one.
+  const sessionReady = !!me;
   useEffect(() => {
-    if (!docId) return;
+    if (!docId || !sessionReady) return;
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docId]);
+  }, [docId, sessionReady]);
 
-  // Auto-poll while any region translation is still pending
-  // (translated_text == null). We stop the moment everything's filled
-  // in so we're not spamming the server during idle viewing. The poll
-  // runs every 4s; the worker typically finishes a full-page region
-  // translate in well under that.
+  // Poll while any region translation is still pending
+  // (translated_text == null), and stop the moment everything is filled
+  // in. The poll pauses while the tab is hidden, backs off on errors,
+  // and stops for good on 401/403/404: an earlier version kept firing
+  // every 4s after the session died and got the doctor's IP banned by
+  // the public proxy's fail2ban jail (10 x 401 in 2 minutes).
   const hasPendingTranslation = !!doc?.region_translations?.some(
     (rt) => !rt.translated_text,
   );
-  useEffect(() => {
-    if (!docId || !hasPendingTranslation) return;
-    const t = setInterval(refresh, 4000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docId, hasPendingTranslation]);
+  usePolling(loadDoc, {
+    intervalMs: TRANSLATION_POLL_MS,
+    enabled: !!docId && hasPendingTranslation && !ended,
+    onStop: (status) => {
+      if (status === 404) setError("Document not available in this share.");
+    },
+  });
 
   const onSelectionConfirm = async (page: number, bbox: NormalizedBbox) => {
     setSelectionMode(false);
@@ -406,7 +420,11 @@ export default function ShareDocumentPage() {
                       <span className="min-w-0 break-words font-medium">
                         {lr.test_name_canonical || lr.test_name_original}
                         {lr.is_abnormal && (
-                          <Badge variant="warning" size="sm" className="ml-1.5 align-middle">
+                          <Badge
+                            variant="warning"
+                            size="sm"
+                            className="ml-1.5 align-middle"
+                          >
                             Abnormal
                           </Badge>
                         )}

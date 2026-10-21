@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/api/client";
+import { usePolling } from "@/lib/polling";
 import { usePatient } from "@/contexts/PatientContext";
 import {
   FileText,
@@ -26,42 +27,48 @@ export default function DashboardPage() {
     failed: 0,
   });
 
+  // Rejects if any request fails, so usePolling can back off / stop.
   const fetchData = () => {
     const params: Record<string, any> = { limit: 10 };
     if (selectedPatient) params.patient_id = selectedPatient.id;
 
-    api.get("/documents", { params }).then((res) => {
-      setDocuments(res.data.items || []);
-      setStats((s) => ({ ...s, total: res.data.total || 0 }));
-    });
+    return Promise.all([
+      api.get("/documents", { params }).then((res) => {
+        setDocuments(res.data.items || []);
+        setStats((s) => ({ ...s, total: res.data.total || 0 }));
+      }),
 
-    api
-      .get("/documents", { params: { status: "pending,processing", limit: 1 } })
-      .then((res) => {
-        setStats((s) => ({ ...s, pending: res.data.total || 0 }));
-      });
+      api
+        .get("/documents", {
+          params: { status: "pending,processing", limit: 1 },
+        })
+        .then((res) => {
+          setStats((s) => ({ ...s, pending: res.data.total || 0 }));
+        }),
 
-    api
-      .get("/documents", { params: { status: "needs_review", limit: 1 } })
-      .then((res) => {
-        setStats((s) => ({ ...s, needs_review: res.data.total || 0 }));
-      });
+      api
+        .get("/documents", { params: { status: "needs_review", limit: 1 } })
+        .then((res) => {
+          setStats((s) => ({ ...s, needs_review: res.data.total || 0 }));
+        }),
 
-    api
-      .get("/documents", { params: { status: "failed", limit: 1 } })
-      .then((res) => {
-        setStats((s) => ({ ...s, failed: res.data.total || 0 }));
-      });
+      api
+        .get("/documents", { params: { status: "failed", limit: 1 } })
+        .then((res) => {
+          setStats((s) => ({ ...s, failed: res.data.total || 0 }));
+        }),
 
-    api.get("/pipeline/status").then((res) => setPipeline(res.data));
+      api.get("/pipeline/status").then((res) => setPipeline(res.data)),
+    ]);
   };
 
   useEffect(() => {
-    fetchData();
-    // Auto-refresh every 5 seconds to show pipeline progress
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    fetchData().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatient]);
+  // Auto-refresh every 5 seconds to show pipeline progress; paused while
+  // the tab is hidden, backoff on errors, stops on 401/403/404.
+  usePolling(fetchData, { intervalMs: 5000 });
 
   return (
     <div className="space-y-6">

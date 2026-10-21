@@ -17,6 +17,9 @@ vi.mock("@/api/client", () => ({
 const shareGet = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
 vi.mock("@/api/shareClient", () => ({
   default: { get: shareGet, post: shareGet },
+  markShareSessionEnded: vi.fn(),
+  onShareSessionEnded: vi.fn(() => () => {}),
+  shareSessionEndedReason: vi.fn(() => null),
 }));
 
 import Root from "./Root";
@@ -83,5 +86,28 @@ describe("Root provider isolation", () => {
     renderAt("/login");
     await waitFor(() => expect(adminGet).toHaveBeenCalledWith("/setup/status"));
     expect(screen.queryByText(/something went wrong/i)).not.toBeInTheDocument();
+  });
+
+  it("does not poll pipeline status or load patients while logged out", async () => {
+    // Logged out, the admin endpoints answer 401; the login page used to
+    // poll /pipeline/status every 5s into them.
+    mockHealth("core");
+    renderAt("/login");
+    await waitFor(() => expect(adminGet).toHaveBeenCalledWith("/setup/status"));
+    await new Promise((r) => setTimeout(r, 50));
+    const urls = adminGet.mock.calls.map((c) => (c as unknown[])[0]);
+    expect(urls).not.toContain("/pipeline/status");
+    expect(urls).not.toContain("/patients");
+  });
+
+  it("does not call /api/share/me on the share landing page", async () => {
+    mockHealth("share");
+    renderAt("/share/abc");
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith("/health", expect.anything()),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    const urls = shareGet.mock.calls.map((c) => (c as unknown[])[0]);
+    expect(urls).not.toContain("/me");
   });
 });

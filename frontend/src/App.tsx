@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { PatientProvider } from "@/contexts/PatientContext";
+import { PipelineStatusProvider } from "@/contexts/PipelineStatusContext";
 import AppLayout from "@/components/layout/AppLayout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 // Eager: first paint for the two entry surfaces (login form, share idle
@@ -110,6 +112,27 @@ function SetupRoute() {
   );
 }
 
+/**
+ * Admin-only providers, mounted as a layout route around ``/setup``,
+ * ``/login`` and the admin shell. They probe ``/api/setup/status``,
+ * ``/api/auth/me`` and ``/api/patients`` on mount and poll
+ * ``/api/pipeline/status`` every few seconds. None of these exist on the
+ * share container, so mounting them on ``/share/*`` produced a stream of
+ * 404s that the public proxy's fail2ban jail counts toward a ban: the
+ * doctor got banned seconds after opening the dashboard.
+ */
+function AdminProviders() {
+  return (
+    <AuthProvider>
+      <PatientProvider>
+        <PipelineStatusProvider>
+          <Outlet />
+        </PipelineStatusProvider>
+      </PatientProvider>
+    </AuthProvider>
+  );
+}
+
 /** Wrap a page element in its own ErrorBoundary so one crash doesn't blank the shell. */
 const page = (label: string, el: React.ReactNode) => (
   <ErrorBoundary label={label}>{el}</ErrorBoundary>
@@ -157,13 +180,11 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/setup" element={<SetupRoute />} />
-      <Route path="/login" element={<LoginPage />} />
-      {/* Doctor share surface — lives outside ProtectedRoute and outside
-          the regular AuthContext-bound AppLayout so account auth and
-          share auth are entirely isolated. We use the Outlet pattern
-          (not a nested <Routes>) so useParams() correctly picks up
-          ``:token`` in the leaf components. */}
+      {/* Doctor share surface — lives outside AdminProviders so account
+          auth and share auth are entirely isolated and no admin endpoint
+          is called from a share page. We use the Outlet pattern (not a
+          nested <Routes>) so useParams() correctly picks up ``:token``
+          in the leaf components. */}
       <Route
         path="/share"
         element={
@@ -190,44 +211,54 @@ export default function App() {
         <Route path=":token/verify" element={<ShareVerifyPage />} />
         <Route path=":token" element={<ShareLandingPage />} />
       </Route>
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={page("Dashboard", <DashboardPage />)} />
-        <Route path="patients" element={page("Patients", <PatientsPage />)} />
+      <Route element={<AdminProviders />}>
+        <Route path="/setup" element={<SetupRoute />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route
-          path="documents"
-          element={page("Documents", <DocumentsPage />)}
-        />
-        <Route path="timeline" element={page("Timeline", <TimelinePage />)} />
-        <Route path="events" element={page("Events", <EventsPage />)} />
-        <Route
-          path="documents/:id"
-          element={page("Document Detail", <DocumentDetailPage />)}
-        />
-        <Route
-          path="unclassified"
-          element={page("Unclassified", <UnclassifiedPage />)}
-        />
-        <Route
-          path="lab-results"
-          element={page("Lab Results", <LabResultsPage />)}
-        />
-        <Route path="imaging" element={page("Imaging", <ImagingPage />)} />
-        <Route
-          path="imaging/:studyId"
-          element={page("Imaging Detail", <ImagingDetailPage />)}
-        />
-        <Route path="chat" element={page("Chat", <ChatPage />)} />
-        <Route path="search" element={page("Search", <SearchPage />)} />
-        <Route path="shares" element={page("Doctor Shares", <SharesPage />)} />
-        <Route path="settings/*" element={page("Settings", <SettingsPage />)} />
-        <Route path="files" element={page("Files", <FileBrowserPage />)} />
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={page("Dashboard", <DashboardPage />)} />
+          <Route path="patients" element={page("Patients", <PatientsPage />)} />
+          <Route
+            path="documents"
+            element={page("Documents", <DocumentsPage />)}
+          />
+          <Route path="timeline" element={page("Timeline", <TimelinePage />)} />
+          <Route path="events" element={page("Events", <EventsPage />)} />
+          <Route
+            path="documents/:id"
+            element={page("Document Detail", <DocumentDetailPage />)}
+          />
+          <Route
+            path="unclassified"
+            element={page("Unclassified", <UnclassifiedPage />)}
+          />
+          <Route
+            path="lab-results"
+            element={page("Lab Results", <LabResultsPage />)}
+          />
+          <Route path="imaging" element={page("Imaging", <ImagingPage />)} />
+          <Route
+            path="imaging/:studyId"
+            element={page("Imaging Detail", <ImagingDetailPage />)}
+          />
+          <Route path="chat" element={page("Chat", <ChatPage />)} />
+          <Route path="search" element={page("Search", <SearchPage />)} />
+          <Route
+            path="shares"
+            element={page("Doctor Shares", <SharesPage />)}
+          />
+          <Route
+            path="settings/*"
+            element={page("Settings", <SettingsPage />)}
+          />
+          <Route path="files" element={page("Files", <FileBrowserPage />)} />
+        </Route>
       </Route>
     </Routes>
   );

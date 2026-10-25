@@ -63,12 +63,12 @@ ocr:
       # Local Tesseract has no credential; leave credential_id empty.
     - id: "llm-vision-1"
       type: "llm_vision"
-      name: "Chandra"
+      name: "GLM-OCR"
       enabled: true
       priority: 2
       credential_id: "cred-ollama-main"
       llm_provider: "ollama"
-      llm_model: "fredrezones55/chandra-ocr-2"
+      llm_model: "glm-ocr"
 
 llm:
   extraction_timeout: 120          # Per-provider timeout (seconds)
@@ -86,7 +86,7 @@ llm:
       enabled: true
       priority: 1
       credential_id: "cred-ollama-main"
-      model: "qwen2.5"
+      model: "qwen3:14b"
       timeout: 120
   # General-purpose LLM, used for chat, auto-merge, auto-rename, link
   # suggestion, event extraction, and AI document edits. When empty, those

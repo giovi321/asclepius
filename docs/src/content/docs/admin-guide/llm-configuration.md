@@ -50,18 +50,16 @@ If you're setting up Asclepius for the first time and want a reasonable default,
 
 | Role           | Model                              | Ollama tag                                |
 |----------------|------------------------------------|-------------------------------------------|
-| OCR primary    | Chandra OCR                        | `fredrezones55/chandra-ocr-2`             |
+| OCR primary    | GLM-OCR                            | `glm-ocr`                                 |
 | OCR fallback   | Tesseract                          | `tesseract` (system package, no GPU)      |
-| Text LLM       | Qwen 2.5 14B                       | `qwen2.5:14b`                             |
-| Vision-LLM     | Qwen 2.5-VL 7B                     | `qwen2.5vl:7b`                            |
+| Text LLM       | Qwen 3 14B                         | `qwen3:14b`                               |
 | Cloud fallback | Claude Haiku                       | `claude-haiku` (Anthropic API)            |
 
-This four-tier stack runs comfortably on a 12 GB VRAM GPU. Tesseract sits as a CPU-only OCR fallback for the rare scan that throws Chandra (or for hosts without a GPU). Claude Haiku is wired as the lowest-priority LLM provider so anything the local Qwen 2.5 fails to extract cleanly can still escalate to a hosted model without manual retries. Pull the local models with:
+This stack runs on a 12 GB VRAM GPU. GLM-OCR (2.7 GB) and Qwen 3 14B (9.3 GB) take turns on the GPU rather than staying loaded together, so the text LLM can use most of the card. Tesseract sits as a CPU-only OCR fallback for the rare scan that throws GLM-OCR (or for hosts without a GPU). Claude Haiku is wired as the lowest-priority LLM provider so anything the local Qwen 3 fails to extract cleanly can still escalate to a hosted model without manual retries. Pull the local models with:
 
 ```bash
-ollama pull fredrezones55/chandra-ocr-2
-ollama pull qwen2.5:14b
-ollama pull qwen2.5vl:7b
+ollama pull glm-ocr
+ollama pull qwen3:14b
 # Tesseract is a system package, install via your distro:
 #   apt install tesseract-ocr   (Debian / Ubuntu)
 #   brew install tesseract      (macOS)
@@ -69,12 +67,11 @@ ollama pull qwen2.5vl:7b
 
 Wire them up under **Settings → Document Analysis → Providers**:
 
-1. First, add a single **Credential** of type `ollama` pointing at your Ollama server URL (e.g. `http://ollama:11434`). `max_concurrent` of `1` is safest when a single GPU serves all three models.
-2. Add an **OCR** provider (*LLM Vision* type) referencing that credential, model `fredrezones55/chandra-ocr-2`.
-3. Add an **LLM** provider (*Ollama* type) referencing the same credential, model `qwen2.5`.
-4. Add a **Vision-LLM** provider (*Ollama* type) referencing the same credential, model `qwen2.5vl:7b`.
+1. First, add a single **Credential** of type `ollama` pointing at your Ollama server URL (e.g. `http://ollama:11434`). Set `max_concurrent` to `1`: a single GPU serves both models, one at a time.
+2. Add an **OCR** provider (*LLM Vision* type) referencing that credential, model `glm-ocr`.
+3. Add an **LLM** provider (*Ollama* type) referencing the same credential, model `qwen3:14b`.
 
-Because all three share the same credential, your Ollama server is never asked to run more than one thing at a time.
+Because both share the same credential, your Ollama server is never asked to run more than one thing at a time. The Vision-LLM flow is optional with this stack; if you want it, a cloud provider such as Claude avoids loading a third model on the same GPU.
 
 ### Cloud (Anthropic)
 
@@ -158,7 +155,7 @@ llm:
       enabled: true
       priority: 1
       credential_id: "cred-ollama-main"
-      model: "qwen2.5"
+      model: "qwen3:14b"
       timeout: 120
     - id: "claude-1"
       type: "claude"
@@ -182,7 +179,7 @@ Legacy inline form (`base_url` + `api_key` directly on the provider, no `credent
 **Ollama:**
 - `llama3.1` -- good balance of speed and quality
 - `llama3.1:70b` -- better quality, requires more VRAM
-- `qwen2.5` -- strong multilingual support
+- `qwen3:14b` -- strong multilingual support, fits a 12 GB GPU
 
 **Claude:**
 - `claude-sonnet-4-20250514` -- best balance of cost and quality
@@ -216,22 +213,22 @@ The old `vision_extraction` OCR provider type has been promoted to its own flow.
 
 The LLM Vision OCR engine sends page images directly to an LLM for text extraction. It produces the best results on handwritten documents, poorly scanned pages, and complex mixed text/image layouts.
 
-Vision OCR can use a different LLM provider and model than the extraction LLM, for example, Chandra for OCR plus llama3.1 for extraction.
+Vision OCR can use a different LLM provider and model than the extraction LLM, for example, GLM-OCR for OCR plus `qwen3:14b` for extraction.
 
 #### Supported vision backends
 
-- **Ollama**, use vision-capable models like `llava:13b`, `llama3.2-vision`, or `chandra-ocr-2`
+- **Ollama**, use a dedicated OCR model such as `glm-ocr`, `deepseek-ocr` or `fredrezones55/chandra-ocr-2`, or a general vision model
 - **Claude**, uses Claude's native vision capability
 - **OpenAI**, uses GPT-4o vision
 
-#### Chandra OCR
+#### GLM-OCR
 
-For the highest OCR quality, use Chandra OCR as the vision model:
+GLM-OCR is the recommended local OCR model:
 
-1. Pull the model: `ollama pull fredrezones55/chandra-ocr-2`
+1. Pull the model: `ollama pull glm-ocr`
 2. Add an LLM Vision OCR provider
 3. Set Vision LLM Provider to **Ollama**
-4. Set Vision Model to `fredrezones55/chandra-ocr-2`
+4. Set Vision Model to `glm-ocr`
 
 ### YAML configuration
 
@@ -248,12 +245,12 @@ ocr:
       # Local Tesseract has no credential, leave credential_id empty.
     - id: "llm-vision-1"
       type: "llm_vision"
-      name: "Chandra Vision OCR"
+      name: "GLM-OCR"
       enabled: true
       priority: 2
       credential_id: "cred-ollama-main"     # shared with LLM/Vision providers
       llm_provider: "ollama"
-      llm_model: "fredrezones55/chandra-ocr-2"
+      llm_model: "glm-ocr"
 ```
 
 Tesseract-remote and Google Vision entries also accept `credential_id` (pointing at a credential of type `tesseract_remote` / `google_vision`). The old inline `remote_url` / `google_vision_key` fields are kept for backward compat and auto-migrated on startup.

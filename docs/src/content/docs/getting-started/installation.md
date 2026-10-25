@@ -106,7 +106,7 @@ llm:
       enabled: true
       priority: 1
       credential_id: "cred-ollama-main"
-      model: "qwen2.5"
+      model: "qwen3:14b"
       timeout: 120
 ```
 

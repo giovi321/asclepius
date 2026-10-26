@@ -23,7 +23,12 @@ import ShareDashboardPage from "./ShareDashboardPage";
 import ShareDocumentPage from "./ShareDocumentPage";
 import ShareLandingPage from "./ShareLandingPage";
 import ShareWaitingPage from "./ShareWaitingPage";
-import { banCounted, fakeAdapter, type FakeReply } from "@/test/fakeAdapter";
+import {
+  SESSION_ENDED_REPLY,
+  banCounted,
+  fakeAdapter,
+  type FakeReply,
+} from "@/test/fakeAdapter";
 
 const TWO_MINUTES = 120_000;
 
@@ -209,6 +214,48 @@ describe("share surface never loops on 4xx", () => {
     const after = calls.length;
     await advance(10 * TWO_MINUTES);
     expect(calls.length).toBe(after);
+    expect(banCounted(calls)).toBe(0);
+  });
+
+  it("a reload does not log the doctor out (no pagehide beacon)", async () => {
+    useBackend((_method, url) =>
+      url === "/me" ? { status: 200, data: mePayload() } : { status: 200 },
+    );
+    renderShare("/share/dashboard");
+    await advance(0);
+    expect(screen.getByText("Patient")).toBeInTheDocument();
+    window.dispatchEvent(new Event("pagehide"));
+    expect(navigator.sendBeacon).not.toHaveBeenCalled();
+  });
+
+  it("a dead session found on reload costs zero ban-counted responses", async () => {
+    const calls = useBackend(() => SESSION_ENDED_REPLY);
+    renderShare("/share/documents/302");
+    await advance(3 * TWO_MINUTES);
+    expect(calls.map((c) => c.url)).toEqual(["/me"]);
+    expect(banCounted(calls)).toBe(0);
+    expect(screen.getByText("Session no longer active")).toBeInTheDocument();
+  });
+
+  it("ends the session when another share replaced the browser's cookie", async () => {
+    let tag = "tag-a";
+    const calls = useBackend((_method, url) => {
+      if (url === "/me")
+        return { status: 200, data: { ...mePayload(), session_tag: "tag-a" } };
+      if (url === "/heartbeat")
+        return { status: 200, data: { active: true, session_tag: tag } };
+      return { status: 200 };
+    });
+    renderShare("/share/dashboard");
+    await advance(0);
+    expect(screen.getByText("Patient")).toBeInTheDocument();
+    await advance(61_000);
+    expect(screen.getByText("Patient")).toBeInTheDocument();
+    tag = "tag-b";
+    await advance(61_000);
+    expect(
+      screen.getByText("Another share was opened in this browser"),
+    ).toBeInTheDocument();
     expect(banCounted(calls)).toBe(0);
   });
 

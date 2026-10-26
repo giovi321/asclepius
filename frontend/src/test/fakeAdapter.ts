@@ -11,8 +11,19 @@ export interface FakeCall {
   status: number;
 }
 
-/** Handler result: a status plus optional JSON body. */
-export type FakeReply = { status: number; data?: unknown };
+/** Handler result: a status plus optional JSON body and headers. */
+export type FakeReply = {
+  status: number;
+  data?: unknown;
+  headers?: Record<string, string>;
+};
+
+/** The reply the share backend gives for a dead session. */
+export const SESSION_ENDED_REPLY: FakeReply = {
+  status: 410,
+  data: { detail: "Share session expired" },
+  headers: { "x-share-session": "ended" },
+};
 
 /**
  * Axios adapter for tests: every request that reaches it is recorded
@@ -28,13 +39,13 @@ export function fakeAdapter(
   const adapter: AxiosAdapter = async (config: InternalAxiosRequestConfig) => {
     const method = (config.method || "get").toLowerCase();
     const url = config.url || "";
-    const { status, data } = handler(method, url);
+    const { status, data, headers } = handler(method, url);
     calls.push({ method, url, status });
     const response: AxiosResponse = {
       status,
       statusText: "",
       data: data ?? {},
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       config,
     };
     if (status >= 400) {

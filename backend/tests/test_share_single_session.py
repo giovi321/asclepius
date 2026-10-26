@@ -233,7 +233,8 @@ def test_heartbeat_bumps_last_seen(share_app):
 
         res = client.post("/api/share/heartbeat", headers=_csrf())
         assert res.status_code == 200, (res.status_code, res.text)
-        assert res.json() == {"active": True}
+        assert res.json()["active"] is True
+        assert len(res.json()["session_tag"]) == 16
 
         conn = sqlite3.connect(str(db_path))
         try:
@@ -271,7 +272,8 @@ def test_heartbeat_reports_inactive_without_4xx(share_app):
 
         res = client.post("/api/share/heartbeat", headers=_csrf())
         assert res.status_code == 200
-        assert res.json() == {"active": True}
+        assert res.json()["active"] is True
+        assert len(res.json()["session_tag"]) == 16
 
         # Session idle past the threshold: inactive, not resurrected.
         import sqlite3
@@ -290,3 +292,46 @@ def test_heartbeat_reports_inactive_without_4xx(share_app):
         res = client.post("/api/share/heartbeat", headers=_csrf())
         assert res.status_code == 200
         assert res.json() == {"active": False}
+
+
+def test_me_and_heartbeat_share_a_session_tag(share_app):
+    """``/me`` and ``/heartbeat`` return the same tag for one session, so
+    a tab can tell when another share replaced the browser's cookie."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed(db_path, vault)
+        share_id, token = _create_share_and_get_token(client, seed)
+        client.post(f"/api/share/{token}/request-otp", headers=_csrf())
+        _verify_otp(client, token, _fetch_active_otp(client, share_id, seed))
+
+        me = client.get("/api/share/me", headers=_csrf())
+        assert me.status_code == 200, me.text
+        beat = client.post("/api/share/heartbeat", headers=_csrf())
+        assert beat.json()["session_tag"] == me.json()["session_tag"]
+        assert client.cookies.get("asclepius_share") not in me.text
+
+
+def test_missing_vault_file_reports_no_file(share_app):
+    """``has_file`` reflects the disk, so the UI never requests a file
+    that would only answer an error."""
+    from fastapi.testclient import TestClient
+
+    app, vault, db_path = share_app
+    with TestClient(app) as client:
+        seed = _seed(db_path, vault)
+        share_id, token = _create_share_and_get_token(client, seed)
+        client.post(f"/api/share/{token}/request-otp", headers=_csrf())
+        _verify_otp(client, token, _fetch_active_otp(client, share_id, seed))
+
+        doc = client.get(f"/api/share/documents/{seed['doc_id']}", headers=_csrf())
+        assert doc.json()["has_file"] is True
+
+        for f in vault.rglob("*"):
+            if f.is_file() and f.suffix.lower() in {".pdf", ".png", ".jpg"}:
+                f.unlink()
+        doc = client.get(f"/api/share/documents/{seed['doc_id']}", headers=_csrf())
+        assert doc.json()["has_file"] is False
+        res = client.get(f"/api/share/documents/{seed['doc_id']}/file", headers=_csrf())
+        assert res.status_code == 410

@@ -54,7 +54,12 @@ export function isSessionBoundUrl(url: string | undefined): boolean {
 
 export const SHARE_SESSION_ENDED_CODE = "ERR_SHARE_SESSION_ENDED";
 
-export type ShareEndReason = "unauthorized" | "expired" | "idle" | "logged_out";
+export type ShareEndReason =
+  | "unauthorized"
+  | "expired"
+  | "idle"
+  | "logged_out"
+  | "replaced";
 
 let endedReason: ShareEndReason | null = null;
 const listeners = new Set<(reason: ShareEndReason) => void>();
@@ -96,12 +101,21 @@ shareApi.interceptors.request.use((config) => {
   return config;
 });
 
+/** True when the server reports the share session as gone. It answers
+ * 410 with ``X-Share-Session: ended`` (410 because the proxy's fail2ban
+ * jail does not count it); 401/403 are still honoured for safety. */
+export function isSessionEndedResponse(error: any): boolean {
+  const status = error?.response?.status;
+  if (status === 401 || status === 403) return true;
+  const header = error?.response?.headers?.["x-share-session"];
+  return status === 410 && header === "ended";
+}
+
 shareApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error?.response?.status;
     if (
-      (status === 401 || status === 403) &&
+      isSessionEndedResponse(error) &&
       isSessionBoundUrl(error?.config?.url)
     ) {
       markShareSessionEnded("unauthorized");

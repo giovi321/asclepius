@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useLocation } from "react-router-dom";
 import shareApi, {
+  isSessionEndedResponse,
   markShareSessionEnded,
   onShareSessionEnded,
   shareSessionEndedReason,
@@ -61,6 +62,9 @@ export interface ShareMe {
   patient_name: string;
   share_expires_at: string;
   session_expires_at: string;
+  /** Opaque label of this session; ``/heartbeat`` returns the same one
+   * while it is still the browser's current share session. */
+  session_tag?: string;
   documents: ShareDocument[];
   translate_rate_limit: ShareTranslateLimit;
   default_translation_language: string;
@@ -154,11 +158,10 @@ export function ShareSessionProvider({
       setLoadFailed(false);
     } catch (err: any) {
       setMe(null);
-      // 401/403 already flipped the ended state via the client
+      // A dead session already flipped the ended state via the client
       // interceptor. Anything else (network, 5xx) gets a manual retry
       // button; it is never retried automatically.
-      const status = err?.response?.status;
-      if (status !== 401 && status !== 403) setLoadFailed(true);
+      if (!isSessionEndedResponse(err)) setLoadFailed(true);
     }
   }, []);
 
@@ -188,7 +191,12 @@ export function ShareSessionProvider({
     }
   }, []);
 
-  // Lifecycle: pagehide beacon, idle timer, heartbeat, local expiry.
+  // Lifecycle: idle timer, heartbeat, local expiry.
+  //
+  // There is deliberately no logout beacon on ``pagehide``: browsers fire
+  // it on reload and pull-to-refresh too, so it logged the doctor out on
+  // every reload and the reloaded page then hit a dead session. A closed
+  // tab's session is freed by the server's idle sweep instead.
   //
   // Armed once the server has confirmed an active session via ``/me``
   // (so ``me`` is populated). On a queued / unauthenticated visit none
@@ -232,9 +240,19 @@ export function ShareSessionProvider({
       if (document.visibilityState !== "visible") return;
       if (Date.now() - lastActivityRef.current > IDLE_TIMEOUT_MS) return;
       shareApi
-        .post<{ active?: boolean }>("/heartbeat")
+        .post<{ active?: boolean; session_tag?: string }>("/heartbeat")
         .then((res) => {
-          if (res.data?.active === false) markShareSessionEnded("expired");
+          if (res.data?.active === false) {
+            markShareSessionEnded("expired");
+          } else if (
+            me.session_tag &&
+            res.data?.session_tag &&
+            res.data.session_tag !== me.session_tag
+          ) {
+            // The browser holds one share cookie; verifying another
+            // share in a second tab replaced this tab's session.
+            markShareSessionEnded("replaced");
+          }
         })
         .catch(() => {
           // ignore — a network blip must not end the session
@@ -260,21 +278,6 @@ export function ShareSessionProvider({
       );
     }
 
-    // Tab/browser close: send a logout beacon. ``sendBeacon`` is the
-    // only reliable way to issue a request during ``pagehide`` —
-    // regular fetch / XHR is cancelled. The backend exempts logout from
-    // the CSRF header check (Beacon cannot set headers) and answers 200
-    // whether or not a session exists.
-    const onPageHide = () => {
-      try {
-        const blob = new Blob([""], { type: "text/plain" });
-        navigator.sendBeacon("/api/share/logout", blob);
-      } catch {
-        // ignore
-      }
-    };
-    window.addEventListener("pagehide", onPageHide);
-
     return () => {
       ACTIVITY_EVENTS.forEach((evt) =>
         document.removeEventListener(evt, bumpActivity),
@@ -282,7 +285,6 @@ export function ShareSessionProvider({
       window.clearInterval(idleTimer);
       window.clearInterval(heartbeatTimer);
       if (expiryTimer !== null) window.clearTimeout(expiryTimer);
-      window.removeEventListener("pagehide", onPageHide);
     };
   }, [me]);
 

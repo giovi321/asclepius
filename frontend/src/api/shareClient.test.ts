@@ -8,7 +8,7 @@ import shareApi, {
   shareSessionEndedReason,
 } from "./shareClient";
 import { resetFourxxBudget } from "./fourxxBudget";
-import { fakeAdapter } from "@/test/fakeAdapter";
+import { SESSION_ENDED_REPLY, fakeAdapter } from "@/test/fakeAdapter";
 
 describe("isSessionBoundUrl", () => {
   it("treats OTP bootstrap, queue, heartbeat and logout as public", () => {
@@ -98,6 +98,24 @@ describe("share client session-ended latch", () => {
     const { adapter } = fakeAdapter(() => ({ status: 401 }));
     shareApi.defaults.adapter = adapter;
     await shareApi.post("/abc/verify-otp", { code: "000000" }).catch(() => {});
+    expect(shareSessionEndedReason()).toBeNull();
+  });
+
+  it("a 410 marked session-ended ends the session", async () => {
+    const { adapter, calls } = fakeAdapter(() => SESSION_ENDED_REPLY);
+    shareApi.defaults.adapter = adapter;
+    await shareApi.get("/documents/302").catch(() => {});
+    expect(shareSessionEndedReason()).toBe("unauthorized");
+    await expect(shareApi.get("/me")).rejects.toMatchObject({
+      code: SHARE_SESSION_ENDED_CODE,
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not end the session on a plain 410 (document not in share)", async () => {
+    const { adapter } = fakeAdapter(() => ({ status: 410 }));
+    shareApi.defaults.adapter = adapter;
+    await shareApi.get("/documents/999").catch(() => {});
     expect(shareSessionEndedReason()).toBeNull();
   });
 

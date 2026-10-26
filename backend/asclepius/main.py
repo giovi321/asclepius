@@ -103,6 +103,39 @@ def _get_mode() -> str:
 # Catch-all SPA paths allowed in share mode. Empty string covers the root URL.
 SHARE_SPA_PATHS = {"", "share"}
 
+# ``index.html`` names the current build's hashed asset files, so it must
+# be revalidated on every load. Hashed assets never change, so they can be
+# cached for good.
+INDEX_HTML_HEADERS = {"Cache-Control": "no-cache"}
+ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable"
+
+
+class HashedAssets(StaticFiles):
+    """``/assets`` mount that answers 410, not 404, for a missing file.
+
+    After a redeploy, a page loaded from the previous build still asks
+    for the previous build's hashed chunks when the doctor opens a
+    document: about ten files at once. The public proxy's fail2ban jail
+    bans an IP after 10 responses with status 401, 403 or 404 in 2
+    minutes, and does not count 410. The frontend reloads once on a
+    failed chunk load (``vite:preloadError`` in ``main.tsx``).
+    """
+
+    async def get_response(self, path, scope):
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+
+        try:
+            response = await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return JSONResponse({"detail": "Asset gone"}, status_code=410)
+            raise
+        if response.status_code == 404:
+            return JSONResponse({"detail": "Asset gone"}, status_code=410)
+        if response.status_code in (200, 304):
+            response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
+        return response
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -282,7 +315,7 @@ def create_app() -> FastAPI:
 
     # Serve frontend static files (production build)
     if STATIC_DIR.exists():
-        app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
+        app.mount("/assets", HashedAssets(directory=str(STATIC_DIR / "assets")), name="assets")
 
         @app.get("/{path:path}")
         async def serve_spa(path: str):
@@ -300,6 +333,8 @@ def create_app() -> FastAPI:
             """
             file_path = STATIC_DIR / path
             if is_within(STATIC_DIR, file_path) and file_path.is_file():
+                if file_path.name == "index.html":
+                    return FileResponse(str(file_path.resolve()), headers=INDEX_HTML_HEADERS)
                 return FileResponse(str(file_path.resolve()))
             if mode == "share":
                 first_segment = path.split("/", 1)[0]
@@ -308,7 +343,7 @@ def create_app() -> FastAPI:
             index = STATIC_DIR / "index.html"
             if not index.exists():
                 return JSONResponse({"detail": "Frontend not built"}, status_code=404)
-            return FileResponse(str(index))
+            return FileResponse(str(index), headers=INDEX_HTML_HEADERS)
 
     return app
 

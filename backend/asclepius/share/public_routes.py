@@ -44,7 +44,11 @@ from asclepius.share.cookies import (
     set_share_cookie,
     set_share_queue_cookie,
 )
-from asclepius.share.dependencies import SHARE_COOKIE_NAME, SHARE_QUEUE_COOKIE_NAME
+from asclepius.share.dependencies import (
+    SHARE_COOKIE_NAME,
+    SHARE_QUEUE_COOKIE_NAME,
+    session_tag,
+)
 from asclepius.share.rate_limit import otp_request_allowed
 from asclepius.share.service import OtpCooldownError
 
@@ -241,7 +245,9 @@ async def verify_otp(
 
     share = await share_service.get_share_by_token(db, token)
     if not share or not share_service.is_share_active(share):
-        raise HTTPException(status_code=401, detail="Invalid or expired share")
+        # 410, not 401: fail2ban counts 401 toward an IP ban, and a doctor
+        # on a revoked or expired link keeps retrying.
+        raise HTTPException(status_code=410, detail="Invalid or expired share")
 
     ok = await share_service.verify_otp(
         db,
@@ -278,7 +284,10 @@ async def verify_otp(
                     "failures": failures,
                 },
             )
-        raise HTTPException(status_code=401, detail="Invalid or expired code")
+        # 422, not 401: a typo or a superseded code is a form error, and
+        # fail2ban counts 401 toward an IP ban. The share lockout above
+        # still bounds brute force.
+        raise HTTPException(status_code=422, detail="Invalid or expired code")
     # Successful verify resets the per-share counter so a doctor whose
     # session expires and re-OTPs months later does not inherit old
     # failed attempts from a previous (legitimate) typo.
@@ -497,7 +506,7 @@ async def heartbeat(
         await share_service.touch_session(db, sid)
     except Exception:
         logger.debug("heartbeat touch failed", exc_info=True)
-    return {"active": True}
+    return {"active": True, "session_tag": session_tag(sid)}
 
 
 @router.post("/logout")

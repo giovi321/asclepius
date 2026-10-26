@@ -9,6 +9,7 @@ const TITLES: Record<ShareEndReason, string> = {
   idle: "Session ended after inactivity",
   expired: "Session expired",
   unauthorized: "Session no longer active",
+  replaced: "Another share was opened in this browser",
 };
 
 /**

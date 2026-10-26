@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 /** Statuses after which a poll must never be retried. 401/403/404 are the
  * ones the public proxy's fail2ban jail counts toward an IP ban; repeating
  * them cannot succeed and gets everyone behind the same NAT banned. */
-export const DEFAULT_STOP_STATUSES: readonly number[] = [401, 403, 404];
+export const DEFAULT_STOP_STATUSES: readonly number[] = [401, 403, 404, 410];
 
 export const DEFAULT_MAX_BACKOFF_MS = 120_000;
 

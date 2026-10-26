@@ -71,8 +71,14 @@ export default function ShareVerifyPage() {
       }
     } catch (err: any) {
       const status = err?.response?.status;
-      if (status === 401) {
-        setError("Invalid or expired code. Request a fresh one.");
+      if (status === 422 || status === 401) {
+        setError(
+          "Invalid or expired code. Use the latest code you received, or request a fresh one.",
+        );
+      } else if (status === 410) {
+        setError(
+          "This share link is no longer active. Ask the sender for a new link.",
+        );
       } else if (status === 429) {
         setError("Too many attempts. Wait and try again.");
       } else {

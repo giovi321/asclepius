@@ -148,13 +148,13 @@ def _run_share_flow(client, seed):
     code = otp["code"]
     assert len(code) == 6
 
-    # 4. Wrong code → 401.
+    # 4. Wrong code → 422 (a form error; fail2ban counts 401).
     res = client.post(
         f"/api/share/{token}/verify-otp",
         json={"code": "000000" if code != "000000" else "111111"},
         headers=csrf,
     )
-    assert res.status_code == 401
+    assert res.status_code == 422
 
     # The wrong-code path consumed the OTP, so we need a fresh one.
     res = client.post(f"/api/share/{token}/request-otp", headers=csrf)
@@ -190,9 +190,10 @@ def _run_share_flow(client, seed):
     assert res.json()["id"] == seed["doc_id"]
     assert "file_path" not in res.json()  # Vault path stripped.
 
-    # 8. Documents not in the share → 404.
+    # 8. Documents not in the share → 410, and not a session-ended 410.
     res = client.get("/api/share/documents/9999", headers=csrf)
-    assert res.status_code == 404
+    assert res.status_code == 410
+    assert "x-share-session" not in res.headers
 
     # 9. File serve returns a watermarked PDF with no-store headers.
     res = client.get(f"/api/share/documents/{seed['doc_id']}/file", headers=csrf)
@@ -218,15 +219,21 @@ def _run_share_flow(client, seed):
     res = client.post("/api/share/logout", headers=csrf)
     assert res.status_code == 200
     res = client.get("/api/share/me", headers=csrf)
-    assert res.status_code == 401
+    # 410 + marker header, never 401: fail2ban counts 401 toward a ban.
+    assert res.status_code == 410
+    assert res.headers.get("x-share-session") == "ended"
 
     # 11. Admin revokes the share — even a fresh OTP exchange should fail.
     res = client.delete(f"/api/shares/{share_id}", cookies=admin_cookies, headers=csrf)
     assert res.status_code == 200
     res = client.post(f"/api/share/{token}/request-otp", headers=csrf)
     # Still 204 — we don't leak token validity. But the share is inert:
-    # a verify call would 401.
+    # a verify call answers 410 (not 401, which fail2ban counts).
     assert res.status_code == 204
+    res = client.post(
+        f"/api/share/{token}/verify-otp", json={"code": "123456"}, headers=csrf
+    )
+    assert res.status_code == 410
 
 
 def _insert_doc(db_path, *, patient_id, filename, rel_path="x/y.pdf"):
@@ -613,7 +620,7 @@ def test_three_failures_revoke_email_share(share_app, monkeypatch):
                 json={"code": "000000"},
                 headers=csrf,
             )
-            assert r.status_code == 401
+            assert r.status_code == 422
 
         # Verify share is now revoked in the DB.
         import sqlite3
@@ -651,7 +658,7 @@ def test_three_failures_revoke_manual_share(share_app, monkeypatch):
                 json={"code": "999999"},
                 headers=csrf,
             )
-            assert r.status_code == 401
+            assert r.status_code == 422
 
         import sqlite3
 

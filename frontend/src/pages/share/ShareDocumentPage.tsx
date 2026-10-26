@@ -92,9 +92,9 @@ export default function ShareDocumentPage() {
   }, [me?.default_translation_language]);
 
   // One-shot load of the document detail. Errors are reported, never
-  // retried: 401/403 end the share session (the share client flips the
-  // provider to the "session ended" screen), 404 means the document is
-  // not in this share.
+  // retried: a dead session ends the share session (the share client
+  // flips the provider to the "session ended" screen), 410 otherwise
+  // means the document is no longer in this share.
   const loadDoc = async () => {
     const res = await shareApi.get<ShareDocumentDetail>(`/documents/${docId}`);
     setDoc(res.data);
@@ -107,7 +107,7 @@ export default function ShareDocumentPage() {
     } catch (err: any) {
       const status = err?.response?.status;
       setError(
-        status === 404
+        status === 410 || status === 404
           ? "Document not available in this share."
           : "Failed to load document.",
       );
@@ -138,7 +138,8 @@ export default function ShareDocumentPage() {
     intervalMs: TRANSLATION_POLL_MS,
     enabled: !!docId && hasPendingTranslation && !ended,
     onStop: (status) => {
-      if (status === 404) setError("Document not available in this share.");
+      if (status === 410 || status === 404)
+        setError("Document not available in this share.");
     },
   });
 

@@ -33,7 +33,7 @@ from asclepius.documents.service import (
 )
 from asclepius.pipeline.text_utils import strip_chandra_markup
 from asclepius.share import service as share_service
-from asclepius.share.dependencies import get_share_session
+from asclepius.share.dependencies import get_share_session, session_tag
 from asclepius.share.rate_limit import translate_allowed, translate_headroom
 from asclepius.share.watermark import (
     WatermarkError,
@@ -134,15 +134,29 @@ class ShareTranslateRegionRequest(BaseModel):
 async def _ensure_doc_in_share(db: aiosqlite.Connection, share_id: int, doc_id: int) -> dict:
     """Resolve a document and confirm it is part of the caller's share.
 
-    Raises 404 (not 403) when the document exists but isn't shared, so we
-    don't leak the existence of unrelated documents.
+    Raises 410 for both "exists but isn't shared" and "doesn't exist", so
+    we don't leak the existence of unrelated documents. 410 rather than
+    404 because the public proxy's fail2ban jail counts 404 toward an IP
+    ban, and a document removed from a share mid-session is a normal
+    state for the doctor.
     """
     if not await share_service.share_has_document(db, share_id, doc_id):
-        raise HTTPException(status_code=404, detail="Document not in this share")
+        raise HTTPException(status_code=410, detail="Document not in this share")
     doc = await get_document(db, doc_id)
     if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(status_code=410, detail="Document not found")
     return doc
+
+
+def _file_on_disk(file_path: str | None) -> bool:
+    """True when the vault file exists, so the UI never asks for a file
+    that would only answer an error."""
+    if not file_path:
+        return False
+    try:
+        return safe_vault_join(Path(get_config().vault.root_path), file_path).is_file()
+    except UnsafePathError:
+        return False
 
 
 # ── Endpoints ────────────────────────────────────────────────────
@@ -203,6 +217,7 @@ async def share_me(
         "patient_name": patient_name,
         "share_expires_at": session["share_expires_at"],
         "session_expires_at": session["expires_at"],
+        "session_tag": session_tag(session["id"]),
         "documents": safe_docs,
         "translate_rate_limit": headroom,
         "default_translation_language": default_language,
@@ -300,7 +315,7 @@ async def share_document_detail(
     # boolean ``has_file`` replaces the vault path so the UI can still
     # gate the translate / fetch affordances.
     public_doc = {k: doc[k] for k in _DOCTOR_DOC_FIELDS if k in doc}
-    public_doc["has_file"] = bool(doc.get("file_path"))
+    public_doc["has_file"] = _file_on_disk(doc.get("file_path"))
 
     return {
         **public_doc,
@@ -321,14 +336,14 @@ async def share_head_file(
 ):
     doc = await _ensure_doc_in_share(db, session["share_id"], doc_id)
     if not doc.get("file_path"):
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=410, detail="File not found")
     cfg = get_config()
     try:
         path = safe_vault_join(Path(cfg.vault.root_path), doc["file_path"])
     except UnsafePathError:
         raise HTTPException(status_code=400, detail="Invalid file path")
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=410, detail="File not found")
     return Response(status_code=200)
 
 
@@ -348,14 +363,14 @@ async def share_serve_file(
     cfg = get_config()
     doc = await _ensure_doc_in_share(db, session["share_id"], doc_id)
     if not doc.get("file_path"):
-        raise HTTPException(status_code=404, detail="File not available")
+        raise HTTPException(status_code=410, detail="File not available")
 
     try:
         path = safe_vault_join(Path(cfg.vault.root_path), doc["file_path"])
     except UnsafePathError:
         raise HTTPException(status_code=400, detail="Invalid file path")
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=410, detail="File not found")
 
     suffix = path.suffix.lower()
     headers = {
@@ -469,7 +484,7 @@ async def share_region_thumbnail(
     )
     row = await cursor.fetchone()
     if not row or not row["thumbnail_path"]:
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
+        raise HTTPException(status_code=410, detail="Thumbnail not found")
 
     cfg = get_config()
     try:
@@ -477,7 +492,7 @@ async def share_region_thumbnail(
     except UnsafePathError:
         raise HTTPException(status_code=400, detail="Invalid thumbnail path")
     if not disk_path.is_file():
-        raise HTTPException(status_code=404, detail="Thumbnail file missing")
+        raise HTTPException(status_code=410, detail="Thumbnail file missing")
 
     return FileResponse(
         path=str(disk_path),

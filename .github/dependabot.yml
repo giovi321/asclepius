@@ -34,3 +34,9 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    # A new CPython minor needs wheels for every native dependency first.
+    # python:3.15-slim broke the image build (no onnxruntime wheel for 3.15).
+    # Bump the runtime base image by hand once the dependency tree supports it.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
